@@ -1,0 +1,32 @@
+<view class="px-24 py-16">
+  <view class="row space-between">
+    <text class="text-xl bold">本小区任务</text>
+    <view class="btn btn-primary btn-sm" bindtap="goPublish">发布任务</view>
+  </view>
+
+  <view class="row mt-16 row-gap-8 wrap">
+    <view class="{{'badge ' + (filter==='all'?'badge-primary':'')}}" bindtap="changeFilter" data-k="all">全部</view>
+    <view class="{{'badge ' + (filter==='new'?'badge-primary':'')}}" bindtap="changeFilter" data-k="new">最新</view>
+    <view class="{{'badge ' + (filter==='money'?'badge-primary':'')}}" bindtap="changeFilter" data-k="money">高佣金</view>
+    <view class="{{'badge ' + (filter==='building'?'badge-primary':'')}}" bindtap="changeFilter" data-k="building">本楼栋</view>
+  </view>
+
+  <block wx:for="{{list}}" wx:key="id">
+    <view class="mt-16">
+      <ui-card title="{{item.title}}" sub="{{item.community}} · 截止 {{item.deadlineText}}">
+        <view class="row space-between">
+          <text class="text-lg bold c-danger">¥ {{item.amountText}}</text>
+          <view class="row row-gap-8">
+            <view class="badge">{{item.statusText}}</view>
+            <view class="btn btn-outline btn-sm" data-id="{{item.id}}" bindtap="toDetail">详情</view>
+          </view>
+        </view>
+        <view class="mt-12 c-muted text-sm">{{item.desc}}</view>
+      </ui-card>
+    </view>
+  </block>
+
+  <view wx:if="{{!list.length}}" class="center" style="height: 50vh;">
+    <text class="c-muted">暂无任务，去发布一个吧 ~</text>
+  </view>
+</view>

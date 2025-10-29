@@ -1,0 +1,7 @@
+<button class="btn {{typeClass}} {{sizeClass}}" bindtap="onTap" hover-class="none">
+  <slot></slot>
+  <text wx:if="{{loading}}" style="margin-left:8rpx">…</text>
+  <text wx:if="{{disabled}}" style="margin-left:8rpx">(禁用)</text>
+  <text wx:if="{{danger}}" style="display:none"></text>
+</button>
+

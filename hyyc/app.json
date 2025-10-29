@@ -1,0 +1,40 @@
+{
+  "pages": [
+    "pages/home/index/index",
+    "pages/auth/realname/index",
+    "pages/task/publish/index",
+    "pages/task/detail/index",
+    "pages/task/submit/index",
+    "pages/chat/room/index",
+    "pages/wallet/index/index",
+    "pages/profile/index/index",
+    "pages/my/tasks/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "HYYC 小区任务",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#FAF7F5",
+    "backgroundTextStyle": "dark"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "tabBar": {
+    "color": "#6b7280",
+    "selectedColor": "#111827",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      { "pagePath": "pages/home/index/index", "text": "首页" },
+      { "pagePath": "pages/task/publish/index", "text": "发布" },
+      { "pagePath": "pages/profile/index/index", "text": "我的" }
+    ]
+  },
+  "usingComponents": {},
+  "requiredPrivateInfos": ["getLocation"],
+  "permission": {
+    "scope.userLocation": {
+      "desc": "用于验证您是否在本小区范围内，以保障社区安全"
+    }
+  }
+}

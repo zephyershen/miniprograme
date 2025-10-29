@@ -1,0 +1,7 @@
+{
+  "usingComponents": {
+    "ui-card": "/components/ui/card/index"
+  },
+  "navigationBarTitleText": "我的"
+}
+

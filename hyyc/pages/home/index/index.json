@@ -1,0 +1,8 @@
+{
+  "usingComponents": {
+    "ui-card": "/components/ui/card/index",
+    "ui-button": "/components/ui/button/index"
+  },
+  "navigationBarTitleText": "任务广场"
+}
+

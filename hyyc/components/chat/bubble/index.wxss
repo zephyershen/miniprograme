@@ -1,0 +1,5 @@
+@import "../../../styles/shadcn.wxss";
+
+.bubble { max-width: 70%; padding: 16rpx 20rpx; border-radius: 16rpx; border: 1px solid #e7e2de; }
+.bubble-mine { background: #65c3c8; color: #ffffff; border-color: #65c3c8; }
+.bubble-other { background: #ffffff; color: #2b3440; border-color: #e7e2de; }

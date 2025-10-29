@@ -1,0 +1,6 @@
+<view class="field">
+  <text class="field-label">{{label}}</text>
+  <slot></slot>
+  <text wx:if="{{error}}" class="text-sm c-danger" style="margin-top:8rpx">{{error}}</text>
+</view>
+

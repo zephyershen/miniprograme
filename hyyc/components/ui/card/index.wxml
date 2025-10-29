@@ -1,0 +1,11 @@
+<view class="card">
+  <view class="row space-between">
+    <text class="card-title">{{title}}</text>
+    <slot name="extra"></slot>
+  </view>
+  <view class="mt-12 card-sub" wx:if="{{sub}}">{{sub}}</view>
+  <view class="mt-16">
+    <slot></slot>
+  </view>
+</view>
+

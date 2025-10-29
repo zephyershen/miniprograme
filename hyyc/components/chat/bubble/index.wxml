@@ -1,0 +1,7 @@
+<view class="row" style="margin: 8rpx 0; justify-content: {{mine?'flex-end':'flex-start'}};">
+  <view wx:if="{{!mine}}" class="avatar" style="margin-right:12rpx;"></view>
+  <view class="bubble {{mine?'bubble-mine':'bubble-other'}}">
+    <text class="text-base">{{text}}</text>
+  </view>
+  <view wx:if="{{mine}}" class="avatar" style="margin-left:12rpx;"></view>
+</view>

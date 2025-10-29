@@ -1,0 +1,17 @@
+<view class="px-24 py-16">
+  <ui-card title="可用余额">
+    <text class="text-xl bold">¥ {{balance}}</text>
+  </ui-card>
+  <ui-card class="mt-16" title="收支明细">
+    <block wx:for="{{flows}}" wx:key="id">
+      <view class="row space-between py-16">
+        <text>{{item.title}}</text>
+        <text class="bold" style="color:{{item.type==='in'?'#36d399':'#f87272'}}">{{item.type==='in'?'+':'-'}}{{item.amount}}</text>
+      </view>
+      <view class="divider"></view>
+    </block>
+  </ui-card>
+  <view class="mt-16">
+    <view class="btn btn-outline" bindtap="gotoProfile">返回</view>
+  </view>
+</view>

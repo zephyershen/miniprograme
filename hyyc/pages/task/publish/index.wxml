@@ -1,0 +1,38 @@
+<view class="px-24 py-16">
+  <view class="card">
+    <view class="gap-12">
+      <ui-field label="标题" error="{{errors.title}}">
+        <input class="input" placeholder="如：帮忙拿快递" value="{{form.title}}" data-k="title" bindinput="onInput"/>
+      </ui-field>
+      <ui-field label="说明" error="{{errors.desc}}">
+        <textarea class="textarea" placeholder="简单描述要做的事" value="{{form.desc}}" data-k="desc" bindinput="onInput"/>
+      </ui-field>
+      <ui-field label="佣金（元）" error="{{errors.amount}}">
+        <input class="input" type="number" placeholder="如 10" value="{{form.amount}}" data-k="amount" bindinput="onInput"/>
+      </ui-field>
+      <ui-field label="截止日期" error="{{errors.deadline}}">
+        <picker mode="date" value="{{form.deadline}}" bindchange="onDate">
+          <view class="input row space-between"><text>{{form.deadline||'选择日期'}}</text><text>›</text></view>
+        </picker>
+      </ui-field>
+      <ui-field label="地址" error="{{errors.address}}">
+        <input class="input" placeholder="如 3栋1单元" value="{{form.address}}" data-k="address" bindinput="onInput"/>
+      </ui-field>
+      <ui-field label="发布楼栋" error="{{errors.building}}">
+        <picker mode="selector" range="{{buildingRange}}" value="{{buildingIndex}}" bindchange="onBuilding">
+          <view class="input row space-between"><text>{{form.building||'选择楼栋（1-23栋）'}}</text><text>›</text></view>
+        </picker>
+      </ui-field>
+      <ui-field label="图片（可选）">
+        <view class="row wrap row-gap-8">
+          <block wx:for="{{form.images}}" wx:key="*this"><image src="{{item}}" style="width:160rpx;height:160rpx;border-radius:12rpx;" lazy-load="true"/></block>
+          <view class="btn btn-outline btn-sm" bindtap="chooseImg">上传图片</view>
+        </view>
+      </ui-field>
+    </view>
+    <view class="row space-between mt-20">
+      <view class="btn btn-outline" bindtap="reset">清空</view>
+      <view class="btn btn-primary" bindtap="submit">发布</view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,75 @@
+<view class="apple">
+  <view class="hero">
+    <text class="h1">验证业主身份</text>
+    <text class="sub">为保障社区安全，请完成以下步骤。</text>
+  </view>
+
+  <view class="panel">
+    <view class="group">
+      <text class="label">姓名</text>
+      <input class="control" placeholder="请输入姓名" value="{{form.name}}" bindinput="onInput" data-key="name"/>
+      <text class="error" wx:if="{{errors.name}}">{{errors.name}}</text>
+    </view>
+
+    <view class="group">
+      <text class="label">身份证号</text>
+      <input class="control" placeholder="请输入身份证号" value="{{form.idNumber}}" bindinput="onInput" data-key="idNumber"/>
+      <text class="error" wx:if="{{errors.idNumber}}">{{errors.idNumber}}</text>
+    </view>
+
+    <view class="group">
+      <text class="label">手机号</text>
+      <view class="row">
+        <input class="control" style="flex:1" placeholder="点击右侧按钮一键获取" value="{{form.phone}}" disabled="true"/>
+        <button class="btn btn-info btn-sm" open-type="getPhoneNumber" bindgetphonenumber="onGetPhoneNumber" style="margin-left:12rpx">获取</button>
+      </view>
+      <text class="error" wx:if="{{errors.phone}}">{{errors.phone}}</text>
+    </view>
+
+    <view class="group">
+      <text class="label">所属小区</text>
+      <input class="control" placeholder="请输入小区名称" value="{{form.community}}" bindinput="onInput" data-key="community"/>
+      <text class="error" wx:if="{{errors.community}}">{{errors.community}}</text>
+    </view>
+
+    <view class="row gap" style="margin-top:12rpx">
+      <view class="group half">
+        <text class="label">楼栋</text>
+        <picker mode="selector" range="{{buildingRange}}" value="{{buildingIndex}}" bindchange="onBuilding">
+          <view class="control row space-between"><text>{{form.building||'选择（1-23栋）'}}</text><text>›</text></view>
+        </picker>
+        <text class="error" wx:if="{{errors.building}}">{{errors.building}}</text>
+      </view>
+      <view class="group half">
+        <text class="label">门号</text>
+        <picker mode="multiSelector" range="{{doorRange}}" value="{{doorIndex}}" bindchange="onDoorChange">
+          <view class="control row space-between"><text>{{form.door?form.door+'（'+form.floor+'楼-'+form.unit+'户）':'选择（每层01-04户）'}}</text><text>›</text></view>
+        </picker>
+        <text class="error" wx:if="{{errors.door}}">{{errors.door}}</text>
+      </view>
+    </view>
+
+    <view class="group">
+      <text class="label">小区邀请码</text>
+      <input class="control" placeholder="请输入物业发放的邀请码（示例：HYYC2025）" value="{{form.inviteCode}}" bindinput="onInput" data-key="inviteCode"/>
+      <text class="error" wx:if="{{errors.inviteCode}}">{{errors.inviteCode}}</text>
+    </view>
+
+    <view class="group">
+      <text class="label">实时定位</text>
+      <view class="row space-between">
+        <text class="hint {{inCommunity?'ok':'warn'}}">{{locationText}}</text>
+        <view class="btn btn-outline btn-sm" bindtap="getLocation">获取定位</view>
+      </view>
+      <text class="error" wx:if="{{errors.location}}">{{errors.location}}</text>
+    </view>
+
+    <view class="actions">
+      <view class="btn btn-primary" bindtap="submit">继续</view>
+    </view>
+  </view>
+
+  <view class="footer">
+    <text class="footer-text">我们只收集完成验证所需的最少信息，并严格用于社区安全。</text>
+  </view>
+</view>
