@@ -1,6 +1,6 @@
 <view class="apple">
   <view class="hero">
-    <text class="h1">验证业主身份</text>
+    <text class="h1">验证花语云萃业主身份</text>
     <text class="sub">为保障社区安全，请完成以下步骤。</text>
   </view>
 
@@ -20,8 +20,8 @@
     <view class="group">
       <text class="label">手机号</text>
       <view class="row">
-        <input class="control" style="flex:1" placeholder="点击右侧按钮一键获取" value="{{form.phone}}" disabled="true"/>
-        <button class="btn btn-info btn-sm" open-type="getPhoneNumber" bindgetphonenumber="onGetPhoneNumber" style="margin-left:12rpx">获取</button>
+        <input class="control" style="flex:1; min-width:0" placeholder="点击右侧按钮一键获取" value="{{form.phone}}" disabled="true"/>
+        <button class="btn btn-info btn-sm btn-compact" size="mini" open-type="getPhoneNumber" bindgetphonenumber="onGetPhoneNumber" style="margin-left:12rpx">获取</button>
       </view>
       <text class="error" wx:if="{{errors.phone}}">{{errors.phone}}</text>
     </view>
@@ -32,18 +32,18 @@
       <text class="error" wx:if="{{errors.community}}">{{errors.community}}</text>
     </view>
 
-    <view class="row gap" style="margin-top:12rpx">
+    <view class="row gap row-top form-pair" style="margin-top:12rpx">
       <view class="group half">
         <text class="label">楼栋</text>
         <picker mode="selector" range="{{buildingRange}}" value="{{buildingIndex}}" bindchange="onBuilding">
-          <view class="control row space-between"><text>{{form.building||'选择（1-23栋）'}}</text><text>›</text></view>
+          <view class="control row space-between"><text class="ellipsis">{{form.building||'选择（1-23栋）'}}</text><text>›</text></view>
         </picker>
         <text class="error" wx:if="{{errors.building}}">{{errors.building}}</text>
       </view>
       <view class="group half">
         <text class="label">门号</text>
         <picker mode="multiSelector" range="{{doorRange}}" value="{{doorIndex}}" bindchange="onDoorChange">
-          <view class="control row space-between"><text>{{form.door?form.door+'（'+form.floor+'楼-'+form.unit+'户）':'选择（每层01-04户）'}}</text><text>›</text></view>
+          <view class="control row space-between"><text class="ellipsis">{{form.door?form.door+'（'+form.floor+'楼-'+form.unit+'户）':'选择（每层01-04户）'}}</text><text>›</text></view>
         </picker>
         <text class="error" wx:if="{{errors.door}}">{{errors.door}}</text>
       </view>

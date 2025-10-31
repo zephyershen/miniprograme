@@ -49,16 +49,29 @@
   font-size: 28rpx;
   font-weight: 600;
   margin-bottom: 12rpx;
+  line-height: 28rpx;   /* 固定标签行高，避免高度误差 */
+  height: 28rpx;        /* 两列标签保持一致高度 */
 }
 
 .control {
   background: #FEFCFB;
   border: 2rpx solid #F5E6DC;
   border-radius: 16rpx;
-  padding: 22rpx 20rpx;
+  height: 64rpx;          /* 统一输入类高度，与 .btn-sm 一致 */
+  line-height: 64rpx;     /* 文本垂直居中（input/picker/view统一） */
+  padding: 0 20rpx;       /* 去掉上下内边距，避免总高度不一致 */
+  box-sizing: border-box; /* 高度包含边框，跨端一致性更好 */
   font-size: 28rpx;
   color: #3D3229;
   transition: all 0.3s ease;
+}
+
+/* 与按钮 .btn-sm 高度对齐（手机号一行） */
+.control-sm {
+  height: 64rpx;           /* 同 styles/shadcn.wxss 中 .btn-sm */
+  line-height: 64rpx;      /* 对 input 主要依赖 height，保留兼容 picker/view */
+  padding: 0 20rpx;        /* 去掉上下内边距，避免整体比按钮高 */
+  box-sizing: border-box;  /* 高度包含边框，跨端更稳妥 */
 }
 
 .control:focus {
@@ -71,6 +84,17 @@ picker .control {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+/* 让 picker 成为块级，去除可能的基线/行高影响 */
+picker { display: block; }
+
+/* 防止选择文字换行撑高导致不对齐 */
+picker .control text:first-child {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .error {
@@ -103,6 +127,17 @@ picker .control {
 .row.gap {
   display: flex;
 }
+
+/* 仅用于“楼栋/门号”这一行：强制顶部对齐，保证两个选择框在同一水平线 */
+.row-top {
+  align-items: flex-start;
+}
+
+/* 去掉成对行内每列自带的上边距，避免额外错位 */
+.form-pair > .group { margin-top: 0; }
+
+/* 兜底：主文案单行省略，避免因换行导致高度差 */
+.ellipsis { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
 .actions {
   margin-top: 36rpx;
@@ -152,9 +187,20 @@ picker .control {
 }
 
 .btn-sm {
-  padding: 12rpx 20rpx;
+  padding: 0 20rpx;  /* 仅左右留白，保持高度64rpx */
   font-size: 24rpx;
 }
+
+/* 更紧凑的“获取”按钮，缩短长度但保持等高 */
+.btn-compact {
+  padding: 0 8rpx;           /* 缩短长度 */
+  width: 120rpx;             /* 固定更窄宽度 */
+  min-width: 120rpx;         /* 防止被拉宽 */
+  text-align: center;        /* 居中文本 */
+  flex: 0 0 120rpx;          /* 在 flex 中锁定宽度 */
+}
+
+/* 说明：若后续需要极小按钮，再启用 .btn-xs 定义 */
 
 .footer {
   margin-top: 32rpx;
