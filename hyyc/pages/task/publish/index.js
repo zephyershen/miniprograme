@@ -6,7 +6,8 @@ Page({
     form: { title:'', desc:'', amount:'', deadline:'', address:'', images:[], building:'' },
     errors: {},
     buildingRange: [],
-    buildingIndex: 0
+    buildingIndex: 0,
+    isLoading: false
   },
   onShow(){
     const u = wx.getStorageSync('hyyc_user');
@@ -38,8 +39,13 @@ Page({
     errors.building=required(f.building,'请选择发布楼栋');
     Object.keys(errors).forEach(k=>{ if(!errors[k]) delete errors[k]; });
     if(Object.keys(errors).length){ this.setData({errors}); return; }
-    toast('已发布（演示）');
-    wx.switchTab({ url: '/pages/home/index/index' });
+    
+    this.setData({ isLoading: true });
+    setTimeout(() => {
+      this.setData({ isLoading: false });
+      toast('已发布（演示）');
+      wx.switchTab({ url: '/pages/home/index/index' });
+    }, 1000);
   },
   onBuilding(e){
     const idx = Number(e.detail.value||0);

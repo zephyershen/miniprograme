@@ -30,7 +30,9 @@
       { "pagePath": "pages/profile/index/index", "text": "我的" }
     ]
   },
-  "usingComponents": {},
+  "usingComponents": {
+    "ui-loading": "/components/ui/loading/index"
+  },
   "requiredPrivateInfos": ["getLocation"],
   "permission": {
     "scope.userLocation": {

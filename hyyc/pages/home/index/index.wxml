@@ -1,3 +1,4 @@
+<ui-loading show="{{isLoading}}" />
 <view class="px-24 py-16">
   <view class="row space-between">
     <text class="text-xl bold">本小区任务</text>

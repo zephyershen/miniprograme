@@ -1,3 +1,4 @@
+<ui-loading show="{{isLoading}}" />
 <view class="px-24 py-16">
   <view class="card">
     <view class="gap-12">

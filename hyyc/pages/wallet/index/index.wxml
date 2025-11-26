@@ -1,3 +1,4 @@
+<ui-loading show="{{isLoading}}" />
 <view class="px-24 py-16">
   <ui-card title="可用余额">
     <text class="text-xl bold">¥ {{balance}}</text>

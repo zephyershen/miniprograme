@@ -1,3 +1,4 @@
+<ui-loading show="{{debugAlwaysLoading || isLoading}}" />
 <view class="apple">
   <view class="hero">
     <text class="h1">验证花语云萃业主身份</text>

@@ -1,12 +1,15 @@
 Page({
-  data: { tid: '', msgs: [], text: '', toView: '' },
+  data: { tid: '', msgs: [], text: '', toView: '', isLoading: true },
   onLoad(q){ this.setData({ tid: q.tid||'' }); this.mockHistory(); },
   mockHistory(){
-    const msgs=[
-      { id:1, text:'你好，我来接这个任务可以吗？', mine:false },
-      { id:2, text:'可以的，取快递在3栋柜子。', mine:true }
-    ];
-    this.setData({ msgs, toView: 'm2' });
+    this.setData({ isLoading: true });
+    setTimeout(() => {
+      const msgs=[
+        { id:1, text:'你好，我来接这个任务可以吗？', mine:false },
+        { id:2, text:'可以的，取快递在3栋柜子。', mine:true }
+      ];
+      this.setData({ msgs, toView: 'm2', isLoading: false });
+    }, 600);
   },
   onInput(e){ this.setData({ text: e.detail.value }); },
   send(){

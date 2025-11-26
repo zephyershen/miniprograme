@@ -1,3 +1,4 @@
+<ui-loading show="{{isLoading}}" />
 <view class="col" style="height:100vh;">
   <scroll-view scroll-y style="flex:1; padding: 16rpx 24rpx;" scroll-with-animation="true" scroll-into-view="{{toView}}">
     <block wx:for="{{msgs}}" wx:key="id">

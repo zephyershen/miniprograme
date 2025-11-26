@@ -1,3 +1,4 @@
+<ui-loading show="{{isLoading}}" />
 <view class="px-24 py-16">
   <ui-card title="{{task.title}}" sub="{{task.community}} · {{task.address}}">
     <view class="row space-between">

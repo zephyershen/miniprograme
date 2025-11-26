@@ -1,0 +1,15 @@
+<view class="loading-mask" wx:if="{{show}}">
+  <view class="loading-card card">
+    <view class="lottie-box">
+      <canvas type="2d" id="loading-canvas" class="lottie-canvas"></canvas>
+    </view>
+    <view class="loading-text-row">
+      <text class="loading-text">{{text}}</text>
+      <view class="dots">
+        <view class="dot d1"></view>
+        <view class="dot d2"></view>
+        <view class="dot d3"></view>
+      </view>
+    </view>
+  </view>
+</view>

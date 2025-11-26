@@ -14,8 +14,13 @@ Page({
     doorIndex: [0,0],
     MAX_FLOOR: 33,
     phoneVerified: false,
-    inCommunity: false,
-    locationText: '未获取定位'
+    // 调试用：强制一直显示 loading 遮罩，方便看效果；调试完可以改成 false
+    debugAlwaysLoading: true,
+    // 业务 loading 状态（接口请求时用）
+    isLoading: false,
+    // 临时：默认当作已经在小区范围内，方便先完成注册
+    inCommunity: true,
+    locationText: '已在' + community.name + '范围内（~0m）'
   },
   onInput(e){
     const key = e.currentTarget.dataset.key;
@@ -44,23 +49,26 @@ Page({
     try{
       const code = e?.detail?.code;
       if (!code) { toast('未授权手机号'); return; }
+      this.setData({ isLoading: true });
       const r = await exchangePhoneNumber(code);
+      this.setData({ isLoading: false });
       if (r.ok) {
         this.setData({ 'form.phone': r.phoneNumber, phoneVerified: true });
         toast('已获取手机号');
       } else { toast('获取手机号失败'); }
-    }catch(err){ console.log(err); toast('获取手机号异常'); }
+    }catch(err){ console.log(err); toast('获取手机号异常'); this.setData({ isLoading: false }); }
   },
   // 移除短信验证码流程，仅保留一键获取手机号
   async getLocation(){
     const self = this;
+    this.setData({ isLoading: true });
     wx.getLocation({ type:'gcj02', isHighAccuracy:true, highAccuracyExpireTime: 5000,
       success(res){
         const d = distanceMeters(res.latitude, res.longitude, community.center.lat, community.center.lng);
         const inRange = d <= community.radiusMeters;
-        self.setData({ inCommunity: inRange, locationText: inRange?`已在${community.name}范围内（~${Math.round(d)}m）`:`不在小区范围（距中心约${Math.round(d)}m）` });
+        self.setData({ inCommunity: inRange, locationText: inRange?`已在${community.name}范围内（~${Math.round(d)}m）`:`不在小区范围（距中心约${Math.round(d)}m）`, isLoading: false });
       },
-      fail(){ self.setData({ inCommunity:false, locationText:'定位失败，请重试' }); }
+      fail(){ self.setData({ inCommunity:false, locationText:'定位失败，请重试', isLoading: false }); }
     });
   },
   goBack(){ wx.navigateBack({ fail: ()=> wx.switchTab({ url: '/pages/home/index/index' })}); },
@@ -75,6 +83,8 @@ Page({
     errors.inviteCode = required(f.inviteCode,'请输入小区邀请码');
     Object.keys(errors).forEach(k=>{ if(!errors[k]) delete errors[k]; });
     if (Object.keys(errors).length){ this.setData({errors}); return; }
+    
+    this.setData({ isLoading: true });
     const self = this;
     const checkAll = async ()=>{
       // 1) 手机号获取校验（必须使用一键获取）
@@ -87,6 +97,7 @@ Page({
       return true;
     };
     checkAll().then(ok=>{
+      this.setData({ isLoading: false });
       if (!ok) return;
       // 存储兼容：保留 building 文本，如 “11栋”，并存储 door 如 “701”
       wx.setStorageSync('hyyc_user', { ...f, id:'me', realname:true, verified:true });
