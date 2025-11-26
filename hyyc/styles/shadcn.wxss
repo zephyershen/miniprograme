@@ -1,38 +1,38 @@
 /*
-  现代苹果风格主题系统
-  设计理念：简洁、温暖、高级感
-  配色：莫兰迪暖色系 + 充足留白 + 柔和阴影
+  现代 Lottie 风格主题系统
+  设计理念：大面积留白 + 明亮珊瑚橙 + 柔和阴影
+  配色灵感：Shopping Bag Lottie 动画
 */
 
 /* ========== 主题配色系统 ========== */
 
 /* 品牌色（暖色系） */
-.color-primary { color: #FF8B7B; }      /* 珊瑚橙 - 主色调 */
-.color-secondary { color: #FFB4A9; }    /* 蜜桃粉 - 次要色 */
-.color-accent { color: #FFD07F; }       /* 暖金色 - 强调色 */
-.color-neutral { color: #3D3229; }      /* 深褐色 - 文字主色 */
+.color-primary { color: #FF6B6B; }      /* 珊瑚红 - 主色调 */
+.color-secondary { color: #FFB5A7; }    /* 肉粉色 - 次要色 */
+.color-accent { color: #FFE066; }       /* 暖黄色 - 强调色 */
+.color-neutral { color: #2F3437; }      /* 深灰色 - 正文主色 */
 
 /* 语义色 */
-.color-info { color: #A0C4FF; }         /* 浅蓝 - 信息提示 */
-.color-success { color: #8ED6A9; }      /* 薄荷绿 - 成功状态 */
-.color-warning { color: #FFBC6F; }      /* 暖橙 - 警告提示 */
-.color-error { color: #FF6B6B; }        /* 珊瑚红 - 错误/危险 */
+.color-info { color: #4DA3FF; }         /* 亮蓝 - 信息提示 */
+.color-success { color: #34D399; }      /* 绿色 - 成功状态 */
+.color-warning { color: #FBBF24; }      /* 暖橙 - 警告提示 */
+.color-error { color: #EF4444; }        /* 红色 - 错误/危险 */
 
 /* 背景色（三层级） */
-.bg-base-100 { background: #F8F7F4; }   /* 主背景 - 暖白色 */
-.bg-base-200 { background: #F2EDE8; }   /* 次级背景 - 浅褐色 */
-.bg-base-300 { background: #E8E0D8; }   /* 三级背景 - 褐灰色 */
+.bg-base-100 { background: #FDFDFE; }   /* 主背景 - 偏冷白 */
+.bg-base-200 { background: #F3F4F6; }   /* 次级背景 - 浅灰 */
+.bg-base-300 { background: #E5E7EB; }   /* 三级背景 - 中性灰 */
 
 /* 兼容旧版类名 */
-.c-text { color: #3D3229; }
-.c-muted { color: #A0826D; }
-.c-primary { color: #FF8B7B; }
-.c-danger { color: #FF6B6B; }
-.bg-page { background: #F8F7F4; }
+.c-text { color: #2F3437; }
+.c-muted { color: #6B7280; }
+.c-primary { color: #FF6B6B; }
+.c-danger { color: #EF4444; }
+.bg-page { background: #FDFDFE; }
 .bg-card { background: #ffffff; }
-.bg-primary { background: #FF8B7B; }
-.bg-muted { background: #F2EDE8; }
-.bg-danger { background: #FF6B6B; }
+.bg-primary { background: #FF6B6B; }
+.bg-muted { background: #F3F4F6; }
+.bg-danger { background: #EF4444; }
 
 
 /* ========== 边框与圆角 ========== */
@@ -172,62 +172,62 @@
 
 /* 渐变按钮样式 */
 .btn-primary {
-  background: linear-gradient(135deg, #FF8B7B 0%, #FF7A69 100%);
+  background: linear-gradient(135deg, #FF6B6B 0%, #FF7F6E 100%);
   color: #ffffff;
-  box-shadow: 0 4rpx 16rpx rgba(255, 139, 123, 0.3);
+  box-shadow: 0 4rpx 16rpx rgba(239, 68, 68, 0.32);
 }
 
 .btn-secondary {
-  background: linear-gradient(135deg, #FFB4A9 0%, #FFA399 100%);
+  background: linear-gradient(135deg, #FFB5A7 0%, #FFA69E 100%);
   color: #ffffff;
   box-shadow: 0 4rpx 16rpx rgba(255, 180, 169, 0.3);
 }
 
 .btn-accent {
-  background: linear-gradient(135deg, #FFD07F 0%, #FFC56F 100%);
-  color: #5D4E3F;
-  box-shadow: 0 4rpx 16rpx rgba(255, 208, 127, 0.3);
+  background: linear-gradient(135deg, #FFE066 0%, #FACC15 100%);
+  color: #3B3A2E;
+  box-shadow: 0 4rpx 16rpx rgba(250, 204, 21, 0.32);
 }
 
 .btn-neutral {
-  background: #3D3229;
+  background: #2F3437;
   color: #ffffff;
 }
 
 .btn-info {
-  background: linear-gradient(135deg, #A0C4FF 0%, #8FB4EF 100%);
-  color: #1A3A5C;
-  box-shadow: 0 4rpx 16rpx rgba(160, 196, 255, 0.3);
+  background: linear-gradient(135deg, #4DA3FF 0%, #3B82F6 100%);
+  color: #0B192E;
+  box-shadow: 0 4rpx 16rpx rgba(59, 130, 246, 0.32);
 }
 
 .btn-success {
-  background: linear-gradient(135deg, #8ED6A9 0%, #7DC699 100%);
-  color: #0F4A2C;
-  box-shadow: 0 4rpx 16rpx rgba(142, 214, 169, 0.3);
+  background: linear-gradient(135deg, #34D399 0%, #22C55E 100%);
+  color: #052E16;
+  box-shadow: 0 4rpx 16rpx rgba(34, 197, 94, 0.3);
 }
 
 .btn-warning {
-  background: linear-gradient(135deg, #FFBC6F 0%, #FFAC5F 100%);
-  color: #5D3200;
-  box-shadow: 0 4rpx 16rpx rgba(255, 188, 111, 0.3);
+  background: linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%);
+  color: #451A03;
+  box-shadow: 0 4rpx 16rpx rgba(245, 158, 11, 0.32);
 }
 
 .btn-danger,
 .btn-error {
-  background: linear-gradient(135deg, #FF6B6B 0%, #FF5555 100%);
+  background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
   color: #ffffff;
-  box-shadow: 0 4rpx 16rpx rgba(255, 107, 107, 0.3);
+  box-shadow: 0 4rpx 16rpx rgba(239, 68, 68, 0.32);
 }
 
 .btn-outline {
   background: transparent;
-  color: #FF8B7B;
-  border: 2rpx solid #FF8B7B;
+  color: #FF6B6B;
+  border: 2rpx solid #FF6B6B;
   box-shadow: none;
 }
 
 .btn-outline:active {
-  background: rgba(255, 139, 123, 0.08);
+  background: rgba(255, 107, 107, 0.08);
 }
 
 .btn-sm {
