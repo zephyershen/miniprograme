@@ -14,8 +14,6 @@ Page({
     doorIndex: [0,0],
     MAX_FLOOR: 33,
     phoneVerified: false,
-    // 调试用：强制一直显示 loading 遮罩，方便看效果；调试完可以改成 false
-    debugAlwaysLoading: true,
     // 业务 loading 状态（接口请求时用）
     isLoading: false,
     // 临时：默认当作已经在小区范围内，方便先完成注册
