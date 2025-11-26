@@ -94,12 +94,14 @@
 .mb-16 { margin-bottom: 16rpx; }
 .mb-24 { margin-bottom: 24rpx; }
 
-/* Gap */
-.gap-8 > view + view { margin-top: 8rpx; }
-.gap-12 > view + view { margin-top: 12rpx; }
-.gap-16 > view + view { margin-top: 16rpx; }
-.row-gap-8 > view + view { margin-left: 8rpx; }
-.row-gap-12 > view + view { margin-left: 12rpx; }
+/* Gap
+   说明：组件 wxss 只允许使用 class 选择器，所以这里不再使用标签选择器 view。
+   使用额外的子元素类名来实现同样的间距效果。 */
+.gap-8 > .gap-item + .gap-item { margin-top: 8rpx; }
+.gap-12 > .gap-item + .gap-item { margin-top: 12rpx; }
+.gap-16 > .gap-item + .gap-item { margin-top: 16rpx; }
+.row-gap-8 > .row-gap-item + .row-gap-item { margin-left: 8rpx; }
+.row-gap-12 > .row-gap-item + .row-gap-item { margin-left: 12rpx; }
 
 
 /* ========== 布局系统 ========== */

@@ -6,10 +6,10 @@
   </view>
 
   <view class="row mt-16 row-gap-8 wrap">
-    <view class="{{'badge ' + (filter==='all'?'badge-primary':'')}}" bindtap="changeFilter" data-k="all">全部</view>
-    <view class="{{'badge ' + (filter==='new'?'badge-primary':'')}}" bindtap="changeFilter" data-k="new">最新</view>
-    <view class="{{'badge ' + (filter==='money'?'badge-primary':'')}}" bindtap="changeFilter" data-k="money">高佣金</view>
-    <view class="{{'badge ' + (filter==='building'?'badge-primary':'')}}" bindtap="changeFilter" data-k="building">本楼栋</view>
+    <view class="{{'badge row-gap-item ' + (filter==='all'?'badge-primary':'')}}" bindtap="changeFilter" data-k="all">全部</view>
+    <view class="{{'badge row-gap-item ' + (filter==='new'?'badge-primary':'')}}" bindtap="changeFilter" data-k="new">最新</view>
+    <view class="{{'badge row-gap-item ' + (filter==='money'?'badge-primary':'')}}" bindtap="changeFilter" data-k="money">高佣金</view>
+    <view class="{{'badge row-gap-item ' + (filter==='building'?'badge-primary':'')}}" bindtap="changeFilter" data-k="building">本楼栋</view>
   </view>
 
   <block wx:for="{{list}}" wx:key="id">
@@ -18,8 +18,8 @@
         <view class="row space-between">
           <text class="text-lg bold c-danger">¥ {{item.amountText}}</text>
           <view class="row row-gap-8">
-            <view class="badge">{{item.statusText}}</view>
-            <view class="btn btn-outline btn-sm" data-id="{{item.id}}" bindtap="toDetail">详情</view>
+            <view class="badge row-gap-item">{{item.statusText}}</view>
+            <view class="btn btn-outline btn-sm row-gap-item" data-id="{{item.id}}" bindtap="toDetail">详情</view>
           </view>
         </view>
         <view class="mt-12 c-muted text-sm">{{item.desc}}</view>

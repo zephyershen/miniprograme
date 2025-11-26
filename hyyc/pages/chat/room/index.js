@@ -14,9 +14,10 @@ Page({
   onInput(e){ this.setData({ text: e.detail.value }); },
   send(){
     if(!this.data.text.trim()) return;
-    const id = (this.data.msgs.slice(-1)[0]?.id||0)+1;
+    // 兼容不支持可选链的环境：手动取最后一条消息的 id
+    const last = this.data.msgs[this.data.msgs.length - 1];
+    const id = ((last && last.id) || 0) + 1;
     const msgs = this.data.msgs.concat({ id, text: this.data.text, mine:true });
     this.setData({ msgs, text:'', toView: 'm'+id });
   }
 });
-

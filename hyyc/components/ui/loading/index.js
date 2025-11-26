@@ -44,10 +44,11 @@ Component({
           const canvas = res.node;
 
           // 解决人物被“拉长/压扁”的问题：
-          // 显式设置 canvas 宽高为正方形，并考虑设备像素比。
-          const sys = wx.getSystemInfoSync();
-          const dpr = sys.pixelRatio || 1;
-          const pxPerRpx = sys.screenWidth / 750; // 750 是小程序默认设计宽
+          // 使用推荐的 getWindowInfo 获取像素比和屏幕宽度，
+          // 低版本基础库不支持时再回退到 getSystemInfoSync，避免老接口直接报 warning。
+          const win = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync();
+          const dpr = win.pixelRatio || 1;
+          const pxPerRpx = win.screenWidth / 750; // 750 是小程序默认设计宽
           const logicalSize = LOTTIE_SIZE_RPX * pxPerRpx; // 视觉上的大小（px）
 
           canvas.width = logicalSize * dpr;

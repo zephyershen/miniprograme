@@ -1,7 +1,7 @@
 {
   "usingComponents": {
-    "chat-bubble": "/components/chat/bubble/index"
+    "chat-bubble": "/components/chat/bubble/index",
+    "ui-loading": "/components/ui/loading/index"
   },
   "navigationBarTitleText": "聊天"
 }
-

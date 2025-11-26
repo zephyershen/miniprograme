@@ -6,8 +6,10 @@
     </ui-field>
     <ui-field label="上传凭证（照片）">
       <view class="row wrap row-gap-8">
-        <block wx:for="{{images}}" wx:key="*this"><image src="{{item}}" style="width:200rpx;height:200rpx;border-radius:12rpx;" lazy-load="true"/></block>
-        <view class="btn btn-outline btn-sm" bindtap="choose">上传图片</view>
+        <block wx:for="{{images}}" wx:key="*this">
+          <image class="row-gap-item" src="{{item}}" style="width:200rpx;height:200rpx;border-radius:12rpx;" lazy-load="true"/>
+        </block>
+        <view class="btn btn-outline btn-sm row-gap-item" bindtap="choose">上传图片</view>
       </view>
     </ui-field>
     <view class="row space-between mt-16">

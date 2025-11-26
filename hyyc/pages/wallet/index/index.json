@@ -1,8 +1,8 @@
 {
   "usingComponents": {
     "ui-card": "/components/ui/card/index",
-    "ui-button": "/components/ui/button/index"
+    "ui-button": "/components/ui/button/index",
+    "ui-loading": "/components/ui/loading/index"
   },
   "navigationBarTitleText": "钱包"
 }
-

@@ -45,7 +45,8 @@ Page({
   },
   async onGetPhoneNumber(e){
     try{
-      const code = e?.detail?.code;
+      // 兼容不支持可选链的环境：安全地从事件对象取 code
+      const code = (e && e.detail) ? e.detail.code : '';
       if (!code) { toast('未授权手机号'); return; }
       this.setData({ isLoading: true });
       const r = await exchangePhoneNumber(code);

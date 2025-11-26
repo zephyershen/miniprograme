@@ -30,13 +30,11 @@
       { "pagePath": "pages/profile/index/index", "text": "我的" }
     ]
   },
-  "usingComponents": {
-    "ui-loading": "/components/ui/loading/index"
-  },
   "requiredPrivateInfos": ["getLocation"],
   "permission": {
     "scope.userLocation": {
       "desc": "用于验证您是否在本小区范围内，以保障社区安全"
     }
-  }
+  },
+  "lazyCodeLoading": "requiredComponents"
 }
