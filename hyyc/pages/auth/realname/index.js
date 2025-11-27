@@ -4,6 +4,10 @@ const { exchangePhoneNumber, validateInvite } = require('../../../utils/api');
 const { distanceMeters } = require('../../../utils/geo');
 const community = require('../../../config/community');
 
+// 使用云开发数据库，当前示例将实名信息存入 test 集合
+const db = wx.cloud.database();
+const USER_COLLECTION = 'test';
+
 Page({
   data: {
     form: { name: '', idNumber: '', phone: '', inviteCode:'', community: '', building: '', floor: '', unit: '', door: '' },
@@ -45,9 +49,24 @@ Page({
   },
   async onGetPhoneNumber(e){
     try{
-      // 兼容不支持可选链的环境：安全地从事件对象取 code
-      const code = (e && e.detail) ? e.detail.code : '';
-      if (!code) { toast('未授权手机号'); return; }
+      // 兼容不支持可选链的环境：安全地从事件对象取 detail
+      const detail = (e && e.detail) || {};
+      console.log('phone event detail ===>', detail); // 方便真机调试查看 errMsg 和 code
+      const code = detail.code;
+      const errMsg = detail.errMsg || '';
+      if (!code) {
+        // 没有拿到 code，根据不同情况给出更清晰的提示
+        if (errMsg.indexOf('user deny') !== -1) {
+          toast('您取消了手机号授权');
+        } else if (errMsg.indexOf('no permission') !== -1) {
+          toast('当前小程序未开通获取手机号能力，请联系管理员在微信后台开通');
+        } else if (errMsg) {
+          toast('获取手机号失败：' + errMsg);
+        } else {
+          toast('获取手机号失败，请稍后再试');
+        }
+        return;
+      }
       this.setData({ isLoading: true });
       const r = await exchangePhoneNumber(code);
       this.setData({ isLoading: false });
@@ -84,10 +103,8 @@ Page({
     if (Object.keys(errors).length){ this.setData({errors}); return; }
     
     this.setData({ isLoading: true });
-    const self = this;
     const checkAll = async ()=>{
-      // 1) 手机号获取校验（必须使用一键获取）
-      if (!this.data.phoneVerified) { toast('请点击“获取”按钮获取微信手机号'); return false; }
+      // 1) 手机号：目前只做格式校验，不再强制一键获取（待后台开通获取手机号能力后再恢复）
       // 2) 邀请码
       const ri = await validateInvite(f.inviteCode, f.building, f.door);
       if (!ri.ok) { toast('邀请码无效'); return false; }
@@ -95,9 +112,30 @@ Page({
       if (!this.data.inCommunity) { toast('请在小区内完成定位'); return false; }
       return true;
     };
-    checkAll().then(ok=>{
+    checkAll().then(async ok=>{
+      if (!ok) {
+        this.setData({ isLoading: false });
+        return;
+      }
+
+      try {
+        // 将实名信息写入云开发数据库 test 集合
+        await db.collection(USER_COLLECTION).add({
+          data: {
+            ...f,
+            realname: true,
+            verified: true,
+            createdAt: new Date()
+          }
+        });
+      } catch (err) {
+        console.error('保存到云数据库失败', err);
+        toast('保存到云数据库失败，请稍后重试');
+      }
+
       this.setData({ isLoading: false });
-      if (!ok) return;
+
+      // 本地缓存一份，兼容后续页面读取
       // 存储兼容：保留 building 文本，如 “11栋”，并存储 door 如 “701”
       wx.setStorageSync('hyyc_user', { ...f, id:'me', realname:true, verified:true });
       toast('实名完成');

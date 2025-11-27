@@ -21,8 +21,11 @@
     <view class="group">
       <text class="label">手机号</text>
       <view class="row">
-        <input class="control" style="flex:1; min-width:0" placeholder="点击右侧按钮一键获取" value="{{form.phone}}" disabled="true"/>
-        <button class="btn btn-info btn-sm btn-compact" size="mini" open-type="getPhoneNumber" bindgetphonenumber="onGetPhoneNumber" style="margin-left:12rpx">获取</button>
+        <input class="control" style="flex:1; min-width:0" placeholder="请输入手机号（暂未开通一键获取）" value="{{form.phone}}" bindinput="onInput" data-key="phone"/>
+        <!--
+          TODO：小程序后台开通“获取手机号”能力后，可恢复一键获取按钮
+          <button class="btn btn-info btn-sm btn-compact" size="mini" open-type="getPhoneNumber" bindgetphonenumber="onGetPhoneNumber" style="margin-left:12rpx">获取</button>
+        -->
       </view>
       <text class="error" wx:if="{{errors.phone}}">{{errors.phone}}</text>
     </view>

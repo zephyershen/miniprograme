@@ -7,10 +7,10 @@
   },
   "setting": {
     "coverView": true,
-    "es6": false,
+    "es6": true,
     "postcss": true,
     "minified": true,
-    "enhance": false,
+    "enhance": true,
     "showShadowRootInWxmlPanel": true,
     "packNpmRelationList": [],
     "babelSetting": {
@@ -37,5 +37,7 @@
     "tabSize": 2
   },
   "appid": "wx36604fcb65e2e3dc",
-  "simulatorPluginLibVersion": {}
+  "simulatorPluginLibVersion": {},
+  "cloudfunctionTemplateRoot": "cloudfunctionTemplate/",
+  "cloudfunctionRoot": "cloudfunctions/"
 }
