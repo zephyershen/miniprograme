@@ -10,12 +10,25 @@ const USER_COLLECTION = 'test';
 
 Page({
   data: {
-    form: { name: '', idNumber: '', phone: '', inviteCode:'', community: '', building: '', floor: '', unit: '', door: '' },
+    // 默认填充测试数据，方便开发联调；正式上线前请改回空值
+    form: {
+      name: '测试用户',
+      idNumber: '110101199001010011',
+      phone: '13800138000',
+      inviteCode: 'HYYC2025',
+      community: community.name,
+      building: '11栋',
+      floor: '7',
+      unit: '01',
+      door: '701'
+    },
     errors: {},
     buildingRange: [],
-    buildingIndex: 0,
+    // 对应 “11栋”（下标从 0 开始）
+    buildingIndex: 10,
     doorRange: [[],[]], // [floors, units]
-    doorIndex: [0,0],
+    // 对应 “7 楼 01 户” -> 第 7 层（索引 6）、01 户（索引 0）
+    doorIndex: [6,0],
     MAX_FLOOR: 33,
     phoneVerified: false,
     // 业务 loading 状态（接口请求时用）

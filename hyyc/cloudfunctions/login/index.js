@@ -8,7 +8,6 @@ exports.main = async (event, context) => {
   return {
     openid: userInfo.openId || '',
     appid: userInfo.appId || '',
-    // 方便调试时查看原始信息
     userInfo,
   };
 };
