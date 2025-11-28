@@ -1,10 +1,15 @@
 @import "../../../styles/shadcn.wxss";
 
+/* 和登录/欢迎页保持同一浅橙色背景 */
+page {
+  background-color: #FFECD6;
+}
+
 /* 现代苹果风格 - 实名认证页面 */
 .apple {
   min-height: 100vh;
   padding: 48rpx 32rpx 80rpx;
-  background: linear-gradient(180deg, #FFF8F6 0%, #FFE8E1 100%);
+  background: #FFECD6;
   position: relative;
 }
 

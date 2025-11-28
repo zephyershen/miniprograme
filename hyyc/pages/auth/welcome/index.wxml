@@ -1,0 +1,16 @@
+<view class="welcome-page">
+  <view class="hero-card">
+    <view class="hero-lottie-box">
+      <canvas type="2d" id="hero-canvas" class="hero-lottie-canvas"></canvas>
+    </view>
+    <view class="hero-text">
+      <text class="hero-title">欢迎各位业主</text>
+      <text class="hero-sub">在温馨客厅里管理你的社区生活</text>
+    </view>
+
+    <view class="actions">
+      <view class="action-btn action-login">登录</view>
+      <view class="action-btn action-register" bindtap="onRegisterTap">注册</view>
+    </view>
+  </view>
+</view>

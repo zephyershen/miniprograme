@@ -1,6 +1,7 @@
 {
   "pages": [
     "pages/home/index/index",
+    "pages/auth/welcome/index",
     "pages/auth/realname/index",
     "pages/task/publish/index",
     "pages/task/detail/index",
@@ -25,12 +26,23 @@
     "backgroundColor": "#ffffff",
     "borderStyle": "black",
     "list": [
-      { "pagePath": "pages/home/index/index", "text": "首页" },
-      { "pagePath": "pages/task/publish/index", "text": "发布" },
-      { "pagePath": "pages/profile/index/index", "text": "我的" }
+      {
+        "pagePath": "pages/home/index/index",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/task/publish/index",
+        "text": "发布"
+      },
+      {
+        "pagePath": "pages/profile/index/index",
+        "text": "我的"
+      }
     ]
   },
-  "requiredPrivateInfos": ["getLocation"],
+  "requiredPrivateInfos": [
+    "getLocation"
+  ],
   "permission": {
     "scope.userLocation": {
       "desc": "用于验证您是否在本小区范围内，以保障社区安全"

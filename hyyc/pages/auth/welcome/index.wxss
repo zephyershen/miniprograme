@@ -1,0 +1,95 @@
+@import "../../../styles/shadcn.wxss";
+
+/* 整个页面背景和动画背景保持同一种浅橙色（与 Lottie 文件背景一致） */
+page {
+  background-color: #FFECD6;
+}
+
+.welcome-page {
+  min-height: 100vh;
+  padding: 40rpx 32rpx 60rpx;
+  box-sizing: border-box;
+  background-color: #FFECD6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.hero-card {
+  width: 100%;
+  max-width: 640rpx;
+  padding: 40rpx 24rpx 32rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.hero-lottie-box {
+  /* 视觉上稍微放大一点，但内部绘制尺寸保持适中，兼顾性能 */
+  width: 420rpx;
+  height: 420rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.hero-lottie-canvas {
+  width: 420rpx;
+  height: 420rpx;
+}
+
+.hero-text {
+  margin-top: 24rpx;
+  text-align: center;
+}
+
+.hero-title,
+.hero-sub {
+  display: block; /* 强制分行显示 */
+  font-family: "XiongKid", -apple-system, BlinkMacSystemFont, "PingFang SC",
+    "Microsoft Yahei", sans-serif; /* 若未配置自定义字体，则自动回退到系统字体 */
+}
+
+.hero-title {
+  font-size: 52rpx;
+  font-weight: 700;
+  color: #111827;
+}
+
+.hero-sub {
+  margin-top: 16rpx;
+  font-size: 32rpx;
+  color: #6B7280;
+}
+
+.actions {
+  width: 100%;
+  margin-top: 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.action-btn {
+  height: 88rpx;
+  border-radius: 999rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 12rpx 40rpx rgba(148, 163, 184, 0.45);
+}
+
+.action-login {
+  background: linear-gradient(135deg, #FDBA74 0%, #FB7185 100%);
+  color: #FFFFFF;
+}
+
+.action-register {
+  background: #FFFFFF;
+  color: #4B5563;
+  border: 2rpx dashed #F97316;
+}

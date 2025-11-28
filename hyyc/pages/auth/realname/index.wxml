@@ -32,7 +32,13 @@
 
     <view class="group">
       <text class="label">所属小区</text>
-      <input class="control" placeholder="请输入小区名称" value="{{form.community}}" bindinput="onInput" data-key="community"/>
+      <input
+        class="control"
+        placeholder="请填写小区名称(提示:4个字)"
+        value="{{form.community}}"
+        bindinput="onInput"
+        data-key="community"
+      />
       <text class="error" wx:if="{{errors.community}}">{{errors.community}}</text>
     </view>
 

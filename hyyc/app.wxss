@@ -1,5 +1,12 @@
 @import "styles/shadcn.wxss";
 
+/* 自定义熊孩子字体，全局可用 */
+@font-face {
+  font-family: "XiongKid";
+  src: url("https://mrshenzf.top/front/XiongKid.ttf") format("truetype");
+  font-display: swap;
+}
+
 /* 全局页面样式 - 现代 Lottie 风格 */
 page {
   background: #FDFDFE;

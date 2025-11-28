@@ -19,5 +19,7 @@
     <view class="py-16" bindtap="gotoRealname">实名认证</view>
     <view class="divider"></view>
     <view class="py-16 c-muted" bindtap="testCloudFunction">测试云函数（login）</view>
+    <view class="divider"></view>
+    <view class="py-16 c-danger" bindtap="logout">退出登录</view>
   </ui-card>
 </view>

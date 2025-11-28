@@ -6,7 +6,8 @@ Page({
   onShow(){
     const u = wx.getStorageSync('hyyc_user');
     if (!u || !u.realname) {
-      wx.navigateTo({ url: '/pages/auth/realname/index' });
+      // 未实名用户，先进入带 Lottie 动画的欢迎页（再由后续逻辑决定去登录/注册）
+      wx.navigateTo({ url: '/pages/auth/welcome/index' });
       return;
     }
     this.load();

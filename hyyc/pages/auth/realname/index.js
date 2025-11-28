@@ -4,9 +4,9 @@ const { exchangePhoneNumber, validateInvite } = require('../../../utils/api');
 const { distanceMeters } = require('../../../utils/geo');
 const community = require('../../../config/community');
 
-// 使用云开发数据库，当前示例将实名信息存入 test 集合
+// 使用云开发数据库，当前示例将实名信息存入 userInfo 集合
 const db = wx.cloud.database();
-const USER_COLLECTION = 'test';
+const USER_COLLECTION = 'userInfo';
 
 Page({
   data: {
@@ -105,10 +105,16 @@ Page({
   goBack(){ wx.navigateBack({ fail: ()=> wx.switchTab({ url: '/pages/home/index/index' })}); },
   submit(){
     const f = this.data.form; const errors = {};
-    errors.name = required(f.name,'请输入姓名');
-    errors.idNumber = isIdNumber(f.idNumber);
-    errors.phone = isPhone(f.phone);
-    errors.community = required(f.community,'请输入小区');
+	    errors.name = required(f.name,'请输入姓名');
+	    errors.idNumber = isIdNumber(f.idNumber);
+	    errors.phone = isPhone(f.phone);
+	    // 小区名称必须包含配置中的小区名，用于过滤非本小区业主
+	    errors.community = required(f.community,'请输入小区');
+	    const communityInput = String(f.community || '').trim();
+	    if (!errors.community && communityInput.indexOf(community.name) === -1) {
+	      // 这里不要把正确小区名称直接提示给用户，只给一个模糊错误信息
+	      errors.community = '小区名称不正确，请联系物业确认后再填写';
+	    }
     errors.building = required(f.building,'请选择楼栋');
     errors.door = required(f.door,'请选择门号');
     errors.inviteCode = required(f.inviteCode,'请输入小区邀请码');
@@ -116,43 +122,76 @@ Page({
     if (Object.keys(errors).length){ this.setData({errors}); return; }
     
     this.setData({ isLoading: true });
-    const checkAll = async ()=>{
-      // 1) 手机号：目前只做格式校验，不再强制一键获取（待后台开通获取手机号能力后再恢复）
-      // 2) 邀请码
-      const ri = await validateInvite(f.inviteCode, f.building, f.door);
-      if (!ri.ok) { toast('邀请码无效'); return false; }
-      // 3) 定位（可作为硬性或提示，这里默认为硬性）
-      if (!this.data.inCommunity) { toast('请在小区内完成定位'); return false; }
-      return true;
-    };
-    checkAll().then(async ok=>{
-      if (!ok) {
-        this.setData({ isLoading: false });
-        return;
-      }
+	    const checkAll = async ()=>{
+	      // 1) 手机号：目前只做格式校验，不再强制一键获取（待后台开通获取手机号能力后再恢复）
+	      // 2) 邀请码
+	      const ri = await validateInvite(f.inviteCode, f.building, f.door);
+	      if (!ri.ok) { toast('邀请码无效'); return false; }
+	      // 3) 定位（可作为硬性或提示，这里默认为硬性）
+	      if (!this.data.inCommunity) { toast('请在小区内完成定位'); return false; }
+	      return true;
+	    };
+	    checkAll().then(async ok=>{
+	      if (!ok) {
+	        this.setData({ isLoading: false });
+	        return;
+	      }
 
-      try {
-        // 将实名信息写入云开发数据库 test 集合
-        await db.collection(USER_COLLECTION).add({
-          data: {
-            ...f,
-            realname: true,
-            verified: true,
-            createdAt: new Date()
-          }
-        });
-      } catch (err) {
-        console.error('保存到云数据库失败', err);
-        toast('保存到云数据库失败，请稍后重试');
-      }
+	      // 先检查数据库中是否已经有同名+同身份证号的用户
+	      let existRes;
+	      try {
+	        existRes = await db.collection(USER_COLLECTION)
+	          .where({
+	            name: f.name,
+	            idNumber: f.idNumber
+	          })
+	          .limit(1)
+	          .get();
+	      } catch (err) {
+	        console.error('查询用户是否存在失败', err);
+	        toast('检查用户信息失败，请稍后重试');
+	        this.setData({ isLoading: false });
+	        return;
+	      }
 
-      this.setData({ isLoading: false });
+	      if (existRes && existRes.data && existRes.data.length > 0) {
+	        // 已经存在用户：提示并返回欢迎页，让用户直接去登录
+	        this.setData({ isLoading: false });
+	        wx.showModal({
+	          title: '提示',
+	          content: '该用户已存在，请直接登录',
+	          showCancel: false,
+	          success: () => {
+	            wx.redirectTo({
+	              url: '/pages/auth/welcome/index'
+	            });
+	          }
+	        });
+	        return;
+	      }
 
-      // 本地缓存一份，兼容后续页面读取
-      // 存储兼容：保留 building 文本，如 “11栋”，并存储 door 如 “701”
-      wx.setStorageSync('hyyc_user', { ...f, id:'me', realname:true, verified:true });
-      toast('实名完成');
-      wx.switchTab({ url: '/pages/home/index/index' });
-    });
+	      try {
+	        // 将实名信息写入云开发数据库 userInfo 集合
+	        await db.collection(USER_COLLECTION).add({
+	          data: {
+	            ...f,
+	            realname: true,
+	            verified: true,
+	            createdAt: new Date()
+	          }
+	        });
+	      } catch (err) {
+	        console.error('保存到云数据库失败', err);
+	        toast('保存到云数据库失败，请稍后重试');
+	      }
+
+	      this.setData({ isLoading: false });
+
+	      // 本地缓存一份，兼容后续页面读取
+	      // 存储兼容：保留 building 文本，如 “11栋”，并存储 door 如 “701”
+	      wx.setStorageSync('hyyc_user', { ...f, id:'me', realname:true, verified:true });
+	      toast('实名完成');
+	      wx.switchTab({ url: '/pages/home/index/index' });
+	    });
   }
 });
