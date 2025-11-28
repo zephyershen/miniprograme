@@ -1,8 +1,12 @@
 <ui-loading show="{{isLoading}}" />
 <view class="apple">
   <view class="hero">
-    <text class="h1">验证花语云萃业主身份</text>
-    <text class="sub">为保障社区安全，请完成以下步骤。</text>
+    <view>
+      <text class="h1">验证业主身份</text>
+    </view>
+    <view>
+      <text class="sub">为保障社区安全，请完成以下步骤。</text>
+    </view>
   </view>
 
   <view class="panel">
