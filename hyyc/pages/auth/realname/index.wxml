@@ -1,4 +1,10 @@
 <ui-loading show="{{isLoading}}" />
+<ui-error-dialog
+  show="{{showUserExist}}"
+  message="该用户已存在，请直接登录"
+  confirm-text="确定"
+  bindconfirm="onUserExistConfirm"
+/>
 <view class="apple">
   <view class="hero">
     <view>

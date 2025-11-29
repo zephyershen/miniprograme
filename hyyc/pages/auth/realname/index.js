@@ -33,9 +33,11 @@ Page({
     phoneVerified: false,
     // 业务 loading 状态（接口请求时用）
     isLoading: false,
-    // 临时：默认当作已经在小区范围内，方便先完成注册
-    inCommunity: true,
-    locationText: '已在' + community.name + '范围内（~0m）'
+    // 定位相关：初始为“尚未定位”，需要用户主动点击“获取定位”
+    inCommunity: false,
+    locationText: '尚未定位，请点击右侧“获取定位”',
+    // 已存在用户提示弹层
+    showUserExist: false
   },
   onInput(e){
     const key = e.currentTarget.dataset.key;
@@ -91,16 +93,25 @@ Page({
   },
   // 移除短信验证码流程，仅保留一键获取手机号
   async getLocation(){
-    const self = this;
-    this.setData({ isLoading: true });
-    wx.getLocation({ type:'gcj02', isHighAccuracy:true, highAccuracyExpireTime: 5000,
-      success(res){
-        const d = distanceMeters(res.latitude, res.longitude, community.center.lat, community.center.lng);
-        const inRange = d <= community.radiusMeters;
-        self.setData({ inCommunity: inRange, locationText: inRange?`已在${community.name}范围内（~${Math.round(d)}m）`:`不在小区范围（距中心约${Math.round(d)}m）`, isLoading: false });
-      },
-      fail(){ self.setData({ inCommunity:false, locationText:'定位失败，请重试', isLoading: false }); }
+    // TODO: 开发临时逻辑：强制视为在小区内，方便测试注册
+    // 点击“获取定位”按钮后，直接当作已在小区范围内
+    this.setData({
+      inCommunity: true,
+      locationText: `开发测试：已视为在${community.name}范围内`
     });
+    return;
+
+    // 下面是真实定位逻辑，上线前请恢复：
+    // const self = this;
+    // this.setData({ isLoading: true });
+    // wx.getLocation({ type:'gcj02', isHighAccuracy:true, highAccuracyExpireTime: 5000,
+    //   success(res){
+    //     const d = distanceMeters(res.latitude, res.longitude, community.center.lat, community.center.lng);
+    //     const inRange = d <= community.radiusMeters;
+    //     self.setData({ inCommunity: inRange, locationText: inRange?`已在${community.name}范围内（~${Math.round(d)}m）`:`不在小区范围（距中心约${Math.round(d)}m）`, isLoading: false });
+    //   },
+    //   fail(){ self.setData({ inCommunity:false, locationText:'定位失败，请重试', isLoading: false }); }
+    // });
   },
   goBack(){ wx.navigateBack({ fail: ()=> wx.switchTab({ url: '/pages/home/index/index' })}); },
   submit(){
@@ -155,18 +166,8 @@ Page({
 	      }
 
 	      if (existRes && existRes.data && existRes.data.length > 0) {
-	        // 已经存在用户：提示并返回欢迎页，让用户直接去登录
-	        this.setData({ isLoading: false });
-	        wx.showModal({
-	          title: '提示',
-	          content: '该用户已存在，请直接登录',
-	          showCancel: false,
-	          success: () => {
-	            wx.redirectTo({
-	              url: '/pages/auth/welcome/index'
-	            });
-	          }
-	        });
+	        // 已经存在用户：弹出带 Lottie 动画的错误提示弹层
+	        this.setData({ isLoading: false, showUserExist: true });
 	        return;
 	      }
 
@@ -193,5 +194,10 @@ Page({
 	      toast('实名完成');
 	      wx.switchTab({ url: '/pages/home/index/index' });
 	    });
+  },
+  onUserExistConfirm(){
+    // 关闭错误弹层并回到欢迎页，让用户直接登录
+    this.setData({ showUserExist: false });
+    wx.redirectTo({ url: '/pages/auth/welcome/index' });
   }
 });
