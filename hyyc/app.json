@@ -9,6 +9,7 @@
     "pages/chat/room/index",
     "pages/wallet/index/index",
     "pages/profile/index/index",
+    "pages/profile/account/index",
     "pages/my/tasks/index"
   ],
   "window": {

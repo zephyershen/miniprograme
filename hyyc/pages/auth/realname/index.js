@@ -12,6 +12,7 @@ Page({
   data: {
     // 默认填充测试数据，方便开发联调；正式上线前请改回空值
     form: {
+      nickname: '',
       name: '测试用户',
       idNumber: '110101199001010011',
       phone: '13800138000',
@@ -19,15 +20,14 @@ Page({
       community: community.name,
       building: '11栋',
       floor: '7',
-      unit: '01',
       door: '701'
     },
     errors: {},
     buildingRange: [],
     // 对应 “11栋”（下标从 0 开始）
     buildingIndex: 10,
-    doorRange: [[],[]], // [floors, units]
-    // 对应 “7 楼 01 户” -> 第 7 层（索引 6）、01 户（索引 0）
+    doorRange: [[],[]], // [floors, rooms]
+    // 对应 “7 楼 01 户” -> 第 7 层（索引 6）、第 1 户（索引 0）
     doorIndex: [6,0],
     MAX_FLOOR: 33,
     phoneVerified: false,
@@ -47,8 +47,8 @@ Page({
     // 初始化楼栋（1-23栋）与门号（1-MAX_FLOOR 楼 × 01-04 户）
     const buildings = Array.from({length:23}, (_,i)=> `${i+1}栋`);
     const floors = Array.from({length:this.data.MAX_FLOOR}, (_,i)=> `${i+1}楼`);
-    const units = ['01户','02户','03户','04户'];
-    this.setData({ buildingRange: buildings, doorRange: [floors, units] });
+    const rooms = ['01户','02户','03户','04户'];
+    this.setData({ buildingRange: buildings, doorRange: [floors, rooms] });
   },
   onBuilding(e){
     const idx = Number(e.detail.value||0);
@@ -58,9 +58,13 @@ Page({
   onDoorChange(e){
     const [fi, ui] = e.detail.value || [0,0];
     const floorNum = fi + 1; // 1-based
-    const unitNum = (ui + 1).toString().padStart(2,'0');
-    const door = `${floorNum}${unitNum}`; // 701,702...
-    this.setData({ doorIndex: [fi,ui], 'form.floor': `${floorNum}`, 'form.unit': unitNum, 'form.door': door });
+    const roomNo = (ui + 1).toString().padStart(2,'0');
+    const door = `${floorNum}${roomNo}`; // 701,702...
+    this.setData({
+      doorIndex: [fi,ui],
+      'form.floor': `${floorNum}`,
+      'form.door': door
+    });
   },
   async onGetPhoneNumber(e){
     try{
@@ -148,12 +152,11 @@ Page({
 	        return;
 	      }
 
-	      // 先检查数据库中是否已经有同名+同身份证号的用户
+	      // 先检查数据库中是否已经有相同身份证号的用户（身份证唯一，一个证号只允许一条记录）
 	      let existRes;
 	      try {
 	        existRes = await db.collection(USER_COLLECTION)
 	          .where({
-	            name: f.name,
 	            idNumber: f.idNumber
 	          })
 	          .limit(1)
@@ -171,26 +174,35 @@ Page({
 	        return;
 	      }
 
-	      try {
-	        // 将实名信息写入云开发数据库 userInfo 集合
-	        await db.collection(USER_COLLECTION).add({
-	          data: {
-	            ...f,
-	            realname: true,
-	            verified: true,
-	            createdAt: new Date()
-	          }
-	        });
-	      } catch (err) {
-	        console.error('保存到云数据库失败', err);
-	        toast('保存到云数据库失败，请稍后重试');
-	      }
+		      let addRes;
+		      try {
+		        // 将实名信息写入云开发数据库 userInfo 集合
+		        // 户号信息已经包含在 door 中，例如 701 = 7 楼 01 户
+		        addRes = await db.collection(USER_COLLECTION).add({
+		          data: {
+		            ...f,
+		            realname: true,
+		            verified: true,
+		            createdAt: new Date()
+		          }
+		        });
+		      } catch (err) {
+		        console.error('保存到云数据库失败', err);
+		        toast('保存到云数据库失败，请稍后重试');
+		        this.setData({ isLoading: false });
+		        return;
+		      }
 
 	      this.setData({ isLoading: false });
 
-	      // 本地缓存一份，兼容后续页面读取
-	      // 存储兼容：保留 building 文本，如 “11栋”，并存储 door 如 “701”
-	      wx.setStorageSync('hyyc_user', { ...f, id:'me', realname:true, verified:true });
+		      // 本地缓存一份，兼容后续页面读取：
+		      // 使用新增记录返回的 _id 作为通用 id，后续 ownerId 等都依赖这个字段
+		      const userId = (addRes && addRes._id) || '';
+		      wx.setStorageSync('hyyc_user', Object.assign({}, f, {
+		        id: userId,
+		        realname: true,
+		        verified: true
+		      }));
 	      toast('实名完成');
 	      wx.switchTab({ url: '/pages/home/index/index' });
 	    });

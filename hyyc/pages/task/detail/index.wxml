@@ -7,7 +7,16 @@
     </view>
     <view class="mt-16 c-muted">{{task.desc}}</view>
     <view class="row wrap mt-12 row-gap-8">
-      <image wx:for="{{task.images}}" wx:key="*this" class="row-gap-item" src="{{item}}" style="width:200rpx;height:200rpx;border-radius:12rpx;" lazy-load="true"/>
+      <image
+        wx:for="{{task.images}}"
+        wx:key="*this"
+        class="row-gap-item"
+        src="{{item}}"
+        style="width:200rpx;height:200rpx;border-radius:12rpx;"
+        lazy-load="true"
+        data-index="{{index}}"
+        bindtap="previewTaskImage"
+      />
     </view>
   </ui-card>
 

@@ -1,2 +1,26 @@
 @import "../../../styles/shadcn.wxss";
 
+/* 标签行：标题 + 小红星 同一行显示 */
+.field-label-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12rpx;
+}
+
+/* 覆盖全局 margin，留给 .field-label-row 统一控制 */
+.field-label {
+  margin-bottom: 0;
+}
+
+/* 标签后面的灰色小提示文字（字号略小一些） */
+.field-hint {
+  margin-left: 8rpx;
+  font-size: 22rpx;
+  color: #9CA3AF;
+}
+
+/* 必填小红星样式，和实名页保持一致 */
+.label-star {
+  color: #FF6B6B;
+  margin-left: 4rpx;
+}

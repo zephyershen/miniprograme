@@ -10,7 +10,22 @@
       <ui-card title="{{item.title}}" sub="截止 {{item.deadlineText}}">
         <view class="row space-between">
           <text class="c-danger">¥ {{item.amountText}}</text>
-          <view class="btn btn-outline btn-sm" data-id="{{item.id}}" data-role="{{tab==='owner'?'owner':''}}" bindtap="toDetail">查看</view>
+          <view class="row row-gap-8">
+            <view
+              wx:if="{{tab === 'owner'}}"
+              class="btn btn-outline btn-sm row-gap-item"
+              data-id="{{item.id}}"
+              bindtap="onDeleteTask">
+              删除
+            </view>
+            <view
+              class="btn btn-outline btn-sm row-gap-item"
+              data-id="{{item.id}}"
+              data-role="{{tab==='owner'?'owner':''}}"
+              bindtap="toDetail">
+              查看
+            </view>
+          </view>
         </view>
       </ui-card>
     </view>

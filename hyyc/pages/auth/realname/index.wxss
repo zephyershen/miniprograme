@@ -58,6 +58,11 @@ page {
   height: 28rpx;        /* 两列标签保持一致高度 */
 }
 
+.label-star {
+  color: #FF6B6B;
+  margin-left: 4rpx;
+}
+
 .control {
   background: #FEFCFB;
   border: 2rpx solid #F5E6DC;
@@ -87,8 +92,9 @@ page {
 
 picker .control {
   display: flex;
-  align-items: center;
+  align-items: center;      /* 垂直居中对齐内容 */
   justify-content: space-between;
+  line-height: normal;      /* 覆盖通用 line-height，防止文本基线偏移 */
 }
 
 /* 让 picker 成为块级，去除可能的基线/行高影响 */

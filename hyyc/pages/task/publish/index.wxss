@@ -1,2 +1,59 @@
 @import "../../../styles/shadcn.wxss";
 
+/* 发布任务页局部样式 */
+
+/* 发布任务页「说明」输入框：高度减半，内容超出时可滚动查看 */
+.textarea-desc {
+  height: 120rpx;
+}
+
+/* 截止时间的日期/时间选择各占一半宽度 */
+.input-half {
+  flex: 1;
+}
+
+/* 发布时展示的图片缩略图（方形） */
+.publish-image-wrap {
+  position: relative;
+}
+
+.publish-image-thumb {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 12rpx;
+  object-fit: cover;
+}
+
+/* 加号方块按钮：和缩略图一样大小，看起来是“空的图片位” */
+.publish-image-add {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 12rpx;
+  border: 2rpx dashed #F97373;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #F97373;
+  font-size: 64rpx;
+  box-sizing: border-box;
+}
+
+.publish-image-add-plus {
+  line-height: 1;
+}
+
+/* 右上角删除小叉号 */
+.publish-image-remove {
+  position: absolute;
+  top: -8rpx;
+  right: -8rpx;
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 9999rpx;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  font-size: 26rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

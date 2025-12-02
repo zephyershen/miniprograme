@@ -1,10 +1,11 @@
 <ui-loading show="{{isLoading}}" />
 <view class="px-24 py-16">
   <ui-card title="账户信息">
-    <view class="row">
+    <view class="row" bindtap="gotoAccount">
       <view class="avatar"></view>
       <view style="margin-left:12rpx;">
         <text class="bold">{{user.name||'未实名'}}</text>
+        <view class="c-muted text-sm" wx:if="{{user.nickname}}">网名：{{user.nickname}}</view>
         <view class="c-muted text-sm">{{user.community||'未设置小区'}} · {{user.realname?'已实名':'未实名'}}</view>
         <view class="c-muted text-sm" wx:if="{{user.building || user.door}}">{{user.building||''}} {{user.door?('· '+user.door):''}}</view>
       </view>
@@ -15,10 +16,6 @@
     <view class="py-16" bindtap="gotoMyTasks">我的任务</view>
     <view class="divider"></view>
     <view class="py-16" bindtap="gotoWallet">我的钱包</view>
-    <view class="divider"></view>
-    <view class="py-16" bindtap="gotoRealname">实名认证</view>
-    <view class="divider"></view>
-    <view class="py-16 c-muted" bindtap="testCloudFunction">测试云函数（login）</view>
     <view class="divider"></view>
     <view class="py-16 c-danger" bindtap="logout">退出登录</view>
   </ui-card>

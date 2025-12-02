@@ -17,19 +17,31 @@
 
   <view class="panel">
     <view class="group">
-      <text class="label">姓名</text>
+      <text class="label">昵称</text>
+      <input
+        class="control"
+        placeholder="默认使用微信昵称，也可以手动填写网名"
+        value="{{form.nickname}}"
+        bindinput="onInput"
+        data-key="nickname"
+      />
+      <text class="error" wx:if="{{errors.nickname}}">{{errors.nickname}}</text>
+    </view>
+
+    <view class="group">
+      <text class="label">姓名<text class="label-star">*</text></text>
       <input class="control" placeholder="请输入姓名" value="{{form.name}}" bindinput="onInput" data-key="name"/>
       <text class="error" wx:if="{{errors.name}}">{{errors.name}}</text>
     </view>
 
     <view class="group">
-      <text class="label">身份证号</text>
+      <text class="label">身份证号<text class="label-star">*</text></text>
       <input class="control" placeholder="请输入身份证号" value="{{form.idNumber}}" bindinput="onInput" data-key="idNumber"/>
       <text class="error" wx:if="{{errors.idNumber}}">{{errors.idNumber}}</text>
     </view>
 
     <view class="group">
-      <text class="label">手机号</text>
+      <text class="label">手机号<text class="label-star">*</text></text>
       <view class="row">
         <input class="control" style="flex:1; min-width:0" placeholder="请输入手机号（暂未开通一键获取）" value="{{form.phone}}" bindinput="onInput" data-key="phone"/>
         <!--
@@ -41,7 +53,7 @@
     </view>
 
     <view class="group">
-      <text class="label">所属小区</text>
+      <text class="label">所属小区<text class="label-star">*</text></text>
       <input
         class="control"
         placeholder="请填写小区名称(提示:4个字)"
@@ -54,29 +66,32 @@
 
     <view class="row gap row-top form-pair" style="margin-top:12rpx">
       <view class="group half">
-        <text class="label">楼栋</text>
+        <text class="label">楼栋<text class="label-star">*</text></text>
         <picker mode="selector" range="{{buildingRange}}" value="{{buildingIndex}}" bindchange="onBuilding">
           <view class="control row space-between"><text class="ellipsis">{{form.building||'选择（1-23栋）'}}</text><text>›</text></view>
         </picker>
         <text class="error" wx:if="{{errors.building}}">{{errors.building}}</text>
       </view>
       <view class="group half">
-        <text class="label">门号</text>
+        <text class="label">门号<text class="label-star">*</text></text>
         <picker mode="multiSelector" range="{{doorRange}}" value="{{doorIndex}}" bindchange="onDoorChange">
-          <view class="control row space-between"><text class="ellipsis">{{form.door?form.door+'（'+form.floor+'楼-'+form.unit+'户）':'选择（每层01-04户）'}}</text><text>›</text></view>
+          <view class="control row space-between">
+            <text class="ellipsis">{{form.door ? (form.door + '（' + form.floor + '楼-' + (doorRange[1][doorIndex[1]] || '') + '）') : '选择（每层01-04户）'}}</text>
+            <text>›</text>
+          </view>
         </picker>
         <text class="error" wx:if="{{errors.door}}">{{errors.door}}</text>
       </view>
     </view>
 
     <view class="group">
-      <text class="label">小区邀请码</text>
+      <text class="label">小区邀请码<text class="label-star">*</text></text>
       <input class="control" placeholder="请输入物业发放的邀请码（示例：HYYC2025）" value="{{form.inviteCode}}" bindinput="onInput" data-key="inviteCode"/>
       <text class="error" wx:if="{{errors.inviteCode}}">{{errors.inviteCode}}</text>
     </view>
 
     <view class="group">
-      <text class="label">实时定位</text>
+      <text class="label">实时定位<text class="label-star">*</text></text>
       <view class="row space-between">
         <text class="hint {{inCommunity?'ok':'warn'}}">{{locationText}}</text>
         <view class="btn btn-outline btn-sm" bindtap="getLocation">获取定位</view>

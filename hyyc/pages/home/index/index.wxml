@@ -4,29 +4,48 @@
     <text class="text-xl bold">本小区任务</text>
     <view class="btn btn-primary btn-sm" bindtap="goPublish">发布任务</view>
   </view>
-
   <view class="row mt-16 row-gap-8 wrap">
-    <view class="{{'badge row-gap-item ' + (filter==='all'?'badge-primary':'')}}" bindtap="changeFilter" data-k="all">全部</view>
-    <view class="{{'badge row-gap-item ' + (filter==='new'?'badge-primary':'')}}" bindtap="changeFilter" data-k="new">最新</view>
-    <view class="{{'badge row-gap-item ' + (filter==='money'?'badge-primary':'')}}" bindtap="changeFilter" data-k="money">高佣金</view>
-    <view class="{{'badge row-gap-item ' + (filter==='building'?'badge-primary':'')}}" bindtap="changeFilter" data-k="building">本楼栋</view>
+    <view class="{{'badge row-gap-item ' + (filter==='all'?'badge-primary':'')}}" bindtap="changeFilter" data-k="all">
+      全部
+    </view>
+    <view class="{{'badge row-gap-item ' + (filter==='new'?'badge-primary':'')}}" bindtap="changeFilter" data-k="new">
+      最新
+    </view>
+    <view class="{{'badge row-gap-item ' + (filter==='money'?'badge-primary':'')}}" bindtap="changeFilter" data-k="money">
+      高佣金
+    </view>
+    <view class="{{'badge row-gap-item ' + (filter==='building'?'badge-primary':'')}}" bindtap="changeFilter" data-k="building">
+      本楼栋
+    </view>
   </view>
-
+  <view class="row mt-12">
+    <picker
+      mode="selector"
+      range="{{locationFilterLabels}}"
+      value="{{locationFilterIndex}}"
+      bindchange="onLocationFilterChange"
+    >
+      <view class="badge">
+        任务地点：{{locationFilterLabels[locationFilterIndex]}}
+      </view>
+    </picker>
+  </view>
   <block wx:for="{{list}}" wx:key="id">
     <view class="mt-16">
-      <ui-card title="{{item.title}}" sub="{{item.community}} · 截止 {{item.deadlineText}}">
+      <ui-card title="{{item.title}}" sub="{{item.community}} · 截止时间 {{item.deadlineText}}">
         <view class="row space-between">
           <text class="text-lg bold c-danger">¥ {{item.amountText}}</text>
           <view class="row row-gap-8">
             <view class="badge row-gap-item">{{item.statusText}}</view>
-            <view class="btn btn-outline btn-sm row-gap-item" data-id="{{item.id}}" bindtap="toDetail">详情</view>
+            <view class="btn btn-outline btn-sm row-gap-item" data-id="{{item.id}}" bindtap="toDetail">
+              详情
+            </view>
           </view>
         </view>
         <view class="mt-12 c-muted text-sm">{{item.desc}}</view>
       </ui-card>
     </view>
   </block>
-
   <view wx:if="{{!list.length}}" class="center" style="height: 50vh;">
     <text class="c-muted">暂无任务，去发布一个吧 ~</text>
   </view>

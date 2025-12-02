@@ -13,6 +13,8 @@ page {
   color: #2F3437;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   -webkit-font-smoothing: antialiased;
+  /* 禁止全局左右滚动，只允许上下滚动 */
+  overflow-x: hidden;
 }
 
 /* 安全区域适配 */

@@ -154,7 +154,7 @@
   - 按钮相关：
     - `.btn`：所有按钮的基础样式。
     - `.btn-primary` / `.btn-outline` / `.btn-info` 等：不同用途的按钮风格。
-    - `.btn-sm`：小尺寸按钮，例如「上传图片」「查看」。
+    - `.btn-sm`：小尺寸按钮，例如任务卡片里的「查看」等。
   - 表单相关：
     - `.field` / `.field-label` / `.input` / `.textarea`：表单容器、标题、输入框。
   - 卡片相关：
@@ -195,6 +195,18 @@
       `pages/profile/index/index`、`pages/my/tasks/index`、
       `pages/auth/realname/index` 等。
 
+### 4.3 `assets/lottie/error.json` & `error.js`
+
+- 作用：错误提示用的 Lottie 动画（一幅「有点头疼/出错了」的插画，会循环播放）。
+- `.json`：原始动画文件。
+- `.js`：把 `.json` 包装成 JS 模块，方便在小程序里 `require('../../../assets/lottie/error.js')`。
+- 使用位置 / 对应页面：
+  - `components/ui/error-dialog/index.js`：
+    - 错误弹层里的主视觉动画。
+  - 间接使用页面：
+    - `pages/auth/realname/index`：
+      - 通过 `<ui-error-dialog ... />` 使用该动画，在「该用户已存在」时弹出。
+
 ---
 
 ## 5. 工具函数：`utils/`
@@ -228,20 +240,11 @@
 ### 5.2 `utils/mock.js` —— 本地假数据
 
 - 导出对象：
-  - `tasks`：一组任务列表，包含：
-    - `title`：任务名称（如「帮忙取快递」）。
-    - `amount`：佣金。
-    - `deadline`：截止时间（时间戳）。
-    - `community`、`address`、`building`：小区和楼栋信息。
-    - `owner`：任务发布人。
-    - `status`：任务状态（目前统一 `posted`）。
+  - `tasks`：一组任务列表（仅用于早期 UI 演示，现在首页/详情/我的任务已经改为走云数据库 `tasks` 集合）。
   - `user`：假用户数据，用于演示「我的」「钱包」等页面。
   - `walletFlows`：钱包收支明细。
 - 使用位置 / 对应页面：
-  - 首页任务列表：`pages/home/index/index.js`（加载任务广场）。
-  - 任务详情：`pages/task/detail/index.js`（根据 `id` 找到对应任务）。
-  - 我的任务：`pages/my/tasks/index.js`（两种「我发布的 / 我接受的」列表共用同一批数据）。
-  - 钱包：`pages/wallet/index/index.js`（余额和流水）。
+  - 钱包：`pages/wallet/index/index.js`（余额和流水，仍使用本地假数据）。
 
 ### 5.3 `utils/format.js` —— 金额与日期格式化
 
@@ -253,7 +256,12 @@
   - `formatDate(ts)`：
     - 把时间戳转成 `"YYYY-MM-DD"` 格式。
     - 使用位置：
-      - 首页任务列表、任务详情、我的任务列表里的截止日期。
+      - 需要只展示日期的地方（例如部分历史记录等）。
+  - `formatDateTime(ts)`：
+    - 把时间戳转成 `"YYYY-MM-DD HH:mm"` 格式。
+    - 使用位置：
+      - 首页任务列表、任务详情、我的任务列表里的截止时间。
+      - 对于没有设置截止时间的任务，业务代码会在调用处把 `deadline` 为空的情况显示为「不限」，而不是具体日期。
 
 ### 5.4 `utils/validators.js` —— 表单校验
 
@@ -284,6 +292,7 @@
     - 封装 `wx.showModal` 并返回 `Promise`，用来做确认对话框。
     - 使用位置 / 对应按钮：
       - `pages/task/detail/index.js` 里的「确认完成」按钮，在打款前弹出确认框。
+      - `pages/my/tasks/index.js` 里的「删除」按钮，在删除自己发布的任务前弹出确认框。
 
 ### 5.6 `utils/geo.js` —— 距离计算
 
@@ -382,12 +391,13 @@
 - 文件：
   - `index.json`：声明组件。
   - `index.wxml`：
-    - 上面是 `label` 标签文字，中间是 slot 放具体输入控件（`<input>` / `<textarea>` / `<picker>` 等），下面根据 `error` 是否有值显示错误文字。
+    - 上面是 `label` 标签文字（支持在必填项后加小红星），中间是 slot 放具体输入控件（`<input>` / `<textarea>` / `<picker>` 等），下面根据 `error` 是否有值显示错误文字。
   - `index.wxss`：引入全局字段样式。
   - `index.js`：
     - 属性：
       - `label`：表单字段标题。
       - `error`：错误文案字符串。
+      - `required`：布尔值，是否在标题后显示红色 `*`。
 - 使用位置 / 对应区域：
   - 发布任务页的所有输入项。
   - 提交验收页中的「完成说明」「上传凭证」区域。
@@ -426,7 +436,55 @@
   - 所有有「数据加载」或「提交中」状态的页面顶部都会先放一个 `<ui-loading show="{{isLoading}}" />`：
     - 比如首页加载任务、发布任务点击「发布」后、实名认证提交、提交验收、打开聊天历史、加载钱包数据、加载个人信息等。
 
-### 7.5 `components/chat/bubble` —— 聊天气泡
+### 7.5 `components/ui/error-dialog` —— 错误提示弹层（带 Lottie 动画）
+
+- 文件：
+  - `index.json`：
+    - `"component": true`，声明组件。
+  - `index.wxml`：
+    - 最外层 `.error-mask` 做整页遮罩，`wx:if="{{show}}"` 控制是否渲染。
+    - 中间 `.error-card.card` 是白色卡片，内部包含：
+      - `lottie-box` + `<canvas id="error-canvas">`：播放错误 Lottie 动画。
+      - `title`：可选标题行。
+      - `message`：错误文案主体。
+      - 一颗确认按钮：「{{confirmText}}」。
+  - `index.wxss`：
+    - 固定定位的半透明背景、卡片居中。
+    - Lottie 区域宽高为 `280rpx`，和 JS 中的 `LOTTIE_SIZE_RPX` 对应。
+    - 把内部按钮 `.actions .btn` 做成比全局默认按钮更小的尺寸。
+  - `index.js`：
+    - 引入：
+      - `lottie-miniprogram`：播放 Lottie 动画的库。
+      - `../../../assets/lottie/error.js`：错误动画数据。
+    - 常量：
+      - `LOTTIE_SIZE_RPX = 280`：和样式里宽高一致，用来按屏幕宽度换算成实际像素。
+    - 属性：
+      - `show`：是否显示错误弹层。
+      - `title`：上方标题文字，可为空。
+      - `message`：主文案，默认是「出错了，请稍后重试」。
+      - `confirmText`：按钮文字，默认「确定」。
+    - 观察者：
+      - `show(val)`：
+        - `true` 时调用 `playLottie()` 启动动画。
+        - `false` 时调用 `stopLottie()` 停止并销毁动画。
+    - 生命周期：
+      - `ready()`：如果一开始 `show=true`，会自动播一遍动画。
+      - `detached()`：组件被销毁时停止动画，防止内存泄漏。
+    - 方法：
+      - `playLottie()`：
+        - 通过 `createSelectorQuery().select('#error-canvas').node(...)` 拿到 canvas。
+        - 根据设备 `pixelRatio` 和屏幕宽度计算 canvas 宽高，保证在不同手机上清晰。
+        - 调用 `lottie.setup(canvas)` + `lottie.loadAnimation({ animationData: errorAnim, ... })` 播放动画。
+      - `stopLottie()`：
+        - 如果已有动画实例，调用 `destroy()` 并清空引用。
+      - `onConfirm()`：
+        - 向外触发 `confirm` 事件，方便页面通过 `bindconfirm` 监听点击。
+- 使用位置 / 对应页面：
+  - `pages/auth/realname/index.wxml`：
+    - `<ui-error-dialog show="{{showUserExist}}" message="该用户已存在，请直接登录" bindconfirm="onUserExistConfirm" />`。
+    - 当发现数据库中已有同名+同身份证的用户时弹出，点击「确定」后会走 `onUserExistConfirm()`，引导用户回到欢迎页直接登录。
+
+### 7.6 `components/chat/bubble` —— 聊天气泡
 
 - 文件：
   - `index.json`：声明组件。
@@ -458,13 +516,14 @@
 #### 8.1.1 `index.json`
 
 - 声明使用的组件：
-  - `ui-button`、`ui-field`、`ui-loading`。
+  - `ui-button`、`ui-field`、`ui-loading`、`ui-error-dialog`。
 - 设置导航栏标题为「实名注册」。
 
 #### 8.1.2 `index.wxml`
 
 - 结构：
   - `<ui-loading show="{{isLoading}}" />`：接口请求或定位时显示加载遮罩。
+  - `<ui-error-dialog ... />`：当检测到同一姓名+身份证的实名信息已存在时，弹出错误提示弹层，引导用户直接登录。
   - `.hero`：顶部文案，说明实名用途。
   - `.panel`：主体表单区域。
     - 表单字段：
@@ -488,7 +547,7 @@
 #### 8.1.4 `index.js`
 
 - 数据字段 `data`：
-  - `form`：表单内容，包括 `name`、`idNumber`、`phone`、`inviteCode`、`community`、`building`、`floor`、`unit`、`door`。
+  - `form`：表单内容，包括 `name`、`idNumber`、`phone`、`inviteCode`、`community`、`building`、`floor`、`door`。
   - `errors`：每个字段的错误消息。
   - `buildingRange`：楼栋选择列表（"1栋" 到 "23栋"）。
   - `buildingIndex`：当前选中的楼栋下标。
@@ -499,6 +558,7 @@
   - `isLoading`：整页 loading 状态，对应 `<ui-loading> show`。
   - `inCommunity`：当前定位是否在小区范围内。
   - `locationText`：定位结果说明文字。
+  - `showUserExist`：是否显示「该用户已存在」错误弹层。
 - 函数：
   - `onInput(e)`：
     - 根据 `data-key` 更新 `form` 某个字段。
@@ -521,11 +581,10 @@
     - 当前页面 WXML 中暂未启用该按钮，但逻辑已经写好，方便以后打开。
   - `async getLocation()`：
     - 用户点击「获取定位」按钮后调用。
-    - 调用 `wx.getLocation` 获取当前经纬度。
-    - 用 `distanceMeters` 对比 `config/community` 中配置的中心点和半径。
-    - 结果：
-      - 更新 `inCommunity` 布尔值。
-      - 更新 `locationText` 文案，如「已在花语云萃范围内（~120m）」或「不在小区范围」。
+    - 当前代码中，为了方便开发调试，直接把 `inCommunity` 设为 `true`，并把 `locationText` 改成「开发测试：已视为在小区范围内」，真实定位逻辑保留在注释里，上线前可以按注释恢复：
+      - 调用 `wx.getLocation` 获取当前经纬度。
+      - 用 `distanceMeters` 对比 `config/community` 中配置的中心点和半径。
+      - 根据距离更新 `inCommunity` 和 `locationText`（「已在花语云萃范围内（~120m）」或「不在小区范围」）。
   - `goBack()`：
     - 尝试返回上一个页面，如果失败则切换到底部「首页」 tab。
   - `submit()`：
@@ -536,56 +595,90 @@
       3. 定义内部异步函数 `checkAll()`：
          - 调用 `validateInvite` 校验小区邀请码。
          - 检查 `inCommunity`，如果不在范围，提示「请在小区内完成定位」。
-      4. 等 `checkAll()` 全部通过后：
-         - 调用 `db.collection(USER_COLLECTION).add(...)` 把实名信息写入云数据库。
-         - 在本地 `wx.setStorageSync('hyyc_user', {...})` 存一份，供后续页面快速读取。
-         - 弹出「实名完成」提示。
-         - 切换到底部「首页」 tab。
+      4. 等 `checkAll()` 全部通过后，先到云开发数据库的 `userInfo` 集合里查询是否已经存在同一姓名 + 同一身份证号的用户：
+         - 如果查到已有记录：
+           - 关闭 loading（`isLoading=false`）。
+           - 把 `showUserExist` 设为 `true`，弹出上一节的 `<ui-error-dialog>`，提示「该用户已存在，请直接登录」。
+           - 不再继续新增记录。
+      5. 只有在「校验通过」且「不存在已实名用户」的情况下：
+         - 调用 `db.collection(USER_COLLECTION).add({ data: {...} })` 把实名信息写入云数据库 `userInfo` 集合：
+           - 这里直接保存 `building`、`floor` 和 `door`，不再单独拆出「单元/户号」字段，`door` 本身已经包含楼层和户号（例如 `701` = 7 楼 01 户）。
+           - 额外写入 `realname: true`、`verified: true`、`createdAt: new Date()` 作为状态字段。
+         - 通过新增结果里的 `_id` 拿到这条用户记录在数据库里的唯一编号 `userId`。
+         - 在本地 `wx.setStorageSync('hyyc_user', {...})` 存一份用户信息：
+           - 内容为表单字段 + `id: userId` + `realname: true` + `verified: true`。
+           - 后续所有页面（发布任务、我的任务等）都通过这个 `id` 作为用户通用编号，比如写入任务里的 `ownerId`。
+         - 弹出「实名完成」提示，并切换到底部「首页」 tab。
+  - `onUserExistConfirm()`：
+    - 处理 `<ui-error-dialog>` 的确认按钮点击。
+    - 先把 `showUserExist` 设为 `false` 关闭弹层，然后通过 `wx.redirectTo` 跳转回欢迎页 `pages/auth/welcome/index`，让已有用户走登录流程。
 
 ---
 
-### 8.2 `pages/auth/welcome` —— 欢迎页（客厅动画）
+### 8.2 `pages/auth/welcome` —— 欢迎页（客厅动画 + 登录/注册入口）
 
 - 对应页面 / 按钮：
   - 页面：首次打开小程序且尚未实名时，从首页跳转到的欢迎页。
   - UI 元素：
-    - 顶部大号 Lottie 客厅动画。
+    - 顶部大号 Lottie 客厅动画（客厅场景）。
     - 中部「欢迎各位业主」标题和说明。
-    - 底部两个按钮样式的块：
-      - 「登录」
-      - 「注册」
-    - 目前这两个按钮还没有 `bindtap` 事件，后续可以在这里接入登录/注册流程。
+    - 底部两个卡片式按钮：
+      - 「登录」：调用登录流程。
+      - 「注册」：跳转到实名注册页。
 
 #### 8.2.1 `index.json`
 
-- 只设置了导航栏标题「欢迎」，暂未声明自定义组件。
+- 设置导航栏标题为「欢迎」。
+- 声明使用 `lottie-miniprogram` 相关能力（在 JS 中通过 `require('lottie-miniprogram')` 使用）。
 
 #### 8.2.2 `index.wxml`
 
-- `<view class="welcome-page">`：整体布局。
-- `hero-lottie-box` + `<canvas id="hero-canvas">`：用来播放 `living-room` 动画。
-- `.actions` 区域的两个 `view` 分别显示「登录」「注册」。
+- 根节点 `<view class="welcome-page">`：整体背景容器。
+- `.hero-card`：中间白色卡片，内部包含：
+  - `.hero-lottie-box` + `<canvas id="hero-canvas">`：播放客厅 Lottie 动画。
+  - `.hero-text`：标题 + 副标题。
+  - `.actions` 区域的两个按钮：
+    - `<view class="action-btn action-login" bindtap="onLoginTap">`：
+      - 当 `isLoading` 为 `true` 时显示「登录中…」，否则显示「登录」。
+    - `<view class="action-btn action-register" bindtap="onRegisterTap">注册</view>`：
+      - 纯跳转按钮，不做任何授权，只负责带用户去实名注册页。
 
 #### 8.2.3 `index.wxss`
 
-- 设置背景色与 Lottie 动画背景一致的浅橙色。
-- 调整卡片的阴影、圆角、字体为更温暖的风格。
-- `.action-login`、`.action-register` 为两种按钮样式（渐变和白底虚线）。
+- 设置浅橙色背景，与客厅动画风格统一。
+- `.hero-card` 负责白色卡片 + 阴影 + 圆角。
+- `.hero-lottie-box` / `.hero-lottie-canvas`：控制动画区域大小。
+- `.action-login`、`.action-register`：
+  - 统一的卡片式按钮基础样式。
+  - 登录按钮使用实心渐变；注册按钮使用白底描边样式。
 
 #### 8.2.4 `index.js`
 
-- 数据：当前只用一个空对象 `data: {}`。
+- 数据：
+  - `isLoading`：登录流程中的 loading 状态，防止多次点击。
 - 函数：
-  - `onReady()`：
-    - 页面首次渲染完成后调用 `playLottie()` 播放客厅动画。
+  - `onShow()` / `onReady()`：
+    - 页面显示或首次渲染时调用 `playLottie()`，启动客厅动画播放。
   - `onHide()` / `onUnload()`：
-    - 页面隐藏或销毁时调用 `stopLottie()` 停止动画，释放资源。
+    - 页面隐藏或销毁时调用 `stopLottie()`，销毁动画实例，释放资源。
+  - `onRegisterTap()`：
+    - 直接调用 `wx.navigateTo({ url: '/pages/auth/realname/index' })`，让用户去填写实名信息。
+  - `async onLoginTap()`：
+    - 如果已经在登录中（`isLoading=true`），直接返回，避免重复提交。
+    - 调用云函数 `login` 获取当前用户在本小程序下的 `openid`。
+    - 根据 `_openid` 到云开发数据库 `userInfo` 集合里查询实名信息：
+      - 未找到记录：弹框提示「尚未注册」，确认后跳转到实名页。
+      - 找到记录：
+        - 取出该文档的 `_id`，作为后续使用的通用 `id` 字段。
+        - 把用户对象（去掉 `_id`，补上 `id` 字段）缓存到本地 `wx.setStorageSync('hyyc_user', cachedUser)`。
+        - 弹出「登录成功」，稍作延时后 `wx.switchTab` 跳转到首页 `pages/home/index/index`。
+    - 整个过程中会用 `wx.showLoading` / `wx.hideLoading` 控制顶部系统 loading。
   - `playLottie()`：
-    - 查询 `#hero-canvas` 节点，按屏幕宽度计算 canvas 尺寸。
-    - 使用 `wx.getWindowInfo()`（老版本回退到 `wx.getSystemInfoSync()`）获取 `pixelRatio`。
-    - 设置动画循环播放，并把速度调成原来的一半，让动作更柔和。
+    - 使用 `this.createSelectorQuery().select('#hero-canvas').node(...)` 拿到 canvas。
+    - 根据屏幕宽度和 `pixelRatio` 计算 canvas 宽高，并用 `lottie-miniprogram` 播放 `living-room` 动画。
+    - 为了真机流畅度，限制了最大像素密度，并把画质设为 `medium`。
   - `stopLottie()`：
-    - 调用动画实例的 `destroy()` 方法并清空引用。
+    - 调用动画实例的 `destroy()` 方法，并清空内部引用。
 
 ---
 
@@ -616,6 +709,10 @@
   - 点击调用 `changeFilter` 更新筛选。
 - 任务列表：
   - 使用 `<block wx:for="{{list}}">` 渲染。
+  - 每条任务用 `<ui-card>` 展示：
+    - 标题：任务标题。
+    - 副标题：`{{item.community}} · 截止时间 {{item.deadlineText}}`：
+      - 当任务没有设置截止时间时，`deadlineText` 为「不限」。
   - 卡片右侧「详情」按钮：
     - 绑定 `bindtap="toDetail"`，通过 `data-id` 传入任务 ID。
 - 无数据提示：
@@ -639,15 +736,22 @@
       - 否则调用 `this.load()` 加载任务列表。
   - `changeFilter(e)`：
     - 根据 `e.currentTarget.dataset.k` 更新 `filter` 并再次调用 `load()`。
+  - `onLocationFilterChange(e)`：
+    - 「任务地点」下拉框的回调，根据用户选择更新 `locationFilter`（`"all"|"inside"|"outside"`）并重新加载任务列表。
   - `load()`：
     - 显示 loading。
-    - 从 `utils/mock.js` 读取任务数据，使用 `formatMoney`、`formatDate` 格式化金额和日期。
-    - 根据 `filter` 不同进行排序或过滤：
+    - 从云开发数据库 `tasks` 集合读取当前小区的任务列表，使用 `formatMoney`、`formatDateTime` 格式化金额和截止时间：
+      - 如果某条任务的 `deadline` 为空，映射为「不限」。
+    - 根据 `filter` 和 `locationFilter` 不同进行排序或过滤：
       - `"money"`：按金额从高到低排序。
       - `"new"`：按截止日期倒序。
       - `"building"`：
         - 如果用户未填写 `building`，弹出提示并引导去实名页补充。
         - 否则筛选出 `building` 等于用户楼栋的任务（如果任务本身没有 `building` 字段，则尝试从 `address` 中解析）。
+      - `locationFilter`：
+        - `"all"`：不过滤任务地点。
+        - `"inside"`：只保留任务字段 `locationType === 'inside'` 的任务（例如小区内帮忙拿快递）。
+        - `"outside"`：只保留 `locationType === 'outside'` 的任务（例如去商场或建材市场帮忙购买）。
     - 最后 `setData({ list, isLoading: false })`。
   - `parseBuilding(addr='')`：
     - 从地址字符串中用正则 `(...栋)` 粗略提取楼栋信息，用于兼容没有显式 `building` 字段的任务。
@@ -665,7 +769,6 @@
 - 对应页面 / 按钮：
   - 底部 tab 中间的「发布」。
   - 页内按钮：
-    - 「上传图片」按钮。
     - 下方「清空」和「发布」两个按钮。
 
 #### 8.4.1 `index.json`
@@ -678,9 +781,21 @@
 
 - `<ui-loading show="{{isLoading}}" />`。
 - 一组 `ui-field`：
-  - 标题、说明、佣金、截止日期、地址、发布楼栋、图片。
-- 「上传图片」按钮：
-  - `bindtap="chooseImg"`。
+  - 标题、说明、佣金、截止时间（日期 + 时刻）、发布楼栋、门牌号、图片。
+  - 「截止时间」这一行：
+    - 左侧是「截止时间（不填默认无限制时间）」标题，说明用户可以不填。
+    - 右侧是日期 picker + 时间 picker：
+      - 日期：`mode="date"`，`bindchange="onDeadlineDate"`。
+      - 时间：`mode="time"`，`bindchange="onDeadlineTime"`。
+    - 如果用户没有选完整的日期和时间，则 `form.deadline` 为空，表示「不限时间」。
+- 图片区域：
+  - 使用一个横向可换行的容器展示缩略图列表 + 加号：
+    - 每张图片：
+      - 用 `<image>` 显示方形缩略图，点击图片本身会调用 `previewFormImage` 打开大图预览。
+      - 右上角叠加一个小圆形「×」按钮，点击调用 `removeFormImage` 从当前表单里删除这张图片。
+    - 在已有图片后面有一个带虚线边框的正方形「+」占位格：
+      - `bindtap="chooseImg"`。
+      - 点击后调用 `wx.chooseImage` 继续添加图片。
 - 底部操作行：
   - 左侧「清空」→ `bindtap="reset"`。
   - 右侧「发布」→ `bindtap="submit"`。
@@ -688,33 +803,65 @@
 #### 8.4.3 `index.js`
 
 - 数据：
-  - `form`：发布任务的所有字段。
+  - `form`：发布任务的所有字段（包括 `title`、`desc`、`amount`、`deadline`、`deadlineDate`、`deadlineTime`、`building`、`floor`、`door`、`address`、`images` 等）。
   - `errors`：校验错误信息。
   - `buildingRange`、`buildingIndex`：楼栋选择。
+  - `doorRange`、`doorIndex`：门牌多列选择（楼层 + 户号）。
+  - `MAX_FLOOR`：最大楼层数，用于生成门牌选择列表。
   - `isLoading`：发布过程中的加载状态。
-- 函数：
+- 函数（仅列出主要逻辑）：
   - `onShow()`：
-    - 检查本地是否有实名信息：
-      - 未实名时直接跳转到实名页。
-    - 初始化楼栋列表，并默认选中用户楼栋。
+    - 从本地缓存 `wx.getStorageSync('hyyc_user')` 读取用户：
+      - 如果未实名（`!u.realname`），跳转到实名页。
+    - 初始化：
+      - 楼栋列表：`1-23栋`。
+      - 楼层列表：`1-MAX_FLOOR 楼`。
+      - 户号列表：`01户-04户`。
+    - 根据实名信息预填楼栋和门牌：
+      - 优先使用用户的 `building` 作为默认楼栋。
+      - 从用户的 `door`（比如 `"701"`）反推出楼层（`"7"`）和第几户（`01` → 第 1 户）。
+      - 更新 `doorIndex`，并拼出任务地址「X栋Y单元」，写入 `form.building`、`form.floor`、`form.door`、`form.address`。
   - `onInput(e)`：
-    - 根据 `data-k` 更新对应表单字段。
-  - `onDate(e)`：
-    - 更新 `form.deadline`。
+    - 根据 `data-k` 更新对应表单字段，例如标题、说明、佣金等。
+  - `onDeadlineDate(e)` / `onDeadlineTime(e)`：
+    - 分别更新日期和时间字段。
+    - 当日期和时间都有值时，把它们拼成完整的 `form.deadline`（`"YYYY-MM-DD HH:mm"`）；否则让 `form.deadline` 为空。
   - `chooseImg()`：
     - 调用 `wx.chooseImage` 选择最多 3 张图片。
-    - 结果追加到 `form.images`。
+    - 把返回的本地临时路径追加到 `form.images`，后续提交时统一上传到云存储。
   - `reset()`：
-    - 把 `form` 重置为初始空值，同时清空 `errors`。
-  - `submit()`：
-    - 使用 `required()` 校验所有必填项。
-    - 如果有错误，写入 `errors` 并中断。
-    - 否则：
-      - 设置 `isLoading=true`，模拟 1 秒提交流程。
-      - 提交完成后弹出「已发布（演示）」。
-      - 切回首页 tab。
+    - 清空标题、说明、佣金、截止时间和图片，保留预填的楼栋和门牌。
+    - 同时清空 `errors`。
+  - `previewFormImage(e)`：
+    - 读取被点击图片在 `form.images` 里的下标 `index`。
+    - 调用 `wx.previewImage({ current, urls })` 预览当前图片，并可以左右滑动查看同一任务里的其他图片。
+  - `removeFormImage(e)`：
+    - 根据 `data-index` 从 `form.images` 数组里移除对应图片，实现「右上角叉号删除」效果。
+  - `async submit()`：
+    - 使用 `required()` 校验必填项：
+      - 标题、佣金、发布楼栋、门牌号。
+      - 截止时间不再强制必填，不填就视为「不限」。
+    - 再次从本地读取 `hyyc_user`，未实名则引导去实名。
+    - 提交流程：
+      1. 把 `form.images` 里的本地临时路径逐个上传到云存储 `wx.cloud.uploadFile`：
+         - 云端路径约定为：`tasks/<用户id>/<时间戳>_序号.jpg`。
+         - 上传成功后收集得到一组 `fileID`。
+      2. 如果 `form.deadline` 有值，把 `"YYYY-MM-DD HH:mm"` 转成时间戳（毫秒）存入 `deadline` 字段；没有值就写 `null`，后续展示为「不限」。
+      3. 调用 `db.collection('tasks').add({ data: {...} })` 写入一条任务记录：
+         - 核心字段包括：`title`、`desc`、`amount`（数字）、`deadline`（时间戳或 `null`）、`community`、`building`、`door`、`address`、`locationType`（任务地点，可为空、`inside`、`outside`）、`images`（fileID 数组）、`ownerId`、`ownerName`、`ownerNickname`、`status: 'posted'`、`createdAt: db.serverDate()`。
+    - 成功后：
+      - `toast('已发布')`。
+      - 把 `isLoading` 设回 `false`。
+      - 切回首页 tab：`wx.switchTab({ url: '/pages/home/index/index' })`。
+    - 出错时：
+      - 打印日志，关闭 loading，并用 `toast('发布失败，请稍后重试')` 提示用户。
   - `onBuilding(e)`：
-    - 选择楼栋 picker 的回调，更新 `buildingIndex` 和 `form.building`。
+    - 楼栋 picker 的回调。
+    - 根据用户选择更新 `buildingIndex`、`form.building`，并根据当前门牌重新拼接地址「X栋Y单元」。
+  - `onDoorChange(e)`：
+    - 多列选择门牌（楼层 + 户号）。
+       - 通过两列下标反推楼层（第几层）和第几户，再组合生成 `door`（例如 `7 楼 + 第 1 户 → "701"`）。
+       - 同时更新 `form.floor`、`form.door` 和中文地址 `form.address`。
 
 ---
 
@@ -742,6 +889,9 @@
 - `<ui-loading show="{{isLoading}}" />`。
 - 上半部分任务信息卡片：
   - 显示标题、社区+地址、金额、状态、描述、图片列表。
+  - 图片区域：
+    - 使用 `<image wx:for="{{task.images}}">` 渲染所有凭证图片。
+    - 点击任意一张图片会调用 `previewTaskImage`，通过 `wx.previewImage` 打开大图预览，并可左右滑动查看该任务所有图片。
 - 下半部分操作区：
   - 根据 `isOwner`、`accepted` 不同切换不同按钮组（接单、沟通、提交、确认完成）。
 
@@ -754,9 +904,12 @@
   - `isLoading`：加载状态。
 - 函数：
   - `onLoad(q)`：
-    - 根据 `q.id` 在 `tasks` 假数据中找到对应任务，没有则退回第一个。
-    - 使用 `formatMoney`、`formatDate` 格式化金额和截止日期。
-    - 设置 `isOwner` 和 `accepted`。
+    - 根据 `q.id` 在云开发数据库 `tasks` 集合中读取对应任务。
+    - 使用 `formatMoney`、`formatDateTime` 格式化金额和截止时间（未设置截止时间时展示为「不限」）。
+    - 设置 `isOwner` 和 `accepted`（根据 URL 参数 `role`、`accepted` 判断）。
+  - `previewTaskImage(e)`：
+    - 读取被点击图片在 `task.images` 里的下标 `index`。
+    - 调用 `wx.previewImage({ current, urls })` 预览当前图片。
   - `accept()`：
     - 对应「接受任务」按钮。
     - 简单弹出「已接受（演示）」提示，并把 `accepted` 设为 `true`。
@@ -907,7 +1060,6 @@
   - 页内按钮/条目：
     - 「我的任务」→ `gotoMyTasks()`。
     - 「我的钱包」→ `gotoWallet()`。
-    - 「实名认证」→ `gotoRealname()`。
     - 「测试云函数（login）」→ `testCloudFunction()`。
     - 「退出登录」→ `logout()`。
 
@@ -937,8 +1089,6 @@
     - 跳转到 `pages/my/tasks/index`。
   - `gotoWallet()`：
     - 跳转到 `pages/wallet/index/index`。
-  - `gotoRealname()`：
-    - 跳转到 `pages/auth/realname/index`。
   - `async testCloudFunction()`：
     - 对应「测试云函数（login）」条目。
     - 调用 `wx.cloud.callFunction({ name: 'login' })`。
@@ -957,7 +1107,7 @@
   - 从「我的」页面的「我的任务」条目进入。
   - 页内按钮：
     - 顶部两个标签：「我发布的」「我接受的」。
-    - 每条任务卡片右侧「查看」按钮。
+    - 每条任务卡片右侧「删除」（仅在「我发布的」标签下出现）和「查看」按钮。
 
 #### 8.10.1 `index.json`
 
@@ -970,9 +1120,21 @@
 - 顶部 tab：
   - 「我发布的」和「我接受的」两个 `view`，根据 `tab` 高亮。
 - 列表：
-  - 每条任务卡片下方有一个「查看」按钮，绑定 `toDetail`，通过：
-    - `data-id` 传任务 ID。
-    - `data-role` 在「我发布的」时传 `"owner"`，在「我接受的」时传空串。
+  - 每条任务卡片显示：
+    - 标题。
+    - 「截止 {{item.deadlineText}}」，其中 `deadlineText` 为格式化后的截止时间，未设置时为「不限」。
+    - 金额（例如 `¥ 5.00`）。
+  - 右侧按钮区域：
+    - 在「我发布的」标签下：
+      - 「删除」按钮：
+        - `bindtap="onDeleteTask"`，只在 `tab === 'owner'` 时展示。
+        - 使用 `data-id="{{item.id}}"` 传入任务 ID。
+      - 「查看」按钮：
+        - `bindtap="toDetail"`，同时通过：
+          - `data-id` 传任务 ID。
+          - `data-role="owner"` 告诉详情页当前用户是发布者。
+    - 在「我接受的」标签下：
+      - 只显示「查看」按钮，不显示「删除」。
 
 #### 8.10.3 `index.js`
 
@@ -986,9 +1148,16 @@
   - `setTab(e)`：
     - 更新 `tab` 为 `owner` 或 `worker`，然后重新 `load()`。
   - `load()`：
-    - 模拟 600ms 加载。
-    - 使用 `tasks` 假数据生成列表，统一格式化金额和日期。
-    - 当前 demo 中「我发布的」「我接受的」两种 tab 展示的是同一批数据，后期接真实接口时可以分开。
+    - 根据当前 tab 从云开发数据库 `tasks` 集合中加载对应的任务列表：
+      - `owner`：查询 `ownerId` 为当前用户的任务（我发布的）。
+      - `worker`：查询 `workerId` 为当前用户的任务（我接受的，当前暂未真正接单，通常为空）。
+    - 使用 `formatMoney`、`formatDateTime` 格式化金额和截止时间，并在 `deadline` 为空时把 `deadlineText` 设为「不限」。
+  - `async onDeleteTask(e)`：
+    - 只在 `tab === 'owner'`（我发布的）时生效。
+    - 从 `e.currentTarget.dataset.id` 读取任务 ID。
+    - 调用 `confirm('确定要删除这个任务吗？删除后无法恢复。', '删除任务')` 让用户确认。
+    - 确认后调用 `db.collection(TASK_COLLECTION).doc(id).remove()` 删除云数据库里的这条任务。
+    - 删除成功后 `toast('已删除')` 并重新调用 `load()` 刷新列表；失败时提示「删除失败，请稍后重试」。
   - `toDetail(e)`：
     - 从 `e.currentTarget.dataset` 中取出任务 `id` 和 `role`。
     - 跳转到 `pages/task/detail/index`，同时传入 `role`（用于决定是否显示「确认完成」按钮）和 `accepted=1`（演示用）。
@@ -1081,4 +1250,3 @@
 - `node_modules/**`：
   - Node 环境下的依赖，例如 Babel 运行时和 Lottie SDK。
   - 仅在本地构建或脚本执行时参与，不会直接出现在小程序包体内。
-

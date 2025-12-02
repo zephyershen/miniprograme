@@ -1,0 +1,85 @@
+@import "../../../styles/shadcn.wxss";
+
+page {
+  background-color: #FAF7F5;
+  /* 给页面底部预留出安全区高度，避免内容被 iPhone 底部横条挡住 */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.page {
+  padding: 24rpx;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  font-size: 26rpx;
+  color: #6B7280;
+  margin-bottom: 8rpx;
+}
+
+.control {
+  height: 80rpx;
+  padding: 0 24rpx;
+  border-radius: 16rpx;
+  border: 1rpx solid #E5E7EB;
+  background-color: #FFFFFF;
+  font-size: 30rpx;
+}
+
+.control.readonly {
+  background-color: #F3F4F6;
+  color: #9CA3AF;
+}
+
+.select-control {
+  height: 80rpx;
+  padding: 0 24rpx;
+  border-radius: 16rpx;
+  border: 1rpx solid #E5E7EB;
+  background-color: #FFFFFF;
+  font-size: 30rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.actions {
+  margin-top: 32rpx;
+}
+
+.btn-primary {
+  width: 100%;
+  height: 88rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #FDBA74 0%, #FB7185 100%);
+  color: #FFFFFF;
+  font-size: 30rpx;
+  font-weight: 600;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0; /* 避免默认内边距影响居中 */
+}
+
+.contact-card {
+  margin: 24rpx;
+}
+
+.contact-tip {
+  font-size: 24rpx;
+  color: #9CA3AF;
+  line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+}

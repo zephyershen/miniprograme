@@ -9,7 +9,11 @@
     </view>
 
     <view class="actions">
-      <view class="action-btn action-login">登录</view>
+      <view class="action-btn action-login" bindtap="onLoginTap">
+        <block wx:if="{{isLoading}}">登录中…</block>
+        <block wx:else>登录</block>
+      </view>
+      <!-- 暂时关闭一键获取手机号/用户信息，注册按钮只负责跳转到实名注册页 -->
       <view class="action-btn action-register" bindtap="onRegisterTap">注册</view>
     </view>
   </view>
