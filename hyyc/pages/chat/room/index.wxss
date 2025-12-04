@@ -1,2 +1,98 @@
 @import "../../../styles/shadcn.wxss";
 
+/* 聊天页面容器，使用 flex 纵向布局 */
+.chat-container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* 防止整体溢出 */
+}
+
+/* 头部区域：显示对方昵称/姓名 */
+.chat-header {
+  flex-shrink: 0;
+  height: 88rpx;
+  /* 头部背景改为灰色 */
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 适配状态栏 */
+  padding-top: constant(safe-area-inset-top);
+  padding-top: env(safe-area-inset-top);
+}
+
+.chat-header-title {
+  font-size: 34rpx;
+  font-weight: 500;
+  /* 灰色背景下使用深色文字，保证可读性 */
+  color: #111827;
+}
+
+/* 聊天消息滚动区域 */
+.chat-scroll {
+  flex: 1;
+  min-height: 0; /* 关键：允许 flex 子元素正确收缩，使滚动生效 */
+  padding: 16rpx 24rpx; /* 左右保持安全距离 */
+  box-sizing: border-box;
+}
+
+/* 初始加载时隐藏内容，防止看到从顶部滚动到底部的过程 */
+.chat-scroll-hidden {
+  opacity: 0;
+}
+
+/* 底部输入栏，使用 flex 布局而非 fixed 定位 */
+.chat-input-safe {
+  flex-shrink: 0; /* 不被压缩 */
+  background: #ffffff;
+  border-top: 1px solid #e5e7eb;
+  /* 基础间距，动态 padding 由 style 属性控制 */
+  padding-bottom: 16rpx;
+}
+
+.chat-input-bar {
+  padding: 12rpx 16rpx;
+}
+
+/* 底部加号按钮：模仿微信的圆形加号样式 */
+.chat-plus-btn {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  border: 2rpx solid #d1d5db;
+  position: relative;
+  margin-right: 16rpx;
+  box-sizing: border-box;
+}
+
+.chat-plus-btn:active {
+  background-color: #f3f4f6;
+}
+
+/* 加号的横竖两条线，绝对居中，保证视觉在圆心 */
+.chat-plus-line {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  background-color: #4b5563;
+  border-radius: 999px;
+}
+
+.chat-plus-line-h {
+  width: 32rpx;
+  height: 4rpx;
+  transform: translate(-50%, -50%);
+}
+
+.chat-plus-line-v {
+  width: 4rpx;
+  height: 32rpx;
+  transform: translate(-50%, -50%);
+}
+
+/* 文本输入框占满剩余空间，用外边距留出间距 */
+.chat-input {
+  flex: 1;
+  margin-right: 12rpx;
+}

@@ -94,30 +94,48 @@ Page({
       const peerUserId = doc.peerUserId || '';
       if (!peerUserId) return;
 
-      const ts = doc.createTime instanceof Date
-        ? doc.createTime.getTime()
-        : doc.createTime;
+      // 获取消息的时间戳（用于比较哪条是最新的）
+      let ts = 0;
+      if (doc.createTime instanceof Date) {
+        ts = doc.createTime.getTime();
+      } else if (typeof doc.createTime === 'number') {
+        ts = doc.createTime;
+      } else if (doc.createTime && doc.createTime.$date) {
+        // 云数据库服务器时间格式
+        ts = doc.createTime.$date;
+      }
       const lastTimeText = ts ? formatDateTime(ts) : '';
 
-      let peerName = '住户';
-      if (doc.fromUserId === peerUserId && doc.fromNickname) {
-        peerName = doc.fromNickname;
-      }
-
       const isText = doc.type === 'text';
-      const lastText = isText
-        ? (doc.text || '')
-        : '[图片]';
+      const lastText = isText ? (doc.text || '') : '[图片]';
+
+      // 如果消息是住户发送的，记录住户昵称
+      const isPeerSent = doc.fromUserId === peerUserId;
+      const peerNameFromDoc = isPeerSent && doc.fromNickname ? doc.fromNickname : '';
 
       if (!map[peerUserId]) {
+        // 首次遇到该住户，初始化会话
         map[peerUserId] = {
           peerUserId,
-          peerName,
+          peerName: peerNameFromDoc || '住户',
           lastType: doc.type || 'text',
           lastText,
           lastTimeText,
+          lastTs: ts, // 记录时间戳，用于后续比较
           unreadCount: 0
         };
+      } else {
+        // 已有该住户的会话，更新最新消息（比较时间戳）
+        if (ts > map[peerUserId].lastTs) {
+          map[peerUserId].lastType = doc.type || 'text';
+          map[peerUserId].lastText = lastText;
+          map[peerUserId].lastTimeText = lastTimeText;
+          map[peerUserId].lastTs = ts;
+        }
+        // 如果还没有住户昵称，尝试从住户发送的消息中获取
+        if (map[peerUserId].peerName === '住户' && peerNameFromDoc) {
+          map[peerUserId].peerName = peerNameFromDoc;
+        }
       }
 
       // 统计未读：来自住户，且 readByOwner !== true
@@ -126,7 +144,10 @@ Page({
       }
     });
 
-    return Object.keys(map).map(k => map[k]);
+    // 转为数组并按最新消息时间降序排序
+    return Object.keys(map)
+      .map(k => map[k])
+      .sort((a, b) => (b.lastTs || 0) - (a.lastTs || 0));
   },
 
   // 会话列表的实时监听：保证业主停留在本页时，列表和未读角标实时刷新

@@ -1,5 +1,5 @@
 <view class="row" style="margin: 8rpx 0; justify-content: {{mine?'flex-end':'flex-start'}};">
-  <view wx:if="{{!mine}}" class="avatar" style="margin-right:12rpx;"></view>
+  <view wx:if="{{!mine}}" class="avatar chat-avatar" style="margin-right:12rpx;"></view>
   <view class="bubble {{mine?'bubble-mine':'bubble-other'}}">
     <block wx:if="{{type === 'text'}}">
       <text class="text-base">{{text}}</text>
@@ -13,5 +13,5 @@
       />
     </block>
   </view>
-  <view wx:if="{{mine}}" class="avatar" style="margin-left:12rpx;"></view>
+  <view wx:if="{{mine}}" class="avatar chat-avatar" style="margin-left:12rpx;"></view>
 </view>

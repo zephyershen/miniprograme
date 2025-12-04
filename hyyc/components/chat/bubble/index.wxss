@@ -4,3 +4,9 @@
 .bubble-mine { background: #65c3c8; color: #ffffff; border-color: #65c3c8; }
 .bubble-other { background: #ffffff; color: #2b3440; border-color: #e7e2de; }
 .bubble-image { max-width: 400rpx; max-height: 400rpx; border-radius: 12rpx; display: block; }
+
+/* 聊天气泡里的头像，略大于默认 avatar，但小于 avatar-lg */
+.chat-avatar {
+  width: 80rpx;
+  height: 80rpx;
+}

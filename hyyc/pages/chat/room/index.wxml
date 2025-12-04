@@ -1,6 +1,21 @@
 <ui-loading show="{{isLoading}}" />
-<view class="col" style="height:100vh;">
-  <scroll-view scroll-y style="flex:1; padding: 16rpx 24rpx;" scroll-with-animation="true" scroll-into-view="{{toView}}">
+<!-- 整个页面用纵向布局铺满可见区域 -->
+<view class="chat-container">
+  <!-- 头部：显示对方昵称/姓名 -->
+  <view class="chat-header">
+    <view class="chat-header-title">{{peerDisplayName || '对方'}}</view>
+  </view>
+
+  <!-- 聊天消息区域：内部滚动 -->
+  <scroll-view
+    class="chat-scroll {{contentReady ? '' : 'chat-scroll-hidden'}}"
+    scroll-y
+    enhanced="{{true}}"
+    show-scrollbar="{{false}}"
+    scroll-with-animation="{{scrollWithAnimation}}"
+    scroll-top="{{scrollTop}}"
+    bindscroll="onScroll"
+  >
     <block wx:for="{{msgs}}" wx:key="id">
       <chat-bubble
         id="m{{item.id}}"
@@ -11,9 +26,16 @@
       />
     </block>
   </scroll-view>
-  <view class="row" style="padding: 12rpx 16rpx; background:#fff; border-top:1px solid #e5e7eb;">
-    <view class="btn btn-outline btn-sm" style="margin-right:12rpx;" bindtap="chooseImage">图片</view>
-    <input class="input" style="flex:1;margin-right:12rpx;" placeholder="输入消息" value="{{text}}" bindinput="onInput"/>
-    <view class="btn btn-primary btn-sm" bindtap="send">发送</view>
+
+  <!-- 底部输入栏，使用 flex 布局而非 fixed 定位 -->
+  <view class="chat-input-safe" style="padding-bottom: calc(16rpx + {{keyboardHeight}}px + env(safe-area-inset-bottom));">
+    <view class="row chat-input-bar">
+      <view class="chat-plus-btn" bindtap="openMediaActions">
+        <view class="chat-plus-line chat-plus-line-h"></view>
+        <view class="chat-plus-line chat-plus-line-v"></view>
+      </view>
+      <input class="input chat-input" placeholder="输入消息" value="{{text}}" bindinput="onInput" adjust-position="{{false}}" hold-keyboard="{{true}}"/>
+      <view class="btn btn-primary btn-sm" bindtap="send">发送</view>
+    </view>
   </view>
 </view>
