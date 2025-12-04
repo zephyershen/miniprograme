@@ -23,6 +23,9 @@ Page({
       // 任务地点类型：''（不区分）|'inside'（小区内）|'outside'（小区外）
       locationType: ''
     },
+    // 截止日期 / 时间选择器的默认定位值（不直接写入表单，只用来让选择器初始停在“现在”）
+    defaultDeadlineDate: '',
+    defaultDeadlineTime: '',
     errors: {},
     buildingRange: [],
     buildingIndex: 0,
@@ -30,7 +33,9 @@ Page({
     doorRange: [[], []],
     doorIndex: [0, 0],
     MAX_FLOOR: 33,
-    isLoading: false
+    isLoading: false,
+    // 如果为编辑模式，则这里保存正在编辑的任务 ID；空字符串表示新建
+    editTaskId: ''
   },
   onShow(){
     const u = wx.getStorageSync('hyyc_user');
@@ -60,18 +65,127 @@ Page({
 
     const buildingText = buildings[idx] || '';
     // 任务地址：沿用注册时的形式「3栋1单元」
-	    const roomLabel = String(roomNoRaw);
-	    const addr = buildingText ? `${buildingText} ${roomLabel}单元` : '';
+    const roomLabel = String(roomNoRaw);
+    const addr = buildingText ? `${buildingText} ${roomLabel}单元` : '';
+
+    // 计算当前日期和时间，用来作为日期/时间选择器的初始定位值
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const todayStr = `${y}-${m}-${day}`;
+    let timeStr = `${hh}:${mm}`;
+    // 为了兼容 time 选择器的 start / end 限制，把默认时间限制在 06:00~23:00 之间
+    const startTime = '06:00';
+    const endTime = '23:00';
+    if (timeStr < startTime) timeStr = startTime;
+    if (timeStr > endTime) timeStr = endTime;
+
+    // 先根据实名信息初始化基础表单：
+    // - 不再在这里清空标题/说明/佣金等，避免用户填写一半去选图片后内容被重置。
+    // - 如果后面检测到是编辑模式，会再用旧任务数据覆盖这些字段。
+    // - 已经选过的图片（form.images）默认保留。
+    const prevForm = this.data.form || {};
+    const baseForm = {
+      ...prevForm,
+      // 已经输入过的内容全部保留，只在缺省时用实名信息补充地址相关字段
+      building: prevForm.building || buildingText,
+      floor: prevForm.floor || String(floorNum),
+      door: prevForm.door || door,
+      address: prevForm.address || addr,
+      // 保证 images 始终是数组
+      images: Array.isArray(prevForm.images) ? prevForm.images : []
+    };
 
     this.setData({
       buildingRange: buildings,
       doorRange: [floors, rooms],
       buildingIndex: idx,
       doorIndex: [floorIdx, roomIdx],
-      'form.building': buildingText,
-      'form.floor': String(floorNum),
-      'form.door': door,
-      'form.address': addr
+      form: baseForm,
+      defaultDeadlineDate: todayStr,
+      defaultDeadlineTime: timeStr
+    });
+
+    // 检查是否有「编辑任务」的暂存 ID
+    const editId = wx.getStorageSync('hyyc_edit_task_id') || '';
+    if (editId) {
+      // 优先从本地缓存的任务对象里直接回填，避免再次请求云端
+      const cachedTask = wx.getStorageSync('hyyc_edit_task_data') || null;
+      wx.setNavigationBarTitle({ title: '编辑任务' });
+      this.setData({ editTaskId: editId });
+      if (cachedTask) {
+        this.fillFormFromTask(cachedTask, editId);
+      } else {
+        // 兜底：如果本地没有任务对象，再从云端拉一次
+        this.loadTaskForEdit(editId);
+      }
+      // 用一次就清掉，避免下次进来误用
+      wx.removeStorageSync('hyyc_edit_task_id');
+      wx.removeStorageSync('hyyc_edit_task_data');
+    } else {
+      // 新建模式：恢复默认标题
+      wx.setNavigationBarTitle({ title: '发布任务' });
+      this.setData({ editTaskId: '' });
+    }
+  },
+  // 根据一条任务记录（本地或云端）回填表单
+  fillFormFromTask(task={}, id){
+    const t = task || {};
+    // 把时间戳还原成日期和时间字符串
+    let deadlineDate = '';
+    let deadlineTime = '';
+    let deadlineStr = '';
+    if (t.deadline) {
+      const d = new Date(t.deadline);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      deadlineDate = `${y}-${m}-${day}`;
+      deadlineTime = `${hh}:${mm}`;
+      deadlineStr = `${deadlineDate} ${deadlineTime}`;
+    }
+
+    this.setData({
+      editTaskId: id || this.data.editTaskId,
+      form: {
+        ...this.data.form,
+        title: t.title || '',
+        desc: t.desc || '',
+        amount: (t.amount != null ? String(t.amount) : ''),
+        deadline: deadlineStr,
+        deadlineDate,
+        deadlineTime,
+        // 地址和楼栋：优先用任务里保存的，其次用默认值
+        address: t.address || this.data.form.address,
+        images: t.images || [],
+        building: t.building || this.data.form.building,
+        floor: t.floor || this.data.form.floor,
+        door: t.door || this.data.form.door,
+        // 任务地点类型：未设置时为空字符串
+        locationType: t.locationType || ''
+      },
+      isLoading: false
+    });
+  },
+  // 加载任务数据用于编辑，把云端的任务信息填回表单
+  loadTaskForEdit(id){
+    if (!id) return;
+    this.setData({ isLoading: true });
+    db.collection(TASK_COLLECTION).doc(id).get({
+      success: (res) => {
+        const t = res.data || {};
+        this.fillFormFromTask(t, id);
+      },
+      fail: (err) => {
+        console.error('加载任务用于编辑失败', err);
+        this.setData({ isLoading: false, editTaskId: '' });
+        toast('任务不存在或已被删除');
+      }
     });
   },
   onInput(e){ const k=e.currentTarget.dataset.k; this.setData({ [`form.${k}`]: e.detail.value }); },
@@ -187,31 +301,57 @@ Page({
         deadlineTs = d.getTime();
       }
 
-      // 3. 写入 tasks 集合
-      await db.collection(TASK_COLLECTION).add({
-        data: {
-          title: f.title,
-          desc: f.desc,
-          amount: Number(f.amount),
-          deadline: deadlineTs,
-          community: u.community || '',
-          building: f.building,
-          // 只在任务集合里保存楼栋和门牌号（door），不再拆出单独的户号字段
-          door: f.door,
-          address: f.address,
-          // 任务地点类型：小区内/小区外；未选择则为空字符串
-          locationType: f.locationType || '',
-          images: fileIDs,
-          ownerId: u.id || '',
-          ownerName: u.name || '',
-          ownerNickname: u.nickname || '',
-          status: 'posted',
-          createdAt: db.serverDate()
-        }
-      });
+      // 3. 根据是否有 editTaskId 决定是「新建」还是「更新」
+      const editId = this.data.editTaskId;
+      if (editId) {
+        // 编辑已有任务：只更新可修改的字段
+        await db.collection(TASK_COLLECTION).doc(editId).update({
+          data: {
+            title: f.title,
+            desc: f.desc,
+            amount: Number(f.amount),
+            deadline: deadlineTs,
+            building: f.building,
+            door: f.door,
+            address: f.address,
+            // 任务地点类型：小区内/小区外；未选择则为空字符串
+            locationType: f.locationType || '',
+            images: fileIDs
+          }
+        });
+        toast('已更新');
+      } else {
+        // 新建任务：写入一条新记录
+        await db.collection(TASK_COLLECTION).add({
+          data: {
+            title: f.title,
+            desc: f.desc,
+            amount: Number(f.amount),
+            deadline: deadlineTs,
+            community: u.community || '',
+            building: f.building,
+            // 只在任务集合里保存楼栋和门牌号（door），不再拆出单独的户号字段
+            door: f.door,
+            address: f.address,
+            // 任务地点类型：小区内/小区外；未选择则为空字符串
+            locationType: f.locationType || '',
+            images: fileIDs,
+            ownerId: u.id || '',
+            ownerName: u.name || '',
+            ownerNickname: u.nickname || '',
+            status: 'posted',
+            createdAt: db.serverDate()
+          }
+        });
+        toast('已发布');
+      }
 
-      toast('已发布');
-      this.setData({ isLoading: false });
+      // 发布 / 更新成功后：
+      // 1. 把表单重置成“空白状态”（但保留楼栋和门牌等提示），方便下一次发布；
+      // 2. 再切回任务广场。
+      this.setData({ isLoading: false, editTaskId: '' });
+      this.reset();
+      // 保存或新建成功后，统一回到任务广场
       wx.switchTab({ url: '/pages/home/index/index' });
     } catch (err) {
       console.error('发布任务失败', err);

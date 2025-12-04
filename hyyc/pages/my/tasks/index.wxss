@@ -1,2 +1,152 @@
 @import "../../../styles/shadcn.wxss";
 
+/* 我的任务：状态指示（生效中 / 已过期） */
+.my-task-status {
+  display: flex;
+  align-items: center;
+  margin-right: 12rpx;
+}
+
+.my-task-status-dot {
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 9999rpx;
+  background: #22C55E;
+  box-shadow: 0 0 0 4rpx rgba(34, 197, 94, 0.30);
+  animation: myTaskDotPulseGreen 1.6s ease-in-out infinite;
+}
+
+/* 过期任务：红色发光点 */
+.my-task-status-dot-expired {
+  background: #EF4444;
+  box-shadow: 0 0 0 4rpx rgba(239, 68, 68, 0.30);
+  animation: myTaskDotPulseRed 1.6s ease-in-out infinite;
+}
+
+.my-task-status-text {
+  display: flex;
+  align-items: center;
+  font-size: 22rpx;
+  color: #16A34A;
+  margin-left: 8rpx;
+}
+
+.my-task-status-text-expired {
+  display: flex;
+  align-items: center;
+  font-size: 22rpx;
+  color: #B91C1C;
+  margin-left: 8rpx;
+}
+
+/* 绿色点呼吸动画 */
+@keyframes myTaskDotPulseGreen {
+  0% {
+    box-shadow: 0 0 0 2rpx rgba(34, 197, 94, 0.08);
+  }
+  50% {
+    box-shadow: 0 0 0 8rpx rgba(34, 197, 94, 0.32);
+  }
+  100% {
+    box-shadow: 0 0 0 2rpx rgba(34, 197, 94, 0.08);
+  }
+}
+
+/* 红色点呼吸动画 */
+@keyframes myTaskDotPulseRed {
+  0% {
+    box-shadow: 0 0 0 2rpx rgba(239, 68, 68, 0.08);
+  }
+  50% {
+    box-shadow: 0 0 0 8rpx rgba(239, 68, 68, 0.32);
+  }
+  100% {
+    box-shadow: 0 0 0 2rpx rgba(239, 68, 68, 0.08);
+  }
+}
+
+/* ========== 批量删除相关样式 ========== */
+
+/* 批量操作栏 */
+.batch-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 24rpx;
+  background: #F8FAFC;
+  border-radius: 16rpx;
+  border: 1rpx solid #E2E8F0;
+}
+
+.batch-bar-left {
+  display: flex;
+  align-items: center;
+}
+
+.batch-bar-text {
+  font-size: 28rpx;
+  color: #475569;
+  margin-left: 16rpx;
+}
+
+/* 复选框 */
+.batch-checkbox {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 8rpx;
+  border: 2rpx solid #CBD5E1;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  color: #fff;
+  transition: all 0.2s;
+}
+
+.batch-checkbox-checked {
+  background: #3B82F6;
+  border-color: #3B82F6;
+}
+
+/* 半选状态 */
+.batch-checkbox-partial {
+  background: #fff;
+  border-color: #3B82F6;
+  color: #3B82F6;
+}
+
+/* 任务项容器 */
+.batch-item-wrapper {
+  display: flex;
+  align-items: flex-start;
+}
+
+.batch-checkbox-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 32rpx;
+  padding-right: 16rpx;
+}
+
+.batch-item-card {
+  flex: 1;
+}
+
+.batch-item-card-indent {
+  /* 批量模式下卡片自动适应剩余空间 */
+}
+
+/* 危险按钮 */
+.btn-danger {
+  background: #EF4444 !important;
+  color: #fff !important;
+  border-color: #EF4444 !important;
+}
+
+/* 禁用按钮 */
+.btn-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}

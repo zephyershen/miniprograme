@@ -23,14 +23,14 @@
         hint="（不填默认无限制时间）"
         error="{{errors.deadline || ''}}">
         <view class="row">
-          <picker mode="date" value="{{form.deadlineDate}}" bindchange="onDeadlineDate">
+          <picker mode="date" value="{{form.deadlineDate || defaultDeadlineDate}}" bindchange="onDeadlineDate">
             <view class="input input-half row space-between">
               <text>{{form.deadlineDate || '选择日期'}}</text>
               <text>›</text>
             </view>
           </picker>
           <view style="width: 16rpx;"></view>
-          <picker mode="time" value="{{form.deadlineTime}}" start="06:00" end="23:00" bindchange="onDeadlineTime">
+          <picker mode="time" value="{{form.deadlineTime || defaultDeadlineTime}}" start="06:00" end="23:00" bindchange="onDeadlineTime">
             <view class="input input-half row space-between">
               <text>{{form.deadlineTime || '选择时间'}}</text>
               <text>›</text>

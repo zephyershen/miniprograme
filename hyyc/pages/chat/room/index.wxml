@@ -2,12 +2,18 @@
 <view class="col" style="height:100vh;">
   <scroll-view scroll-y style="flex:1; padding: 16rpx 24rpx;" scroll-with-animation="true" scroll-into-view="{{toView}}">
     <block wx:for="{{msgs}}" wx:key="id">
-      <chat-bubble id="m{{item.id}}" mine="{{item.mine}}" text="{{item.text}}" />
+      <chat-bubble
+        id="m{{item.id}}"
+        mine="{{item.mine}}"
+        type="{{item.type}}"
+        text="{{item.text}}"
+        image-url="{{item.imageUrl}}"
+      />
     </block>
   </scroll-view>
   <view class="row" style="padding: 12rpx 16rpx; background:#fff; border-top:1px solid #e5e7eb;">
+    <view class="btn btn-outline btn-sm" style="margin-right:12rpx;" bindtap="chooseImage">图片</view>
     <input class="input" style="flex:1;margin-right:12rpx;" placeholder="输入消息" value="{{text}}" bindinput="onInput"/>
     <view class="btn btn-primary btn-sm" bindtap="send">发送</view>
   </view>
 </view>
-

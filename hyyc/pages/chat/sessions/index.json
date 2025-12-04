@@ -3,5 +3,6 @@
     "ui-card": "/components/ui/card/index",
     "ui-loading": "/components/ui/loading/index"
   },
-  "navigationBarTitleText": "任务详情"
+  "navigationBarTitleText": "聊天会话"
 }
+

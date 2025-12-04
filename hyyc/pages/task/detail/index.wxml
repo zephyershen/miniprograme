@@ -1,6 +1,6 @@
 <ui-loading show="{{isLoading}}" />
 <view class="px-24 py-16">
-  <ui-card title="{{task.title}}" sub="{{task.community}} · {{task.address}}">
+  <ui-card title="{{task.title}}" sub="{{task.community}} · {{task.locationText}}">
     <view class="row space-between">
       <text class="text-xl bold c-danger">¥ {{task.amountText}}</text>
       <view class="badge">{{task.statusText}}</view>
@@ -24,14 +24,40 @@
     <text class="card-title">操作</text>
     <view class="row space-between mt-16" wx:if="{{!isOwner && !accepted}}">
       <view class="btn btn-primary" bindtap="accept">接受任务</view>
-      <view class="btn btn-outline" bindtap="toChat">先沟通</view>
+      <view class="btn btn-outline" bindtap="toChat" style="position:relative;">
+        先沟通
+        <view
+          wx:if="{{peerUnreadCount > 0}}"
+          class="chat-unread-badge"
+        >
+          {{ peerUnreadCount > 99 ? '99+' : peerUnreadCount }}
+        </view>
+      </view>
     </view>
     <view class="row space-between mt-16" wx:if="{{!isOwner && accepted}}">
       <view class="btn btn-primary" bindtap="toSubmit">提交完成</view>
-      <view class="btn btn-outline" bindtap="toChat">与业主聊天</view>
+      <view class="btn btn-outline" bindtap="toChat" style="position:relative;">
+        与业主聊天
+        <view
+          wx:if="{{peerUnreadCount > 0}}"
+          class="chat-unread-badge"
+        >
+          {{ peerUnreadCount > 99 ? '99+' : peerUnreadCount }}
+        </view>
+      </view>
     </view>
+    <!-- 发布者视角：不再显示“接受任务”，改为“聊天会话列表 + 确认完成” -->
     <view class="row space-between mt-16" wx:if="{{isOwner}}">
-      <view class="btn btn-outline" bindtap="toChat">与接单人聊天</view>
+      <view class="btn btn-outline" bindtap="toChatSessions" style="position:relative;">
+        聊天会话列表
+        <!-- 未读消息红点，最多展示到 99+ -->
+        <view
+          wx:if="{{unreadCount > 0}}"
+          class="chat-unread-badge"
+        >
+          {{ unreadCount > 99 ? '99+' : unreadCount }}
+        </view>
+      </view>
       <view class="btn btn-primary" bindtap="approve">确认完成</view>
     </view>
   </view>

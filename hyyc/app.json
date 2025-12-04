@@ -7,6 +7,7 @@
     "pages/task/detail/index",
     "pages/task/submit/index",
     "pages/chat/room/index",
+    "pages/chat/sessions/index",
     "pages/wallet/index/index",
     "pages/profile/index/index",
     "pages/profile/account/index",

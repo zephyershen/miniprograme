@@ -152,25 +152,31 @@ Page({
 	        return;
 	      }
 
-	      // 先检查数据库中是否已经有相同身份证号的用户（身份证唯一，一个证号只允许一条记录）
-	      let existRes;
+	      // 先通过云函数在服务端检查：是否已经有相同身份证号的用户
+	      // 这样即便 userInfo 集合的权限是“仅创建者可读”，也可以在云端做完整查重
+	      let existResult;
 	      try {
-	        existRes = await db.collection(USER_COLLECTION)
-	          .where({
-	            idNumber: f.idNumber
-	          })
-	          .limit(1)
-	          .get();
+	        const fnRes = await wx.cloud.callFunction({
+	          name: 'checkUserByIdNumber',
+	          data: { idNumber: f.idNumber }
+	        });
+	        existResult = fnRes && fnRes.result;
 	      } catch (err) {
-	        console.error('查询用户是否存在失败', err);
+	        console.error('调用 checkUserByIdNumber 失败', err);
 	        toast('检查用户信息失败，请稍后重试');
 	        this.setData({ isLoading: false });
 	        return;
 	      }
 
-	      if (existRes && existRes.data && existRes.data.length > 0) {
+	      if (existResult && existResult.ok && existResult.exists) {
 	        // 已经存在用户：弹出带 Lottie 动画的错误提示弹层
 	        this.setData({ isLoading: false, showUserExist: true });
+	        return;
+	      }
+	      if (existResult && existResult.ok === false) {
+	        // 云函数明确返回错误，例如参数不完整或查询异常
+	        toast('检查用户信息失败，请稍后重试');
+	        this.setData({ isLoading: false });
 	        return;
 	      }
 

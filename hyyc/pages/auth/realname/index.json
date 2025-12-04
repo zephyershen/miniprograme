@@ -1,6 +1,5 @@
 {
   "usingComponents": {
-    "ui-button": "/components/ui/button/index",
     "ui-field": "/components/ui/field/index",
     "ui-loading": "/components/ui/loading/index",
     "ui-error-dialog": "/components/ui/error-dialog/index"

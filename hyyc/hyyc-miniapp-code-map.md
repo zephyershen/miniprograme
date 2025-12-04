@@ -595,8 +595,9 @@
       3. 定义内部异步函数 `checkAll()`：
          - 调用 `validateInvite` 校验小区邀请码。
          - 检查 `inCommunity`，如果不在范围，提示「请在小区内完成定位」。
-      4. 等 `checkAll()` 全部通过后，先到云开发数据库的 `userInfo` 集合里查询是否已经存在同一姓名 + 同一身份证号的用户：
-         - 如果查到已有记录：
+      4. 等 `checkAll()` 全部通过后，通过云函数 `checkUserByIdNumber` 在服务端查询是否已经存在同一身份证号的用户（身份证号唯一，一个证件号只能注册一次）：
+         - 云函数入参：`{ idNumber }`。
+         - 如果云函数返回 `ok: true, exists: true`：
            - 关闭 loading（`isLoading=false`）。
            - 把 `showUserExist` 设为 `true`，弹出上一节的 `<ui-error-dialog>`，提示「该用户已存在，请直接登录」。
            - 不再继续新增记录。
@@ -689,8 +690,9 @@
   - 页内元素：
     - 顶部「本小区任务」标题。
     - 右上角「发布任务」按钮（`goPublish()`）。
-    - 筛选标签一排四个：
-      - 「全部」「最新」「高佣金」「本楼栋」。
+    - 筛选区域一排：
+      - 标签：「全部」「最新」「本楼栋」。
+      - 以及一个「任务地点：xxx」下拉标签（可选「全部」「小区内」「小区外」）。
     - 任务列表卡片，每条里有「详情」按钮。
 
 #### 8.3.1 `index.json`
@@ -705,7 +707,7 @@
 - 标题和「发布任务」按钮：
   - 「发布任务」绑定 `bindtap="goPublish"`。
 - 筛选标签：
-  - 每个标签是一个 `<view class="badge ...">`，`data-k` 分别为 `"all"|"new"|"money"|"building"`。
+  - 每个标签是一个 `<view class="badge ...">`，`data-k` 分别为 `"all"|"new"|"building"`。
   - 点击调用 `changeFilter` 更新筛选。
 - 任务列表：
   - 使用 `<block wx:for="{{list}}">` 渲染。
@@ -713,6 +715,11 @@
     - 标题：任务标题。
     - 副标题：`{{item.community}} · 截止时间 {{item.deadlineText}}`：
       - 当任务没有设置截止时间时，`deadlineText` 为「不限」。
+    - 说明（`desc`）：
+      - 默认只展示前若干个字，例如最多 32 个字符，后面加 `…`。
+      - 后面跟一个「展开 / 收起」的小文字按钮：
+        - 点击「展开」：把当前卡片的 `descExpanded` 设为 `true`，显示完整说明。
+        - 点击「收起」：再次设为 `false`，恢复为截断后的 `descShort`。
   - 卡片右侧「详情」按钮：
     - 绑定 `bindtap="toDetail"`，通过 `data-id` 传入任务 ID。
 - 无数据提示：
@@ -728,6 +735,7 @@
   - `filter`：当前筛选类型，默认 `"all"`。
   - `list`：当前展示的任务列表。
   - `isLoading`：加载状态，对应 `<ui-loading>`。
+  - `locationFilter` / `locationFilterIndex` / `locationFilterLabels`：任务地点下拉选择相关字段。
 - 函数：
   - `onShow()`：
     - 每次页面显示时执行。
@@ -742,8 +750,10 @@
     - 显示 loading。
     - 从云开发数据库 `tasks` 集合读取当前小区的任务列表，使用 `formatMoney`、`formatDateTime` 格式化金额和截止时间：
       - 如果某条任务的 `deadline` 为空，映射为「不限」。
+      - 根据当前时间 `Date.now()` 计算每条任务是否「生效中」：
+        - 条件：`status === 'posted'` 且 `deadline` 为空或晚于当前时间。
+        - 只保留满足条件的任务（也就是任务广场只显示绿色「任务生效中」的任务）。
     - 根据 `filter` 和 `locationFilter` 不同进行排序或过滤：
-      - `"money"`：按金额从高到低排序。
       - `"new"`：按截止日期倒序。
       - `"building"`：
         - 如果用户未填写 `building`，弹出提示并引导去实名页补充。
@@ -753,6 +763,9 @@
         - `"inside"`：只保留任务字段 `locationType === 'inside'` 的任务（例如小区内帮忙拿快递）。
         - `"outside"`：只保留 `locationType === 'outside'` 的任务（例如去商场或建材市场帮忙购买）。
     - 最后 `setData({ list, isLoading: false })`。
+  - `toggleDesc(e)`：
+    - 点击某条任务说明后面的「展开 / 收起」按钮时触发。
+    - 根据 `data-id` 找到当前任务在 `list` 里的下标，把对应项的 `descExpanded` 布尔值取反。
   - `parseBuilding(addr='')`：
     - 从地址字符串中用正则 `(...栋)` 粗略提取楼栋信息，用于兼容没有显式 `building` 字段的任务。
   - `goPublish()`：
@@ -769,7 +782,7 @@
 - 对应页面 / 按钮：
   - 底部 tab 中间的「发布」。
   - 页内按钮：
-    - 下方「清空」和「发布」两个按钮。
+    - 下方「清空」和「发布」两个按钮（在「编辑任务」模式下，顶部标题会动态变为「编辑任务」）。
 
 #### 8.4.1 `index.json`
 
@@ -808,7 +821,8 @@
   - `buildingRange`、`buildingIndex`：楼栋选择。
   - `doorRange`、`doorIndex`：门牌多列选择（楼层 + 户号）。
   - `MAX_FLOOR`：最大楼层数，用于生成门牌选择列表。
-  - `isLoading`：发布过程中的加载状态。
+  - `isLoading`：发布 / 保存过程中的加载状态。
+  - `editTaskId`：如果是从「我的任务」里进入编辑，则这里保存正在编辑的任务 ID；为空表示新建。
 - 函数（仅列出主要逻辑）：
   - `onShow()`：
     - 从本地缓存 `wx.getStorageSync('hyyc_user')` 读取用户：
@@ -821,6 +835,15 @@
       - 优先使用用户的 `building` 作为默认楼栋。
       - 从用户的 `door`（比如 `"701"`）反推出楼层（`"7"`）和第几户（`01` → 第 1 户）。
       - 更新 `doorIndex`，并拼出任务地址「X栋Y单元」，写入 `form.building`、`form.floor`、`form.door`、`form.address`。
+    - 再检查是否有本地缓存的 `hyyc_edit_task_id`：
+      - 如果有：说明是从「我的任务」点「编辑」过来的，会把导航标题改为「编辑任务」，并调用 `loadTaskForEdit(id)` 把云端任务信息填回表单。
+      - 如果没有：保持标题为「发布任务」，`editTaskId` 设为空。
+  - `loadTaskForEdit(id)`：
+    - 根据任务 ID 从云开发数据库 `tasks` 集合读取任务详情。
+    - 把任务里的字段（标题、说明、金额、截止时间、楼栋、门牌、地址、图片、任务地点等）逐一写回 `form`：
+      - 把时间戳 `deadline` 转成 `"YYYY-MM-DD HH:mm"` 并拆回 `deadlineDate`、`deadlineTime`。
+      - 图片数组 `images` 直接写入表单，后续提交时会保留原 fileID。
+      - 把任务里的 `locationType` 写回到表单（可能为空、`inside`、`outside`）。
   - `onInput(e)`：
     - 根据 `data-k` 更新对应表单字段，例如标题、说明、佣金等。
   - `onDeadlineDate(e)` / `onDeadlineTime(e)`：
@@ -897,31 +920,95 @@
 
 #### 8.5.3 `index.js`
 
-- 数据：
-  - `task`：当前任务详情。
-  - `isOwner`：当前用户是否为发布者（由 URL 参数 `role` 判断）。
-  - `accepted`：任务是否已被接受（由 URL 参数 `accepted` 判断）。
-  - `isLoading`：加载状态。
-- 函数：
+- 依赖：
+  - `formatMoney`、`formatDateTime`：金额和时间格式化工具。
+  - `toast`、`confirm`：统一的轻提示 / 确认弹窗工具。
+  - 云数据库：`tasks` 集合（任务）、`messages` 集合（聊天记录）。
+
+- 数据字段：
+  - `task`：当前任务详情（包括标题、金额、社区、楼栋门牌、图片等）。
+  - `isOwner`：当前登录用户是否为任务发布者：
+    - 不是通过 URL 判断，而是用本地缓存的 `hyyc_user.id` 和任务里的 `ownerId` 对比。
+  - `accepted`：是否已接受任务（当前仍由 URL 上的 `accepted` 控制，实际接单逻辑后续再接入）。
+  - `isLoading`：详情加载状态。
+  - `unreadCount`：**业主视角**下，这个任务下所有住户会话的未读消息总条数（只统计“别人发给我且我没读过”的消息）。
+  - `peerUnreadCount`：**普通住户视角**下，这个任务下“业主发给我”的未读消息条数。
+
+- 关键函数：
   - `onLoad(q)`：
-    - 根据 `q.id` 在云开发数据库 `tasks` 集合中读取对应任务。
-    - 使用 `formatMoney`、`formatDateTime` 格式化金额和截止时间（未设置截止时间时展示为「不限」）。
-    - 设置 `isOwner` 和 `accepted`（根据 URL 参数 `role`、`accepted` 判断）。
+    - 从 URL 参数里读取 `id`（任务 ID），如果缺失则提示错误并返回。
+    - 从本地 `wx.getStorageSync('hyyc_user')` 取当前登录用户信息：
+      - 取出 `myId = hyyc_user.id`。
+    - 调用 `db.collection('tasks').doc(id).get()` 拉取任务详情：
+      - 额外组装一些展示字段：
+        - `amountText`：`formatMoney(amount)`。
+        - `deadlineText`：未设置截止时间时显示为「不限」。
+        - `statusText`：当前只区分「已发布」和原始状态字符串。
+        - `locationText`：优先使用「楼栋 + 门牌号」，否则回退到 `address`。
+      - 根据 `myId` 是否等于 `task.ownerId` 计算 `isOwner`。
+      - 读取 URL 上的 `accepted` 字段，兼容当前「已接受」演示逻辑。
+      - 把 `task`、`isOwner`、`accepted` 写入 `data`。
+      - 根据角色不同，初始化未读角标：
+        - 如果是业主：
+          - 调用 `loadUnreadCount(task.id, myId)` 统计未读消息总条数。
+          - 调用 `setupBadgeWatch(task, myId, true)` 启动实时监听（见后文）。
+        - 如果是普通住户：
+          - 调用 `loadPeerUnread(task.id, task.ownerId, myId)` 统计“业主发给我”的未读消息条数。
+          - 调用 `setupBadgeWatch(task, myId, false)` 启动住户侧的实时监听。
+  - `onShow()`：
+    - 从本地再拿一次当前用户和 `task.id`。
+    - 如果没有任务或没登录，直接返回。
+    - 根据 `isOwner` 再次刷新未读数据，并重新挂载对应的 `watch`：
+      - 业主：`loadUnreadCount + setupBadgeWatch(task, myId, true)`。
+      - 住户：`loadPeerUnread + setupBadgeWatch(task, myId, false)`。
+  - `onHide()` / `onUnload()`：
+    - 调用 `clearBadgeWatch()` 关闭云数据库的实时监听，避免页面切换时重复监听。
+  - `loadUnreadCount(tid, ownerId)`：
+    - 业主视角下的一次性统计：
+      - 查询 `messages` 集合：`where({ tid, ownerId })`，按 `createTime` 倒序取最多 500 条。
+      - 未读条件：`fromUserId` 不等于 `ownerId` 且 `readByOwner !== true`。
+      - 把所有满足条件的消息条数累加，写入 `unreadCount`。
+      - 这个数字会展示在任务详情页的「聊天会话列表」按钮右上角红点里。
+  - `loadPeerUnread(tid, ownerId, peerUserId)`：
+    - 普通住户视角的一次性统计：
+      - 查询当前任务下自己这条会话：`where({ tid, ownerId, peerUserId })`。
+      - 未读条件：`fromUserId === ownerId` 且 `readByPeer !== true`（业主发给我的、我没看过的）。
+      - 把满足条件的消息条数累加，写入 `peerUnreadCount`。
+      - 这个数字会展示在任务详情页「先沟通 / 与业主聊天」按钮右上角红点里。
+  - `setupBadgeWatch(task, myId, isOwner)` / `clearBadgeWatch()`：
+    - 统一管理任务详情页上的未读角标实时监听。
+    - 如果是业主视角：调用 `openOwnerBadgeWatch(task.id, myId)`。
+    - 如果是住户视角：调用 `openPeerBadgeWatch(task.id, task.ownerId, myId)`。
+    - `clearBadgeWatch()` 会在 `onHide`/`onUnload` 时关闭已有监听。
+  - `openOwnerBadgeWatch(tid, ownerId)`：
+    - 调用 `db.collection('messages').where({ tid, ownerId }).orderBy('createTime','desc').watch(...)`。
+    - 每次 `onChange` 时：
+      - 按上面的“业主未读条件”重新统计未读消息条数，写入 `unreadCount`。
+      - 所以当住户不停给业主发消息时，业主停留在任务详情页也能实时看到红点从 1→2→3 增长。
+  - `openPeerBadgeWatch(tid, ownerId, peerUserId)`：
+    - 只监听当前住户自己那条会话：`where({ tid, ownerId, peerUserId })`。
+    - 每次 `onChange` 时：
+      - 按“住户未读条件”统计未读消息条数，写入 `peerUnreadCount`。
+      - 所以业主发来消息时，如果住户停留在任务详情页，「先沟通 / 与业主聊天」按钮的红点数字也会实时变化。
   - `previewTaskImage(e)`：
-    - 读取被点击图片在 `task.images` 里的下标 `index`。
-    - 调用 `wx.previewImage({ current, urls })` 预览当前图片。
+    - 点击任务图片时调用。
+    - 读取下标并使用 `wx.previewImage` 打开大图预览（可左右滑动查看本任务的所有图片）。
   - `accept()`：
-    - 对应「接受任务」按钮。
-    - 简单弹出「已接受（演示）」提示，并把 `accepted` 设为 `true`。
+    - 演示用的「接受任务」逻辑：
+      - 如果当前用户本身就是业主，提示「这是你发布的任务，无需自己接受」。
+      - 否则弹出「已接受（演示）」并把 `accepted` 设为 `true`。
   - `toChat()`：
-    - 对应所有「聊天」类按钮。
-    - 跳转到 `pages/chat/room/index`，参数里带上任务 ID。
+    - 普通住户点击「先沟通 / 与业主聊天」按钮时调用。
+    - 使用 `wx.navigateTo({ url: '/pages/chat/room/index?tid=' + task.id })` 打开与该任务发布者的一对一聊天页。
+  - `toChatSessions()`：
+    - 业主视角下显示的「聊天会话列表」按钮。
+    - 跳转到 `pages/chat/sessions/index`，并带上 `tid`：
+      - 会话列表页会根据 `tid + 当前业主 id` 聚合出所有有聊天记录的住户会话，并展示每个住户的最后一条消息和未读数量。
   - `toSubmit()`：
-    - 对应「提交完成」按钮。
-    - 跳转到 `pages/task/submit/index`。
+    - 普通住户点击「提交完成」时，跳转到 `pages/task/submit/index`，把 `tid` 传过去。
   - `async approve()`：
-    - 对应发布者看到的「确认完成」按钮。
-    - 使用 `confirm()` 弹出确认弹窗，确认后再 `toast("已确认完成（演示）")`。
+    - 业主点击「确认完成」按钮时调用。
+    - 使用 `confirm('确认任务已完成并打款给对方？')` 做二次确认，确认后弹出「已确认完成（演示）」。
 
 ---
 
@@ -1107,7 +1194,7 @@
   - 从「我的」页面的「我的任务」条目进入。
   - 页内按钮：
     - 顶部两个标签：「我发布的」「我接受的」。
-    - 每条任务卡片右侧「删除」（仅在「我发布的」标签下出现）和「查看」按钮。
+    - 每条任务卡片右侧「删除」「编辑」「查看」按钮（根据当前 tab 不同展示不同组合）。
 
 #### 8.10.1 `index.json`
 
@@ -1129,12 +1216,15 @@
       - 「删除」按钮：
         - `bindtap="onDeleteTask"`，只在 `tab === 'owner'` 时展示。
         - 使用 `data-id="{{item.id}}"` 传入任务 ID。
-      - 「查看」按钮：
-        - `bindtap="toDetail"`，同时通过：
-          - `data-id` 传任务 ID。
-          - `data-role="owner"` 告诉详情页当前用户是发布者。
+      - 「编辑」按钮：
+        - `bindtap="onEditTask"`，只在 `tab === 'owner'` 时展示。
+        - 点击后会：
+          - 把任务 ID 暂存在本地 `wx.setStorageSync('hyyc_edit_task_id', id)`。
+          - 使用 `wx.switchTab({ url: '/pages/task/publish/index' })` 切到底部「发布」 tab。
+          - 发布页在 `onShow()` 里读取这个 ID 并进入「编辑任务」模式。
     - 在「我接受的」标签下：
-      - 只显示「查看」按钮，不显示「删除」。
+      - 只显示「查看」按钮，不显示「删除」和「编辑」：
+        - 「查看」依然通过 `bindtap="toDetail"` 跳转到任务详情页。
 
 #### 8.10.3 `index.js`
 
@@ -1221,6 +1311,44 @@
   - 前端 `pages/profile/index/index.js` 中：
     - 调用 `wx.cloud.callFunction({ name: 'login' })`。
     - 成功后从 `res.result.openid` 读取 openid，并在 `Toast` 中展示前几位，验证云函数是否可用。
+
+### 9.2 `cloudfunctions/checkUserByIdNumber/index.js` —— 根据身份证号查重
+
+- 作用：
+  - 在服务端（云函数环境）根据身份证号查询 `userInfo` 集合，判断是否已经存在实名记录。
+  - 解决前端因为数据库权限限制查不到“别人注册过的身份证号”的问题。
+- 入参：
+  - `event.idNumber`：字符串，用户在实名页输入的身份证号。
+- 返回：
+  - `ok: true|false`：本次调用是否成功。
+  - `exists: true|false`：当 `ok=true` 时，表示是否已经查到同一个身份证号的用户。
+  - `user`：当 `exists=true` 时，返回一个精简的用户对象（只带 `_id`、`_openid`、`name`、`idNumber`），方便后续需要时扩展使用。
+- 使用位置：
+  - `pages/auth/realname/index.js` 的 `submit()` 中：
+    - 在本地校验、邀请码校验、定位校验都通过后，先调用该云函数。
+    - 如果 `exists=true`，直接弹出「该用户已存在，请直接登录」，不再 `add()` 新记录。
+
+### 9.3 `cloudfunctions/markMessagesReadByOwner` / `markMessagesReadByPeer` —— 聊天已读标记
+
+- 共同目标：
+  - 在服务端统一把某个任务下、某条住户会话里的消息标记为“业主已读”或“住户已读”，避免前端因为数据库权限设置无法更新别人的记录。
+- `markMessagesReadByOwner`：
+  - 入参：`{ tid, ownerId, peerUserId }`。
+  - 行为：
+    - 在 `messages` 集合中查找所有满足 `(tid, ownerId, peerUserId)` 的记录。
+    - 调用 `update({ data: { readByOwner: true } })` 把这些消息对业主视角全部标记为已读。
+  - 使用位置：
+    - `pages/chat/room/index.js`：
+      - 业主进入某个住户的聊天页时调用一次。
+      - 在聊天页的实时监听 `watch` 回调里，每次收到新消息也会调用一次，保证正在聊天时不会产生“未读”。
+- `markMessagesReadByPeer`：
+  - 入参：`{ tid, ownerId, peerUserId }`。
+  - 行为：
+    - 在 `messages` 集合中查找同一房间的所有记录，并把 `readByPeer` 统一更新为 `true`。
+  - 使用位置：
+    - `pages/chat/room/index.js`：
+      - 住户进入与业主的聊天页时调用一次。
+      - 在聊天页实时监听回调里也会调用一次，保证住户停留在聊天页时看到的新消息不会累积未读数。
 
 ---
 

@@ -1,7 +1,6 @@
 {
   "usingComponents": {
     "ui-field": "/components/ui/field/index",
-    "ui-button": "/components/ui/button/index",
     "ui-loading": "/components/ui/loading/index"
   },
   "navigationBarTitleText": "发布任务"

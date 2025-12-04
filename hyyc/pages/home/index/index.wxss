@@ -1,2 +1,67 @@
 @import "../../../styles/shadcn.wxss";
 
+/* 任务广场：任务状态「任务生效中」样式 */
+.task-status-active {
+  display: flex;
+  align-items: center;
+  margin-right: 20rpx; /* 和「详情」按钮拉开一点距离（整体稍微往左一点） */
+}
+
+.task-status-dot {
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 9999rpx;
+  background: #22C55E;
+  /* 绿色发光基础光晕（比之前更小一点） */
+  box-shadow: 0 0 0 4rpx rgba(34, 197, 94, 0.30);
+  /* 动态呼吸光晕效果 */
+  animation: taskDotPulse 1.6s ease-in-out infinite;
+}
+
+.task-status-text {
+  font-size: 22rpx;
+  color: #16A34A;
+}
+
+/* 任务说明行：左侧"任务说明"和右侧三角形在同一行垂直居中、两端对齐 */
+.task-desc-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  background: #F3F4F6;
+  padding: 12rpx 16rpx;
+  border-radius: 8rpx;
+}
+
+.task-desc-text {
+  font-size: 24rpx;
+  line-height: 1;
+}
+
+/* 展开/收起三角形 */
+.task-desc-arrow {
+  width: 0;
+  height: 0;
+  border-top: 10rpx solid transparent;
+  border-bottom: 10rpx solid transparent;
+  border-left: 12rpx solid #9CA3AF;
+  transition: transform 0.2s ease;
+}
+
+.task-desc-arrow.expanded {
+  transform: rotate(90deg);
+}
+
+/* 绿色发光点的呼吸动画：外圈光晕轻微放大缩小，制造动感 */
+@keyframes taskDotPulse {
+  0% {
+    box-shadow: 0 0 0 2rpx rgba(34, 197, 94, 0.08);
+  }
+  50% {
+    box-shadow: 0 0 0 8rpx rgba(34, 197, 94, 0.32);
+  }
+  100% {
+    box-shadow: 0 0 0 2rpx rgba(34, 197, 94, 0.08);
+  }
+}

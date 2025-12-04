@@ -1,33 +1,99 @@
 <ui-loading show="{{isLoading}}" />
 <view class="px-24 py-16">
-  <view class="row row-gap-8">
-    <view class="{{'badge row-gap-item ' + (tab==='owner'?'badge-primary':'')}}" bindtap="setTab" data-k="owner">我发布的</view>
-    <view class="{{'badge row-gap-item ' + (tab==='worker'?'badge-primary':'')}}" bindtap="setTab" data-k="worker">我接受的</view>
+  <view class="row row-gap-8 space-between">
+    <view class="row row-gap-8">
+      <view class="{{'badge row-gap-item ' + (tab==='owner'?'badge-primary':'')}}" bindtap="setTab" data-k="owner">我发布的</view>
+      <view class="{{'badge row-gap-item ' + (tab==='worker'?'badge-primary':'')}}" bindtap="setTab" data-k="worker">我接受的</view>
+    </view>
+    <!-- 批量管理按钮：仅在"我发布的"且有数据时显示 -->
+    <view
+      wx:if="{{tab === 'owner' && list.length}}"
+      class="btn btn-outline btn-sm"
+      bindtap="toggleBatchMode">
+      {{batchMode ? '取消' : '批量管理'}}
+    </view>
+  </view>
+
+  <!-- 批量操作栏：全选和批量删除 -->
+  <view wx:if="{{batchMode && list.length}}" class="batch-bar mt-16">
+    <view class="batch-bar-left" bindtap="toggleSelectAll">
+      <view class="batch-checkbox {{isAllSelected ? 'batch-checkbox-checked' : ''}} {{isPartialSelected ? 'batch-checkbox-partial' : ''}}">
+        <text wx:if="{{isAllSelected}}">✓</text>
+        <text wx:elif="{{isPartialSelected}}">-</text>
+      </view>
+      <text class="batch-bar-text">全选 ({{selectedIds.length}}/{{list.length}})</text>
+    </view>
+    <view
+      class="btn btn-danger btn-sm {{selectedIds.length ? '' : 'btn-disabled'}}"
+      bindtap="onBatchDelete">
+      删除选中
+    </view>
   </view>
 
   <block wx:for="{{list}}" wx:key="id">
-    <view class="mt-16">
-      <ui-card title="{{item.title}}" sub="截止 {{item.deadlineText}}">
-        <view class="row space-between">
-          <text class="c-danger">¥ {{item.amountText}}</text>
-          <view class="row row-gap-8">
-            <view
-              wx:if="{{tab === 'owner'}}"
-              class="btn btn-outline btn-sm row-gap-item"
-              data-id="{{item.id}}"
-              bindtap="onDeleteTask">
-              删除
-            </view>
-            <view
-              class="btn btn-outline btn-sm row-gap-item"
-              data-id="{{item.id}}"
-              data-role="{{tab==='owner'?'owner':''}}"
-              bindtap="toDetail">
-              查看
+    <view class="mt-16 batch-item-wrapper">
+      <!-- 批量模式下显示复选框 -->
+      <view
+        wx:if="{{batchMode}}"
+        class="batch-checkbox-wrap"
+        data-id="{{item.id}}"
+        bindtap="toggleSelect">
+        <view class="batch-checkbox {{item.selected ? 'batch-checkbox-checked' : ''}}">
+          <text wx:if="{{item.selected}}">✓</text>
+        </view>
+      </view>
+      <view class="batch-item-card {{batchMode ? 'batch-item-card-indent' : ''}}">
+        <ui-card title="{{item.title}}" sub="截止 {{item.deadlineText}}">
+          <view class="row space-between">
+            <text class="c-danger">¥ {{item.amountText}}</text>
+            <view class="row row-gap-8">
+              <!-- 仅在"我发布的"里展示任务状态：绿色生效中 / 红色已过期 -->
+              <view
+                wx:if="{{tab === 'owner'}}"
+                class="my-task-status">
+                <view
+                  class="my-task-status-dot {{item.isExpired ? 'my-task-status-dot-expired' : ''}}"
+                ></view>
+                <view
+                  class="{{item.isExpired ? 'my-task-status-text-expired' : 'my-task-status-text'}}"
+                >
+                  {{item.isExpired ? '已过期' : '生效中'}}
+                </view>
+              </view>
+              <!-- 非批量模式下显示操作按钮 -->
+              <view
+                wx:if="{{tab === 'owner' && !batchMode}}"
+                class="btn btn-outline btn-sm row-gap-item"
+                data-id="{{item.id}}"
+                bindtap="onDeleteTask">
+                删除
+              </view>
+              <view
+                wx:if="{{tab === 'owner' && !batchMode}}"
+                class="btn btn-outline btn-sm row-gap-item"
+                data-id="{{item.id}}"
+                bindtap="onEditTask">
+                编辑
+              </view>
+              <view
+                wx:if="{{tab === 'owner' && !batchMode}}"
+                class="btn btn-outline btn-sm row-gap-item"
+                data-id="{{item.id}}"
+                bindtap="toDetailOwner">
+                详情
+              </view>
+              <view
+                wx:if="{{tab === 'worker'}}"
+                class="btn btn-outline btn-sm row-gap-item"
+                data-id="{{item.id}}"
+                data-role=""
+                bindtap="toDetail">
+                查看
+              </view>
             </view>
           </view>
-        </view>
-      </ui-card>
+        </ui-card>
+      </view>
     </view>
   </block>
   <view wx:if="{{!list.length}}" class="center" style="height: 50vh;">

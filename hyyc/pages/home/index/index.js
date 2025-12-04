@@ -48,19 +48,30 @@ Page({
 
     query.get({
       success: (res) => {
-        let list = (res.data || []).map(doc => ({
-          ...doc,
-          id: doc._id, // 用文档 _id 作为前端使用的 id
-          amountText: formatMoney(doc.amount),
-          // 未设置截止时间时，显示「不限」
-          deadlineText: doc.deadline ? formatDateTime(doc.deadline) : '不限',
-          statusText: doc.status === 'posted' ? '已发布' : (doc.status || '')
-        }));
+        const now = Date.now();
+        // 任务广场只展示「任务生效中」的任务：
+        // - 没有设置截止时间：一律视为生效中
+        // - 设置了截止时间：必须晚于当前时间
+        let list = (res.data || [])
+          .filter(doc => {
+            const deadlineTs = doc.deadline;
+            return deadlineTs == null || deadlineTs > now;
+          })
+          .map(doc => {
+            const deadlineTs = doc.deadline;
+            return {
+              ...doc,
+              id: doc._id, // 用文档 _id 作为前端使用的 id
+              amountText: formatMoney(doc.amount),
+              // 未设置截止时间时，显示「不限」
+              deadlineText: deadlineTs ? formatDateTime(deadlineTs) : '不限',
+              // 任务说明展开/收起用到的字段：默认收起
+              descExpanded: false
+            };
+          });
 
         // 本地过滤 / 排序逻辑保留
-        if (this.data.filter === 'money') {
-          list = list.sort((a, b) => (b.amount || 0) - (a.amount || 0));
-        } else if (this.data.filter === 'new') {
+        if (this.data.filter === 'new') {
           list = list.sort((a, b) => (b.deadline || 0) - (a.deadline || 0));
         } else if (this.data.filter === 'building') {
           if (!userBuilding) {
@@ -100,6 +111,16 @@ Page({
         wx.showToast({ title: '任务加载失败', icon: 'none' });
       }
     });
+  },
+  // 切换某条任务的说明展开/收起
+  toggleDesc(e){
+    const id = e.currentTarget.dataset.id;
+    if (!id) return;
+    const list = this.data.list || [];
+    const idx = list.findIndex(t => t.id === id || t._id === id);
+    if (idx < 0) return;
+    const key = `list[${idx}].descExpanded`;
+    this.setData({ [key]: !list[idx].descExpanded });
   },
   parseBuilding(addr=''){
     const m = String(addr).match(/([0-9]+|[一二三四五六七八九十]+)栋/);

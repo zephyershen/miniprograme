@@ -11,24 +11,16 @@
     <view class="{{'badge row-gap-item ' + (filter==='new'?'badge-primary':'')}}" bindtap="changeFilter" data-k="new">
       最新
     </view>
-    <view class="{{'badge row-gap-item ' + (filter==='money'?'badge-primary':'')}}" bindtap="changeFilter" data-k="money">
-      高佣金
-    </view>
     <view class="{{'badge row-gap-item ' + (filter==='building'?'badge-primary':'')}}" bindtap="changeFilter" data-k="building">
       本楼栋
     </view>
-  </view>
-  <view class="row mt-12">
-    <picker
-      mode="selector"
-      range="{{locationFilterLabels}}"
-      value="{{locationFilterIndex}}"
-      bindchange="onLocationFilterChange"
-    >
-      <view class="badge">
-        任务地点：{{locationFilterLabels[locationFilterIndex]}}
-      </view>
-    </picker>
+    <view class="row-gap-item">
+      <picker mode="selector" range="{{locationFilterLabels}}" value="{{locationFilterIndex}}" bindchange="onLocationFilterChange">
+        <view class="{{'badge ' + (locationFilter!=='all' ? 'badge-primary' : '')}}">
+          任务地点：{{locationFilterLabels[locationFilterIndex]}}
+        </view>
+      </picker>
+    </view>
   </view>
   <block wx:for="{{list}}" wx:key="id">
     <view class="mt-16">
@@ -36,13 +28,24 @@
         <view class="row space-between">
           <text class="text-lg bold c-danger">¥ {{item.amountText}}</text>
           <view class="row row-gap-8">
-            <view class="badge row-gap-item">{{item.statusText}}</view>
+            <view class="row row-gap-8 task-status-active">
+              <view class="task-status-dot row-gap-item"></view>
+              <text class="task-status-text row-gap-item">生效中</text>
+            </view>
             <view class="btn btn-outline btn-sm row-gap-item" data-id="{{item.id}}" bindtap="toDetail">
               详情
             </view>
           </view>
         </view>
-        <view class="mt-12 c-muted text-sm">{{item.desc}}</view>
+        <view wx:if="{{item.desc && item.desc.length > 0}}" class="mt-24">
+          <!-- 上面一行：左边提示文字，右边展开/收起箭头 -->
+          <view class="task-desc-row" data-id="{{item.id}}" bindtap="toggleDesc">
+            <text class="task-desc-text c-muted">任务说明</text>
+            <view class="task-desc-arrow {{item.descExpanded ? 'expanded' : ''}}"></view>
+          </view>
+          <!-- 展开时再展示具体说明内容，默认收起不占空间 -->
+          <view wx:if="{{item.descExpanded}}" class="mt-8 text-sm c-text">{{item.desc}}</view>
+        </view>
       </ui-card>
     </view>
   </block>

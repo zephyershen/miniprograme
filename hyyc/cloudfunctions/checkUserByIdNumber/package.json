@@ -1,0 +1,10 @@
+{
+  "name": "checkUserByIdNumber",
+  "version": "1.0.0",
+  "description": "云函数：根据身份证号在 userInfo 集合中查重",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}
+
