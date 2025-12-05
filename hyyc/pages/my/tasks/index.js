@@ -85,7 +85,8 @@ Page({
     this.setData({ isLoading: true });
 
     try {
-      await db.collection(TASK_COLLECTION).doc(id).remove();
+      // 通过云函数删除任务及其下所有聊天记录（文字 + 图片）
+      await this._deleteTaskWithMessages(id);
       toast('已删除');
       // 删除成功后刷新列表
       this.load();
@@ -166,11 +167,36 @@ Page({
     this.setData({ selectedIds, list, isAllSelected, isPartialSelected });
   },
 
+  // 删除单个任务及其下所有聊天记录
+  // 为了绕过小程序端数据库权限（例如 messages 集合“仅创建者可写”），
+  // 这里统一通过云函数 deleteTaskWithMessages 来执行真正的删除逻辑。
+  _deleteTaskWithMessages(taskId){
+    if (!taskId) return Promise.resolve();
+    return wx.cloud.callFunction({
+      name: 'deleteTaskWithMessages',
+      data: { tid: taskId }
+    }).then(res => {
+      const result = (res && res.result) || {};
+      if (!result || result.ok !== true) {
+        const msg = (result && result.msg) || '删除失败，请稍后重试';
+        // 抛出错误让调用方走到 catch 分支，不要误以为删除成功
+        return Promise.reject(new Error(msg));
+      }
+      return result;
+    });
+  },
+
   // 批量删除
   async onBatchDelete(){
     const { selectedIds } = this.data;
     if (!selectedIds.length) {
       toast('请先选择要删除的任务');
+      return;
+    }
+
+    // 保护：批量删除只针对“我发布的”任务
+    if (this.data.tab !== 'owner') {
+      toast('只能批量删除自己发布的任务');
       return;
     }
 
@@ -180,10 +206,8 @@ Page({
     this.setData({ isLoading: true });
 
     try {
-      // 逐个删除选中的任务
-      const promises = selectedIds.map(id =>
-        db.collection(TASK_COLLECTION).doc(id).remove()
-      );
+      // 逐个删除选中的任务及其聊天记录
+      const promises = selectedIds.map(id => this._deleteTaskWithMessages(id));
       await Promise.all(promises);
       toast(`已删除 ${selectedIds.length} 个任务`);
       // 退出批量模式并刷新列表

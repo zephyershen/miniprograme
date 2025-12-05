@@ -151,64 +151,45 @@ Page({
 	        this.setData({ isLoading: false });
 	        return;
 	      }
-
-	      // 先通过云函数在服务端检查：是否已经有相同身份证号的用户
-	      // 这样即便 userInfo 集合的权限是“仅创建者可读”，也可以在云端做完整查重
-	      let existResult;
+	      // 通过云函数在服务端执行“查重 + 写入”一体化的实名注册
+	      let regResult;
 	      try {
 	        const fnRes = await wx.cloud.callFunction({
-	          name: 'checkUserByIdNumber',
-	          data: { idNumber: f.idNumber }
+	          name: 'registerUser',
+	          data: { form: f }
 	        });
-	        existResult = fnRes && fnRes.result;
+	        regResult = fnRes && fnRes.result;
 	      } catch (err) {
-	        console.error('调用 checkUserByIdNumber 失败', err);
-	        toast('检查用户信息失败，请稍后重试');
+	        console.error('调用 registerUser 失败', err);
+	        toast('实名失败，请稍后重试');
 	        this.setData({ isLoading: false });
 	        return;
 	      }
 
-	      if (existResult && existResult.ok && existResult.exists) {
-	        // 已经存在用户：弹出带 Lottie 动画的错误提示弹层
+	      // 身份证号已存在：弹出提示，不写入本地缓存
+	      if (regResult && regResult.code === 'ID_EXISTS') {
 	        this.setData({ isLoading: false, showUserExist: true });
 	        return;
 	      }
-	      if (existResult && existResult.ok === false) {
-	        // 云函数明确返回错误，例如参数不完整或查询异常
-	        toast('检查用户信息失败，请稍后重试');
+
+	      if (!regResult || regResult.ok !== true) {
+	        // 其他错误（参数问题 / 事务失败等）
+	        toast(regResult && regResult.msg ? regResult.msg : '实名失败，请稍后重试');
 	        this.setData({ isLoading: false });
 	        return;
 	      }
 
-		      let addRes;
-		      try {
-		        // 将实名信息写入云开发数据库 userInfo 集合
-		        // 户号信息已经包含在 door 中，例如 701 = 7 楼 01 户
-		        addRes = await db.collection(USER_COLLECTION).add({
-		          data: {
-		            ...f,
-		            realname: true,
-		            verified: true,
-		            createdAt: new Date()
-		          }
-		        });
-		      } catch (err) {
-		        console.error('保存到云数据库失败', err);
-		        toast('保存到云数据库失败，请稍后重试');
-		        this.setData({ isLoading: false });
-		        return;
-		      }
+	      const user = regResult.user || {};
 
 	      this.setData({ isLoading: false });
 
-		      // 本地缓存一份，兼容后续页面读取：
-		      // 使用新增记录返回的 _id 作为通用 id，后续 ownerId 等都依赖这个字段
-		      const userId = (addRes && addRes._id) || '';
-		      wx.setStorageSync('hyyc_user', Object.assign({}, f, {
-		        id: userId,
-		        realname: true,
-		        verified: true
-		      }));
+	      // 本地缓存一份，兼容后续页面读取
+	      try {
+	        wx.setStorageSync('hyyc_user', user);
+	      } catch (e) {
+	        console.error('缓存实名用户信息失败', e);
+	      }
+
 	      toast('实名完成');
 	      wx.switchTab({ url: '/pages/home/index/index' });
 	    });
