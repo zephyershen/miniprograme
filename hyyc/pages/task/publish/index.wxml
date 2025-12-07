@@ -18,7 +18,7 @@
         </ui-field>
       </view>
       <view class="gap-item">
-        <ui-field label="截止时间" hint="（不填默认无限制时间）" error="{{errors.deadline || ''}}">
+        <ui-field label="截止时间" hint="（可选，不选则默认从现在起 7 天内有效）" error="{{errors.deadline || ''}}">
           <view class="row">
             <picker mode="date" value="{{form.deadlineDate || defaultDeadlineDate}}" bindchange="onDeadlineDate">
               <view class="input input-half row space-between">

@@ -99,4 +99,9 @@
   <view wx:if="{{!list.length}}" class="center" style="height: 50vh;">
     <text class="c-muted">暂无记录</text>
   </view>
+  <view class="mt-16">
+    <text class="c-muted" style="font-size: 24rpx;">
+      提示：如果不设置截止时间，任务默认从发布起 7 天内有效；已过期的任务最多保留 30 天，之后系统会自动删除（包括聊天记录）。
+    </text>
+  </view>
 </view>

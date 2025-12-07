@@ -37,13 +37,26 @@ Page({
           ? `${t.building} ${t.door}`
           : (t.address || '');
 
+        const now = Date.now();
+        const ONE_DAY = 24 * 60 * 60 * 1000;
+        const ONE_WEEK = 7 * ONE_DAY;
+        const rawDeadline = t.deadline;
+        const createdAt = t.createdAt;
+        const createdTs = createdAt && createdAt.getTime ? createdAt.getTime() : null;
+        // 未设置截止时间时，默认从创建时间起 7 天内有效
+        const effectiveDeadline = rawDeadline != null
+          ? rawDeadline
+          : (createdTs ? (createdTs + ONE_WEEK) : null);
+        const isExpired = effectiveDeadline != null && effectiveDeadline <= now;
+
         const task = {
           ...t,
           id,
           amountText: formatMoney(t.amount),
-          // 未设置截止时间时，显示「不限」
-          deadlineText: t.deadline ? formatDateTime(t.deadline) : '不限',
-          statusText: t.status === 'posted' ? '已发布' : (t.status || ''),
+          // 截止时间：未设置则展示默认过期时间
+          deadlineText: effectiveDeadline ? formatDateTime(effectiveDeadline) : '默认 7 天内有效',
+          // 状态：如果已过期，优先展示“已过期”
+          statusText: isExpired ? '已过期' : (t.status === 'posted' ? '已发布' : (t.status || '')),
           locationText
         };
 

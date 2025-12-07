@@ -45,22 +45,64 @@ Page({
       .get({
         success: (res) => {
           const now = Date.now();
-          const list = (res.data || []).map(doc => {
-            const deadlineTs = doc.deadline;
-            const hasDeadline = deadlineTs != null;
-            const isExpired = hasDeadline && deadlineTs <= now;
-            const isActive = !hasDeadline || deadlineTs > now;
+          const ONE_DAY = 24 * 60 * 60 * 1000;
+          const ONE_WEEK = 7 * ONE_DAY;
+          const ONE_MONTH = 30 * ONE_DAY;
+          const docs = res.data || [];
+
+          const list = docs.map(doc => {
+            const rawDeadline = doc.deadline;
+            const createdAt = doc.createdAt;
+            const createdTs = createdAt && createdAt.getTime ? createdAt.getTime() : null;
+            // 没有设置截止时间时，默认从创建时间起 7 天内有效
+            const effectiveDeadline = rawDeadline != null
+              ? rawDeadline
+              : (createdTs ? (createdTs + ONE_WEEK) : null);
+            const hasDeadline = effectiveDeadline != null;
+            const isExpired = hasDeadline && effectiveDeadline <= now;
+            const isActive = hasDeadline ? effectiveDeadline > now : true;
             return {
               ...doc,
               id: doc._id,
               amountText: formatMoney(doc.amount),
-              // 未设置截止时间时，显示「不限」
-              deadlineText: hasDeadline ? formatDateTime(deadlineTs) : '不限',
+              // 未设置截止时间时，展示默认过期时间
+              deadlineText: hasDeadline ? formatDateTime(effectiveDeadline) : '默认 7 天内有效',
               isActive,
               isExpired
             };
           });
+
           this.setData({ list, isLoading: false });
+
+          // 仅在“我发布的”列表中，自动清理：已过期且超过 30 天的任务（连同聊天记录一起删除）
+          if (this.data.tab === 'owner' && docs.length) {
+            const expiredTooLongIds = docs
+              .map(doc => {
+                const rawDeadline = doc.deadline;
+                const createdAt = doc.createdAt;
+                const createdTs = createdAt && createdAt.getTime ? createdAt.getTime() : null;
+                const effectiveDeadline = rawDeadline != null
+                  ? rawDeadline
+                  : (createdTs ? (createdTs + ONE_WEEK) : null);
+                if (!effectiveDeadline) return null;
+                if (now - effectiveDeadline >= ONE_MONTH) {
+                  return doc._id;
+                }
+                return null;
+              })
+              .filter(id => !!id);
+
+            if (expiredTooLongIds.length) {
+              Promise.all(
+                expiredTooLongIds.map(id => this._deleteTaskWithMessages(id))
+              ).then(() => {
+                // 自动清理后刷新一次列表
+                this.load();
+              }).catch(err => {
+                console.error('自动清理过期任务失败', err);
+              });
+            }
+          }
         },
         fail: (err) => {
           console.error('加载我的任务失败', err);

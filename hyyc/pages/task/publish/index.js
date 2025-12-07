@@ -193,7 +193,19 @@ Page({
   onDeadlineDate(e){
     const date = e.detail.value || '';
     const time = this.data.form.deadlineTime || '';
-    const dl = (date && time) ? `${date} ${time}` : '';
+    // 组合规则：
+    // - 只有日期：默认当天 00:00
+    // - 只有时间：默认使用今天的日期（defaultDeadlineDate）
+    // - 日期 + 时间：按用户选择组合
+    let dl = '';
+    if (date && time) {
+      dl = `${date} ${time}`;
+    } else if (date && !time) {
+      dl = `${date} 00:00`;
+    } else if (!date && time) {
+      const today = this.data.defaultDeadlineDate || '';
+      if (today && time) dl = `${today} ${time}`;
+    }
     this.setData({
       'form.deadlineDate': date,
       'form.deadline': dl
@@ -202,9 +214,19 @@ Page({
   // 选择截止时间（几点钟）
   onDeadlineTime(e){
     const time = e.detail.value || '';
-    const date = this.data.form.deadlineDate || '';
-    const dl = (date && time) ? `${date} ${time}` : '';
+    // 如果还没选日期，但用户先选了时间，则默认日期为今天
+    let date = this.data.form.deadlineDate || '';
+    let dl = '';
+    if (time) {
+      if (!date) {
+        date = this.data.defaultDeadlineDate || '';
+      }
+      if (date) {
+        dl = `${date} ${time}`;
+      }
+    }
     this.setData({
+      'form.deadlineDate': date,
       'form.deadlineTime': time,
       'form.deadline': dl
     });
@@ -268,6 +290,65 @@ Page({
       return;
     }
 
+    // 截止时间相关校验：
+    // - 如果只选了「今天的日期」，但没选时间：提示必须选具体时间；
+    // - 如果选了截止时间，但时间不晚于当前时间：提示必须选择将来的时间。
+    const deadlineDate = f.deadlineDate || '';
+    const deadlineTime = f.deadlineTime || '';
+    const todayStr = this.data.defaultDeadlineDate || '';
+
+    // 1）选了今天的日期但没选时间：不允许提交
+    if (deadlineDate && !deadlineTime && todayStr && deadlineDate === todayStr) {
+      toast('今天的截止时间请选具体几点几分');
+      return;
+    }
+
+    // 2）解析成时间戳并校验必须晚于当前时间。
+    //    完全不选截止时间时（日期和时间都为空）：
+    //    - 默认从“现在”起 7 天内有效。
+    const ONE_DAY = 24 * 60 * 60 * 1000;
+    const ONE_WEEK = 7 * ONE_DAY;
+    const nowTs = Date.now();
+    let deadlineTs = null;
+
+    if (!deadlineDate && !deadlineTime && !f.deadline) {
+      // 用户完全没有选截止日期/时间：默认一周后过期
+      deadlineTs = nowTs + ONE_WEEK;
+    } else if (deadlineDate || deadlineTime || f.deadline) {
+      // 兜底：根据日期/时间字段重新拼出完整字符串，避免依赖 onDeadlineDate/onDeadlineTime 一定被触发
+      let dlStr = f.deadline || '';
+      if (!dlStr) {
+        let datePart = deadlineDate;
+        let timePart = deadlineTime;
+        if (!datePart && timePart && todayStr) {
+          // 只选了时间：默认日期为今天
+          datePart = todayStr;
+        }
+        if (datePart && timePart) {
+          dlStr = `${datePart} ${timePart}`;
+        } else if (datePart && !timePart) {
+          // 选了未来某天但没选时间：默认当天 00:00
+          dlStr = `${datePart} 00:00`;
+        }
+      }
+
+      if (dlStr) {
+        const safeStr = dlStr.replace(/-/g, '/');
+        const d = new Date(safeStr);
+        deadlineTs = d.getTime();
+
+        if (!deadlineTs || Number.isNaN(deadlineTs)) {
+          toast('截止时间格式不正确，请重新选择');
+          return;
+        }
+
+        if (deadlineTs <= nowTs) {
+          toast('截止时间必须晚于当前时间');
+          return;
+        }
+      }
+    }
+
     const u = wx.getStorageSync('hyyc_user') || {};
     if (!u || !u.realname) {
       toast('请先完成实名信息');
@@ -292,16 +373,7 @@ Page({
       });
       const fileIDs = await Promise.all(uploadTasks);
 
-      // 2. 解析截止时间字符串为时间戳（毫秒）
-      let deadlineTs = null;
-      if (f.deadline) {
-        // 为兼容 iOS，这里把 "YYYY-MM-DD HH:mm" 替换成 "YYYY/MM/DD HH:mm"
-        const safeStr = f.deadline.replace(/-/g, '/');
-        const d = new Date(safeStr);
-        deadlineTs = d.getTime();
-      }
-
-      // 3. 根据是否有 editTaskId 决定是「新建」还是「更新」
+      // 2. 根据是否有 editTaskId 决定是「新建」还是「更新」
       const editId = this.data.editTaskId;
       if (editId) {
         // 编辑已有任务：只更新可修改的字段

@@ -49,22 +49,36 @@ Page({
     query.get({
       success: (res) => {
         const now = Date.now();
+        const ONE_DAY = 24 * 60 * 60 * 1000;
+        const ONE_WEEK = 7 * ONE_DAY;
         // 任务广场只展示「任务生效中」的任务：
-        // - 没有设置截止时间：一律视为生效中
-        // - 设置了截止时间：必须晚于当前时间
+        // - 有截止时间：必须晚于当前时间；
+        // - 没有设置截止时间：默认从创建时间起 7 天内有效，超过则视为过期。
         let list = (res.data || [])
           .filter(doc => {
-            const deadlineTs = doc.deadline;
-            return deadlineTs == null || deadlineTs > now;
+            const rawDeadline = doc.deadline;
+            const createdAt = doc.createdAt;
+            const createdTs = createdAt && createdAt.getTime ? createdAt.getTime() : null;
+            const effectiveDeadline = rawDeadline != null
+              ? rawDeadline
+              : (createdTs ? (createdTs + ONE_WEEK) : null);
+            // 没有任何时间信息的旧数据：默认始终视为生效中
+            if (effectiveDeadline == null) return true;
+            return effectiveDeadline > now;
           })
           .map(doc => {
-            const deadlineTs = doc.deadline;
+            const rawDeadline = doc.deadline;
+            const createdAt = doc.createdAt;
+            const createdTs = createdAt && createdAt.getTime ? createdAt.getTime() : null;
+            const effectiveDeadline = rawDeadline != null
+              ? rawDeadline
+              : (createdTs ? (createdTs + ONE_WEEK) : null);
             return {
               ...doc,
               id: doc._id, // 用文档 _id 作为前端使用的 id
               amountText: formatMoney(doc.amount),
-              // 未设置截止时间时，显示「不限」
-              deadlineText: deadlineTs ? formatDateTime(deadlineTs) : '不限',
+              // 截止时间：优先使用用户设置的；未设置则显示“默认 7 天内有效”
+              deadlineText: effectiveDeadline ? formatDateTime(effectiveDeadline) : '默认 7 天内有效',
               // 任务说明展开/收起用到的字段：默认收起
               descExpanded: false
             };
