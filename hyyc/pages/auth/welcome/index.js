@@ -18,10 +18,15 @@ Page({
 
   // 页面每次显示（包括从注册页返回）时尝试播放动画
   onShow() {
-    this.playLottie();
+    // 首次进入时 onShow 会早于 onReady，此时节点可能还没就绪；
+    // 等页面 ready 之后再启动，避免偶发的重复初始化导致卡顿。
+    if (this._pageReady) {
+      this.playLottie();
+    }
   },
 
   onReady() {
+    this._pageReady = true;
     this.playLottie();
   },
 
@@ -110,12 +115,22 @@ Page({
 
   playLottie() {
     // 已经有实例就不用重复创建
-    if (this._lottieInstance) return;
+    if (this._lottieInstance || this._lottieInitializing) return;
+    this._lottieInitializing = true;
 
     this.createSelectorQuery()
       .select('#hero-canvas')
       .node(res => {
-        if (!res || !res.node) return;
+        // 可能出现：页面刚显示就立刻跳转/隐藏，回调里拿不到节点
+        if (!res || !res.node) {
+          this._lottieInitializing = false;
+          return;
+        }
+        // 防止极端情况下多次触发回调导致重复创建实例
+        if (this._lottieInstance) {
+          this._lottieInitializing = false;
+          return;
+        }
         const canvas = res.node;
 
         // 处理清晰度 & 流畅度：
@@ -157,6 +172,7 @@ Page({
         if (this._lottieInstance && this._lottieInstance.setSpeed) {
           this._lottieInstance.setSpeed(1);
         }
+        this._lottieInitializing = false;
       })
       .exec();
   },
@@ -166,5 +182,6 @@ Page({
       this._lottieInstance.destroy();
     }
     this._lottieInstance = null;
+    this._lottieInitializing = false;
   }
 });
