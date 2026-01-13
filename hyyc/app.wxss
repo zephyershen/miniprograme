@@ -1,17 +1,11 @@
 @import "styles/shadcn.wxss";
 
-/* 自定义熊孩子字体，全局可用 */
-@font-face {
-  font-family: "XiongKid";
-  src: url("https://mrshenzf.top/front/XiongKid.ttf") format("truetype");
-  font-display: swap;
-}
-
 /* 全局页面样式 - 现代 Lottie 风格 */
 page {
-  background: #FDFDFE;
-  color: #2F3437;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background: #F5F6F8;
+  color: #1F2328;
+  /* 让 iOS / 安卓 都尽量用各自更顺眼的系统字体（没有就自动用下一个） */
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'HarmonyOS Sans SC', 'Noto Sans SC', Roboto, 'Droid Sans Fallback', 'Microsoft YaHei', sans-serif;
   -webkit-font-smoothing: antialiased;
   /* 禁止全局左右滚动，只允许上下滚动 */
   overflow-x: hidden;

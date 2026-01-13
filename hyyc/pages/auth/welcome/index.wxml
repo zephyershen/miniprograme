@@ -1,8 +1,13 @@
 <view class="welcome-page">
-  <view class="hero-card">
-    <view class="hero-lottie-box">
-      <canvas type="2d" id="hero-canvas" class="hero-lottie-canvas"></canvas>
-    </view>
+  <view class="hero-lottie-box">
+    <image
+      class="hero-lottie-canvas"
+      src="../../../assets/lottie/Welcome-cuate.svg"
+      mode="aspectFit"
+     style="width: 660rpx; height: 643rpx; display: block; box-sizing: border-box; position: relative; left: 0rpx; top: -79rpx"></image>
+  </view>
+
+  <view class="bottom">
     <view class="hero-text">
       <text class="hero-title">欢迎各位业主</text>
       <text class="hero-sub">在温馨客厅里管理你的社区生活</text>

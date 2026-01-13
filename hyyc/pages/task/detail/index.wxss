@@ -8,7 +8,7 @@
   width: 36rpx;
   height: 36rpx;
   border-radius: 50%;
-  background-color: #f43f5e; /* 红色提示 */
+  background-color: #B95E49; /* 红点提示（跟随主题色） */
   color: #ffffff;
   font-size: 20rpx;
   line-height: 36rpx;

@@ -17,14 +17,14 @@
     "navigationBarTitleText": "HYYC 小区任务",
     "navigationBarBackgroundColor": "#ffffff",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#FAF7F5",
+    "backgroundColor": "#F5F6F8",
     "backgroundTextStyle": "dark"
   },
   "style": "v2",
   "sitemapLocation": "sitemap.json",
   "tabBar": {
     "color": "#6b7280",
-    "selectedColor": "#111827",
+    "selectedColor": "#B95E49",
     "backgroundColor": "#ffffff",
     "borderStyle": "black",
     "list": [

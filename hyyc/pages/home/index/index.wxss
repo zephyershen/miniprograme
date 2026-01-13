@@ -11,16 +11,16 @@
   width: 16rpx;
   height: 16rpx;
   border-radius: 9999rpx;
-  background: #22C55E;
-  /* 绿色发光基础光晕（比之前更小一点） */
-  box-shadow: 0 0 0 4rpx rgba(34, 197, 94, 0.30);
+  background: #447244;
+  /* 更克制的光晕 */
+  box-shadow: 0 0 0 4rpx rgba(68, 114, 68, 0.22);
   /* 动态呼吸光晕效果 */
   animation: taskDotPulse 1.6s ease-in-out infinite;
 }
 
 .task-status-text {
   font-size: 22rpx;
-  color: #16A34A;
+  color: #447244;
 }
 
 /* 任务说明行：左侧"任务说明"和右侧三角形在同一行垂直居中、两端对齐 */
@@ -29,7 +29,7 @@
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  background: #F3F4F6;
+  background: #F2F3F5;
   padding: 12rpx 16rpx;
   border-radius: 8rpx;
 }
@@ -56,12 +56,12 @@
 /* 绿色发光点的呼吸动画：外圈光晕轻微放大缩小，制造动感 */
 @keyframes taskDotPulse {
   0% {
-    box-shadow: 0 0 0 2rpx rgba(34, 197, 94, 0.08);
+    box-shadow: 0 0 0 2rpx rgba(68, 114, 68, 0.08);
   }
   50% {
-    box-shadow: 0 0 0 8rpx rgba(34, 197, 94, 0.32);
+    box-shadow: 0 0 0 8rpx rgba(68, 114, 68, 0.26);
   }
   100% {
-    box-shadow: 0 0 0 2rpx rgba(34, 197, 94, 0.08);
+    box-shadow: 0 0 0 2rpx rgba(68, 114, 68, 0.08);
   }
 }

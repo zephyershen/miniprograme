@@ -1,63 +1,62 @@
 /*
-  现代 Lottie 风格主题系统
-  设计理念：大面积留白 + 明亮珊瑚橙 + 柔和阴影
-  配色灵感：Shopping Bag Lottie 动画
+  多抓鱼 / 日系极简风（克制留白 + 砖红主色 + 墨绿点缀）
+  目标：少渐变、少高饱和、卡片化、圆角更大、阴影更轻
 */
 
 /* ========== 主题配色系统 ========== */
 
-/* 品牌色（暖色系） */
-.color-primary { color: #FF6B6B; }      /* 珊瑚红 - 主色调 */
-.color-secondary { color: #FFB5A7; }    /* 肉粉色 - 次要色 */
-.color-accent { color: #FFE066; }       /* 暖黄色 - 强调色 */
-.color-neutral { color: #2F3437; }      /* 深灰色 - 正文主色 */
+/* 品牌色（更克制的低饱和） */
+.color-primary { color: #B95E49; }      /* 砖红 - 主色调 */
+.color-secondary { color: #DBB4AB; }    /* 浅砖粉 - 次要色 */
+.color-accent { color: #447244; }       /* 墨绿 - 强调色 */
+.color-neutral { color: #1F2328; }      /* 深灰 - 正文主色 */
 
 /* 语义色 */
-.color-info { color: #4DA3FF; }         /* 亮蓝 - 信息提示 */
-.color-success { color: #34D399; }      /* 绿色 - 成功状态 */
+.color-info { color: #4DA3FF; }         /* 蓝色 - 信息提示 */
+.color-success { color: #447244; }      /* 墨绿 - 成功状态 */
 .color-warning { color: #FBBF24; }      /* 暖橙 - 警告提示 */
 .color-error { color: #EF4444; }        /* 红色 - 错误/危险 */
 
 /* 背景色（三层级） */
-.bg-base-100 { background: #FDFDFE; }   /* 主背景 - 偏冷白 */
-.bg-base-200 { background: #F3F4F6; }   /* 次级背景 - 浅灰 */
-.bg-base-300 { background: #E5E7EB; }   /* 三级背景 - 中性灰 */
+.bg-base-100 { background: #F5F6F8; }   /* 主背景 - 轻灰白 */
+.bg-base-200 { background: #F2F3F5; }   /* 次级背景 - 更浅灰 */
+.bg-base-300 { background: #E9EBEF; }   /* 三级背景 - 分割/边框 */
 
 /* 兼容旧版类名 */
-.c-text { color: #2F3437; }
+.c-text { color: #1F2328; }
 .c-muted { color: #6B7280; }
-.c-primary { color: #FF6B6B; }
+.c-primary { color: #B95E49; }
 .c-danger { color: #EF4444; }
-.bg-page { background: #FDFDFE; }
+.bg-page { background: #F5F6F8; }
 .bg-card { background: #ffffff; }
-.bg-primary { background: #FF6B6B; }
-.bg-muted { background: #F3F4F6; }
+.bg-primary { background: #B95E49; }
+.bg-muted { background: #F2F3F5; }
 .bg-danger { background: #EF4444; }
 
 
 /* ========== 边框与圆角 ========== */
 
-.b { border: 1rpx solid #E8E0D8; }
-.br { border-radius: 16rpx; }           /* 标准圆角（更大） */
-.br-lg { border-radius: 20rpx; }        /* 大圆角 */
+.b { border: 1rpx solid #EDEFF2; }
+.br { border-radius: 20rpx; }           /* 标准圆角 */
+.br-lg { border-radius: 24rpx; }        /* 大圆角 */
 .br-full { border-radius: 9999rpx; }    /* 完全圆形 */
 
 
 /* ========== 阴影系统（多层次柔和阴影） ========== */
 
 .shadow-sm {
-  box-shadow: 0 2rpx 8rpx rgba(61, 50, 41, 0.04),
-              0 1rpx 3rpx rgba(61, 50, 41, 0.02);
+  box-shadow: 0 2rpx 8rpx rgba(17, 24, 39, 0.04),
+              0 1rpx 3rpx rgba(17, 24, 39, 0.02);
 }
 
 .shadow {
-  box-shadow: 0 4rpx 16rpx rgba(61, 50, 41, 0.06),
-              0 2rpx 8rpx rgba(61, 50, 41, 0.04);
+  box-shadow: 0 4rpx 16rpx rgba(17, 24, 39, 0.06),
+              0 2rpx 8rpx rgba(17, 24, 39, 0.04);
 }
 
 .shadow-lg {
-  box-shadow: 0 8rpx 32rpx rgba(61, 50, 41, 0.08),
-              0 4rpx 16rpx rgba(61, 50, 41, 0.04);
+  box-shadow: 0 8rpx 32rpx rgba(17, 24, 39, 0.08),
+              0 4rpx 16rpx rgba(17, 24, 39, 0.06);
 }
 
 
@@ -158,78 +157,85 @@
   height: 88rpx;
   line-height: 88rpx;
   padding: 0 32rpx;
-  border-radius: 16rpx;
-  border: none;
+  border-radius: 9999rpx;
+  border: 1rpx solid #EDEFF2;
   background: #ffffff;
-  color: #3D3229;
-  box-shadow: 0 2rpx 8rpx rgba(61, 50, 41, 0.06);
-  transition: all 0.3s ease;
+  color: #1F2328;
+  box-shadow: 0 2rpx 10rpx rgba(17, 24, 39, 0.06);
+  transition: background-color 0.2s ease, opacity 0.2s ease;
   font-weight: 600;
 }
 
 .btn:active {
-  transform: translateY(2rpx);
-  opacity: 0.9;
+  opacity: 0.92;
 }
 
-/* 渐变按钮样式 */
+/* 更克制的按钮（以纯色为主） */
 .btn-primary {
-  background: linear-gradient(135deg, #FF6B6B 0%, #FF7F6E 100%);
+  background: #B95E49;
+  border-color: #B95E49;
   color: #ffffff;
-  box-shadow: 0 4rpx 16rpx rgba(239, 68, 68, 0.32);
+  box-shadow: 0 8rpx 24rpx rgba(185, 94, 73, 0.28);
 }
 
 .btn-secondary {
-  background: linear-gradient(135deg, #FFB5A7 0%, #FFA69E 100%);
-  color: #ffffff;
-  box-shadow: 0 4rpx 16rpx rgba(255, 180, 169, 0.3);
+  background: #DBB4AB;
+  border-color: #DBB4AB;
+  color: #1F2328;
+  box-shadow: 0 8rpx 24rpx rgba(219, 180, 171, 0.24);
 }
 
 .btn-accent {
-  background: linear-gradient(135deg, #FFE066 0%, #FACC15 100%);
-  color: #3B3A2E;
-  box-shadow: 0 4rpx 16rpx rgba(250, 204, 21, 0.32);
+  background: #447244;
+  border-color: #447244;
+  color: #ffffff;
+  box-shadow: 0 8rpx 24rpx rgba(68, 114, 68, 0.24);
 }
 
 .btn-neutral {
-  background: #2F3437;
+  background: #1F2328;
+  border-color: #1F2328;
   color: #ffffff;
 }
 
 .btn-info {
-  background: linear-gradient(135deg, #4DA3FF 0%, #3B82F6 100%);
+  background: #4DA3FF;
+  border-color: #4DA3FF;
   color: #0B192E;
-  box-shadow: 0 4rpx 16rpx rgba(59, 130, 246, 0.32);
+  box-shadow: 0 8rpx 24rpx rgba(77, 163, 255, 0.24);
 }
 
 .btn-success {
-  background: linear-gradient(135deg, #34D399 0%, #22C55E 100%);
-  color: #052E16;
-  box-shadow: 0 4rpx 16rpx rgba(34, 197, 94, 0.3);
+  background: #447244;
+  border-color: #447244;
+  color: #ffffff;
+  box-shadow: 0 8rpx 24rpx rgba(68, 114, 68, 0.24);
 }
 
 .btn-warning {
-  background: linear-gradient(135deg, #FBBF24 0%, #F59E0B 100%);
+  background: #FBBF24;
+  border-color: #FBBF24;
   color: #451A03;
-  box-shadow: 0 4rpx 16rpx rgba(245, 158, 11, 0.32);
+  box-shadow: 0 8rpx 24rpx rgba(251, 191, 36, 0.22);
 }
 
 .btn-danger,
 .btn-error {
-  background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+  background: #EF4444;
+  border-color: #EF4444;
   color: #ffffff;
-  box-shadow: 0 4rpx 16rpx rgba(239, 68, 68, 0.32);
+  box-shadow: 0 8rpx 24rpx rgba(239, 68, 68, 0.24);
 }
 
 .btn-outline {
   background: transparent;
-  color: #FF6B6B;
-  border: 2rpx solid #FF6B6B;
+  color: #B95E49;
+  border: 2rpx solid #B95E49;
   box-shadow: none;
 }
 
 .btn-outline:active {
-  background: rgba(255, 107, 107, 0.08);
+  background: rgba(185, 94, 73, 0.08);
 }
 
 .btn-sm {
@@ -249,27 +255,26 @@
 
 .field-label {
   font-size: 28rpx;
-  color: #5D4E3F;
+  color: #1F2328;
   font-weight: 600;
   margin-bottom: 12rpx;
 }
 
 .input,
 .textarea {
-  background: #FEFCFB;
-  border: 2rpx solid #E8E0D8;
-  border-radius: 16rpx;
+  background: #ffffff;
+  border: 1rpx solid #EDEFF2;
+  border-radius: 20rpx;
   padding: 24rpx 20rpx;
   font-size: 28rpx;
-  color: #3D3229;
-  transition: all 0.3s ease;
+  color: #1F2328;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .input:focus,
 .textarea:focus {
-  border-color: #FF8B7B;
-  background: #ffffff;
-  box-shadow: 0 0 0 4rpx rgba(255, 139, 123, 0.1);
+  border-color: #B95E49;
+  box-shadow: 0 0 0 6rpx rgba(185, 94, 73, 0.12);
 }
 
 .textarea {
@@ -282,21 +287,22 @@
 
 .card {
   background: #ffffff;
-  border: 1rpx solid #F2EDE8;
-  border-radius: 20rpx;
+  border: 1rpx solid #EDEFF2;
+  border-radius: 24rpx;
   padding: 28rpx;
-  box-shadow: 0 4rpx 16rpx rgba(61, 50, 41, 0.06),
-              0 2rpx 8rpx rgba(61, 50, 41, 0.04);
-  transition: all 0.3s ease;
+  box-shadow: 0 8rpx 24rpx rgba(17, 24, 39, 0.06),
+              0 3rpx 10rpx rgba(17, 24, 39, 0.04);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .card:active {
-  transform: translateY(-2rpx);
-  box-shadow: 0 6rpx 24rpx rgba(61, 50, 41, 0.08);
+  transform: translateY(-1rpx);
+  box-shadow: 0 10rpx 28rpx rgba(17, 24, 39, 0.07),
+              0 4rpx 12rpx rgba(17, 24, 39, 0.05);
 }
 
 .card-glass {
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.86);
   backdrop-filter: blur(20rpx);
   border: 1rpx solid rgba(255, 255, 255, 0.3);
 }
@@ -304,13 +310,13 @@
 .card-title {
   font-size: 32rpx;
   font-weight: 600;
-  color: #3D3229;
+  color: #1F2328;
   line-height: 1.4;
 }
 
 .card-sub {
   font-size: 26rpx;
-  color: #A0826D;
+  color: #6B7280;
   margin-top: 8rpx;
 }
 
@@ -321,30 +327,34 @@
   font-size: 22rpx;
   padding: 6rpx 14rpx;
   border-radius: 9999rpx;
-  border: none;
-  background: #F2EDE8;
-  color: #5D4E3F;
+  border: 1rpx solid #EDEFF2;
+  background: #F2F3F5;
+  color: #6B7280;
   font-weight: 500;
 }
 
 .badge-primary {
-  background: rgba(255, 139, 123, 0.15);
-  color: #D65A48;
+  background: rgba(185, 94, 73, 0.12);
+  border-color: rgba(185, 94, 73, 0.14);
+  color: #B95E49;
 }
 
 .badge-secondary {
-  background: rgba(255, 180, 169, 0.15);
-  color: #E66B5A;
+  background: rgba(219, 180, 171, 0.18);
+  border-color: rgba(219, 180, 171, 0.22);
+  color: #7A4A3E;
 }
 
 .badge-accent {
-  background: rgba(255, 208, 127, 0.15);
-  color: #CC8F3F;
+  background: rgba(68, 114, 68, 0.12);
+  border-color: rgba(68, 114, 68, 0.14);
+  color: #447244;
 }
 
 .badge-success {
-  background: rgba(142, 214, 169, 0.15);
-  color: #4A9C6C;
+  background: rgba(68, 114, 68, 0.12);
+  border-color: rgba(68, 114, 68, 0.14);
+  color: #447244;
 }
 
 .badge-warning {
@@ -354,8 +364,9 @@
 
 .badge-danger,
 .badge-error {
-  background: rgba(255, 107, 107, 0.15);
-  color: #D63F3F;
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.14);
+  color: #EF4444;
 }
 
 
@@ -365,9 +376,9 @@
   width: 64rpx;
   height: 64rpx;
   border-radius: 9999rpx;
-  background: #F2EDE8;
+  background: #F2F3F5;
   overflow: hidden;
-  box-shadow: 0 2rpx 8rpx rgba(61, 50, 41, 0.08);
+  box-shadow: 0 2rpx 10rpx rgba(17, 24, 39, 0.06);
 }
 
 .avatar-lg {
@@ -385,7 +396,7 @@
 
 .divider {
   height: 1rpx;
-  background: #E8E0D8;
+  background: #EDEFF2;
   margin: 20rpx 0;
 }
 
@@ -396,4 +407,4 @@
 .opacity-60 { opacity: 0.6; }
 .opacity-80 { opacity: 0.8; }
 
-.transition { transition: all 0.3s ease; }
+.transition { transition: all 0.2s ease; }

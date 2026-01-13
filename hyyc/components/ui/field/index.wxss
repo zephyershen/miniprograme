@@ -21,6 +21,6 @@
 
 /* 必填小红星样式，和实名页保持一致 */
 .label-star {
-  color: #FF6B6B;
+  color: #B95E49;
   margin-left: 4rpx;
 }

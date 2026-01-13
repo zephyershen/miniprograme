@@ -100,7 +100,7 @@
     </view>
 
     <view class="actions">
-      <view class="btn btn-primary" bindtap="submit">继续</view>
+      <view class="btn btn-primary btn-continue" bindtap="submit">继续</view>
     </view>
   </view>
 

@@ -1,72 +1,70 @@
 @import "../../../styles/shadcn.wxss";
 
-/* 整个页面背景和动画背景保持同一种浅橙色（与 Lottie 文件背景一致） */
+/* 欢迎页：纯白留白风格（类似 ui_2.png） */
 page {
-  background-color: #FFECD6;
+  background-color: #FFFFFF;
 }
 
 .welcome-page {
   min-height: 100vh;
-  padding: 40rpx 32rpx 60rpx;
+  padding: 120rpx 64rpx 0;
   box-sizing: border-box;
-  background-color: #FFECD6;
+  background-color: #FFFFFF;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
 }
 
-.hero-card {
+.hero-lottie-box {
+  flex: 1;
   width: 100%;
-  max-width: 640rpx;
-  padding: 40rpx 24rpx 32rpx;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.hero-lottie-canvas {
+  width: 660rpx;
+  height: 660rpx;
+  top: -79rpx;
+}
+
+.bottom {
+  width: 100%;
+  padding-bottom: calc(80rpx + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
-.hero-lottie-box {
-  /* 视觉上稍微放大一点，但内部绘制尺寸保持适中，兼顾性能 */
-  width: 420rpx;
-  height: 420rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-
-.hero-lottie-canvas {
-  width: 420rpx;
-  height: 420rpx;
-}
-
 .hero-text {
-  margin-top: 24rpx;
   text-align: center;
 }
 
 .hero-title,
-.hero-sub {
-  display: block; /* 强制分行显示 */
-  font-family: "XiongKid", -apple-system, BlinkMacSystemFont, "PingFang SC",
-    "Microsoft Yahei", sans-serif; /* 若未配置自定义字体，则自动回退到系统字体 */
-}
+.hero-sub { display: block; }
 
 .hero-title {
-  font-size: 52rpx;
-  font-weight: 700;
-  color: #111827;
+  font-size: 56rpx;
+  font-weight: 800;
+  color: #2F6B3D;
+  letter-spacing: 2rpx;
+  line-height: 1.25;
 }
 
 .hero-sub {
-  margin-top: 16rpx;
-  font-size: 32rpx;
-  color: #6B7280;
+  margin-top: 22rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #2F6B3D;
+  opacity: 0.85;
 }
 
 .actions {
   width: 100%;
-  margin-top: 24rpx;
+  max-width: 560rpx;
+  margin-top: 56rpx;
   display: flex;
   flex-direction: column;
   gap: 20rpx;
@@ -74,14 +72,14 @@ page {
 
 .action-btn {
   width: 100%;
-  height: 88rpx;
+  height: 92rpx;
   border-radius: 999rpx;
-  font-size: 30rpx;
-  font-weight: 600;
+  font-size: 32rpx;
+  font-weight: 700;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 12rpx 40rpx rgba(148, 163, 184, 0.45);
 }
 
 /* 覆盖 button 组件的默认内边距/边框，保证和原来的 view 按钮一致大小 */
@@ -96,12 +94,13 @@ button.action-btn::after {
 }
 
 .action-login {
-  background: linear-gradient(135deg, #FDBA74 0%, #FB7185 100%);
+  background: #2F6B3D;
   color: #FFFFFF;
+  border: 1rpx solid #2F6B3D;
 }
 
 .action-register {
-  background: #FFFFFF;
-  color: #4B5563;
-  border: 2rpx dashed #F97316;
+  background: transparent;
+  color: #2F6B3D;
+  border: 2rpx solid rgba(47, 107, 61, 0.35);
 }

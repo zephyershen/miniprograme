@@ -12,8 +12,8 @@
 .chat-header {
   flex-shrink: 0;
   height: 88rpx;
-  /* 头部背景改为灰色 */
-  background: #f3f4f6;
+  /* 头部背景（跟随主题浅灰） */
+  background: #F2F3F5;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -46,7 +46,7 @@
 .chat-input-safe {
   flex-shrink: 0; /* 不被压缩 */
   background: #ffffff;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid #EDEFF2;
   /* 基础间距，动态 padding 由 style 属性控制 */
   padding-bottom: 16rpx;
 }
@@ -67,7 +67,7 @@
 }
 
 .chat-plus-btn:active {
-  background-color: #f3f4f6;
+  background-color: #F2F3F5;
 }
 
 /* 加号的横竖两条线，绝对居中，保证视觉在圆心 */

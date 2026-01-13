@@ -12,14 +12,7 @@ App({
     }
 
     // 主动加载自定义字体（真机上仅写 @font-face 往往不会自动下载）
-    // 注意：需要在小程序后台「downloadFile 合法域名」里配置 mrshenzf.top
-    wx.loadFontFace({
-      family: 'XiongKid',
-      source: 'url("https://mrshenzf.top/front/XiongKid.ttf")',
-      global: true,
-      success(res) { console.log('XiongKid font loaded', res); },
-      fail(err) { console.error('XiongKid font load fail', err); }
-    });
+    // 如需自定义字体，建议把字体文件放到小程序包里（不用走网络），再按需加载。
 
     console.log('HYYC UI app launch');
 

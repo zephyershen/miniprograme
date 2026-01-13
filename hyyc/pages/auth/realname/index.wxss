@@ -1,15 +1,14 @@
 @import "../../../styles/shadcn.wxss";
 
-/* 和登录/欢迎页保持同一浅橙色背景 */
+/* 实名页：多抓鱼风格（留白 + 卡片 + 砖红主按钮） */
 page {
-  background-color: #FFECD6;
+  background-color: #F5F6F8;
 }
 
-/* 现代苹果风格 - 实名认证页面 */
 .apple {
   min-height: 100vh;
   padding: 48rpx 32rpx 80rpx;
-  background: #FFECD6;
+  background: #F5F6F8;
   position: relative;
 }
 
@@ -21,23 +20,23 @@ page {
 .h1 {
   font-size: 48rpx;
   font-weight: 700;
-  color: #FF8B7B;
+  color: #B95E49;
   letter-spacing: 1rpx;
 }
 
 .sub {
   margin-top: 12rpx;
-  color: #A0826D;
+  color: #6B7280;
   font-size: 28rpx;
 }
 
 .panel {
   background: #ffffff;
-  border: none;
+  border: 1rpx solid #EDEFF2;
   border-radius: 24rpx;
   padding: 36rpx 28rpx;
-  box-shadow: 0 8rpx 32rpx rgba(255, 139, 123, 0.1),
-              0 4rpx 16rpx rgba(61, 50, 41, 0.04);
+  box-shadow: 0 10rpx 28rpx rgba(17, 24, 39, 0.06),
+              0 4rpx 12rpx rgba(17, 24, 39, 0.04);
 }
 
 .group {
@@ -50,7 +49,7 @@ page {
 
 .label {
   display: block;
-  color: #5D4E3F;
+  color: #1F2328;
   font-size: 28rpx;
   font-weight: 600;
   margin-bottom: 12rpx;
@@ -59,21 +58,21 @@ page {
 }
 
 .label-star {
-  color: #FF6B6B;
+  color: #B95E49;
   margin-left: 4rpx;
 }
 
 .control {
-  background: #FEFCFB;
-  border: 2rpx solid #F5E6DC;
-  border-radius: 16rpx;
+  background: #ffffff;
+  border: 1rpx solid #EDEFF2;
+  border-radius: 20rpx;
   height: 64rpx;          /* 统一输入类高度，与 .btn-sm 一致 */
   line-height: 64rpx;     /* 文本垂直居中（input/picker/view统一） */
   padding: 0 20rpx;       /* 去掉上下内边距，避免总高度不一致 */
   box-sizing: border-box; /* 高度包含边框，跨端一致性更好 */
   font-size: 28rpx;
-  color: #3D3229;
-  transition: all 0.3s ease;
+  color: #1F2328;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 /* 与按钮 .btn-sm 高度对齐（手机号一行） */
@@ -85,9 +84,8 @@ page {
 }
 
 .control:focus {
-  border-color: #FF8B7B;
-  background: #ffffff;
-  box-shadow: 0 0 0 4rpx rgba(255, 139, 123, 0.1);
+  border-color: #B95E49;
+  box-shadow: 0 0 0 6rpx rgba(185, 94, 73, 0.12);
 }
 
 picker .control {
@@ -109,22 +107,22 @@ picker .control text:first-child {
 }
 
 .error {
-  color: #FF6B6B;
+  color: #EF4444;
   font-size: 24rpx;
   margin-top: 8rpx;
 }
 
 .hint {
   font-size: 26rpx;
-  color: #A0826D;
+  color: #6B7280;
 }
 
 .hint.ok {
-  color: #8ED6A9;
+  color: #447244;
 }
 
 .hint.warn {
-  color: #FF8B7B;
+  color: #B95E49;
 }
 
 .gap > view + view {
@@ -154,6 +152,16 @@ picker .control text:first-child {
   margin-top: 36rpx;
 }
 
+.btn-primary.btn-continue {
+  height: 81rpx;
+  padding: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
 .apple .btn,
 .apple .btn-primary,
 .apple .btn-outline {
@@ -162,15 +170,15 @@ picker .control text:first-child {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #FF8B7B 0%, #FF7A69 100%);
+  background: #B95E49;
   color: #ffffff;
-  border: none;
-  border-radius: 16rpx;
+  border: 1rpx solid #B95E49;
+  border-radius: 9999rpx;
   padding: 26rpx;
   font-size: 32rpx;
   font-weight: 600;
   text-align: center;
-  box-shadow: 0 8rpx 24rpx rgba(255, 139, 123, 0.3);
+  box-shadow: 0 10rpx 28rpx rgba(185, 94, 73, 0.26);
 }
 
 .apple .btn:active,
@@ -179,32 +187,32 @@ picker .control text:first-child {
   /* 去掉按下时的位移 / 阴影变化 */
   transform: none;
   opacity: 1;
-  box-shadow: 0 8rpx 24rpx rgba(255, 139, 123, 0.3);
+  box-shadow: 0 10rpx 28rpx rgba(185, 94, 73, 0.26);
 }
 
 .btn-outline {
   background: #ffffff;
-  color: #FF8B7B;
-  border: 2rpx solid #FF8B7B;
-  border-radius: 12rpx;
+  color: #B95E49;
+  border: 1rpx solid #B95E49;
+  border-radius: 9999rpx;
   padding: 14rpx 24rpx;
   font-size: 26rpx;
   font-weight: 600;
-  transition: all 0.3s ease;
+  transition: background-color 0.2s ease;
 }
 
 .btn-outline:active {
-  background: rgba(255, 139, 123, 0.08);
+  background: rgba(185, 94, 73, 0.08);
 }
 
 .btn-info {
-  background: linear-gradient(135deg, #FFB4A9 0%, #FF8B7B 100%);
-  color: #ffffff;
-  border: none;
-  border-radius: 12rpx;
+  background: #DBB4AB;
+  color: #1F2328;
+  border: 1rpx solid #DBB4AB;
+  border-radius: 9999rpx;
   font-size: 26rpx;
   font-weight: 600;
-  box-shadow: 0 4rpx 12rpx rgba(255, 139, 123, 0.2);
+  box-shadow: 0 8rpx 22rpx rgba(219, 180, 171, 0.22);
 }
 
 .btn-sm {
@@ -229,7 +237,7 @@ picker .control text:first-child {
 }
 
 .footer-text {
-  color: #A0826D;
+  color: #6B7280;
   font-size: 24rpx;
   line-height: 1.6;
 }

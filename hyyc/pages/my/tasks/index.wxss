@@ -11,8 +11,8 @@
   width: 16rpx;
   height: 16rpx;
   border-radius: 9999rpx;
-  background: #22C55E;
-  box-shadow: 0 0 0 4rpx rgba(34, 197, 94, 0.30);
+  background: #447244;
+  box-shadow: 0 0 0 4rpx rgba(68, 114, 68, 0.22);
   animation: myTaskDotPulseGreen 1.6s ease-in-out infinite;
 }
 
@@ -27,7 +27,7 @@
   display: flex;
   align-items: center;
   font-size: 22rpx;
-  color: #16A34A;
+  color: #447244;
   margin-left: 8rpx;
 }
 
@@ -42,13 +42,13 @@
 /* 绿色点呼吸动画 */
 @keyframes myTaskDotPulseGreen {
   0% {
-    box-shadow: 0 0 0 2rpx rgba(34, 197, 94, 0.08);
+    box-shadow: 0 0 0 2rpx rgba(68, 114, 68, 0.08);
   }
   50% {
-    box-shadow: 0 0 0 8rpx rgba(34, 197, 94, 0.32);
+    box-shadow: 0 0 0 8rpx rgba(68, 114, 68, 0.26);
   }
   100% {
-    box-shadow: 0 0 0 2rpx rgba(34, 197, 94, 0.08);
+    box-shadow: 0 0 0 2rpx rgba(68, 114, 68, 0.08);
   }
 }
 
@@ -73,9 +73,9 @@
   align-items: center;
   justify-content: space-between;
   padding: 20rpx 24rpx;
-  background: #F8FAFC;
-  border-radius: 16rpx;
-  border: 1rpx solid #E2E8F0;
+  background: #ffffff;
+  border-radius: 20rpx;
+  border: 1rpx solid #EDEFF2;
 }
 
 .batch-bar-left {
@@ -85,7 +85,7 @@
 
 .batch-bar-text {
   font-size: 28rpx;
-  color: #475569;
+  color: #6B7280;
   margin-left: 16rpx;
 }
 
@@ -94,7 +94,7 @@
   width: 44rpx;
   height: 44rpx;
   border-radius: 8rpx;
-  border: 2rpx solid #CBD5E1;
+  border: 2rpx solid #D1D5DB;
   background: #fff;
   display: flex;
   align-items: center;
@@ -105,15 +105,15 @@
 }
 
 .batch-checkbox-checked {
-  background: #3B82F6;
-  border-color: #3B82F6;
+  background: #B95E49;
+  border-color: #B95E49;
 }
 
 /* 半选状态 */
 .batch-checkbox-partial {
   background: #fff;
-  border-color: #3B82F6;
-  color: #3B82F6;
+  border-color: #B95E49;
+  color: #B95E49;
 }
 
 /* 任务项容器 */
