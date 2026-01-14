@@ -3,6 +3,7 @@
     "pages/home/index/index",
     "pages/auth/welcome/index",
     "pages/auth/realname/index",
+    "pages/legal/doc/index",
     "pages/task/publish/index",
     "pages/task/detail/index",
     "pages/task/submit/index",

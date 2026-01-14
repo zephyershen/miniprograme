@@ -33,6 +33,8 @@ Page({
     phoneVerified: false,
     // 业务 loading 状态（接口请求时用）
     isLoading: false,
+    // 协议勾选：默认未同意
+    agreeChecked: false,
     // 定位相关：初始为“尚未定位”，需要用户主动点击“获取定位”
     inCommunity: false,
     locationText: '尚未定位，请点击右侧“获取定位”',
@@ -117,6 +119,14 @@ Page({
     //   fail(){ self.setData({ inCommunity:false, locationText:'定位失败，请重试', isLoading: false }); }
     // });
   },
+  toggleAgree(){
+    this.setData({ agreeChecked: !this.data.agreeChecked });
+  },
+  openLegalDoc(e){
+    const type = (e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.type) || '';
+    if (!type) return;
+    wx.navigateTo({ url: '/pages/legal/doc/index?type=' + encodeURIComponent(type) });
+  },
   goBack(){ wx.navigateBack({ fail: ()=> wx.switchTab({ url: '/pages/home/index/index' })}); },
   submit(){
     const f = this.data.form; const errors = {};
@@ -135,6 +145,11 @@ Page({
     errors.inviteCode = required(f.inviteCode,'请输入小区邀请码');
     Object.keys(errors).forEach(k=>{ if(!errors[k]) delete errors[k]; });
     if (Object.keys(errors).length){ this.setData({errors}); return; }
+
+    if (!this.data.agreeChecked) {
+      toast('请先阅读并同意用户协议和隐私政策');
+      return;
+    }
     
     this.setData({ isLoading: true });
 	    const checkAll = async ()=>{
@@ -156,7 +171,7 @@ Page({
 	      try {
 	        const fnRes = await wx.cloud.callFunction({
 	          name: 'registerUser',
-	          data: { form: f }
+	          data: { form: f, agree: this.data.agreeChecked }
 	        });
 	        regResult = fnRes && fnRes.result;
 	      } catch (err) {
@@ -166,11 +181,11 @@ Page({
 	        return;
 	      }
 
-	      // 身份证号已存在：弹出提示，不写入本地缓存
-	      if (regResult && regResult.code === 'ID_EXISTS') {
-	        this.setData({ isLoading: false, showUserExist: true });
-	        return;
-	      }
+		      // 身份证号已存在 / 同一微信已注册：弹出提示，不写入本地缓存
+		      if (regResult && (regResult.code === 'ID_EXISTS' || regResult.code === 'OPENID_EXISTS')) {
+		        this.setData({ isLoading: false, showUserExist: true });
+		        return;
+		      }
 
 	      if (!regResult || regResult.ok !== true) {
 	        // 其他错误（参数问题 / 事务失败等）

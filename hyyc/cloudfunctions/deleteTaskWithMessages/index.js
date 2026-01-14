@@ -42,10 +42,20 @@ exports.main = async (event, context) => {
     const userRes = await db
       .collection(USER_COLLECTION)
       .where({ _openid: openid })
-      .limit(1)
+      .limit(2)
       .get();
 
-    const me = (userRes && userRes.data && userRes.data[0]) || null;
+    const list = (userRes && userRes.data) || [];
+
+    if (list.length > 1) {
+      return {
+        ok: false,
+        code: 'MULTI_USER',
+        msg: '当前微信账号存在多条实名记录，请联系管理员处理',
+      };
+    }
+
+    const me = list[0] || null;
 
     if (!me || !me._id) {
       return {
@@ -129,4 +139,3 @@ exports.main = async (event, context) => {
     };
   }
 };
-

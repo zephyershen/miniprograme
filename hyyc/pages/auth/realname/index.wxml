@@ -99,6 +99,18 @@
       <text class="error" wx:if="{{errors.location}}">{{errors.location}}</text>
     </view>
 
+    <view class="agreement">
+      <view class="agreement-row">
+        <view class="agreement-check {{agreeChecked ? 'is-checked' : ''}}" bindtap="toggleAgree"></view>
+        <view class="agreement-text" bindtap="toggleAgree">
+          <text>我已阅读并同意</text>
+          <text class="agreement-link" catchtap="openLegalDoc" data-type="user_agreement">「用户协议」</text>
+          <text>和</text>
+          <text class="agreement-link" catchtap="openLegalDoc" data-type="privacy_policy">「隐私政策」</text>
+        </view>
+      </view>
+    </view>
+
     <view class="actions">
       <view class="btn btn-primary btn-continue" bindtap="submit">继续</view>
     </view>

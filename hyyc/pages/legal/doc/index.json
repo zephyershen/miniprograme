@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "协议",
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "ui-loading": "/components/ui/loading/index"
+  }
+}

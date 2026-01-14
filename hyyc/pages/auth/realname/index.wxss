@@ -125,6 +125,52 @@ picker .control text:first-child {
   color: #B95E49;
 }
 
+.agreement {
+  margin-top: 18rpx;
+}
+
+.agreement-row {
+  display: flex;
+  align-items: center;
+  padding: 8rpx 6rpx;
+}
+
+.agreement-check {
+  width: 34rpx;
+  height: 34rpx;
+  border-radius: 9999rpx;
+  border: 2rpx solid rgba(47, 107, 61, 0.35);
+  box-sizing: border-box;
+  margin-right: 12rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 34rpx;
+}
+
+.agreement-check.is-checked {
+  border-color: #2F6B3D;
+}
+
+.agreement-check.is-checked::after {
+  content: '';
+  width: 18rpx;
+  height: 18rpx;
+  border-radius: 9999rpx;
+  background: #2F6B3D;
+}
+
+.agreement-text {
+  font-size: 26rpx;
+  color: #1F2328;
+  line-height: 34rpx;
+}
+
+.agreement-link {
+  color: #2F6B3D;
+  font-weight: 700;
+}
+
 .gap > view + view {
   margin-left: 16rpx;
 }

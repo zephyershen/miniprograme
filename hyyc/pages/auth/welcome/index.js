@@ -34,10 +34,18 @@ Page({
       // 2）根据 _openid 查询 userInfo，看是否已经实名/注册
       const queryRes = await db.collection(USER_COLLECTION)
         .where({ _openid: openid })
-        .limit(1)
+        .limit(2)
         .get();
 
       const list = (queryRes && queryRes.data) || [];
+      if (list.length > 1) {
+        wx.showModal({
+          title: '登录异常',
+          content: '检测到当前微信账号存在多条实名记录，请联系管理员处理后再登录。',
+          showCancel: false
+        });
+        return;
+      }
       if (!list.length) {
         // 没找到实名信息，引导用户先去注册
         wx.showModal({
