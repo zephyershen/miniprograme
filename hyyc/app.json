@@ -31,7 +31,9 @@
     "list": [
       {
         "pagePath": "pages/home/index/index",
-        "text": "首页"
+        "text": "首页",
+        "iconPath": "assets/lottie/home-unclick.png",
+        "selectedIconPath": "assets/lottie/home-clicked.png"
       },
       {
         "pagePath": "pages/task/publish/index",
@@ -39,7 +41,9 @@
       },
       {
         "pagePath": "pages/profile/index/index",
-        "text": "我的"
+        "text": "我的",
+        "iconPath": "assets/lottie/profile-unclick.png",
+        "selectedIconPath": "assets/lottie/profile-clicked.png"
       }
     ]
   },

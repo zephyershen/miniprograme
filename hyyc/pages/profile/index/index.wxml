@@ -1,22 +1,43 @@
 <ui-loading show="{{isLoading}}" />
-<view class="px-24 py-16">
-  <ui-card title="账户信息">
-    <view class="row" bindtap="gotoAccount">
-      <view class="avatar"></view>
-      <view style="margin-left:12rpx;">
-        <text class="bold">{{user.name||'未实名'}}</text>
-        <view class="c-muted text-sm" wx:if="{{user.nickname}}">网名：{{user.nickname}}</view>
-        <view class="c-muted text-sm">{{user.community||'未设置小区'}} · {{user.realname?'已实名':'未实名'}}</view>
-        <view class="c-muted text-sm" wx:if="{{user.building || user.door}}">{{user.building||''}} {{user.door?('· '+user.door):''}}</view>
+<view class="profile-page">
+  <!-- 顶部：背景图 + 用户信息 -->
+  <view class="hero">
+    <image class="hero-bg" src="/assets/lottie/indoor.svg" mode="aspectFit"></image>
+    <view class="hero-mask"></view>
+
+    <view class="hero-inner">
+      <view class="user-strip" bindtap="gotoAccount">
+        <view class="avatar avatar-lg"></view>
+        <view class="user-text">
+          <text class="user-name">{{user.name||'未实名'}}</text>
+          <text class="user-sub" wx:if="{{user.nickname}}">网名：{{user.nickname}}</text>
+          <text class="user-sub">{{user.community||'未设置小区'}} · {{user.realname?'已实名':'未实名'}}</text>
+          <text class="user-sub" wx:if="{{user.building || user.door}}">{{user.building||''}} {{user.door?('· '+user.door):''}}</text>
+        </view>
+        <text class="user-arrow">›</text>
       </view>
     </view>
-  </ui-card>
+  </view>
 
-  <ui-card class="mt-16" title="导航">
-    <view class="py-16" bindtap="gotoMyTasks">我的任务</view>
-    <view class="divider"></view>
-    <view class="py-16" bindtap="gotoWallet">我的钱包</view>
-    <view class="divider"></view>
-    <view class="py-16 c-danger" bindtap="logout">退出登录</view>
-  </ui-card>
+  <!-- 下方：功能面板 -->
+  <view class="content">
+    <view class="panel card card-glass" style="position: relative; left: 0rpx; top: 25rpx">
+      <view class="quick-grid">
+        <view class="quick-item" bindtap="gotoMyTasks">
+          <view class="quick-icon quick-icon-task">
+            <image class="quick-icon-svg" src="/assets/lottie/task.svg" mode="aspectFit"></image>
+          </view>
+          <text class="quick-label">任务</text>
+        </view>
+        <view class="quick-item" bindtap="gotoWallet">
+          <view class="quick-icon quick-icon-wallet">
+            <image class="quick-icon-svg" src="/assets/lottie/wallet.svg" mode="aspectFit"></image>
+          </view>
+          <text class="quick-label">钱包</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="logout-btn" bindtap="logout">退出登录</view>
+  </view>
 </view>

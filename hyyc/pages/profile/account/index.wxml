@@ -1,74 +1,71 @@
 <ui-loading show="{{isLoading}}" />
 
-<view class="page">
-  <ui-card title="账户信息">
-    <view class="form">
-      <view class="field">
-        <view class="label">昵称</view>
-        <input class="control" value="{{form.nickname}}" bindinput="onInput" data-key="nickname" placeholder="请输入昵称（网名）" />
+<view class="account-page">
+  <view class="content">
+    <!-- 账户信息卡片 -->
+    <view class="panel card card-glass">
+      <text class="panel-title">账户信息</text>
+
+      <view class="form">
+        <view class="field-row">
+          <text class="field-label">昵称</text>
+          <input class="field-input" value="{{form.nickname}}" bindinput="onInput" data-key="nickname" placeholder="请输入昵称（网名）" />
+        </view>
+
+        <view class="field-row">
+          <text class="field-label">姓名</text>
+          <input class="field-input field-readonly" value="{{form.name}}" disabled placeholder="未填写" />
+        </view>
+
+        <view class="field-row">
+          <text class="field-label">身份证号</text>
+          <input class="field-input field-readonly" value="{{form.idNumber}}" disabled placeholder="未填写" />
+        </view>
+
+        <view class="field-row">
+          <text class="field-label">手机号</text>
+          <input class="field-input" value="{{form.phone}}" bindinput="onInput" data-key="phone" placeholder="请输入手机号" />
+        </view>
+
+        <view class="field-row">
+          <text class="field-label">小区名称</text>
+          <input class="field-input field-readonly" value="{{form.community}}" disabled placeholder="未填写" />
+        </view>
+
+        <view class="field-row">
+          <text class="field-label">楼栋</text>
+          <picker mode="selector" range="{{buildingRange}}" value="{{buildingIndex}}" bindchange="onBuildingChange">
+            <view class="field-select">
+              <text class="{{form.building ? '' : 'placeholder'}}">{{form.building || '请选择楼栋'}}</text>
+              <text class="select-arrow">›</text>
+            </view>
+          </picker>
+        </view>
+
+        <view class="field-row">
+          <text class="field-label">门牌号</text>
+          <picker mode="multiSelector" range="{{doorRange}}" value="{{doorIndex}}" bindchange="onDoorChange">
+            <view class="field-select">
+              <text class="{{form.door ? '' : 'placeholder'}}">{{form.door || '请选择门牌（楼层+户号）'}}</text>
+              <text class="select-arrow">›</text>
+            </view>
+          </picker>
+        </view>
       </view>
 
-      <view class="field">
-        <view class="label">姓名</view>
-        <input class="control readonly" value="{{form.name}}" disabled placeholder="未填写" />
-      </view>
-
-      <view class="field">
-        <view class="label">身份证号</view>
-        <input class="control readonly" value="{{form.idNumber}}" disabled placeholder="未填写" />
-      </view>
-
-      <view class="field">
-        <view class="label">手机号</view>
-        <input class="control" value="{{form.phone}}" bindinput="onInput" data-key="phone" placeholder="请输入手机号" />
-      </view>
-
-      <view class="field">
-        <view class="label">小区名称</view>
-        <input class="control readonly" value="{{form.community}}" disabled placeholder="未填写" />
-      </view>
-
-      <view class="field">
-        <view class="label">楼栋</view>
-        <picker mode="selector"
-                range="{{buildingRange}}"
-                value="{{buildingIndex}}"
-                bindchange="onBuildingChange">
-          <view class="select-control">
-            {{form.building || '请选择楼栋'}}
-          </view>
-        </picker>
-      </view>
-
-      <view class="field">
-        <view class="label">门牌号</view>
-        <picker mode="multiSelector"
-                range="{{doorRange}}"
-                value="{{doorIndex}}"
-                bindchange="onDoorChange">
-          <view class="select-control">
-            {{form.door || '请选择门牌（楼层+户号）'}}
-          </view>
-        </picker>
+      <view class="actions">
+        <view class="btn-save" bindtap="onSave">保存修改</view>
       </view>
     </view>
-  </ui-card>
 
-  <view class="actions">
-    <button class="btn-primary" bindtap="onSave">保存修改</button>
+    <!-- 联系管理员卡片 -->
+    <view class="panel card card-glass contact-panel">
+      <text class="panel-title">联系管理员</text>
+      <view class="contact-info">
+        <text class="contact-text">有任何问题可以联系管理员：</text>
+        <text class="contact-item">微信：MrShenzf</text>
+        <!-- <text class="contact-item">电话：18451306773</text> -->
+      </view>
+    </view>
   </view>
-</view>
-
-<view class="contact-card">
-  <ui-card title="联系管理员">
-    <view class="contact-tip">
-      <text>有任何问题可以联系管理员：</text>
-      <view>
-        <text>微信：MrShenzf</text>
-      </view>
-      <view>
-        <text>电话：18451306773</text>
-      </view>
-    </view>
-  </ui-card>
 </view>
