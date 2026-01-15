@@ -263,7 +263,7 @@
 .input,
 .textarea {
   background: #ffffff;
-  border: 1rpx solid #EDEFF2;
+  border: 2rpx solid #D1D5DB;
   border-radius: 20rpx;
   padding: 24rpx 20rpx;
   font-size: 28rpx;

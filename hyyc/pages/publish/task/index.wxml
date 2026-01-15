@@ -58,14 +58,14 @@
         </view>
         <view class="gap-item">
           <ui-field label="任务地点（可选）">
-            <view class="row row-gap-8">
-              <view class="{{'badge ' + (!form.locationType ? 'badge-primary' : '')}}" data-v="" bindtap="onLocationTap">
+            <view class="location-tabs">
+              <view class="{{'location-tab ' + (!form.locationType ? 'location-tab-active' : '')}}" data-v="" bindtap="onLocationTap">
                 不区分
               </view>
-              <view class="{{'badge ' + (form.locationType==='inside' ? 'badge-primary' : '')}}" data-v="inside" bindtap="onLocationTap">
+              <view class="{{'location-tab ' + (form.locationType==='inside' ? 'location-tab-active' : '')}}" data-v="inside" bindtap="onLocationTap">
                 小区内
               </view>
-              <view class="{{'badge ' + (form.locationType==='outside' ? 'badge-primary' : '')}}" data-v="outside" bindtap="onLocationTap">
+              <view class="{{'location-tab ' + (form.locationType==='outside' ? 'location-tab-active' : '')}}" data-v="outside" bindtap="onLocationTap">
                 小区外
               </view>
             </view>
@@ -90,9 +90,9 @@
           </ui-field>
         </view>
       </view>
-      <view class="row space-between mt-20">
-        <view class="btn btn-outline" bindtap="reset">清空</view>
-        <view class="btn btn-primary" bindtap="submit">发布</view>
-  </view>
+      <view class="btn-group">
+        <view class="btn-reset" bindtap="reset">清空</view>
+        <view class="btn-submit" bindtap="submit">发布任务</view>
+      </view>
 </view>
 </view>
