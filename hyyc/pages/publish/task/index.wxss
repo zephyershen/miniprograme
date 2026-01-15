@@ -1,10 +1,14 @@
 @import "../../../styles/shadcn.wxss";
 
+page {
+  background-color: #f5f5f5;
+}
+
 /* 发布任务页局部样式 */
 
 /* 发布任务页「说明」输入框：高度减半，内容超出时可滚动查看 */
 .textarea-desc {
-  height: 120rpx;
+  height: 50rpx;
 }
 
 /* 截止时间的日期/时间选择各占一半宽度 */
@@ -56,4 +60,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.btn {
+  text-align: center;
+}
+
+.mt-20 {
+  padding-bottom: calc(3rpx + env(safe-area-inset-bottom));
 }

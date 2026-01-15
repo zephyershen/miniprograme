@@ -41,8 +41,11 @@
   - 注册相关：
     - `pages/auth/welcome/index`：欢迎页（客厅 Lottie 动画，一个会动的客厅插画，带登录/注册两个大按钮）。
     - `pages/auth/realname/index`：实名注册页。
+  - 发布相关：
+    - `pages/publish/index/index`：选择发布类型页（底部 tab 里的「发布」）。
+    - `pages/publish/task/index`：发布任务表单页（从选择页进入；也用于编辑任务）。
+    - `pages/publish/goods/index`：发布商品页（暂未开放）。
   - 任务相关：
-    - `pages/task/publish/index`：发布任务页（底部 tab 里的「发布」）。
     - `pages/task/detail/index`：任务详情页，从任务列表/我的任务点进。
     - `pages/task/submit/index`：提交任务完成页。
   - 聊天：
@@ -56,7 +59,7 @@
 
 - tabBar 配置（底部三个入口）：
   - 「首页」→ `pages/home/index/index`
-  - 「发布」→ `pages/task/publish/index`
+  - 「发布」→ `pages/publish/index/index`
   - 「我的」→ `pages/profile/index/index`
 
 - 其它关键字段：
@@ -162,7 +165,7 @@
 
 - 典型使用页面：
   - `pages/home/index/index.wxml` 中的任务列表和筛选标签。
-  - `pages/task/publish/index.wxml` 中的输入表单和「清空 / 发布」按钮。
+  - `pages/publish/task/index.wxml` 中的输入表单和「清空 / 发布」按钮。
   - `pages/auth/realname/index.wxss` 中也基于此做了更「苹果风」的一层定制。
 
 ---
@@ -189,7 +192,7 @@
     - 在「全屏加载中」弹层里播放。
     - 任何页面只要用 `<ui-loading show="{{isLoading}}" />`，就会显示这一动画。
   - 典型调用页面：
-    - `pages/home/index/index`、`pages/task/publish/index`、
+    - `pages/home/index/index`、`pages/publish/task/index`、
       `pages/task/detail/index`、`pages/task/submit/index`、
       `pages/chat/room/index`、`pages/wallet/index/index`、
       `pages/profile/index/index`、`pages/my/tasks/index`、
@@ -271,7 +274,7 @@
     - 返回：错误消息字符串或空字符串。
     - 使用位置：
       - `pages/auth/realname/index.js`：实名表单。
-      - `pages/task/publish/index.js`：发布任务表单。
+      - `pages/publish/task/index.js`：发布任务表单。
   - `isPhone(v)`：
     - 简单检查手机号是否为 1 开头的 11 位数字。
     - 使用位置：
@@ -770,17 +773,17 @@
     - 从地址字符串中用正则 `(...栋)` 粗略提取楼栋信息，用于兼容没有显式 `building` 字段的任务。
   - `goPublish()`：
     - 对应「发布任务」按钮。
-    - 调用 `wx.switchTab({ url: '/pages/task/publish/index' })` 跳转到底部「发布」 tab。
+    - 调用 `wx.switchTab({ url: '/pages/publish/index/index' })` 跳转到底部「发布」 tab。
   - `toDetail(e)`：
     - 对应任务卡片中的「详情」按钮。
     - 读取 `data-id` 并跳转到 `pages/task/detail/index`，携带任务 `id`。
 
 ---
 
-### 8.4 `pages/task/publish` —— 发布任务页
+### 8.4 `pages/publish/task` —— 发布任务表单页
 
 - 对应页面 / 按钮：
-  - 底部 tab 中间的「发布」。
+  - 从底部 tab 中间的「发布」里，选择「发布任务」后进入。
   - 页内按钮：
     - 下方「清空」和「发布」两个按钮（在「编辑任务」模式下，顶部标题会动态变为「编辑任务」）。
 
@@ -1220,8 +1223,8 @@
         - `bindtap="onEditTask"`，只在 `tab === 'owner'` 时展示。
         - 点击后会：
           - 把任务 ID 暂存在本地 `wx.setStorageSync('hyyc_edit_task_id', id)`。
-          - 使用 `wx.switchTab({ url: '/pages/task/publish/index' })` 切到底部「发布」 tab。
-          - 发布页在 `onShow()` 里读取这个 ID 并进入「编辑任务」模式。
+          - 使用 `wx.switchTab({ url: '/pages/publish/index/index' })` 切到底部「发布」 tab。
+          - 「发布」页会自动跳到发布任务表单页，并进入「编辑任务」模式。
     - 在「我接受的」标签下：
       - 只显示「查看」按钮，不显示「删除」和「编辑」：
         - 「查看」依然通过 `bindtap="toDetail"` 跳转到任务详情页。

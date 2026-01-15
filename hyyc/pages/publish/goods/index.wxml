@@ -1,0 +1,7 @@
+<view class="px-24 py-16">
+  <view class="card">
+    <view class="c-muted">发布商品功能还在准备中~</view>
+    <view class="c-muted mt-12">你可以先用「发布任务」体验一下。</view>
+  </view>
+</view>
+

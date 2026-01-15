@@ -4,7 +4,9 @@
     "pages/auth/welcome/index",
     "pages/auth/realname/index",
     "pages/legal/doc/index",
-    "pages/task/publish/index",
+    "pages/publish/index/index",
+    "pages/publish/task/index",
+    "pages/publish/goods/index",
     "pages/task/detail/index",
     "pages/task/submit/index",
     "pages/chat/room/index",
@@ -36,8 +38,10 @@
         "selectedIconPath": "assets/lottie/home-clicked.png"
       },
       {
-        "pagePath": "pages/task/publish/index",
-        "text": "发布"
+        "pagePath": "pages/publish/index/index",
+        "text": "发布",
+        "iconPath": "assets/lottie/add-unclick.png",
+        "selectedIconPath": "assets/lottie/add-clicked.png"
       },
       {
         "pagePath": "pages/profile/index/index",

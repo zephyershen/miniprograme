@@ -126,7 +126,7 @@ Page({
       wx.removeStorageSync('hyyc_edit_task_id');
       wx.removeStorageSync('hyyc_edit_task_data');
     } else {
-      // 新建模式：恢复默认标题
+      // 新建模式：发布任务
       wx.setNavigationBarTitle({ title: '发布任务' });
       this.setData({ editTaskId: '' });
     }

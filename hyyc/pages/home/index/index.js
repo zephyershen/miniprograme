@@ -140,7 +140,7 @@ Page({
     const m = String(addr).match(/([0-9]+|[一二三四五六七八九十]+)栋/);
     return m ? (m[1] + '栋') : '';
   },
-  goPublish(){ wx.switchTab({ url: '/pages/task/publish/index' }); },
+  goPublish(){ wx.switchTab({ url: '/pages/publish/index/index' }); },
   toDetail(e){
     const id = e.currentTarget.dataset.id;
     wx.navigateTo({ url: '/pages/task/detail/index?id=' + id });

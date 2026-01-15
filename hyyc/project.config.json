@@ -2,7 +2,10 @@
   "compileType": "miniprogram",
   "libVersion": "3.12.0",
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      { "type": "file", "value": "assets/lottie/task.png" },
+      { "type": "file", "value": "assets/lottie/products.png" }
+    ],
     "include": []
   },
   "setting": {

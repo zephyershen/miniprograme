@@ -1,0 +1,31 @@
+<ui-loading show="{{isLoading}}" text="拼命加载中..." />
+<view class="publish-type-page safe">
+  <view class="publish-type-card card card-glass">
+    <view class="publish-type-title">请选择发布类型</view>
+    <view class="publish-type-divider"></view>
+
+    <view class="gap-16 mt-24">
+      <view class="gap-item">
+        <view class="publish-type-option">
+          <image class="publish-type-icon" src="{{taskIconSrc}}" />
+          <view class="publish-type-text">
+            <view class="publish-type-text-main">发布任务</view>
+            <view class="publish-type-text-sub">发挥你的想象~,让生活变得方便起来哦</view>
+          </view>
+        </view>
+        <view class="btn btn-primary" bindtap="onChoosePublishTask">是的,我需要帮忙!</view>
+      </view>
+
+      <view class="gap-item">
+        <view class="publish-type-option">
+          <image class="publish-type-icon" src="{{productsIconSrc}}" />
+          <view class="publish-type-text">
+            <view class="publish-type-text-main">发布商品</view>
+            <view class="publish-type-text-sub">可以让躲在角落的宝贝出来见见阳光</view>
+          </view>
+        </view>
+        <view class="btn btn-primary" bindtap="onChoosePublishGoods">是的,我确实有很多宝贝~</view>
+      </view>
+    </view>
+  </view>
+</view>

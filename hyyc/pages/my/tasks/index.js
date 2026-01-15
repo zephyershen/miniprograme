@@ -150,7 +150,7 @@ Page({
     if (task) {
       wx.setStorageSync('hyyc_edit_task_data', task);
     }
-    wx.switchTab({ url: '/pages/task/publish/index' });
+    wx.switchTab({ url: '/pages/publish/index/index' });
   },
   // 查看我发布的任务详情：与任务广场的详情逻辑保持一致
   toDetailOwner(e){
