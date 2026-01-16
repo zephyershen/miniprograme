@@ -12,12 +12,12 @@ Component({
     text: { type: String, value: '正在加载' }
   },
   observers: {
-    // show 打开时启动动画，关闭时销毁动画
+    // show 打开时启动动画，关闭时暂停动画（不要反复 destroy，避免累计监听器）
     show(val) {
       if (val) {
         this.playLottie();
       } else {
-        this.stopLottie();
+        this.pauseLottie();
       }
     }
   },
@@ -29,13 +29,17 @@ Component({
       }
     },
     detached() {
-      this.stopLottie();
+      // 组件离开页面时再真正销毁，释放内存
+      this.destroyLottie();
     }
   },
   methods: {
     playLottie() {
-      // 已经有实例就不用重复创建
-      if (this._lottieInstance) return;
+      // 已经有实例就直接继续播放，不重复创建
+      if (this._lottieInstance) {
+        if (this._lottieInstance.play) this._lottieInstance.play();
+        return;
+      }
 
       this.createSelectorQuery()
         .select('#loading-canvas')
@@ -68,7 +72,16 @@ Component({
         })
         .exec();
     },
-    stopLottie() {
+    pauseLottie() {
+      if (!this._lottieInstance) return;
+      // 有的版本支持 pause，有的只有 stop；优先 pause
+      if (this._lottieInstance.pause) {
+        this._lottieInstance.pause();
+      } else if (this._lottieInstance.stop) {
+        this._lottieInstance.stop();
+      }
+    },
+    destroyLottie() {
       if (this._lottieInstance && this._lottieInstance.destroy) {
         this._lottieInstance.destroy();
       }

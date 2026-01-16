@@ -20,6 +20,14 @@ Page({
     this.setData({ isLoading: true });
     // 顶部显示一个系统自带的「加载中」提示，并禁止点击背景
     wx.showLoading({ title: '登录中...', mask: true });
+    // 注意：showToast/showModal 可能会“顺手”把 loading 顶掉；
+    // 为了避免出现“showLoading 与 hideLoading 必须配对使用”的警告，这里保证只关一次 loading。
+    let loadingClosed = false;
+    const closeLoading = () => {
+      if (loadingClosed) return;
+      loadingClosed = true;
+      wx.hideLoading();
+    };
 
     try {
       // 1）通过云函数 login 获取当前用户在本小程序下的 openid
@@ -27,6 +35,7 @@ Page({
       const openid = fnRes && fnRes.result && fnRes.result.openid;
 
       if (!openid) {
+        closeLoading();
         wx.showToast({ title: '获取登录信息失败', icon: 'none' });
         return;
       }
@@ -39,6 +48,7 @@ Page({
 
       const list = (queryRes && queryRes.data) || [];
       if (list.length > 1) {
+        closeLoading();
         wx.showModal({
           title: '登录异常',
           content: '检测到当前微信账号存在多条实名记录，请联系管理员处理后再登录。',
@@ -48,6 +58,7 @@ Page({
       }
       if (!list.length) {
         // 没找到实名信息，引导用户先去注册
+        closeLoading();
         wx.showModal({
           title: '尚未注册',
           content: '未找到您的实名信息，请先完成注册。',
@@ -76,6 +87,7 @@ Page({
         console.error('缓存用户信息失败', e);
       }
 
+      closeLoading();
       wx.showToast({ title: '登录成功', icon: 'success' });
 
       // 稍微延时一下再跳转，避免 toast 还没显示就切页
@@ -84,11 +96,12 @@ Page({
       }, 400);
     } catch (err) {
       console.error('登录失败', err);
+      closeLoading();
       wx.showToast({ title: '登录失败，请稍后重试', icon: 'none' });
     } finally {
       // 不管成功还是失败，都在最后关闭 loading 状态
       this.setData({ isLoading: false });
-      wx.hideLoading();
+      closeLoading();
     }
   }
 });

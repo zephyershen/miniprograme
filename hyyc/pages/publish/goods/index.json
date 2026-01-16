@@ -1,4 +1,7 @@
 {
+  "usingComponents": {
+    "ui-field": "/components/ui/field/index",
+    "ui-loading": "/components/ui/loading/index"
+  },
   "navigationBarTitleText": "发布商品"
 }
-

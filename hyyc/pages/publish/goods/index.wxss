@@ -1,2 +1,106 @@
 @import "../../../styles/shadcn.wxss";
 
+/* 发布商品页局部样式 */
+
+.textarea-desc {
+  height: 160rpx;
+  min-height: 160rpx;
+}
+
+/* 发布时展示的图片缩略图（方形） */
+.publish-image-wrap {
+  position: relative;
+}
+
+.publish-image-thumb {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 12rpx;
+  object-fit: cover;
+}
+
+/* 加号方块按钮：和缩略图一样大小，看起来是“空的图片位” */
+.publish-image-add {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 12rpx;
+  border: 2rpx dashed rgba(185, 94, 73, 0.45);
+  background: rgba(185, 94, 73, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #B95E49;
+  font-size: 64rpx;
+  box-sizing: border-box;
+}
+
+.publish-image-add.is-disabled {
+  opacity: 0.5;
+}
+
+.publish-image-add-plus {
+  line-height: 1;
+}
+
+/* 右上角删除小叉号 */
+.publish-image-remove {
+  position: absolute;
+  top: -8rpx;
+  right: -8rpx;
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 9999rpx;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  font-size: 26rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 交易方式选择（iOS 分段控件风格） */
+.trade-tabs {
+  display: flex;
+  background: #F2F3F5;
+  border-radius: 16rpx;
+  padding: 6rpx;
+}
+
+.trade-tab {
+  flex: 1;
+  height: 64rpx;
+  line-height: 64rpx;
+  text-align: center;
+  font-size: 26rpx;
+  color: #6B7280;
+  border-radius: 12rpx;
+  transition: all 0.2s ease;
+}
+
+.trade-tab-active {
+  background: #ffffff;
+  color: #B95E49;
+  font-weight: 500;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.08);
+}
+
+/* 底部按钮行 */
+.btn-bar {
+  display: flex;
+  gap: 24rpx;
+  margin-top: 32rpx;
+  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
+}
+
+.btn-flex,
+.btn-flex2 {
+  text-align: center;
+}
+
+.btn-flex {
+  flex: 1;
+}
+
+.btn-flex2 {
+  flex: 2;
+}
