@@ -3,7 +3,7 @@
     "pages/home/index/index",
     "pages/auth/welcome/index",
     "pages/auth/realname/index",
-    "pages/legal/doc/index",
+    "pages/auth/legal/doc/index",
     "pages/publish/index/index",
     "pages/publish/task/index",
     "pages/publish/goods/index",
@@ -11,10 +11,10 @@
     "pages/task/submit/index",
     "pages/chat/room/index",
     "pages/chat/sessions/index",
-    "pages/wallet/index/index",
+    "pages/profile/wallet/index",
     "pages/profile/index/index",
     "pages/profile/account/index",
-    "pages/my/tasks/index"
+    "pages/profile/tasks/index"
   ],
   "window": {
     "navigationBarTitleText": "HYYC 小区任务",

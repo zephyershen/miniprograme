@@ -45,7 +45,7 @@ Page({
       })
       .catch(() => {
         this.setData({ isLoading: false });
-        wx.showToast({ title: '图片加载失败，请稍后重试', icon: 'none' });
+        wx.showToast({ title: '加载失败，请稍后重试', icon: 'none' });
       });
   },
   onChoosePublishTask(){

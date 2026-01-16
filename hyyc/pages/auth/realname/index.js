@@ -125,7 +125,7 @@ Page({
   openLegalDoc(e){
     const type = (e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.type) || '';
     if (!type) return;
-    wx.navigateTo({ url: '/pages/legal/doc/index?type=' + encodeURIComponent(type) });
+    wx.navigateTo({ url: '/pages/auth/legal/doc/index?type=' + encodeURIComponent(type) });
   },
   goBack(){ wx.navigateBack({ fail: ()=> wx.switchTab({ url: '/pages/home/index/index' })}); },
   submit(){

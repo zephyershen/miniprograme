@@ -10,8 +10,8 @@ Page({
   gotoAccount(){
     wx.navigateTo({ url: '/pages/profile/account/index' });
   },
-  gotoMyTasks(){ wx.navigateTo({ url: '/pages/my/tasks/index' }); },
-  gotoWallet(){ wx.navigateTo({ url: '/pages/wallet/index/index' }); },
+  gotoMyTasks(){ wx.navigateTo({ url: '/pages/profile/tasks/index' }); },
+  gotoWallet(){ wx.navigateTo({ url: '/pages/profile/wallet/index' }); },
 
   // 退出登录：清掉本地缓存的用户信息，并回到欢迎页
   logout(){

@@ -55,7 +55,7 @@
 - 聊天页：`hyyc/pages/chat/room/index.wxss`
 - 会话列表红点：`hyyc/pages/chat/sessions/index.wxss`
 - 我的账号页：`hyyc/pages/profile/account/index.wxss`
-- 我的任务状态点：`hyyc/pages/my/tasks/index.wxss`
+- 我的任务状态点：`hyyc/pages/profile/tasks/index.wxss`
 - 任务详情红点：`hyyc/pages/task/detail/index.wxss`
 
 ## 6) 统一风格时的简单规则（别复杂）

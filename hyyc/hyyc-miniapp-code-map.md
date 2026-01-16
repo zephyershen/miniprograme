@@ -41,6 +41,7 @@
   - 注册相关：
     - `pages/auth/welcome/index`：欢迎页（客厅 Lottie 动画，一个会动的客厅插画，带登录/注册两个大按钮）。
     - `pages/auth/realname/index`：实名注册页。
+    - `pages/auth/legal/doc/index`：协议页（比如「用户协议」「隐私政策」）。
   - 发布相关：
     - `pages/publish/index/index`：选择发布类型页（底部 tab 里的「发布」）。
     - `pages/publish/task/index`：发布任务表单页（从选择页进入；也用于编辑任务）。
@@ -51,11 +52,11 @@
   - 聊天：
     - `pages/chat/room/index`：聊天室页，任务详情里的「先沟通 / 聊天」按钮跳转到这里。
   - 钱包：
-    - `pages/wallet/index/index`：钱包页，「我的钱包」入口对应。
+    - `pages/profile/wallet/index`：钱包页，「我的钱包」入口对应。
   - 我的：
     - `pages/profile/index/index`：「我的」页面，底部 tab 里的第三项。
   - 我的任务：
-    - `pages/my/tasks/index`：「我的任务」列表，从「我的」页面点击进入。
+    - `pages/profile/tasks/index`：「我的任务」列表，从「我的」页面点击进入。
 
 - tabBar 配置（底部三个入口）：
   - 「首页」→ `pages/home/index/index`
@@ -194,8 +195,8 @@
   - 典型调用页面：
     - `pages/home/index/index`、`pages/publish/task/index`、
       `pages/task/detail/index`、`pages/task/submit/index`、
-      `pages/chat/room/index`、`pages/wallet/index/index`、
-      `pages/profile/index/index`、`pages/my/tasks/index`、
+      `pages/chat/room/index`、`pages/profile/wallet/index`、
+      `pages/profile/index/index`、`pages/profile/tasks/index`、
       `pages/auth/realname/index` 等。
 
 ### 4.3 `assets/lottie/error.json` & `error.js`
@@ -247,7 +248,7 @@
   - `user`：假用户数据，用于演示「我的」「钱包」等页面。
   - `walletFlows`：钱包收支明细。
 - 使用位置 / 对应页面：
-  - 钱包：`pages/wallet/index/index.js`（余额和流水，仍使用本地假数据）。
+  - 钱包：`pages/profile/wallet/index.js`（余额和流水，仍使用本地假数据）。
 
 ### 5.3 `utils/format.js` —— 金额与日期格式化
 
@@ -295,7 +296,7 @@
     - 封装 `wx.showModal` 并返回 `Promise`，用来做确认对话框。
     - 使用位置 / 对应按钮：
       - `pages/task/detail/index.js` 里的「确认完成」按钮，在打款前弹出确认框。
-      - `pages/my/tasks/index.js` 里的「删除」按钮，在删除自己发布的任务前弹出确认框。
+      - `pages/profile/tasks/index.js` 里的「删除」按钮，在删除自己发布的任务前弹出确认框。
 
 ### 5.6 `utils/geo.js` —— 距离计算
 
@@ -307,15 +308,10 @@
         - 用户点击「获取定位」按钮后，调用 `wx.getLocation` 获取当前位置，再用本函数计算与小区中心点的距离。
         - 结果用来判断 `inCommunity` 是否为 `true`，并更新页面上的「已在/不在小区范围」提示。
 
-### 5.7 `utils/util.js` —— 日志页面的时间格式化
+### 5.7 `utils/util.js` ——（已删除的微信模板示例）
 
-- 函数：
-  - `formatTime(date)`：
-    - 把 JS `Date` 对象转成 `"YYYY/MM/DD hh:mm:ss"` 格式。
-    - 内部用到 `formatNumber(n)` 把一位数补 0。
-  - 使用位置 / 对应页面：
-    - `pages/logs/logs.js`：
-      - 小程序官方示例日志页，用本函数格式化每条日志的时间。
+- 说明：这是微信新建项目自带的示例工具，只给示例页面 `pages/logs` 用来“把时间变成好读的文字”。
+- 现在项目里示例页已经删掉了，所以这个文件也一起删除，避免干扰理解。
 
 ---
 
@@ -1108,7 +1104,7 @@
 
 ---
 
-### 8.8 `pages/wallet/index` —— 钱包页
+### 8.8 `pages/profile/wallet` —— 钱包页
 
 - 对应页面 / 按钮：
   - 从「我的」页面中的「我的钱包」条目进入。
@@ -1176,9 +1172,9 @@
     - 每次进入页面时，从 `wx.getStorageSync('hyyc_user')` 读取用户。
     - 模拟 500ms loading。
   - `gotoMyTasks()`：
-    - 跳转到 `pages/my/tasks/index`。
+    - 跳转到 `pages/profile/tasks/index`。
   - `gotoWallet()`：
-    - 跳转到 `pages/wallet/index/index`。
+    - 跳转到 `pages/profile/wallet/index`。
   - `async testCloudFunction()`：
     - 对应「测试云函数（login）」条目。
     - 调用 `wx.cloud.callFunction({ name: 'login' })`。
@@ -1191,7 +1187,7 @@
 
 ---
 
-### 8.10 `pages/my/tasks` —— 我的任务页
+### 8.10 `pages/profile/tasks` —— 我的任务页
 
 - 对应页面 / 按钮：
   - 从「我的」页面的「我的任务」条目进入。
@@ -1257,42 +1253,15 @@
 
 ---
 
-### 8.11 `pages/index` —— 官方示例首页（暂未接入主流程）
+### 8.11 `pages/index` ——（已删除的微信模板示例）
 
-- 对应页面：
-  - 微信小程序官方模板自带的用户头像+昵称示例页面。
-  - 当前没有出现在 `app.json` 的主页面数组中，所以正常用户不会跳到这里。
-- 主要按钮：
-  - 选择头像、输入昵称、获取头像昵称等按钮，都属于官方示例逻辑。
-- 文件：
-  - `index.json`：空配置。
-  - `index.wxml`：原生示例布局。
-  - `index.wxss`：对应的基础样式。
-  - `index.js`：
-    - `bindViewTap()`：跳转到 `pages/logs/logs`。
-    - `onChooseAvatar(e)`：更新头像。
-    - `onInputChange(e)`：更新昵称。
-    - `getUserProfile(e)`：调用微信 `wx.getUserProfile` 获取用户信息。
+- 说明：微信模板自带的示例首页，项目没用到，已删除。
 
 ---
 
-### 8.12 `pages/logs` —— 官方示例日志页
+### 8.12 `pages/logs` ——（已删除的微信模板示例）
 
-- 对应页面：
-  - 只用于演示记录小程序启动日志，当前也未在 `app.json` 中暴露给普通用户。
-- 文件：
-  - `logs.json`：空配置。
-  - `logs.wxml`：
-    - 滚动列表展示 logs 数组。
-  - `logs.wxss`：
-    - 简单样式。
-  - `logs.js`：
-    - 数据：
-      - `logs`：格式化后的日志数组。
-    - 函数：
-      - `onLoad()`：
-        - 从 `wx.getStorageSync('logs')` 读取时间戳数组。
-        - 使用 `util.formatTime` 转成人类可读的日期时间。
+- 说明：微信模板自带的示例日志页，项目没用到，已删除。
 
 ---
 
