@@ -1,6 +1,7 @@
 {
   "pages": [
     "pages/home/index/index",
+    "pages/goods/index/index",
     "pages/auth/welcome/index",
     "pages/auth/realname/index",
     "pages/auth/legal/doc/index",
@@ -33,9 +34,15 @@
     "list": [
       {
         "pagePath": "pages/home/index/index",
-        "text": "首页",
-        "iconPath": "assets/lottie/home-unclick.png",
-        "selectedIconPath": "assets/lottie/home-clicked.png"
+        "text": "任务",
+        "iconPath": "assets/lottie/task-unclick.png",
+        "selectedIconPath": "assets/lottie/task-clicked.png"
+      },
+      {
+        "pagePath": "pages/goods/index/index",
+        "text": "商品",
+        "iconPath": "assets/lottie/goods-unclick.png",
+        "selectedIconPath": "assets/lottie/goods-clicked.png"
       },
       {
         "pagePath": "pages/publish/index/index",

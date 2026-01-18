@@ -1,124 +1,51 @@
 <ui-loading show="{{isLoading}}" />
 <view class="px-24 py-16">
-  <!-- 顶部标签切换：任务列表 / 商品列表 -->
-  <view class="home-tabs">
-    <view class="home-tab {{activeTab==='task' ? 'home-tab-active' : ''}}" data-v="task" bindtap="onTabTap">
-      任务列表
+  <view class="row mt-16 row-gap-8 wrap">
+    <view class="{{'badge row-gap-item ' + (filter==='all'?'badge-primary':'')}}" bindtap="changeFilter" data-k="all">
+      全部
     </view>
-    <view class="home-tab {{activeTab==='goods' ? 'home-tab-active' : ''}}" data-v="goods" bindtap="onTabTap">
-      商品列表
+    <view class="{{'badge row-gap-item ' + (filter==='new'?'badge-primary':'')}}" bindtap="changeFilter" data-k="new">
+      最新
     </view>
-  </view>
-
-  <!-- 任务列表 -->
-  <view wx:if="{{activeTab==='task'}}">
-    <view class="row mt-16 row-gap-8 wrap">
-      <view class="{{'badge row-gap-item ' + (filter==='all'?'badge-primary':'')}}" bindtap="changeFilter" data-k="all">
-        全部
-      </view>
-      <view class="{{'badge row-gap-item ' + (filter==='new'?'badge-primary':'')}}" bindtap="changeFilter" data-k="new">
-        最新
-      </view>
-      <view class="{{'badge row-gap-item ' + (filter==='building'?'badge-primary':'')}}" bindtap="changeFilter" data-k="building">
-        本楼栋
-      </view>
-      <view class="row-gap-item">
-        <picker mode="selector" range="{{locationFilterLabels}}" value="{{locationFilterIndex}}" bindchange="onLocationFilterChange">
-          <view class="{{'badge ' + (locationFilter!=='all' ? 'badge-primary' : '')}}">
-            任务地点：{{locationFilterLabels[locationFilterIndex]}}
-          </view>
-        </picker>
-      </view>
+    <view class="{{'badge row-gap-item ' + (filter==='building'?'badge-primary':'')}}" bindtap="changeFilter" data-k="building">
+      本楼栋
     </view>
-    <block wx:for="{{list}}" wx:key="id">
-      <view class="mt-16">
-        <ui-card title="{{item.title}}" sub="{{item.community}} · 截止时间 {{item.deadlineText}}">
-          <view class="row space-between">
-            <text class="text-lg bold c-danger">¥ {{item.amountText}}</text>
-            <view class="row row-gap-8">
-              <view class="row row-gap-8 task-status-active">
-                <view class="task-status-dot row-gap-item"></view>
-                <text class="task-status-text row-gap-item">生效中</text>
-              </view>
-              <view class="btn btn-outline btn-sm row-gap-item" data-id="{{item.id}}" bindtap="toDetail">
-                详情
-              </view>
-            </view>
-          </view>
-          <view wx:if="{{item.desc && item.desc.length > 0}}" class="mt-24">
-            <!-- 上面一行：左边提示文字，右边展开/收起箭头 -->
-            <view class="task-desc-row" data-id="{{item.id}}" bindtap="toggleDesc">
-              <text class="task-desc-text c-muted">任务说明</text>
-              <view class="task-desc-arrow {{item.descExpanded ? 'expanded' : ''}}"></view>
-            </view>
-            <!-- 展开时再展示具体说明内容，默认收起不占空间 -->
-            <view wx:if="{{item.descExpanded}}" class="mt-8 text-sm c-text">{{item.desc}}</view>
-          </view>
-        </ui-card>
-      </view>
-    </block>
-    <view wx:if="{{!list.length}}" class="center" style="height: 50vh;">
-      <text class="c-muted">暂无任务，去发布一个吧 ~</text>
-    </view>
-  </view>
-
-  <!-- 商品列表 -->
-  <view wx:if="{{activeTab==='goods'}}">
-    <view class="row mt-16 row-gap-8 wrap">
-      <block wx:for="{{goodsCategoryOptions}}" wx:key="key">
-        <view
-          class="{{'badge row-gap-item ' + (goodsCategory===item.key ? 'badge-primary' : '')}}"
-          bindtap="changeGoodsCategory"
-          data-k="{{item.key}}"
-        >
-          {{item.label}}
+    <view class="row-gap-item">
+      <picker mode="selector" range="{{locationFilterLabels}}" value="{{locationFilterIndex}}" bindchange="onLocationFilterChange">
+        <view class="{{'badge ' + (locationFilter!=='all' ? 'badge-primary' : '')}}">
+          任务地点：{{locationFilterLabels[locationFilterIndex]}}
         </view>
-      </block>
+      </picker>
     </view>
+  </view>
 
-    <block wx:for="{{goodsList}}" wx:key="id">
-      <view class="mt-16">
-        <ui-card title="{{item.title}}" sub="{{item.subText}}">
-          <view slot="extra">
-            <view class="badge badge-primary">{{item.categoryLabel}}</view>
-          </view>
-
-          <view class="row space-between">
-            <view class="row row-gap-8">
-              <text class="text-lg bold c-danger">¥ {{item.priceText}}</text>
-              <text wx:if="{{item.originalPriceText}}" class="text-sm c-muted goods-original">¥ {{item.originalPriceText}}</text>
+  <block wx:for="{{list}}" wx:key="id">
+    <view class="mt-16">
+      <ui-card title="{{item.title}}" sub="{{item.community}} · 截止时间 {{item.deadlineText}}">
+        <view class="row space-between">
+          <text class="text-lg bold c-danger">¥ {{item.amountText}}</text>
+          <view class="row row-gap-8">
+            <view class="row row-gap-8 task-status-active">
+              <view class="task-status-dot row-gap-item"></view>
+              <text class="task-status-text row-gap-item">生效中</text>
             </view>
-            <view wx:if="{{item.tradeTypeLabel}}" class="badge">{{item.tradeTypeLabel}}</view>
+            <view class="btn btn-outline btn-sm row-gap-item" data-id="{{item.id}}" bindtap="toDetail">
+              详情
+            </view>
           </view>
-
-          <view class="row wrap mt-12 row-gap-8" wx:if="{{item.conditionLabel}}">
-            <view class="badge row-gap-item">{{item.conditionLabel}}</view>
+        </view>
+        <view wx:if="{{item.desc && item.desc.length > 0}}" class="mt-24">
+          <view class="task-desc-row" data-id="{{item.id}}" bindtap="toggleDesc">
+            <text class="task-desc-text c-muted">任务说明</text>
+            <view class="task-desc-arrow {{item.descExpanded ? 'expanded' : ''}}"></view>
           </view>
-
-          <view class="row wrap mt-12 row-gap-8" wx:if="{{item.imagesPreview && item.imagesPreview.length}}">
-            <image
-              wx:for="{{item.imagesPreview}}"
-              wx:key="*this"
-              wx:for-item="img"
-              wx:for-index="imgIndex"
-              class="row-gap-item goods-image"
-              src="{{img}}"
-              lazy-load="true"
-              data-id="{{item.id}}"
-              data-index="{{imgIndex}}"
-              bindtap="previewGoodsImage"
-            />
-          </view>
-
-          <view wx:if="{{item.desc && item.desc.length > 0}}" class="mt-16 text-sm c-muted">
-            {{item.desc}}
-          </view>
-        </ui-card>
-      </view>
-    </block>
-
-    <view wx:if="{{!goodsList.length}}" class="center" style="height: 50vh;">
-      <text class="c-muted">暂无商品，去发布一个吧 ~</text>
+          <view wx:if="{{item.descExpanded}}" class="mt-8 text-sm c-text">{{item.desc}}</view>
+        </view>
+      </ui-card>
     </view>
+  </block>
+
+  <view wx:if="{{!list.length && !isLoading}}" class="center" style="height: 50vh;">
+    <text class="c-muted">暂无任务，去发布一个吧 ~</text>
   </view>
 </view>

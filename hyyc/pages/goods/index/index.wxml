@@ -1,0 +1,98 @@
+<ui-loading show="{{isLoading}}" />
+
+<!-- 商品卡片模板：避免左右列重复一份 WXML（减少冗余，方便统一改样式/交互） -->
+<template name="goodsCard">
+  <view class="goods-card" data-id="{{item.id}}" data-col="{{col}}">
+    <view
+      class="goods-cover-wrap"
+      style="padding-top: {{item.coverPct || 100}}%;"
+      data-id="{{item.id}}"
+      data-index="0"
+      bindtap="previewGoodsImage"
+    >
+      <image
+        wx:if="{{item.coverSrc}}"
+        class="goods-cover"
+        src="{{item.coverSrc}}"
+        mode="aspectFill"
+        lazy-load="true"
+        data-id="{{item.id}}"
+        binderror="onCoverImageError"
+      />
+      <view wx:else class="goods-cover-placeholder">图片加载中</view>
+      <view wx:if="{{item.images && item.images.length > 1}}" class="goods-cover-badge">
+        {{item.images.length}}图
+      </view>
+    </view>
+
+    <view class="goods-body">
+      <view class="row wrap row-gap-8 goods-tags" wx:if="{{item.categoryLabel || item.conditionLabel || item.tradeTypeLabel}}">
+        <view wx:if="{{item.categoryLabel}}" class="goods-tag goods-tag-green row-gap-item">{{item.categoryLabel}}</view>
+        <view wx:if="{{item.conditionLabel}}" class="goods-tag goods-tag-outline row-gap-item">{{item.conditionLabel}}</view>
+        <view wx:if="{{item.tradeTypeLabel}}" class="goods-tag row-gap-item">{{item.tradeTypeLabel}}</view>
+      </view>
+
+      <view class="goods-title mt-12">{{item.title}}</view>
+      <view wx:if="{{item.desc && item.desc.length > 0}}" class="goods-desc mt-8">{{item.desc}}</view>
+
+      <view class="row space-between goods-price-row mt-12">
+        <view class="row row-gap-8">
+          <text class="goods-price">¥ {{item.priceText}}</text>
+          <text wx:if="{{item.originalPriceText}}" class="goods-original">¥ {{item.originalPriceText}}</text>
+        </view>
+      </view>
+
+      <view wx:if="{{item.subText}}" class="goods-sub mt-8">{{item.subText}}</view>
+    </view>
+  </view>
+</template>
+
+<view class="px-24 py-16">
+  <!-- 分类筛选（清爽白底 + 绿色强调） -->
+  <view class="row mt-16 row-gap-8 wrap goods-chips">
+    <block wx:for="{{goodsCategoryOptions}}" wx:key="key">
+      <view
+        class="{{'goods-chip row-gap-item ' + (goodsCategory===item.key ? 'goods-chip-active' : '')}}"
+        bindtap="changeGoodsCategory"
+        data-k="{{item.key}}"
+      >
+        {{item.label}}
+      </view>
+    </block>
+  </view>
+
+  <!-- 商品瀑布流（虚拟列表渲染）：只渲染视口附近的卡片，避免商品很多时滚动卡顿 -->
+  <view
+    id="goodsVirtual"
+    class="goods-waterfall mt-16"
+    wx:if="{{goodsTotal && goodsTotal > 0}}"
+  >
+    <view class="goods-col">
+      <view class="goods-spacer" style="height: {{virtualLeftTopPx}}px;"></view>
+      <block wx:for="{{renderLeft}}" wx:key="id">
+        <template is="goodsCard" data="{{ item: item, col: 'left' }}" />
+      </block>
+      <view class="goods-spacer" style="height: {{virtualLeftBottomPx}}px;"></view>
+    </view>
+
+    <view class="goods-col">
+      <view class="goods-spacer" style="height: {{virtualRightTopPx}}px;"></view>
+      <block wx:for="{{renderRight}}" wx:key="id">
+        <template is="goodsCard" data="{{ item: item, col: 'right' }}" />
+      </block>
+      <view class="goods-spacer" style="height: {{virtualRightBottomPx}}px;"></view>
+    </view>
+  </view>
+
+  <view wx:if="{{goodsTotal && goodsTotal > 0}}" class="goods-loadmore center mt-16">
+    <text wx:if="{{isLoadingMore}}" class="c-muted">加载中...</text>
+    <text wx:elif="{{loadMoreError}}" class="c-muted" bindtap="retryLoadMore">加载失败，点我重试</text>
+    <text wx:elif="{{!hasMore}}" class="c-muted">没有更多了</text>
+    <text wx:else class="c-muted">上拉继续加载</text>
+  </view>
+
+  <view wx:if="{{(!goodsTotal || goodsTotal === 0) && !isLoading}}" class="center" style="height: 50vh;">
+    <text wx:if="{{loadMoreError}}" class="c-muted" bindtap="retryLoadMore">加载失败，点我重试</text>
+    <text wx:else class="c-muted">暂无商品，去发布一个吧 ~</text>
+  </view>
+</view>

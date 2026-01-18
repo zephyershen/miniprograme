@@ -1,0 +1,169 @@
+@import "../../../styles/shadcn.wxss";
+
+/* 商品列表：原价划掉 */
+.goods-original {
+  text-decoration: line-through;
+  font-size: 24rpx;
+  color: #9CA3AF;
+  font-weight: 600;
+}
+
+/* 分类筛选（图 2 风格：浅灰底，选中深绿） */
+.goods-chips {
+  align-items: flex-start;
+}
+
+.goods-chip {
+  font-size: 24rpx;
+  padding: 14rpx 22rpx;
+  border-radius: 9999rpx;
+  border: 1rpx solid #EDEFF2;
+  background: #F2F3F5;
+  color: #374151;
+  font-weight: 600;
+}
+
+.goods-chip-active {
+  background: #447244;
+  border-color: #447244;
+  color: #ffffff;
+}
+
+/* 瀑布流布局 */
+.goods-waterfall {
+  display: flex;
+  justify-content: space-between;
+}
+
+.goods-col {
+  width: calc(50% - 8rpx);
+  display: flex;
+  flex-direction: column;
+}
+
+.goods-spacer {
+  width: 100%;
+}
+
+.goods-loadmore {
+  height: 72rpx;
+}
+
+.goods-col > .goods-card + .goods-card {
+  margin-top: 16rpx;
+}
+
+.goods-card {
+  background: #ffffff;
+  border: 1rpx solid #EDEFF2;
+  border-radius: 18rpx;
+  overflow: hidden;
+  box-shadow: 0 4rpx 16rpx rgba(17, 24, 39, 0.06),
+              0 2rpx 8rpx rgba(17, 24, 39, 0.04);
+}
+
+.goods-cover-wrap {
+  position: relative;
+  /* 用 padding-top 百分比控制封面高度（由 item.coverPct 动态注入） */
+  width: 100%;
+  height: 0;
+  background: #F2F3F5;
+  overflow: hidden;
+}
+
+.goods-cover {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.goods-cover-placeholder {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9CA3AF;
+  font-size: 24rpx;
+}
+
+.goods-cover-badge {
+  position: absolute;
+  right: 12rpx;
+  bottom: 12rpx;
+  font-size: 22rpx;
+  padding: 6rpx 12rpx;
+  border-radius: 9999rpx;
+  background: rgba(0, 0, 0, 0.55);
+  color: #ffffff;
+}
+
+.goods-body {
+  padding: 18rpx;
+}
+
+.goods-tag {
+  font-size: 22rpx;
+  padding: 6rpx 14rpx;
+  border-radius: 9999rpx;
+  border: 1rpx solid #EDEFF2;
+  background: #F2F3F5;
+  color: #6B7280;
+  font-weight: 600;
+}
+
+.goods-tag-green {
+  background: rgba(68, 114, 68, 0.12);
+  border-color: rgba(68, 114, 68, 0.14);
+  color: #447244;
+}
+
+.goods-tag-outline {
+  background: #ffffff;
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #EF4444;
+}
+
+.goods-title {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.goods-desc {
+  font-size: 24rpx;
+  color: #6B7280;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.goods-price-row {
+  align-items: baseline;
+}
+
+.goods-price {
+  font-size: 30rpx;
+  font-weight: 800;
+  color: #111827;
+}
+
+.goods-sub {
+  font-size: 22rpx;
+  color: #9CA3AF;
+}

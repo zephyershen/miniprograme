@@ -193,6 +193,27 @@ Page({
 
     try {
       const tempImages = f.images || [];
+      // 记录封面图宽高比（height/width），用于商品广场瀑布流更准确地预估卡片高度
+      let coverRatio = null;
+      const coverSrc = tempImages[0];
+      if (typeof coverSrc === 'string' && coverSrc && coverSrc.indexOf('cloud://') !== 0) {
+        try {
+          const info = await new Promise((resolve, reject) => {
+            wx.getImageInfo({
+              src: coverSrc,
+              success: resolve,
+              fail: reject
+            });
+          });
+          const w = Number(info.width || 0);
+          const h = Number(info.height || 0);
+          if (w > 0 && h > 0) {
+            coverRatio = h / w;
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
       const uploadTasks = tempImages.map((path, idx) => {
         if (typeof path === 'string' && path.indexOf('cloud://') === 0) {
           return Promise.resolve(path);
@@ -216,6 +237,7 @@ Page({
           condition: f.condition || '',
           tradeType: f.tradeType || '',
           images: fileIDs,
+          coverRatio,
           community: u.community || '',
           building: f.building || '',
           ownerId: u.id || '',
@@ -225,6 +247,13 @@ Page({
           createdAt: db.serverDate()
         }
       });
+
+      // 通知商品列表 tab：下次展示时刷新一次（避免商品列表每次切 tab 都重刷）
+      try {
+        wx.setStorageSync('hyyc_goods_refresh_token', Date.now());
+      } catch (e) {
+        // ignore
+      }
 
       toast('已发布');
       this.setData({ isLoading: false });
