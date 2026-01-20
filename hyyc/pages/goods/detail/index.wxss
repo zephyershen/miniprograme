@@ -1,0 +1,291 @@
+@import "../../../styles/shadcn.wxss";
+
+.goods-detail-page {
+  background: #ffffff;
+  padding-bottom: 140rpx;
+  min-height: 100vh;
+}
+
+/* 卖家信息头部 */
+.seller-header {
+  padding: 24rpx 32rpx;
+  background: #ffffff;
+}
+
+.seller-info {
+  display: flex;
+  align-items: center;
+}
+
+.seller-avatar {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  background: #f5f5f5;
+  flex-shrink: 0;
+}
+
+.seller-meta {
+  margin-left: 20rpx;
+  display: flex;
+  flex-direction: column;
+}
+
+.seller-name {
+  font-size: 28rpx;
+  font-weight: 500;
+  color: #333333;
+  line-height: 1.4;
+}
+
+.seller-extra {
+  font-size: 24rpx;
+  color: #999999;
+  margin-top: 4rpx;
+}
+
+/* 价格区域 */
+.price-section {
+  padding: 16rpx 32rpx 24rpx;
+}
+
+.price-row {
+  display: flex;
+  align-items: baseline;
+}
+
+.price-symbol {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #FF5040;
+}
+
+.price-value {
+  font-size: 56rpx;
+  font-weight: 700;
+  color: #FF5040;
+  margin-left: 4rpx;
+}
+
+.condition-tag {
+  margin-left: 20rpx;
+  padding: 6rpx 16rpx;
+  background: linear-gradient(135deg, #FF5040 0%, #FF7A45 100%);
+  color: #ffffff;
+  font-size: 22rpx;
+  font-weight: 500;
+  border-radius: 6rpx;
+}
+
+.original-price-row {
+  display: flex;
+  align-items: center;
+  margin-top: 8rpx;
+}
+
+.original-label {
+  font-size: 24rpx;
+  color: #999999;
+}
+
+.original-price {
+  font-size: 24rpx;
+  color: #999999;
+  text-decoration: line-through;
+  margin-left: 8rpx;
+}
+
+/* 描述区域 */
+.desc-section {
+  padding: 0 32rpx 24rpx;
+}
+
+.desc-text {
+  font-size: 30rpx;
+  color: #333333;
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+/* 属性区域 */
+.attr-section {
+  padding: 0 32rpx 24rpx;
+}
+
+.attr-grid {
+  display: flex;
+  flex-wrap: wrap;
+  background: #f8f8f8;
+  border-radius: 12rpx;
+  padding: 20rpx;
+}
+
+.attr-item {
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  padding: 12rpx 0;
+  box-sizing: border-box;
+}
+
+.attr-item:nth-child(odd) {
+  padding-right: 16rpx;
+}
+
+.attr-item:nth-child(even) {
+  padding-left: 16rpx;
+}
+
+.attr-label {
+  font-size: 24rpx;
+  color: #999999;
+  margin-bottom: 6rpx;
+}
+
+.attr-value {
+  font-size: 26rpx;
+  color: #333333;
+  font-weight: 500;
+}
+
+/* 标签区域 */
+.tags-section {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 0 32rpx 24rpx;
+  gap: 16rpx;
+}
+
+.goods-tag {
+  padding: 8rpx 20rpx;
+  background: #f5f5f5;
+  border-radius: 6rpx;
+  font-size: 24rpx;
+  color: #666666;
+}
+
+/* 图片展示区域 */
+.images-section {
+  padding: 0 32rpx 32rpx;
+}
+
+.main-image-wrap {
+  width: 100%;
+  border-radius: 12rpx;
+  overflow: hidden;
+  margin-bottom: 16rpx;
+}
+
+.main-image {
+  width: 100%;
+  height: 686rpx;
+  display: block;
+  background: #f5f5f5;
+}
+
+.sub-images-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.sub-image-wrap {
+  width: calc((100% - 24rpx) / 3);
+  aspect-ratio: 1;
+  border-radius: 8rpx;
+  overflow: hidden;
+}
+
+.sub-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: #f5f5f5;
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 60vh;
+  padding: 0 32rpx;
+}
+
+.empty-text {
+  font-size: 28rpx;
+  color: #999999;
+}
+
+/* 底部操作栏 */
+.footer-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  padding: 16rpx 24rpx;
+  box-shadow: 0 -2rpx 20rpx rgba(0, 0, 0, 0.06);
+}
+
+.footer-bar.safe {
+  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
+}
+
+.footer-left {
+  display: flex;
+  align-items: center;
+}
+
+.footer-icon-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 24rpx;
+}
+
+.footer-icon {
+  width: 44rpx;
+  height: 44rpx;
+}
+
+.footer-icon-text {
+  font-size: 20rpx;
+  color: #666666;
+  margin-top: 4rpx;
+}
+
+.footer-right {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.btn-buy {
+  padding: 20rpx 48rpx;
+  background: #FFE043;
+  border-radius: 40rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #333333;
+}
+
+.btn-chat {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 20rpx 36rpx;
+  background: #FFE043;
+  border-radius: 40rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #333333;
+}
+
+.chat-icon {
+  width: 36rpx;
+  height: 36rpx;
+}

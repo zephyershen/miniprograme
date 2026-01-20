@@ -4,8 +4,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const src = path.join(__dirname, '..', 'assets', 'lottie', 'shopping-bag.json');
-const dest = path.join(__dirname, '..', 'assets', 'lottie', 'shopping-bag.js');
+// loading 组件用到的动画数据
+const src = path.join(__dirname, '..', 'assets', 'loading', 'shopping-bag.json');
+const dest = path.join(__dirname, '..', 'assets', 'loading', 'shopping-bag.js');
 
 const json = fs.readFileSync(src, 'utf8');
 
@@ -14,4 +15,3 @@ const out = 'module.exports = ' + json.trim() + ';\n';
 
 fs.writeFileSync(dest, out, 'utf8');
 console.log('generated', path.relative(process.cwd(), dest));
-

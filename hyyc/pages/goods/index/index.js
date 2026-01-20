@@ -398,6 +398,14 @@ Page({
   retryLoadMore() {
     this.loadMoreGoods(true);
   },
+  // 列表卡片点击：进入商品详情
+  toGoodsDetail(e) {
+    const id = e.currentTarget.dataset.id;
+    if (!id) return;
+    wx.navigateTo({
+      url: `/pages/goods/detail/index?id=${encodeURIComponent(id)}`
+    });
+  },
   _getWindowInfoSafe() {
     // wx.getSystemInfoSync 已被标记为 deprecated；优先使用 getWindowInfo。
     // 仅在低基础库缺失 getWindowInfo 时才回退旧接口（可能会有 warning，但兼容不崩）。

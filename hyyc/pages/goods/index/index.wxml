@@ -2,13 +2,13 @@
 
 <!-- 商品卡片模板：避免左右列重复一份 WXML（减少冗余，方便统一改样式/交互） -->
 <template name="goodsCard">
-  <view class="goods-card" data-id="{{item.id}}" data-col="{{col}}">
+  <view class="goods-card" data-id="{{item.id}}" data-col="{{col}}" bindtap="toGoodsDetail">
     <view
       class="goods-cover-wrap"
       style="padding-top: {{item.coverPct || 100}}%;"
       data-id="{{item.id}}"
       data-index="0"
-      bindtap="previewGoodsImage"
+      catchtap="previewGoodsImage"
     >
       <image
         wx:if="{{item.coverSrc}}"

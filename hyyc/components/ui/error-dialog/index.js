@@ -1,7 +1,7 @@
 // 错误提示弹层，使用 Lottie Error 动画
 const lottie = require('lottie-miniprogram');
 // 小程序不支持直接 require .json，这里用 .js 包了一层
-const errorAnim = require('../../../assets/lottie/error.js');
+const errorAnim = require('../../../assets/error/error.js');
 
 // 与 wxss 中 .lottie-box/.lottie-canvas 的宽高保持一致（单位：rpx）
 const LOTTIE_SIZE_RPX = 280;

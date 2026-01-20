@@ -7,7 +7,12 @@
     <view class="gap-16 mt-24">
       <view class="gap-item">
         <view class="publish-type-option">
-          <image class="publish-type-icon" src="{{taskIconSrc}}" />
+          <image
+            class="publish-type-icon"
+            src="{{taskIconSrc}}"
+            bindload="onTaskIconLoad"
+            binderror="onTaskIconError"
+          />
           <view class="publish-type-text">
             <view class="publish-type-text-main">发布任务</view>
             <view class="publish-type-text-sub">发挥你的想象~,让生活变得方便起来哦</view>
@@ -18,7 +23,12 @@
 
       <view class="gap-item">
         <view class="publish-type-option">
-          <image class="publish-type-icon" src="{{productsIconSrc}}" />
+          <image
+            class="publish-type-icon"
+            src="{{productsIconSrc}}"
+            bindload="onProductsIconLoad"
+            binderror="onProductsIconError"
+          />
           <view class="publish-type-text">
             <view class="publish-type-text-main">发布商品</view>
             <view class="publish-type-text-sub">可以让躲在角落的宝贝出来见见阳光</view>

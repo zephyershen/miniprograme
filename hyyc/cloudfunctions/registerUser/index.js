@@ -13,6 +13,7 @@ cloud.init({
 
 const db = cloud.database();
 const USER_COLLECTION = 'userInfo';
+const USER_COMMUNITY_COLLECTION = 'user_community';
 const LEGAL_COLLECTION = 'legal_docs';
 
 function toTs(v) {
@@ -96,7 +97,7 @@ exports.main = async (event, context) => {
 
   const idNumber = form.idNumber;
   const name = form.name;
-  const community = form.community;
+  const community = String(form.community || '').trim();
   const building = form.building;
   const door = form.door;
 
@@ -192,6 +193,8 @@ exports.main = async (event, context) => {
 
       const dataToAdd = {
         ...form,
+        // 统一去掉前后空格，避免 “community 不一致” 导致商品权限判断失败
+        community,
         realname: true,
         verified: true,
         legalAcceptance,
@@ -208,6 +211,31 @@ exports.main = async (event, context) => {
       });
 
       const newId = (addRes && addRes._id) || '';
+
+      // 同步写入 user_community：用 openid 作为 docId，给商品“同小区可读”做权限判断
+      // 这张表由云函数写入，客户端只读自己的（避免用户自己改成别的小区）
+      // 用 upsert（有则更新，无则创建），避免出现“表里已有 doc 导致注册失败”的意外情况。
+      const ucColl = transaction.collection(USER_COMMUNITY_COLLECTION);
+      const ucRes = await ucColl.where({ _id: openid }).limit(1).get();
+      const ucList = (ucRes && ucRes.data) || [];
+      const ucExists = ucList.length > 0;
+      if (ucExists) {
+        await ucColl.doc(openid).update({
+          data: {
+            community,
+            updatedAt: now
+          }
+        });
+      } else {
+        await ucColl.add({
+          data: {
+            _id: openid,
+            community,
+            updatedAt: now,
+            createdAt: now
+          }
+        });
+      }
 
       // 前端本地缓存用的用户对象：带上 id / _id
       const userForClient = {

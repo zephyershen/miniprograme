@@ -1,0 +1,91 @@
+<ui-loading show="{{isLoading}}" />
+
+<view wx:if="{{!isLoading && goods}}" class="goods-detail-page">
+  <!-- 顶部导航区域（卖家信息） -->
+  <view class="seller-header">
+    <view class="seller-info" bindtap="onSellerTap">
+      <image class="seller-avatar" src="{{goods.sellerAvatar || '/assets/pages/goods/detail/default-avatar.svg'}}" mode="aspectFill" />
+      <view class="seller-meta">
+        <text class="seller-name">{{goods.sellerName || '匿名用户'}}</text>
+        <text class="seller-extra">{{goods.publishTimeText}} | {{goods.locationText}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 价格区域 -->
+  <view class="price-section">
+    <view class="price-row">
+      <text class="price-symbol">¥</text>
+      <text class="price-value">{{goods.priceText}}</text>
+      <view wx:if="{{goods.conditionLabel}}" class="condition-tag">{{goods.conditionLabel}}</view>
+    </view>
+    <view wx:if="{{goods.originalPriceText}}" class="original-price-row">
+      <text class="original-label">原价</text>
+      <text class="original-price">¥{{goods.originalPriceText}}</text>
+    </view>
+  </view>
+
+  <!-- 商品描述 -->
+  <view class="desc-section">
+    <text class="desc-text">{{goods.desc || goods.title}}</text>
+  </view>
+
+  <!-- 商品属性 -->
+  <view wx:if="{{goods.attributes && goods.attributes.length}}" class="attr-section">
+    <view class="attr-grid">
+      <view wx:for="{{goods.attributes}}" wx:key="key" class="attr-item">
+        <text class="attr-label">{{item.label}}</text>
+        <text class="attr-value">{{item.value}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 标签区域 -->
+  <view class="tags-section" wx:if="{{goods.categoryLabel || goods.tradeTypeLabel}}">
+    <view wx:if="{{goods.categoryLabel}}" class="goods-tag">{{goods.categoryLabel}}</view>
+    <view wx:if="{{goods.tradeTypeLabel}}" class="goods-tag">{{goods.tradeTypeLabel}}</view>
+  </view>
+
+  <!-- 图片展示区域 -->
+  <view class="images-section">
+    <!-- 首图大图 -->
+    <view wx:if="{{imagesPreview.length > 0}}" class="main-image-wrap" bindtap="previewImage" data-index="0">
+      <image class="main-image" src="{{imagesPreview[0].thumbUrl}}" mode="aspectFill" lazy-load="true" />
+    </view>
+
+    <!-- 小图网格 -->
+    <view wx:if="{{imagesPreview.length > 1}}" class="sub-images-grid">
+      <view
+        wx:for="{{imagesPreview}}"
+        wx:if="{{index > 0}}"
+        wx:key="index"
+        class="sub-image-wrap"
+        bindtap="previewImage"
+        data-index="{{index}}"
+      >
+        <image class="sub-image" src="{{item.thumbUrl}}" mode="aspectFill" lazy-load="true" />
+      </view>
+    </view>
+  </view>
+</view>
+
+<view wx:if="{{!isLoading && !goods}}" class="empty-state">
+  <text class="empty-text">商品不存在或已下架</text>
+</view>
+
+<!-- 底部操作栏 -->
+<view wx:if="{{goods}}" class="footer-bar safe">
+  <view class="footer-left">
+    <view class="footer-icon-btn" bindtap="onFavoriteTap">
+      <image class="footer-icon" src="{{isFavorite ? '/assets/pages/goods/detail/icon-star-filled.svg' : '/assets/pages/goods/detail/icon-star.svg'}}" mode="aspectFit" />
+      <text class="footer-icon-text">收藏</text>
+    </view>
+  </view>
+  <view class="footer-right">
+    <view class="btn-buy" bindtap="onBuyTap">立即购买</view>
+    <view class="btn-chat" bindtap="onChatTap">
+      <image class="chat-icon" src="/assets/pages/goods/detail/icon-chat.svg" mode="aspectFit" />
+      <text>聊一聊</text>
+    </view>
+  </view>
+</view>

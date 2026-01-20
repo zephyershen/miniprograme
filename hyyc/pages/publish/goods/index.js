@@ -238,7 +238,8 @@ Page({
           tradeType: f.tradeType || '',
           images: fileIDs,
           coverRatio,
-          community: u.community || '',
+          // 去掉前后空格，避免 goods.community 和用户小区映射不一致
+          community: String(u.community || '').trim(),
           building: f.building || '',
           ownerId: u.id || '',
           ownerName: u.name || '',

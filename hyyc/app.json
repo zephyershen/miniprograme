@@ -2,6 +2,7 @@
   "pages": [
     "pages/home/index/index",
     "pages/goods/index/index",
+    "pages/goods/detail/index",
     "pages/auth/welcome/index",
     "pages/auth/realname/index",
     "pages/auth/legal/doc/index",
@@ -35,26 +36,26 @@
       {
         "pagePath": "pages/home/index/index",
         "text": "任务",
-        "iconPath": "assets/lottie/task-unclick.png",
-        "selectedIconPath": "assets/lottie/task-clicked.png"
+        "iconPath": "assets/tabbar/task-unclick.png",
+        "selectedIconPath": "assets/tabbar/task-clicked.png"
       },
       {
         "pagePath": "pages/goods/index/index",
         "text": "商品",
-        "iconPath": "assets/lottie/goods-unclick.png",
-        "selectedIconPath": "assets/lottie/goods-clicked.png"
+        "iconPath": "assets/tabbar/goods-unclick.png",
+        "selectedIconPath": "assets/tabbar/goods-clicked.png"
       },
       {
         "pagePath": "pages/publish/index/index",
         "text": "发布",
-        "iconPath": "assets/lottie/add-unclick.png",
-        "selectedIconPath": "assets/lottie/add-clicked.png"
+        "iconPath": "assets/tabbar/add-unclick.png",
+        "selectedIconPath": "assets/tabbar/add-clicked.png"
       },
       {
         "pagePath": "pages/profile/index/index",
         "text": "我的",
-        "iconPath": "assets/lottie/profile-unclick.png",
-        "selectedIconPath": "assets/lottie/profile-clicked.png"
+        "iconPath": "assets/tabbar/profile-unclick.png",
+        "selectedIconPath": "assets/tabbar/profile-clicked.png"
       }
     ]
   },

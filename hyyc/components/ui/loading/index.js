@@ -1,7 +1,7 @@
 // 使用 lottie 播放购物袋加载动画
 const lottie = require('lottie-miniprogram');
 // 小程序不支持直接 require .json，这里用 .js 包了一层
-const shoppingBagAnim = require('../../../assets/lottie/shopping-bag.js');
+const shoppingBagAnim = require('../../../assets/loading/shopping-bag.js');
 
 // 与 wxss 中 .lottie-box/.lottie-canvas 的宽高保持一致（单位：rpx）
 const LOTTIE_SIZE_RPX = 200;

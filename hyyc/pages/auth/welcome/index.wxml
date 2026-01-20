@@ -2,7 +2,7 @@
   <view class="hero-lottie-box">
     <image
       class="hero-lottie-canvas"
-      src="../../../assets/lottie/Welcome-cuate.svg"
+      src="../../../assets/pages/auth/Welcome-cuate.svg"
       mode="aspectFit"
      style="width: 660rpx; height: 643rpx; display: block; box-sizing: border-box; position: relative; left: 0rpx; top: -79rpx"></image>
   </view>

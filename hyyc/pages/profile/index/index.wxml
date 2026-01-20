@@ -2,7 +2,7 @@
 <view class="profile-page">
   <!-- 顶部：背景图 + 用户信息 -->
   <view class="hero">
-    <image class="hero-bg" src="/assets/lottie/indoor.svg" mode="aspectFit"></image>
+    <image class="hero-bg" src="/assets/pages/profile/indoor.svg" mode="aspectFit"></image>
     <view class="hero-mask"></view>
 
     <view class="hero-inner">
@@ -25,13 +25,13 @@
       <view class="quick-grid">
         <view class="quick-item" bindtap="gotoMyTasks">
           <view class="quick-icon quick-icon-task">
-            <image class="quick-icon-svg" src="/assets/lottie/task.svg" mode="aspectFit"></image>
+            <image class="quick-icon-svg" src="/assets/pages/profile/task.svg" mode="aspectFit"></image>
           </view>
           <text class="quick-label">任务</text>
         </view>
         <view class="quick-item" bindtap="gotoWallet">
           <view class="quick-icon quick-icon-wallet">
-            <image class="quick-icon-svg" src="/assets/lottie/wallet.svg" mode="aspectFit"></image>
+            <image class="quick-icon-svg" src="/assets/pages/profile/wallet.svg" mode="aspectFit"></image>
           </view>
           <text class="quick-label">钱包</text>
         </view>
