@@ -37,6 +37,10 @@ const GOODS_TRADE_LABEL_MAP = {
   mail: '邮寄'
 };
 
+function pickStr(v) {
+  return String(v == null ? '' : v).trim();
+}
+
 // 格式化发布时间
 function formatPublishTime(date) {
   if (!date) return '';
@@ -78,6 +82,27 @@ Page({
   },
   onPullDownRefresh() {
     this.loadGoodsDetail(true);
+  },
+  async _ensureOpenid() {
+    // 数据库安全规则里用 auth.openid 判断“是不是本人”，这里需要拿到 openid 才能做“本人查询”。
+    const u = wx.getStorageSync('hyyc_user') || {};
+    let openid = pickStr(u._openid || u.openid || u.openId);
+    if (openid) return openid;
+    try {
+      const res = await wx.cloud.callFunction({ name: 'login' });
+      openid = pickStr(res && res.result && res.result.openid);
+      if (openid) {
+        try {
+          wx.setStorageSync('hyyc_user', { ...u, _openid: openid });
+        } catch (e) {
+          // ignore
+        }
+        return openid;
+      }
+    } catch (e) {
+      // ignore
+    }
+    return '';
   },
   _isCloudFileID(v = '') {
     const s = String(v || '');
@@ -161,7 +186,8 @@ Page({
     let sellerName = '匿名用户';
     if (seller) {
       sellerAvatar = seller.avatarUrl || '';
-      sellerName = seller.nickName || seller.name || '匿名用户';
+      // 兼容不同字段：前端实名页/账户页使用 nickname，微信用户信息常见字段是 nickName
+      sellerName = seller.nickname || seller.nickName || seller.name || '匿名用户';
     }
 
     return {
@@ -191,19 +217,51 @@ Page({
     try {
       const u = wx.getStorageSync('hyyc_user') || {};
       const community = String(u.community || '').trim();
+      const openid = await this._ensureOpenid();
 
+      // 重要：
+      // 你的 goods 安全规则里 read 用了 doc._openid / doc.status / doc.community 这类条件。
+      // 在云开发里，这里的 doc 更像“查询条件”，所以我们必须把条件写到 where 里，才能通过权限校验。
+      // 1) 先按“本人”查：允许查看自己 pending/need_fix 的商品
+      // 2) 再按“公开”查：只允许查看 posted 且同小区的商品
       let doc = null;
-      if (community) {
-        const res = await db.collection(GOODS_COLLECTION)
-          .where({ _id: id, community })
+      if (openid) {
+        try {
+          const r1 = await db.collection(GOODS_COLLECTION)
+            .where({ _id: id, _openid: openid })
+            .limit(1)
+            .get();
+          doc = (r1 && r1.data && r1.data[0]) ? r1.data[0] : null;
+        } catch (e) {
+          console.warn('按本人查询商品失败', e);
+        }
+      }
+      if (!doc && community) {
+        const r2 = await db.collection(GOODS_COLLECTION)
+          .where({ _id: id, status: 'posted', community })
           .limit(1)
           .get();
-        doc = (res && res.data && res.data[0]) ? res.data[0] : null;
-      } else {
-        const res = await db.collection(GOODS_COLLECTION).doc(id).get();
-        doc = res && res.data ? res.data : null;
+        doc = (r2 && r2.data && r2.data[0]) ? r2.data[0] : null;
       }
       if (!doc) throw new Error('goods not found');
+
+      // 保护：审核中/需修改的商品，不允许“非本人”查看详情
+      // （本人在“我的商品”里可以查看/修改）
+      const meId = u && u.id ? String(u.id) : '';
+      const isOwner = meId && doc.ownerId && String(doc.ownerId) === meId;
+      const st = doc.status || '';
+      if (st && st !== 'posted' && !isOwner) {
+        this.setData({ isLoading: false, goods: null, imagesPreview: [] });
+        wx.showModal({
+          title: '暂不可查看',
+          content: '该商品正在审核中或需要修改，请稍后再试。',
+          showCancel: false,
+          success: () => {
+            wx.navigateBack({ delta: 1 });
+          }
+        });
+        return;
+      }
 
       // 获取卖家信息
       const seller = await this._getSellerInfo(doc._openid);

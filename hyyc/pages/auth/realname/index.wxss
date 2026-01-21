@@ -75,6 +75,16 @@ page {
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
+.control-disabled {
+  background: #F3F4F6;
+  border-color: #E5E7EB;
+  color: #9CA3AF;
+}
+
+.placeholder-disabled {
+  color: #9CA3AF;
+}
+
 /* 与按钮 .btn-sm 高度对齐（手机号一行） */
 .control-sm {
   height: 64rpx;           /* 同 styles/shadcn.wxss 中 .btn-sm */

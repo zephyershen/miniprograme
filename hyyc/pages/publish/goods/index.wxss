@@ -19,6 +19,11 @@
   object-fit: cover;
 }
 
+.publish-image-wrap.is-need-fix .publish-image-thumb {
+  outline: 4rpx solid #EF4444;
+  outline-offset: 2rpx;
+}
+
 /* 加号方块按钮：和缩略图一样大小，看起来是“空的图片位” */
 .publish-image-add {
   width: 160rpx;

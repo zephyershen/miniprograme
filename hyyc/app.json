@@ -16,7 +16,8 @@
     "pages/profile/wallet/index",
     "pages/profile/index/index",
     "pages/profile/account/index",
-    "pages/profile/tasks/index"
+    "pages/profile/tasks/index",
+    "pages/profile/goods/index"
   ],
   "window": {
     "navigationBarTitleText": "HYYC 小区任务",

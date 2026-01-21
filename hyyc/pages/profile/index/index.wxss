@@ -169,6 +169,18 @@
   height: 80rpx;
 }
 
+.quick-icon-goods {
+  width: 80rpx;
+  height: 80rpx;
+  background: none;
+  box-shadow: none;
+}
+
+.quick-icon-png {
+  width: 72rpx;
+  height: 72rpx;
+}
+
 .quick-label {
   margin-top: 14rpx;
   font-size: 24rpx;

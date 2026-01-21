@@ -1,5 +1,10 @@
 <ui-loading show="{{isLoading}}" />
 
+<!-- 顶部提示：有新商品，点一下刷新 -->
+<view wx:if="{{showNewGoodsTip}}" class="goods-new-tip" bindtap="onTapNewGoodsTip">
+  有新商品，点我刷新
+</view>
+
 <!-- 商品卡片模板：避免左右列重复一份 WXML（减少冗余，方便统一改样式/交互） -->
 <template name="goodsCard">
   <view class="goods-card" data-id="{{item.id}}" data-col="{{col}}" bindtap="toGoodsDetail">

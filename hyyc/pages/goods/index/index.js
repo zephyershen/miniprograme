@@ -55,6 +55,36 @@ const THUMB_LOCAL_CACHE_MAX = 220;
 const GOODS_WATERFALL_GAP_RPX = 16;
 const PAGE_PADDING_X_RPX = 48;
 
+function pickStr(v) {
+  return String(v == null ? '' : v).trim();
+}
+
+function toTimeMs(v) {
+  if (!v) return 0;
+  if (typeof v.getTime === 'function') return v.getTime();
+  const t = Date.parse(v);
+  return Number.isNaN(t) ? 0 : t;
+}
+
+function toMarkerFromAnchor(anchor) {
+  if (!anchor) return null;
+  return { t: toTimeMs(anchor.createdAt), id: pickStr(anchor.id) };
+}
+
+function toMarkerFromDoc(doc) {
+  if (!doc) return null;
+  return { t: toTimeMs(doc.createdAt || doc._createTime), id: pickStr(doc._id || doc.id) };
+}
+
+function isMarkerNewer(a, b) {
+  if (!a || !a.id) return false;
+  if (!b || !b.id) return true;
+  if (a.t > b.t) return true;
+  if (a.t < b.t) return false;
+  // createdAt 相同：按 _id 做 tie-break（和列表 orderBy('_id','desc') 保持一致）
+  return String(a.id) > String(b.id);
+}
+
 Page({
   data: {
     goodsCategory: 'all',
@@ -70,13 +100,21 @@ Page({
     hasMore: true,
     isLoadingMore: false,
     loadMoreError: '',
-    isLoading: true
+    isLoading: true,
+    // 顶部提示：有新商品（点击刷新）
+    showNewGoodsTip: false
   },
   onLoad() {
     // Tab 页会被缓存：onShow 会频繁触发，但不希望每次都重刷列表。
     this._pageInited = false;
     this._handledRefreshToken = Number(wx.getStorageSync(GOODS_REFRESH_TOKEN_KEY) || 0) || 0;
     this._savedScrollTop = 0;
+
+    // 新商品提示（watch：像“开着对讲机”，有新数据就会通知）
+    this._newGoodsWatcher = null;
+    this._newGoodsWatchKey = '';
+    this._newGoodsWatchInited = false;
+    this._newGoodsWatchLatest = null;
 
     // 缩略图预加载缓存：thumbUrl -> wxfile temp path
     this._thumbLocalByUrl = {};
@@ -117,6 +155,7 @@ Page({
 
     // 非刷新场景：保留列表 & 视情况恢复滚动位置
     this._virtualContainerTopPx = null;
+    this._openNewGoodsWatch();
     setTimeout(() => this._restoreScrollIfNeeded(), 0);
   },
   onPageScroll(e) {
@@ -132,10 +171,122 @@ Page({
     this._isVisible = false;
     this._savedScrollTop = Number(this._lastScrollTop || 0) || 0;
     this._clearVirtualTimers();
+    this._clearNewGoodsWatch();
   },
   onUnload() {
     this._isVisible = false;
     this._clearVirtualTimers();
+    this._clearNewGoodsWatch();
+  },
+  _clearNewGoodsWatch() {
+    if (this._newGoodsWatcher && this._newGoodsWatcher.close) {
+      this._newGoodsWatcher.close();
+    }
+    this._newGoodsWatcher = null;
+    this._newGoodsWatchKey = '';
+    this._newGoodsWatchInited = false;
+    this._newGoodsWatchLatest = null;
+  },
+  _openNewGoodsWatch(force = false) {
+    if (!this._isVisible) return;
+
+    const u = wx.getStorageSync('hyyc_user') || {};
+    const community = pickStr(u.community);
+    const c = pickStr(this.data.goodsCategory) || 'all';
+    const key = `${community}::${c}`;
+
+    if (!force && this._newGoodsWatcher && this._newGoodsWatchKey === key) return;
+
+    this._clearNewGoodsWatch();
+    this._newGoodsWatchKey = key;
+
+    const where = { status: 'posted' };
+    if (community) where.community = community;
+    if (c && c !== 'all') where.category = c;
+
+    try {
+      this._newGoodsWatcher = db.collection(GOODS_COLLECTION)
+        .where(where)
+        .orderBy('createdAt', 'desc')
+        .orderBy('_id', 'desc')
+        .limit(1)
+        .watch({
+          onChange: (snapshot) => this._onNewGoodsWatchChange(snapshot),
+          onError: (err) => {
+            console.error('商品列表新商品 watch error', err);
+          }
+        });
+    } catch (e) {
+      console.error('开启新商品监听失败', e);
+    }
+  },
+  _onNewGoodsWatchChange(snapshot) {
+    if (!this._isVisible) return;
+    const docs = (snapshot && snapshot.docs) || [];
+    const latest = toMarkerFromDoc(docs[0]);
+    if (!latest || !latest.id) return;
+
+    // 列表还在加载时，不提示（刚进页面那次加载是最新的，不需要提示条）
+    if (this.data.isLoading) {
+      this._newGoodsWatchInited = true;
+      this._newGoodsWatchLatest = latest;
+      return;
+    }
+
+    const anchor = toMarkerFromAnchor(this._goodsAnchor);
+    const hasAnyList = Number(this.data.goodsTotal || 0) > 0;
+
+    // 第一次回调：只记录“当前最新”，不主动弹提示
+    if (!this._newGoodsWatchInited) {
+      this._newGoodsWatchInited = true;
+      this._newGoodsWatchLatest = latest;
+
+      // 如果页面已有列表，但顶部边界(anchor)比当前最新更旧，说明有新商品需要刷新
+      if (hasAnyList && anchor && isMarkerNewer(latest, anchor)) {
+        if (!this.data.showNewGoodsTip) this.setData({ showNewGoodsTip: true });
+      }
+
+      // 如果当前列表为空，但 watch 已经看到有商品了，也给个提示
+      if (!hasAnyList && !this.data.showNewGoodsTip) {
+        this.setData({ showNewGoodsTip: true });
+      }
+      return;
+    }
+
+    const prev = this._newGoodsWatchLatest;
+    const changed = !prev || latest.id !== prev.id || latest.t !== prev.t;
+    if (!changed) return;
+
+    this._newGoodsWatchLatest = latest;
+
+    // 已经有列表：只有当“最新商品”比本次列表会话的顶部边界更新时，才提示刷新
+    if (hasAnyList) {
+      if (anchor && isMarkerNewer(latest, anchor)) {
+        if (!this.data.showNewGoodsTip) this.setData({ showNewGoodsTip: true });
+      }
+      return;
+    }
+
+    // 列表为空：有新商品时直接提示
+    if (!this.data.showNewGoodsTip) this.setData({ showNewGoodsTip: true });
+  },
+  onTapNewGoodsTip() {
+    this.setData({ showNewGoodsTip: false }, () => {
+      // 点击提示条后，回到顶部并刷新第一页
+      if (wx.pageScrollTo) {
+        wx.pageScrollTo({
+          scrollTop: 0,
+          duration: 0,
+          complete: () => {
+            this._lastScrollTop = 0;
+            this.loadGoods(true);
+          }
+        });
+      } else {
+        this._lastScrollTop = 0;
+        this.loadGoods(true);
+      }
+    });
   },
   _clearVirtualTimers() {
     if (this._virtualUpdateTimer) clearTimeout(this._virtualUpdateTimer);
@@ -824,8 +975,12 @@ Page({
       virtualRightBottomPx: 0,
       hasMore: true,
       isLoadingMore: false,
-      loadMoreError: ''
+      loadMoreError: '',
+      showNewGoodsTip: false
     });
+
+    // 刷新/切换分类后，重新开启新商品监听（避免监听条件还是旧的）
+    if (reset) this._openNewGoodsWatch(true);
 
     // 首次加载一页
     this.loadMoreGoods(true);
@@ -842,6 +997,9 @@ Page({
       const baseWhere = {};
       if (community) baseWhere.community = community;
       if (c && c !== 'all') baseWhere.category = c;
+      // 只展示已上架（posted）的商品：
+      // 审核中（pending）/需修改（need_fix）的内容不会出现在商品广场里。
+      baseWhere.status = 'posted';
 
       let cursorWhere = null;
       if (cursor && cursor.createdAt) {

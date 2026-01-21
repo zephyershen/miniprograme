@@ -6,7 +6,7 @@
         <ui-field label="图片" hint="建议至少 1 张，最多 {{MAX_IMAGES}} 张" error="{{errors.images || ''}}" required="{{true}}">
           <view class="row wrap row-gap-8">
             <block wx:for="{{form.images}}" wx:key="*this">
-              <view class="row-gap-item publish-image-wrap">
+              <view class="{{'row-gap-item publish-image-wrap ' + (needFixIdxMap[index] ? 'is-need-fix' : '')}}">
                 <image class="publish-image-thumb" src="{{item}}" lazy-load="true" data-index="{{index}}" bindtap="previewFormImage" />
                 <view class="publish-image-remove" data-index="{{index}}" catchtap="removeFormImage">
                   ×

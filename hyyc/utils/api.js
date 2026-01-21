@@ -16,10 +16,22 @@ async function verifySmsCode(phone, code){
 }
 
 async function exchangePhoneNumber(wxCode){
-  console.log('mock exchangePhoneNumber', wxCode);
-  await delay(300);
-  // 演示：返回一个占位手机号
-  return { ok: true, phoneNumber: '13800138000' };
+  // 正式逻辑：把前端拿到的 code 发到云函数，云函数再调用微信 openapi 换回手机号
+  // 说明：如果云函数未部署/未开通能力，会在 catch 里返回 ok:false
+  try {
+    const fnRes = await wx.cloud.callFunction({
+      name: 'exchangePhoneNumber',
+      data: { code: wxCode }
+    });
+    const r = (fnRes && fnRes.result) || {};
+    if (r && r.ok && r.phoneNumber) {
+      return { ok: true, phoneNumber: r.phoneNumber };
+    }
+    return { ok: false, msg: r.msg || '获取手机号失败' };
+  } catch (err) {
+    console.error('callFunction exchangePhoneNumber 失败', err);
+    return { ok: false, msg: '获取手机号失败（云函数未部署或未开通能力）' };
+  }
 }
 
 async function validateInvite(inviteCode, building, door){
@@ -30,4 +42,3 @@ async function validateInvite(inviteCode, building, door){
 }
 
 module.exports = { sendSmsCode, verifySmsCode, exchangePhoneNumber, validateInvite };
-

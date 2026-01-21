@@ -1,0 +1,7 @@
+{
+  "usingComponents": {
+    "ui-loading": "/components/ui/loading/index"
+  },
+  "navigationBarTitleText": "我的商品"
+}
+

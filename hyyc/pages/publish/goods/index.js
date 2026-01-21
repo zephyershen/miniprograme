@@ -1,9 +1,14 @@
 const { required } = require('../../../utils/validators');
 const { toast } = require('../../../utils/ui');
+const { startImageAudit } = require('../../../utils/imageAudit');
 
 // 使用云开发数据库 goods 集合存储商品
 const db = wx.cloud.database();
 const GOODS_COLLECTION = 'goods';
+
+function pickStr(v) {
+  return String(v == null ? '' : v).trim();
+}
 
 Page({
   data: {
@@ -22,7 +27,11 @@ Page({
     },
     errors: {},
     isLoading: false,
-    MAX_IMAGES: 6,
+    MAX_IMAGES: 9,
+    // 编辑模式：从“我的商品”进入时会带上这个 id
+    editGoodsId: '',
+    // 需要用户替换的图片下标（用于红框提示）
+    needFixIdxMap: {},
     categoryOptions: [
       { key: 'digital', label: '电子数码' },
       { key: 'appliance', label: '家用电器' },
@@ -44,6 +53,34 @@ Page({
     ],
     buildingRange: [],
     buildingIndex: 0
+  },
+  async _ensureOpenid() {
+    // 数据库安全规则里我们用 auth.openid 判断“是不是本人”，这里需要拿到 openid 才能做“本人写入/更新”。
+    const u = wx.getStorageSync('hyyc_user') || {};
+    let openid = pickStr(u._openid || u.openid || u.openId);
+    if (openid) return openid;
+
+    try {
+      const res = await wx.cloud.callFunction({ name: 'login' });
+      openid = pickStr(res && res.result && res.result.openid);
+      if (openid) {
+        try {
+          wx.setStorageSync('hyyc_user', { ...u, _openid: openid });
+        } catch (e) {
+          // ignore
+        }
+        return openid;
+      }
+    } catch (e) {
+      // ignore
+    }
+    return '';
+  },
+  onLoad(options) {
+    const id = (options && (options.id || options.editId)) || '';
+    if (id) {
+      this.setData({ editGoodsId: String(id) });
+    }
   },
   onShow() {
     const u = wx.getStorageSync('hyyc_user');
@@ -71,7 +108,86 @@ Page({
         ...prevForm,
         building: prevForm.building || buildings[idx] || ''
       }
+    }, () => {
+      // 编辑模式：回填商品数据（只加载一次）
+      const editId = this.data.editGoodsId;
+      if (editId && !this._editLoaded) {
+        this._editLoaded = true;
+        this.loadGoodsForEdit(editId);
+      }
     });
+  },
+  async loadGoodsForEdit(id) {
+    const gid = String(id || '').trim();
+    if (!gid) return;
+
+    const u = wx.getStorageSync('hyyc_user') || {};
+    const userId = u.id || '';
+    if (!userId) return;
+
+    this.setData({ isLoading: true });
+    try {
+      // 重要：goods 的 read 规则里用到了 doc._openid（查询条件），
+      // 所以这里不要用 doc(id).get()，而是按 {_id, _openid} 精确查询。
+      const openid = await this._ensureOpenid();
+
+      if (!openid) {
+        toast('获取用户身份失败，请重新登录');
+        this.setData({ isLoading: false });
+        return;
+      }
+
+      const res = await db.collection(GOODS_COLLECTION)
+        .where({ _id: gid, _openid: openid })
+        .limit(1)
+        .get();
+      const doc = (res && res.data && res.data[0]) ? res.data[0] : null;
+      if (!doc) {
+        toast('商品不存在或无权限编辑');
+        this.setData({ isLoading: false });
+        return;
+      }
+      if (doc.ownerId && doc.ownerId !== userId) {
+        toast('无权限编辑');
+        this.setData({ isLoading: false });
+        return;
+      }
+
+      // 楼栋回填：优先用商品自己的
+      const buildings = this.data.buildingRange || [];
+      const b = doc.building || '';
+      const idx = b ? buildings.indexOf(b) : -1;
+
+      const needFixIdx = Array.isArray(doc.auditNeedFixIdx) ? doc.auditNeedFixIdx : [];
+      const needFixIdxMap = {};
+      needFixIdx.forEach((i) => {
+        const n = Number(i);
+        if (Number.isFinite(n) && n >= 0) needFixIdxMap[n] = true;
+      });
+
+      this.setData({
+        buildingIndex: idx >= 0 ? idx : (this.data.buildingIndex || 0),
+        form: {
+          title: doc.title || '',
+          category: doc.category || '',
+          price: (doc.price != null && doc.price !== '') ? String(doc.price) : '',
+          originalPrice: (doc.originalPrice != null && doc.originalPrice !== '') ? String(doc.originalPrice) : '',
+          condition: doc.condition || '',
+          tradeType: doc.tradeType || '',
+          desc: doc.desc || '',
+          // 编辑时 images 里可能是云 fileID，也可能是 URL；都保留原样
+          images: Array.isArray(doc.images) ? doc.images : [],
+          building: b || (buildings[this.data.buildingIndex] || '')
+        },
+        needFixIdxMap,
+        errors: {},
+        isLoading: false
+      });
+    } catch (err) {
+      console.error('加载待编辑商品失败', err);
+      this.setData({ isLoading: false });
+      toast('加载失败，请稍后重试');
+    }
   },
   onInput(e) {
     const k = e.currentTarget.dataset.k;
@@ -151,6 +267,11 @@ Page({
     });
   },
   async submit() {
+    // 防止重复点击导致重复写入（view 按钮没有 disabled 属性，需要在 JS 里兜底）
+    if (this._submitting) return;
+    this._submitting = true;
+
+    try {
     const f = this.data.form || {};
     const errors = {};
 
@@ -193,14 +314,33 @@ Page({
 
     try {
       const tempImages = f.images || [];
+      const imagesSignature = JSON.stringify(tempImages || []);
+
       // 记录封面图宽高比（height/width），用于商品广场瀑布流更准确地预估卡片高度
       let coverRatio = null;
       const coverSrc = tempImages[0];
-      if (typeof coverSrc === 'string' && coverSrc && coverSrc.indexOf('cloud://') !== 0) {
+      // 封面可能是：
+      // - 本地临时路径（wxfile:// 或者开发者工具里的临时路径）
+      // - 云文件 fileID（cloud://...）
+      // - http(s) 链接
+      if (typeof coverSrc === 'string' && coverSrc) {
         try {
+          let srcForInfo = coverSrc;
+          // 云文件先转成临时 URL，否则 getImageInfo 可能拿不到宽高
+          if (coverSrc.indexOf('cloud://') === 0) {
+            try {
+              const t = await wx.cloud.getTempFileURL({
+                fileList: [{ fileID: coverSrc, maxAge: 60 * 60 }]
+              });
+              const first = t && t.fileList && t.fileList[0];
+              if (first && first.tempFileURL) srcForInfo = first.tempFileURL;
+            } catch (e) {
+              // ignore
+            }
+          }
           const info = await new Promise((resolve, reject) => {
             wx.getImageInfo({
-              src: coverSrc,
+              src: srcForInfo,
               success: resolve,
               fail: reject
             });
@@ -214,40 +354,131 @@ Page({
           // ignore
         }
       }
-      const uploadTasks = tempImages.map((path, idx) => {
-        if (typeof path === 'string' && path.indexOf('cloud://') === 0) {
-          return Promise.resolve(path);
-        }
-        return wx.cloud
-          .uploadFile({
-            cloudPath: `goods/${u.id || 'anonymous'}/${Date.now()}_${idx}.jpg`,
-            filePath: path
-          })
-          .then((res) => res.fileID);
-      });
-      const fileIDs = await Promise.all(uploadTasks);
+      // 如果用户“重复点提交”但图片没变，复用上一次上传结果，避免重复占用存储空间
+      let fileIDs = null;
+      if (
+        this._lastUpload &&
+        this._lastUpload.signature === imagesSignature &&
+        Array.isArray(this._lastUpload.fileIDs) &&
+        this._lastUpload.fileIDs.length === tempImages.length
+      ) {
+        fileIDs = this._lastUpload.fileIDs;
+      } else {
+        const uploadTasks = tempImages.map((path, idx) => {
+          if (typeof path === 'string' && path.indexOf('cloud://') === 0) {
+            return Promise.resolve(path);
+          }
+          return wx.cloud
+            .uploadFile({
+              cloudPath: `goods/${u.id || 'anonymous'}/${Date.now()}_${idx}.jpg`,
+              filePath: path
+            })
+            .then((res) => res.fileID);
+        });
+        fileIDs = await Promise.all(uploadTasks);
+        this._lastUpload = { signature: imagesSignature, fileIDs };
+      }
 
-      await db.collection(GOODS_COLLECTION).add({
-        data: {
-          title: f.title,
-          desc: f.desc,
-          price: Number(f.price),
-          originalPrice: String(f.originalPrice || '').trim() ? Number(f.originalPrice) : null,
-          category: f.category,
-          condition: f.condition || '',
-          tradeType: f.tradeType || '',
-          images: fileIDs,
-          coverRatio,
-          // 去掉前后空格，避免 goods.community 和用户小区映射不一致
-          community: String(u.community || '').trim(),
-          building: f.building || '',
-          ownerId: u.id || '',
-          ownerName: u.name || '',
-          ownerNickname: u.nickname || '',
-          status: 'posted',
-          createdAt: db.serverDate()
+      // 写库：先保存为 pending（审核中），通过审核后再变成 posted（可见）
+      const editId = String(this.data.editGoodsId || '').trim();
+      let goodsId = editId;
+      if (editId) {
+        const openid = await this._ensureOpenid();
+        if (!openid) {
+          this.setData({ isLoading: false });
+          toast('获取用户身份失败，请重新登录');
+          return;
         }
-      });
+
+        // 注意：安全规则里 update 往往会用到 doc._openid == auth.openid，
+        // 这里用 {_id, _openid} 精确匹配，避免被判定为“不安全更新”而拒绝。
+        const upRes = await db.collection(GOODS_COLLECTION).where({ _id: editId, _openid: openid }).update({
+          data: {
+            title: f.title,
+            desc: f.desc,
+            price: Number(f.price),
+            originalPrice: String(f.originalPrice || '').trim() ? Number(f.originalPrice) : null,
+            category: f.category,
+            condition: f.condition || '',
+            tradeType: f.tradeType || '',
+            images: fileIDs,
+            coverRatio,
+            // 去掉前后空格，避免 goods.community 和用户小区映射不一致
+            community: String(u.community || '').trim(),
+            building: f.building || '',
+            ownerId: u.id || '',
+            ownerName: u.name || '',
+            ownerNickname: u.nickname || '',
+            status: 'pending',
+            updatedAt: db.serverDate()
+          }
+        });
+        const updated = Number(upRes && upRes.stats && upRes.stats.updated) || 0;
+        if (!updated) {
+          this.setData({ isLoading: false });
+          toast('商品不存在或无权限编辑');
+          return;
+        }
+      } else {
+        const addRes = await db.collection(GOODS_COLLECTION).add({
+          data: {
+            title: f.title,
+            desc: f.desc,
+            price: Number(f.price),
+            originalPrice: String(f.originalPrice || '').trim() ? Number(f.originalPrice) : null,
+            category: f.category,
+            condition: f.condition || '',
+            tradeType: f.tradeType || '',
+            images: fileIDs,
+            coverRatio,
+            // 去掉前后空格，避免 goods.community 和用户小区映射不一致
+            community: String(u.community || '').trim(),
+            building: f.building || '',
+            ownerId: u.id || '',
+            ownerName: u.name || '',
+            ownerNickname: u.nickname || '',
+            status: 'pending',
+            createdAt: db.serverDate()
+          }
+        });
+        goodsId = (addRes && addRes._id) ? String(addRes._id) : '';
+        // 重要：新建成功后，把 id 留在页面里；
+        // 这样就算后面“审核启动失败”，用户再点提交也会走 update，不会重复新增多条商品。
+        if (goodsId) {
+          this.setData({ editGoodsId: goodsId });
+        }
+      }
+
+      // 启动图片审核（异步回调）
+      try {
+        await startImageAudit({ bizType: 'goods', bizId: goodsId, images: fileIDs });
+      } catch (e) {
+        console.error('启动商品图片审核失败', e);
+        // 审核没启动成功也不要让商品上架
+        try {
+          const openid = await this._ensureOpenid();
+          if (openid && goodsId) {
+            await db.collection(GOODS_COLLECTION).where({ _id: goodsId, _openid: openid }).update({
+              data: { status: 'need_fix', auditError: String(e && e.message ? e.message : '审核启动失败') }
+            });
+          }
+        } catch (e2) {
+          // ignore
+        }
+        this.setData({ isLoading: false });
+        wx.showModal({
+          title: '已保存，但审核启动失败',
+          content: '商品已经保存到“我的商品”里了。请稍后在“我的商品”里点“重新审核”。',
+          confirmText: '去我的商品',
+          cancelText: '留在这里',
+          success: (res) => {
+            if (res.confirm) {
+              wx.navigateTo({ url: '/pages/profile/goods/index' });
+            }
+          }
+        });
+        return;
+      }
 
       // 通知商品列表 tab：下次展示时刷新一次（避免商品列表每次切 tab 都重刷）
       try {
@@ -256,7 +487,7 @@ Page({
         // ignore
       }
 
-      toast('已发布');
+      toast(editId ? '已重新提交审核' : '已提交审核');
       this.setData({ isLoading: false });
       this.reset();
 
@@ -271,6 +502,9 @@ Page({
       console.error('发布商品失败', err);
       this.setData({ isLoading: false });
       toast('发布失败，请稍后重试');
+    }
+    } finally {
+      this._submitting = false;
     }
   }
 });

@@ -15,7 +15,7 @@ Page({
       nickname: '',
       name: '测试用户',
       idNumber: '110101199001010011',
-      phone: '13800138000',
+      phone: '',
       inviteCode: 'HYYC2025',
       community: community.name,
       building: '11栋',
@@ -39,11 +39,27 @@ Page({
     inCommunity: false,
     locationText: '尚未定位，请点击右侧“获取定位”',
     // 已存在用户提示弹层
-    showUserExist: false
+    showUserExist: false,
+    // 点击“获取”时用来聚焦昵称输入框，触发键盘上方的“微信昵称”选择
+    nicknameFocus: false
+  },
+  // 用户点击“获取”后，聚焦昵称输入框；用户可从键盘上方一键选择微信昵称
+  onGetWechatProfile() {
+    // 新版规则：微信不会再把真实昵称直接返回给 getUserProfile，
+    // 推荐用 input 的 type="nickname" 让用户从键盘上方一键选择微信昵称。
+    this.setData({ nicknameFocus: true }, () => {
+      // 立刻再置回 false，方便用户下次还能再次点击“获取”触发聚焦
+      setTimeout(() => this.setData({ nicknameFocus: false }), 200);
+    });
+    toast('请在键盘上方选择微信昵称');
   },
   onInput(e){
     const key = e.currentTarget.dataset.key;
-    this.setData({ [`form.${key}`]: e.detail.value });
+    const value = e.detail.value;
+    const patch = { [`form.${key}`]: value };
+    // 用户手动改了手机号后，就不再算“一键获取过”
+    if (key === 'phone') patch.phoneVerified = false;
+    this.setData(patch);
   },
   onLoad(){
     // 初始化楼栋（1-23栋）与门号（1-MAX_FLOOR 楼 × 01-04 户）
@@ -94,7 +110,7 @@ Page({
       if (r.ok) {
         this.setData({ 'form.phone': r.phoneNumber, phoneVerified: true });
         toast('已获取手机号');
-      } else { toast('获取手机号失败'); }
+      } else { toast(r.msg || '获取手机号失败'); }
     }catch(err){ console.log(err); toast('获取手机号异常'); this.setData({ isLoading: false }); }
   },
   // 移除短信验证码流程，仅保留一键获取手机号
@@ -132,7 +148,8 @@ Page({
     const f = this.data.form; const errors = {};
 	    errors.name = required(f.name,'请输入姓名');
 	    errors.idNumber = isIdNumber(f.idNumber);
-	    errors.phone = isPhone(f.phone);
+	    // 手机号输入框已禁用，只允许走「获取手机号」授权
+	    errors.phone = this.data.phoneVerified ? isPhone(f.phone) : '请点击右侧“获取”授权手机号';
 	    // 小区名称必须包含配置中的小区名，用于过滤非本小区业主
 	    errors.community = required(f.community,'请输入小区');
 	    const communityInput = String(f.community || '').trim();
@@ -151,11 +168,11 @@ Page({
       return;
     }
     
-    this.setData({ isLoading: true });
-	    const checkAll = async ()=>{
-	      // 1) 手机号：目前只做格式校验，不再强制一键获取（待后台开通获取手机号能力后再恢复）
-	      // 2) 邀请码
-	      const ri = await validateInvite(f.inviteCode, f.building, f.door);
+	    this.setData({ isLoading: true });
+		    const checkAll = async ()=>{
+		      // 1) 手机号：已在表单校验阶段强制要求“获取手机号”授权
+		      // 2) 邀请码
+		      const ri = await validateInvite(f.inviteCode, f.building, f.door);
 	      if (!ri.ok) { toast('邀请码无效'); return false; }
 	      // 3) 定位（可作为硬性或提示，这里默认为硬性）
 	      if (!this.data.inCommunity) { toast('请在小区内完成定位'); return false; }

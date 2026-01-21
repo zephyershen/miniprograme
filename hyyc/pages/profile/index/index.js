@@ -11,6 +11,7 @@ Page({
     wx.navigateTo({ url: '/pages/profile/account/index' });
   },
   gotoMyTasks(){ wx.navigateTo({ url: '/pages/profile/tasks/index' }); },
+  gotoMyGoods(){ wx.navigateTo({ url: '/pages/profile/goods/index' }); },
   gotoWallet(){ wx.navigateTo({ url: '/pages/profile/wallet/index' }); },
 
   // 退出登录：清掉本地缓存的用户信息，并回到欢迎页

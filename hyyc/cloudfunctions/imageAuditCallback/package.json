@@ -1,0 +1,10 @@
+{
+  "name": "imageAuditCallback",
+  "version": "1.0.0",
+  "description": "云函数URL：接收 COS 图片审核回调，并更新业务状态",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}
+

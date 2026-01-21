@@ -1,5 +1,21 @@
 @import "../../../styles/shadcn.wxss";
 
+/* 顶部提示：有新商品（固定在顶部，不占布局） */
+.goods-new-tip {
+  position: fixed;
+  top: 18rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+  padding: 14rpx 22rpx;
+  border-radius: 9999rpx;
+  background: rgba(68, 114, 68, 0.95);
+  color: #ffffff;
+  font-size: 24rpx;
+  font-weight: 700;
+  box-shadow: 0 8rpx 24rpx rgba(17, 24, 39, 0.18);
+}
+
 /* 商品列表：原价划掉 */
 .goods-original {
   text-decoration: line-through;

@@ -1,0 +1,10 @@
+{
+  "name": "exchangePhoneNumber",
+  "version": "1.0.0",
+  "description": "云函数：获取手机号（用前端 code 换手机号）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}
+
