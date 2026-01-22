@@ -107,6 +107,20 @@
       <text class="error" wx:if="{{errors.inviteCode}}">{{errors.inviteCode}}</text>
     </view>
 
+    <view class="group">
+      <text class="label">实时定位<text class="label-star">*</text></text>
+      <view class="row">
+        <text class="hint {{locationStatus}}" style="flex:1; min-width:0">{{locationText}}</text>
+        <button
+          class="btn btn-info btn-sm btn-compact"
+          size="mini"
+          bindtap="getLocation"
+          style="margin-left:12rpx"
+          disabled="{{isLoading || idCardUploading}}"
+        >{{hasLocated ? '重新定位' : '获取定位'}}</button>
+      </view>
+    </view>
+
     <view class="agreement">
       <view class="agreement-row">
         <view class="agreement-check {{agreeChecked ? 'is-checked' : ''}}" bindtap="toggleAgree"></view>

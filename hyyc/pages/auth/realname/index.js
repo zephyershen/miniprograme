@@ -1,6 +1,7 @@
 const { required, isPhone } = require('../../../utils/validators');
 const { toast } = require('../../../utils/ui');
 const { exchangePhoneNumber } = require('../../../utils/api');
+const { distanceMeters } = require('../../../utils/geo');
 const community = require('../../../config/community');
 
 function pickStr(v) {
@@ -84,7 +85,13 @@ Page({
     // 身份证正面（人像面）
     idCardFrontFileID: '',
     idCardFrontPreview: '',
-    idCardUploading: false
+    idCardUploading: false,
+
+    // 定位校验：用于验证用户是否在配置的小区范围内
+    hasLocated: false,
+    inCommunity: false,
+    locationStatus: 'warn', // '' | 'ok' | 'warn'
+    locationText: '未定位，请点击“获取定位”'
   },
 
   // 用户点击“获取”后，聚焦昵称输入框；用户可从键盘上方一键选择微信昵称
@@ -165,6 +172,96 @@ Page({
     } catch (err) {
       console.log(err);
       toast('获取手机号异常');
+      this.setData({ isLoading: false });
+    }
+  },
+
+  // 获取当前位置并进行小区围栏校验（GCJ-02 坐标）
+  async getLocation() {
+    if (this.data.isLoading || this.data.idCardUploading) return;
+
+    this.setData({
+      isLoading: true,
+      hasLocated: true,
+      locationText: '定位中...',
+      locationStatus: ''
+    });
+
+    try {
+      const res = await new Promise((resolve, reject) => {
+        wx.getLocation({
+          type: 'gcj02',
+          // 尽量拿到更准的结果（部分机型/权限下会忽略）
+          isHighAccuracy: true,
+          highAccuracyExpireTime: 4000,
+          success: resolve,
+          fail: reject
+        });
+      });
+
+      const lat = Number(res && res.latitude);
+      const lng = Number(res && res.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        throw new Error('invalid latitude/longitude');
+      }
+
+      const c = (community && community.center) || {};
+      const cLat = Number(c.lat);
+      const cLng = Number(c.lng);
+      const radius = Number(community && community.radiusMeters);
+
+      // 如果围栏参数缺失：不拦截注册，但提示一下（避免线上配置漏填导致无法注册）
+      if (!Number.isFinite(cLat) || !Number.isFinite(cLng) || !Number.isFinite(radius) || radius <= 0) {
+        this.setData({
+          inCommunity: true,
+          locationText: '已获取定位（围栏未配置）',
+          locationStatus: 'ok'
+        });
+        return;
+      }
+
+      const dist = distanceMeters(lat, lng, cLat, cLng);
+      const meters = Math.round(dist);
+      const ok = Number.isFinite(dist) && dist <= radius;
+
+      const name = (community && community.name) || '小区';
+      const distText = Number.isFinite(meters) ? `（约${meters}m）` : '';
+      const text = ok ? `已在${name}范围内${distText}` : `不在${name}范围内${distText}`;
+
+      this.setData({
+        inCommunity: ok,
+        locationText: text,
+        locationStatus: ok ? 'ok' : 'warn'
+      });
+    } catch (err) {
+      console.warn('getLocation 失败', err);
+
+      const errMsg = (err && err.errMsg) || '';
+      const denied =
+        errMsg.indexOf('auth deny') !== -1 ||
+        errMsg.indexOf('authorize') !== -1 ||
+        errMsg.indexOf('permission denied') !== -1;
+
+      this.setData({
+        inCommunity: false,
+        locationText: denied ? '定位权限未开启，请在设置中允许定位' : '定位失败，请重试',
+        locationStatus: 'warn'
+      });
+
+      if (denied) {
+        wx.showModal({
+          title: '需要定位权限',
+          content: '用于验证您是否在本小区范围内。请在设置中开启定位权限后重试。',
+          confirmText: '去设置',
+          cancelText: '取消',
+          success: (r) => {
+            if (r && r.confirm) wx.openSetting({});
+          }
+        });
+      } else {
+        toast('获取定位失败，请稍后再试');
+      }
+    } finally {
       this.setData({ isLoading: false });
     }
   },
@@ -264,6 +361,16 @@ Page({
       return;
     }
 
+    // 必须在小区范围内完成定位校验（避免非本小区人员注册）
+    if (!this.data.hasLocated) {
+      toast('请先点击“获取定位”验证在小区范围内');
+      return;
+    }
+    if (!this.data.inCommunity) {
+      toast(this.data.locationText || '不在小区范围内，请到小区内重新定位');
+      return;
+    }
+
     this.setData({ isLoading: true, idCardUploading: true });
 
     let uploadedFileID = '';
@@ -353,4 +460,3 @@ Page({
     if (fid) safeDeleteCloudFile(fid);
   }
 });
-
