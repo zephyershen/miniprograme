@@ -40,15 +40,24 @@
     </view>
 
     <view class="group">
-      <text class="label">姓名<text class="label-star">*</text></text>
-      <input class="control" placeholder="请输入姓名" value="{{form.name}}" bindinput="onInput" data-key="name"/>
-      <text class="error" wx:if="{{errors.name}}">{{errors.name}}</text>
-    </view>
-
-    <view class="group">
-      <text class="label">身份证号<text class="label-star">*</text></text>
-      <input class="control" placeholder="请输入身份证号" value="{{form.idNumber}}" bindinput="onInput" data-key="idNumber"/>
-      <text class="error" wx:if="{{errors.idNumber}}">{{errors.idNumber}}</text>
+      <text class="label">身份证正面（人像面）<text class="label-star">*</text></text>
+      <view class="idcard-box">
+        <view wx:if="{{!idCardFrontPreview}}" class="idcard-empty">
+          <view class="btn btn-outline btn-sm" bindtap="chooseIdCardFront">上传照片</view>
+          <view class="idcard-tips">
+            <text class="hint">请拍清楚、不要反光、别遮挡四角</text>
+            <text class="hint">请上传本人身份证</text>
+          </view>
+        </view>
+        <view wx:else class="idcard-preview">
+          <image class="idcard-image" src="{{idCardFrontPreview}}" mode="aspectFill" bindtap="previewIdCardFront" />
+          <view class="row gap idcard-actions">
+            <view class="btn btn-outline btn-sm" bindtap="chooseIdCardFront">重传</view>
+            <view class="btn btn-outline btn-sm" bindtap="removeIdCardFront">删除</view>
+          </view>
+        </view>
+      </view>
+      <text class="error" wx:if="{{errors.idCardFront}}">{{errors.idCardFront}}</text>
     </view>
 
     <view class="group">
@@ -93,18 +102,9 @@
     </view>
 
     <view class="group">
-      <text class="label">小区邀请码<text class="label-star">*</text></text>
-      <input class="control" placeholder="请输入物业发放的邀请码（示例：HYYC2025）" value="{{form.inviteCode}}" bindinput="onInput" data-key="inviteCode"/>
+      <text class="label">小区邀请码（可选）</text>
+      <input class="control" placeholder="如果物业有发邀请码，可填写（示例：HYYC2025）" value="{{form.inviteCode}}" bindinput="onInput" data-key="inviteCode"/>
       <text class="error" wx:if="{{errors.inviteCode}}">{{errors.inviteCode}}</text>
-    </view>
-
-    <view class="group">
-      <text class="label">实时定位<text class="label-star">*</text></text>
-      <view class="row space-between">
-        <text class="hint {{inCommunity?'ok':'warn'}}">{{locationText}}</text>
-        <view class="btn btn-outline btn-sm" bindtap="getLocation">获取定位</view>
-      </view>
-      <text class="error" wx:if="{{errors.location}}">{{errors.location}}</text>
     </view>
 
     <view class="agreement">

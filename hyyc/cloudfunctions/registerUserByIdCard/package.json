@@ -1,0 +1,11 @@
+{
+  "name": "registerUserByIdCard",
+  "version": "1.0.0",
+  "description": "云函数：身份证照片 OCR 核验（腾讯 FaceID）通过后完成注册（不保存照片）",
+  "main": "index.js",
+  "dependencies": {
+    "tencentcloud-sdk-nodejs": "latest",
+    "wx-server-sdk": "latest"
+  }
+}
+

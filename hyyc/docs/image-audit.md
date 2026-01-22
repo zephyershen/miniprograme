@@ -130,7 +130,7 @@
 
 如果 `user_community` 没这条记录，`create/read` 都可能被拒绝。
 
-（项目里 `registerUser` 云函数会写这张表；如果你之前没走过实名/注册流程，表里可能没有。）
+（项目里 `registerUserByIdCard` 云函数会写这张表；如果你之前没走过实名/注册流程，表里可能没有。）
 
 ---
 

@@ -112,5 +112,5 @@
 ## 备注（和数据保存的关系）
 
 - 昵称/手机号只是“回填到表单里”，真正写进数据库是在你点击「继续」并成功注册后：
-  - 注册逻辑在云函数：`hyyc/cloudfunctions/registerUser/index.js`
+  - 注册逻辑在云函数：`hyyc/cloudfunctions/registerUserByIdCard/index.js`
   - 写入集合：`userInfo`
