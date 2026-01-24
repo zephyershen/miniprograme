@@ -187,6 +187,19 @@ Page({
       locationStatus: ''
     });
 
+    // 开发阶段：跳过真实定位，直接模拟在范围内
+    const DEV_MODE = true; // 正式上线前请改为 false
+    if (DEV_MODE) {
+      const name = (community && community.name) || '小区';
+      this.setData({
+        isLoading: false,
+        inCommunity: true,
+        locationText: `已在${name}范围内（开发模式）`,
+        locationStatus: 'ok'
+      });
+      return;
+    }
+
     try {
       const res = await new Promise((resolve, reject) => {
         wx.getLocation({

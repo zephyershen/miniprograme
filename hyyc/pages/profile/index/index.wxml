@@ -9,8 +9,7 @@
       <view class="user-strip" bindtap="gotoAccount">
         <view class="avatar avatar-lg"></view>
         <view class="user-text">
-          <text class="user-name">{{user.name||'未实名'}}</text>
-          <text class="user-sub" wx:if="{{user.nickname}}">网名：{{user.nickname}}</text>
+          <text class="user-name">{{user.nickname||'未实名'}}</text>
           <text class="user-sub">{{user.community||'未设置小区'}} · {{user.realname?'已实名':'未实名'}}</text>
           <text class="user-sub" wx:if="{{user.building || user.door}}">{{user.building||''}} {{user.door?('· '+user.door):''}}</text>
         </view>
