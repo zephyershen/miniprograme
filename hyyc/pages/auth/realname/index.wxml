@@ -17,6 +17,19 @@
 
   <view class="panel">
     <view class="group">
+      <text class="label">头像</text>
+      <view class="avatar-box">
+        <button class="avatar-btn" open-type="chooseAvatar" bind:chooseavatar="onChooseAvatar">
+          <image wx:if="{{avatarUrl}}" class="avatar-img" src="{{avatarUrl}}" mode="aspectFill" />
+          <view wx:else class="avatar-placeholder">
+            <text class="avatar-plus">+</text>
+            <text class="avatar-hint">选择头像</text>
+          </view>
+        </button>
+      </view>
+    </view>
+
+    <view class="group">
       <text class="label">昵称</text>
       <view class="row">
         <input

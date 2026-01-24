@@ -91,7 +91,40 @@ Page({
     hasLocated: false,
     inCommunity: false,
     locationStatus: 'warn', // '' | 'ok' | 'warn'
-    locationText: '未定位，请点击“获取定位”'
+    locationText: '未定位，请点击“获取定位”',
+
+    // 用户头像（临时路径 + 云存储 fileID）
+    avatarUrl: '',
+    avatarFileID: ''
+  },
+
+  // 用户选择微信头像
+  async onChooseAvatar(e) {
+    const { avatarUrl } = e.detail;
+    if (!avatarUrl) return;
+
+    // 先显示临时路径作为预览
+    this.setData({ avatarUrl });
+
+    // 上传到云存储
+    try {
+      const rand = Math.random().toString(16).slice(2, 8);
+      const cloudPath = `avatar/${Date.now()}_${rand}.jpg`;
+      const res = await wx.cloud.uploadFile({
+        cloudPath,
+        filePath: avatarUrl
+      });
+      if (res && res.fileID) {
+        // 删除旧头像（如果有）
+        if (this.data.avatarFileID) {
+          safeDeleteCloudFile(this.data.avatarFileID);
+        }
+        this.setData({ avatarFileID: res.fileID });
+      }
+    } catch (err) {
+      console.warn('上传头像失败', err);
+      toast('头像上传失败，请重试');
+    }
   },
 
   // 用户点击“获取”后，聚焦昵称输入框；用户可从键盘上方一键选择微信昵称
@@ -407,6 +440,7 @@ Page({
           name: 'registerUserByIdCard',
           data: {
             idCardFrontFileID: uploadedFileID,
+            avatarFileID: this.data.avatarFileID,
             form: f,
             agree: this.data.agreeChecked
           }

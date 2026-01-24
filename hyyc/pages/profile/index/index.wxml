@@ -7,7 +7,8 @@
 
     <view class="hero-inner">
       <view class="user-strip" bindtap="gotoAccount">
-        <view class="avatar avatar-lg"></view>
+        <image wx:if="{{user.avatarFileID}}" class="avatar avatar-lg" src="{{user.avatarFileID}}" mode="aspectFill"></image>
+        <view wx:else class="avatar avatar-lg"></view>
         <view class="user-text">
           <text class="user-name">{{user.nickname||'未实名'}}</text>
           <text class="user-sub">{{user.community||'未设置小区'}} · {{user.realname?'已实名':'未实名'}}</text>

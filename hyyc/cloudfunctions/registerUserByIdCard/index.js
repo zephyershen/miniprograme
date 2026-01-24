@@ -158,6 +158,7 @@ exports.main = async (event, context) => {
 
   const agree = !!(event && event.agree);
   const idCardFrontFileID = pickStr(event && event.idCardFrontFileID);
+  const avatarFileID = pickStr(event && event.avatarFileID);
   const form = (event && event.form) || {};
 
   const phone = pickStr(form.phone);
@@ -302,6 +303,8 @@ exports.main = async (event, context) => {
         community,
         name,
         idNumber,
+        // 用户头像（云存储 fileID）
+        avatarFileID,
         // 为了兼容登录流程中通过 _openid 查询 userInfo，这里手动写入 _openid
         _openid: openid,
         realname: true,

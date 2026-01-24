@@ -127,6 +127,62 @@ picker .control text:first-child {
   color: #6B7280;
 }
 
+/* 头像选择区 */
+.avatar-box {
+  display: flex;
+  justify-content: center;
+}
+
+.avatar-btn {
+  width: 160rpx !important;
+  height: 160rpx !important;
+  min-height: 160rpx !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  border-radius: 50% !important;
+  overflow: hidden;
+  line-height: 1 !important;
+  box-sizing: border-box;
+}
+
+.avatar-btn::after {
+  display: none !important;
+}
+
+.avatar-img {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 50%;
+  display: block;
+}
+
+.avatar-placeholder {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 50%;
+  background: #F3F4F6;
+  border: 2rpx dashed #D1D5DB;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.avatar-plus {
+  font-size: 48rpx;
+  color: #9CA3AF;
+  line-height: 1;
+}
+
+.avatar-hint {
+  font-size: 22rpx;
+  color: #9CA3AF;
+  margin-top: 8rpx;
+}
+
 /* 身份证上传区 */
 .idcard-box {
   background: #ffffff;
