@@ -273,6 +273,11 @@
   color: #333333;
 }
 
+.btn-buy-disabled {
+  background: #f0f0f0;
+  color: #999999;
+}
+
 .btn-chat {
   display: flex;
   align-items: center;

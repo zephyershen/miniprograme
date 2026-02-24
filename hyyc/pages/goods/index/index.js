@@ -127,7 +127,7 @@ Page({
     this._isVisible = true;
     const u = wx.getStorageSync('hyyc_user');
     if (!u || !u.realname) {
-      wx.navigateTo({ url: '/pages/auth/welcome/index' });
+      wx.navigateTo({ url: '/pages/welcome/index' });
       return;
     }
     this._initVirtualEnv();

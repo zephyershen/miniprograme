@@ -35,12 +35,6 @@
           </view>
           <text class="quick-label">商品</text>
         </view>
-        <view class="quick-item" bindtap="gotoWallet">
-          <view class="quick-icon quick-icon-wallet">
-            <image class="quick-icon-svg" src="/assets/pages/profile/wallet.svg" mode="aspectFit"></image>
-          </view>
-          <text class="quick-label">钱包</text>
-        </view>
       </view>
     </view>
 

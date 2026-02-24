@@ -1,5 +1,6 @@
 const { formatMoney, formatDateTime } = require('../../../utils/format');
 const { toast, confirm } = require('../../../utils/ui');
+const access = require('../../../config/access');
 
 // 使用云开发数据库 tasks 集合加载任务详情
 const db = wx.cloud.database();
@@ -12,6 +13,7 @@ Page({
 	    isOwner: false,
 	    accepted: false,
 	    isLoading: true,
+	    workflowEnabled: !!(access && access.features && access.features.taskWorkflow),
 	    // 任务发布者视角下，该任务下所有会话的未读消息总数（以“有未读的会话数量”计）
 	    unreadCount: 0,
 	    // 普通住户视角：当前任务下，与业主聊天的未读消息条数
@@ -242,12 +244,16 @@ Page({
     });
   },
   accept(){
+    if (!this.data.workflowEnabled) {
+      toast('当前操作暂未开放');
+      return;
+    }
     // 发布者不能接受自己发布的任务，按钮在 UI 上也会置灰
     if (this.data.isOwner) {
       toast('这是你发布的任务，无需自己接受');
       return;
     }
-    toast('已接受（演示）');
+    toast('已接受');
     this.setData({ accepted: true });
   },
   toChat(){ wx.navigateTo({ url: '/pages/chat/room/index?tid=' + this.data.task.id }); },
@@ -262,9 +268,19 @@ Page({
       url: `/pages/chat/sessions/index?tid=${task.id}`
     });
   },
-  toSubmit(){ wx.navigateTo({ url: '/pages/task/submit/index?tid=' + this.data.task.id }); },
+  toSubmit(){
+    if (!this.data.workflowEnabled) {
+      toast('当前操作暂未开放');
+      return;
+    }
+    wx.navigateTo({ url: '/pages/task/submit/index?tid=' + this.data.task.id });
+  },
   async approve(){
+    if (!this.data.workflowEnabled) {
+      toast('当前操作暂未开放');
+      return;
+    }
     const ok = await confirm('确认任务已完成并打款给对方？');
-    if (ok) { toast('已确认完成（演示）'); }
+    if (ok) { toast('已确认完成'); }
   }
 });

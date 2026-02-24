@@ -19,6 +19,17 @@ function pickStr(v) {
   return String(v == null ? '' : v).trim();
 }
 
+function getAllowedCommunities() {
+  // 云端鉴权：避免只靠前端限制导致被绕过
+  // - 支持云函数环境变量 ALLOWED_COMMUNITIES=花语云萃,其它小区...
+  // - 未配置时默认只允许“花语云萃”（与你当前业务一致）
+  const raw = pickStr(process.env.ALLOWED_COMMUNITIES);
+  const list = raw
+    ? raw.split(',').map((s) => pickStr(s)).filter(Boolean)
+    : [];
+  return list.length ? list : ['花语云萃'];
+}
+
 function last4(s) {
   const v = pickStr(s);
   if (!v) return '';
@@ -178,6 +189,16 @@ exports.main = async (event, context) => {
 
     if (!idCardFrontFileID || !phone || !community || !building || !door) {
       return { ok: false, code: 'INVALID_PARAM', msg: '缺少必要参数' };
+    }
+
+    // 特定人群鉴权：仅允许合作小区注册（服务端强校验）
+    const allowed = getAllowedCommunities();
+    if (allowed.indexOf(community) < 0) {
+      return {
+        ok: false,
+        code: 'COMMUNITY_NOT_ALLOWED',
+        msg: '账号仅限合作小区业主/住户使用，请联系物业或管理员开通'
+      };
     }
 
     // 先做“重复注册”拦截（省钱也省时间）：同一个微信（openid）只允许一条实名记录
@@ -355,4 +376,3 @@ exports.main = async (event, context) => {
     await safeDeleteFile(idCardFrontFileID);
   }
 };
-

@@ -63,7 +63,7 @@ Page({
     const me = wx.getStorageSync('hyyc_user') || null;
     if (!me || !me.id) {
       wx.showToast({ title: '请先登录', icon: 'none' });
-      wx.navigateTo({ url: '/pages/auth/welcome/index' });
+      wx.navigateTo({ url: '/pages/welcome/index' });
       return;
     }
 

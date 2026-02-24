@@ -29,12 +29,7 @@ const tasks = [
 ];
 
 const user = {
-  id: 'me', name: '我', realname: true, community: '花语云萃', building: '3栋', door: '701', balance: 58.8
+  id: 'me', name: '我', realname: true, community: '花语云萃', building: '3栋', door: '701'
 };
 
-const walletFlows = [
-  { id: 'f1', type: 'in', title: '完成任务#t100', amount: 12.5, time: Date.now() - 3600000 },
-  { id: 'f2', type: 'out', title: '提现申请', amount: 20, time: Date.now() - 7200000 }
-];
-
-module.exports = { tasks, user, walletFlows };
+module.exports = { tasks, user };

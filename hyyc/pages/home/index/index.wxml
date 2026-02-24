@@ -1,5 +1,16 @@
-<ui-loading show="{{isLoading}}" />
-<view class="px-24 py-16">
+<ui-loading show="{{isLoading && !needsLogin}}" />
+<view wx:if="{{needsLogin}}" class="px-24 py-16">
+  <ui-card title="请先登录">
+    <view class="text-sm c-muted" style="line-height: 1.6;">
+      登录后可查看任务列表与更多功能。
+    </view>
+    <view class="mt-16 row">
+      <view class="btn btn-primary" bindtap="goWelcome">登录 / 注册</view>
+    </view>
+  </ui-card>
+</view>
+
+<view wx:else class="px-24 py-16">
   <view class="row mt-16 row-gap-8 wrap">
     <view class="{{'badge row-gap-item ' + (filter==='all'?'badge-primary':'')}}" bindtap="changeFilter" data-k="all">
       全部

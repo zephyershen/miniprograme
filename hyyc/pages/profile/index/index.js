@@ -1,9 +1,15 @@
 Page({
-  data: { user: {}, isLoading: true },
+  data: {
+    user: {},
+    isLoading: true,
+  },
   onShow(){
     this.setData({ isLoading: true });
     setTimeout(() => {
-      this.setData({ user: wx.getStorageSync('hyyc_user')||{}, isLoading: false });
+      this.setData({
+        user: wx.getStorageSync('hyyc_user')||{},
+        isLoading: false,
+      });
     }, 500);
   },
   // 点击“账户信息”卡片，进入账户详情页
@@ -12,7 +18,6 @@ Page({
   },
   gotoMyTasks(){ wx.navigateTo({ url: '/pages/profile/tasks/index' }); },
   gotoMyGoods(){ wx.navigateTo({ url: '/pages/profile/goods/index' }); },
-  gotoWallet(){ wx.navigateTo({ url: '/pages/profile/wallet/index' }); },
 
   // 退出登录：清掉本地缓存的用户信息，并回到欢迎页
   logout(){
@@ -29,8 +34,8 @@ Page({
           console.error('清除本地用户信息失败', e);
         }
         // 清空页面栈，直接回到欢迎页（带 Lottie 动画）
-        wx.reLaunch({ url: '/pages/auth/welcome/index' });
+        wx.reLaunch({ url: '/pages/welcome/index' });
       }
     });
-  }
+  },
 });

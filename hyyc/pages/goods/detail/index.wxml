@@ -82,8 +82,9 @@
     </view>
   </view>
   <view class="footer-right">
-    <view class="btn-buy" bindtap="onBuyTap">立即购买</view>
-    <view class="btn-chat" bindtap="onChatTap">
+    <view wx:if="{{canBuy}}" class="btn-buy" bindtap="onBuyTap">{{buyButtonText || '立即购买'}}</view>
+    <view wx:else class="btn-buy btn-buy-disabled">{{buyButtonText || '不可购买'}}</view>
+    <view wx:if="{{goodsChatEnabled}}" class="btn-chat" bindtap="onChatTap">
       <image class="chat-icon" src="/assets/pages/goods/detail/icon-chat.svg" mode="aspectFit" />
       <text>聊一聊</text>
     </view>

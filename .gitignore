@@ -1,1 +1,7 @@
 pics/
+
+# Cloud function local secrets (do not commit)
+hyyc/cloudfunctions/**/config.local.js
+hyyc/cloudfunctions/**/cert/
+hyyc/cloudfunctions/**/*.pem
+hyyc/cloudfunctions/**/*.key

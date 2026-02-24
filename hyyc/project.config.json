@@ -3,8 +3,7 @@
   "libVersion": "3.12.0",
   "packOptions": {
     "ignore": [
-      { "type": "file", "value": "assets/pages/publish/task.png" },
-      { "type": "file", "value": "assets/pages/publish/products.png" }
+      { "type": "folder", "value": "node_modules" }
     ],
     "include": []
   },

@@ -22,6 +22,7 @@ function statusText(s) {
   if (st === 'pending') return { text: '审核中', badge: 'badge-outline' };
   if (st === 'need_fix') return { text: '需修改', badge: 'badge-outline' };
   if (st === 'posted') return { text: '已上架', badge: 'badge-primary' };
+  if (st === 'sold') return { text: '已售出', badge: 'badge-outline' };
   return { text: '未知', badge: 'badge-outline' };
 }
 
@@ -64,7 +65,7 @@ Page({
   async load() {
     const u = wx.getStorageSync('hyyc_user') || {};
     if (!u || !u.realname) {
-      wx.navigateTo({ url: '/pages/auth/realname/index' });
+      wx.navigateTo({ url: '/pages/welcome/index' });
       return;
     }
     const openid = await this._ensureOpenid();

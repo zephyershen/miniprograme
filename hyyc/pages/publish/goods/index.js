@@ -85,7 +85,7 @@ Page({
   onShow() {
     const u = wx.getStorageSync('hyyc_user');
     if (!u || !u.realname) {
-      wx.navigateTo({ url: '/pages/auth/realname/index' });
+      wx.navigateTo({ url: '/pages/welcome/index' });
       return;
     }
 
@@ -306,7 +306,7 @@ Page({
     const u = wx.getStorageSync('hyyc_user') || {};
     if (!u || !u.realname) {
       toast('请先完成实名信息');
-      wx.navigateTo({ url: '/pages/auth/realname/index' });
+      wx.navigateTo({ url: '/pages/welcome/index' });
       return;
     }
 

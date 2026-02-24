@@ -1,4 +1,5 @@
 const { formatMoney, formatDateTime } = require('../../../utils/format');
+const access = require('../../../config/access');
 
 // 使用云开发数据库 tasks 集合作为任务数据源
 const db = wx.cloud.database();
@@ -8,7 +9,15 @@ Page({
   data: {
     filter: 'all',
     list: [],
-    isLoading: true,
+    // 首页初始不主动展示全屏 loading：
+    // - 未登录时，直接展示“特定人群说明 + 登录入口”
+    // - 已登录时，再在 loadTasks() 内开启 loading
+    // 避免首次进入时出现“中间一直转”的观感（审核也容易误判为强制流程）
+    isLoading: false,
+    // 未登录/未实名时：展示简单的“请先登录”提示（不在任务广场展示特定人群说明）
+    needsLogin: false,
+    allowedCommunities: (access && access.allowedCommunities) || [],
+    allowedCommunitiesText: ((access && access.allowedCommunities) || []).join(' / ') || '',
     // 任务地点筛选：all（全部）、inside（小区内）、outside（小区外）
     locationFilter: 'all',
     locationFilterIndex: 0,
@@ -17,11 +26,19 @@ Page({
   onShow(){
     const u = wx.getStorageSync('hyyc_user');
     if (!u || !u.realname) {
-      // 未实名用户，先进入带 Lottie 动画的欢迎页（再由后续逻辑决定去登录/注册）
-      wx.navigateTo({ url: '/pages/auth/welcome/index' });
+      // 未登录：不再在任务广场显示“特定人群说明”，只提示去欢迎页操作
+      this.setData({
+        needsLogin: true,
+        isLoading: false,
+        list: []
+      });
       return;
     }
+    if (this.data.needsLogin) this.setData({ needsLogin: false });
     this.loadTasks();
+  },
+  goWelcome() {
+    wx.navigateTo({ url: '/pages/welcome/index' });
   },
   changeFilter(e){ this.setData({ filter: e.currentTarget.dataset.k }, ()=> this.loadTasks()); },
   // 任务地点下拉筛选
@@ -35,6 +52,7 @@ Page({
   },
   // 加载任务列表
   loadTasks(){
+    if (this.data.needsLogin) return;
     this.setData({ isLoading: true });
     const u = wx.getStorageSync('hyyc_user') || {};
     const userBuilding = (u.building || '').trim();

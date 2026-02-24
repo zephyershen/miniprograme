@@ -84,13 +84,12 @@
 
     <view class="group">
       <text class="label">所属小区<text class="label-star">*</text></text>
-      <input
-        class="control"
-        placeholder="请填写小区名称(提示:4个字)"
-        value="{{form.community}}"
-        bindinput="onInput"
-        data-key="community"
-      />
+      <picker mode="selector" range="{{communityLabels}}" value="{{communityIndex}}" bindchange="onCommunityChange">
+        <view class="control row space-between">
+          <text class="ellipsis">{{form.community || '请选择小区'}}</text>
+          <text>›</text>
+        </view>
+      </picker>
       <text class="error" wx:if="{{errors.community}}">{{errors.community}}</text>
     </view>
 

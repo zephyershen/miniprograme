@@ -1,0 +1,10 @@
+{
+  "name": "goodsPurchase",
+  "version": "1.0.0",
+  "description": "Mark goods as sold after buyer completes payment (best-effort, idempotent)",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}
+

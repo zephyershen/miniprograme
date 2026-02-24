@@ -1,10 +1,13 @@
 const { formatMoney } = require('../../../utils/format');
+const access = require('../../../config/access');
 
 const db = wx.cloud.database();
 const GOODS_COLLECTION = 'goods';
 const USERS_COLLECTION = 'users';
 const GOODS_THUMB_STYLE = 'goods_thumb';
 const TEMP_URL_BATCH_SIZE = 50;
+// 支付/购买完成后，用于触发商品列表刷新（商品列表页会对该 token 做“仅刷新一次”的处理）
+const GOODS_REFRESH_TOKEN_KEY = 'hyyc_goods_refresh_token';
 
 const GOODS_CATEGORY_OPTIONS = [
   { key: 'digital', label: '电子数码' },
@@ -41,6 +44,13 @@ function pickStr(v) {
   return String(v == null ? '' : v).trim();
 }
 
+function clampStr(s = '', maxLen = 120) {
+  const t = String(s || '').trim();
+  if (!t) return '';
+  if (t.length <= maxLen) return t;
+  return `${t.slice(0, maxLen)}...`;
+}
+
 // 格式化发布时间
 function formatPublishTime(date) {
   if (!date) return '';
@@ -69,7 +79,14 @@ Page({
     imagesPreview: [],
     currentImage: 0,
     isLoading: true,
-    isFavorite: false
+    isFavorite: false,
+    // 商品“聊一聊”入口开关：未接入前隐藏
+    goodsChatEnabled: !!(access && access.features && access.features.goodsChat),
+    // 当前用户是否为商品发布者
+    isOwner: false,
+    // 是否允许购买（非本人 + status=posted）
+    canBuy: false,
+    buyButtonText: '立即购买'
   },
   onLoad(options) {
     const id = String((options && options.id) || '').trim();
@@ -248,7 +265,9 @@ Page({
       // 保护：审核中/需修改的商品，不允许“非本人”查看详情
       // （本人在“我的商品”里可以查看/修改）
       const meId = u && u.id ? String(u.id) : '';
-      const isOwner = meId && doc.ownerId && String(doc.ownerId) === meId;
+      // 以 openid 为主（更可靠），兼容历史数据用 ownerId 辅助判断
+      const isOwner = (openid && doc._openid && String(doc._openid) === String(openid))
+        || (meId && doc.ownerId && String(doc.ownerId) === meId);
       const st = doc.status || '';
       if (st && st !== 'posted' && !isOwner) {
         this.setData({ isLoading: false, goods: null, imagesPreview: [] });
@@ -290,9 +309,22 @@ Page({
       }
 
       const goods = this._mapGoodsDoc(doc, thumbMap, seller);
+
+      // 统一在详情页里计算“是否本人/是否可购买”，避免 WXML 里堆复杂判断
+      const isOwner2 = (openid && doc._openid && String(doc._openid) === String(openid))
+        || (meId && doc.ownerId && String(doc.ownerId) === meId);
+      const st2 = pickStr(doc.status) || 'posted';
+      const canBuy = !isOwner2 && (!st2 || st2 === 'posted');
+      const buyButtonText = isOwner2
+        ? '我的商品'
+        : (st2 === 'sold' ? '已售出' : (canBuy ? '立即购买' : '不可购买'));
+
       this.setData({
         goods,
         imagesPreview: goods.imagesPreview || [],
+        isOwner: isOwner2,
+        canBuy,
+        buyButtonText,
         isLoading: false
       });
     } catch (err) {
@@ -345,9 +377,144 @@ Page({
     // TODO: 实际收藏逻辑
   },
   onChatTap() {
-    wx.showToast({ title: '下一阶段：商品聊天', icon: 'none' });
+    wx.showToast({ title: '当前操作暂未开放', icon: 'none' });
   },
-  onBuyTap() {
-    wx.showToast({ title: '下一阶段：拍下/支付', icon: 'none' });
+  async onBuyTap() {
+    if (this._buying) return;
+
+    // 将“立即购买”接入为“汇付聚合正扫（小程序）支付”入口：
+    // 1) 云函数调汇付下单拿 pay_info
+    // 2) 小程序端 wx.requestPayment 拉起支付
+
+    const goods = this.data.goods || null;
+    if (!goods) return wx.showToast({ title: '商品信息缺失', icon: 'none' });
+    if (!this.data.canBuy) {
+      return wx.showToast({ title: this.data.buyButtonText || '当前不可购买', icon: 'none' });
+    }
+
+    // 防止购买自己的商品（双保险：即便 canBuy 计算错了也拦一下）
+    const u = wx.getStorageSync('hyyc_user') || {};
+    if (u && u.id && goods.ownerId && String(u.id) === String(goods.ownerId)) {
+      return wx.showToast({ title: '不能购买自己发布的商品', icon: 'none' });
+    }
+
+    const amountYuan = Number(goods.price);
+    if (!Number.isFinite(amountYuan) || amountYuan <= 0) {
+      return wx.showToast({ title: '商品价格不合法', icon: 'none' });
+    }
+
+    // 小程序 appid 用于 Huifu 的 wx_data.sub_appid
+    let appid = '';
+    try {
+      const info = wx.getAccountInfoSync && wx.getAccountInfoSync();
+      appid = info && info.miniProgram ? (info.miniProgram.appId || '') : '';
+    } catch (e) {
+      // ignore
+    }
+
+    wx.showModal({
+      title: '确认支付',
+      content: `是否确认支付 ¥${formatMoney(amountYuan)} 购买该商品？`,
+      confirmText: '支付',
+      cancelText: '取消',
+      success: async (res) => {
+        if (!res.confirm) return;
+
+        this._buying = true;
+        wx.showLoading({ title: '生成 pay_info', mask: true });
+        try {
+          const r = await wx.cloud.callFunction({
+            name: 'huifuMiniappPayTest',
+            data: {
+              action: 'jspay_goods',
+              goodsId: goods.id || goods._id || '',
+              subAppid: appid || undefined,
+            }
+          });
+
+          const ret = r && r.result ? r.result : null;
+          console.log('[huifuPay][goodsDetail] result=', ret);
+
+          if (!ret || !ret.ok) {
+            wx.hideLoading();
+            const msg = (ret && ret.err)
+              ? (typeof ret.err === 'string' ? ret.err : (ret.err.msg || '下单失败'))
+              : '下单失败';
+            wx.showToast({ title: msg, icon: 'none' });
+            return;
+          }
+
+          wx.hideLoading();
+          wx.showLoading({ title: '调起支付', mask: true });
+          await wx.requestPayment({
+            ...(ret.payParams || {}),
+          });
+
+          wx.hideLoading();
+          wx.showLoading({ title: '更新商品状态', mask: true });
+
+          // 支付完成后，把商品置为 sold（从而不再出现在商品列表）
+          const purchaseRes = await wx.cloud.callFunction({
+            name: 'goodsPurchase',
+            data: {
+              goodsId: goods.id || goods._id || '',
+              buyerId: (u && u.id) ? String(u.id) : '',
+              transAmtYuan: amountYuan,
+              reqSeqId: (ret && ret.reqSeqId) ? String(ret.reqSeqId) : ''
+            }
+          });
+
+          const pr = purchaseRes && purchaseRes.result ? purchaseRes.result : null;
+          wx.hideLoading();
+
+          if (!pr || !pr.ok) {
+            const code = pr && pr.code ? String(pr.code) : '';
+            if (code === 'ALREADY_SOLD') {
+              wx.showModal({
+                title: '商品已被购买',
+                content: '该商品已被其他人购买，已无法再次购买。若你已完成付款，请联系管理员/客服处理。',
+                showCancel: false,
+                success: () => {
+                  try { wx.setStorageSync(GOODS_REFRESH_TOKEN_KEY, Date.now()); } catch (e) { /* ignore */ }
+                  wx.navigateBack({ delta: 1 });
+                }
+              });
+              return;
+            }
+
+            wx.showModal({
+              title: '支付已完成',
+              content: '支付已完成，但商品状态更新失败。你可以稍后在商品列表下拉刷新；若仍显示可购买，请联系管理员处理。',
+              showCancel: false,
+              success: () => {
+                try { wx.setStorageSync(GOODS_REFRESH_TOKEN_KEY, Date.now()); } catch (e) { /* ignore */ }
+                wx.navigateBack({ delta: 1 });
+              }
+            });
+            return;
+          }
+
+          // 本地也同步一下，避免用户还停留在详情页时显示“可购买”
+          this.setData({
+            'goods.status': 'sold',
+            canBuy: false,
+            buyButtonText: '已售出'
+          });
+
+          try { wx.setStorageSync(GOODS_REFRESH_TOKEN_KEY, Date.now()); } catch (e) { /* ignore */ }
+          wx.showToast({ title: '购买成功，商品已下架', icon: 'success' });
+          setTimeout(() => {
+            wx.navigateBack({ delta: 1 });
+          }, 500);
+        } catch (err) {
+          console.error('汇付支付失败', err);
+          wx.hideLoading();
+          wx.showToast({ title: '支付取消/失败', icon: 'none' });
+        } finally {
+          this._buying = false;
+          wx.hideLoading();
+        }
+      }
+    });
   }
 });

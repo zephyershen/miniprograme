@@ -1,0 +1,338 @@
+@import "../../styles/shadcn.wxss";
+
+/* 欢迎页：纯白留白风格（类似 ui_2.png） */
+page {
+  background-color: #FFFFFF;
+}
+
+.welcome-page {
+  min-height: 100vh;
+  padding: 120rpx 64rpx 0;
+  box-sizing: border-box;
+  background-color: #FFFFFF;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.hero-lottie-box {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.hero-lottie-canvas {
+  width: 660rpx;
+  height: 660rpx;
+  top: -79rpx;
+}
+
+.bottom {
+  width: 100%;
+  padding-bottom: calc(80rpx + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.hero-text {
+  text-align: center;
+}
+
+.hero-title,
+.hero-sub { display: block; }
+
+.hero-title {
+  font-size: 56rpx;
+  font-weight: 800;
+  color: #2F6B3D;
+  letter-spacing: 2rpx;
+  line-height: 1.25;
+}
+
+.hero-sub {
+  margin-top: 22rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #2F6B3D;
+  opacity: 0.85;
+}
+
+.notice-card {
+  width: 100%;
+  max-width: 600rpx;
+  margin-top: 36rpx;
+  padding: 22rpx 24rpx;
+  box-sizing: border-box;
+  border-radius: 18rpx;
+  background: rgba(47, 107, 61, 0.06);
+  border: 2rpx solid rgba(47, 107, 61, 0.14);
+}
+
+.notice-title {
+  font-size: 26rpx;
+  font-weight: 800;
+  color: rgba(47, 107, 61, 0.9);
+}
+
+.notice-text {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: rgba(15, 23, 42, 0.78);
+}
+
+.notice-sub {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: rgba(15, 23, 42, 0.6);
+}
+
+.actions {
+  width: 100%;
+  max-width: 560rpx;
+  margin-top: 56rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.action-btn {
+  width: 100%;
+  height: 92rpx;
+  border-radius: 999rpx;
+  font-size: 32rpx;
+  font-weight: 700;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 覆盖 button 组件的默认内边距/边框，保证和原来的 view 按钮一致大小 */
+button.action-btn {
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+button.action-btn::after {
+  border: none;
+}
+
+.action-login {
+  background: #2F6B3D;
+  color: #FFFFFF;
+  border: 1rpx solid #2F6B3D;
+}
+
+.action-exit {
+  background: transparent;
+  color: rgba(15, 23, 42, 0.82);
+  border: 2rpx solid rgba(15, 23, 42, 0.18);
+}
+
+.admin-login-link {
+  margin-top: 22rpx;
+  font-size: 24rpx;
+  line-height: 1.4;
+  color: rgba(47, 107, 61, 0.65);
+  text-decoration: underline;
+}
+
+.admin-modal-mask {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40rpx;
+  box-sizing: border-box;
+  z-index: 9999;
+}
+
+.admin-modal {
+  width: 100%;
+  max-width: 620rpx;
+  background: #FFFFFF;
+  border-radius: 20rpx;
+  padding: 28rpx;
+  box-sizing: border-box;
+}
+
+.admin-modal-title {
+  font-size: 34rpx;
+  font-weight: 800;
+  color: #0F172A;
+  text-align: center;
+}
+
+.admin-modal-form {
+  margin-top: 22rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 18rpx;
+}
+
+.admin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+
+.admin-label {
+  font-size: 24rpx;
+  color: rgba(15, 23, 42, 0.7);
+}
+
+.admin-input {
+  height: 78rpx;
+  padding: 0 22rpx;
+  border-radius: 14rpx;
+  border: 2rpx solid rgba(15, 23, 42, 0.12);
+  font-size: 28rpx;
+  box-sizing: border-box;
+}
+
+.admin-modal-actions {
+  margin-top: 22rpx;
+  display: flex;
+  gap: 16rpx;
+}
+
+.admin-btn {
+  flex: 1;
+  height: 78rpx;
+  border-radius: 999rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.admin-btn-cancel {
+  background: transparent;
+  color: rgba(47, 107, 61, 0.85);
+  border: 2rpx solid rgba(47, 107, 61, 0.35);
+}
+
+.admin-btn-ok {
+  background: #2F6B3D;
+  color: #FFFFFF;
+  border: 1rpx solid #2F6B3D;
+}
+
+/* 小区选择弹窗 */
+.picker-mask {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40rpx;
+  box-sizing: border-box;
+  z-index: 9998;
+}
+
+.picker-modal {
+  width: 100%;
+  max-width: 680rpx;
+  background: #ffffff;
+  border-radius: 20rpx;
+  padding: 28rpx;
+  box-sizing: border-box;
+}
+
+.picker-title {
+  font-size: 34rpx;
+  font-weight: 800;
+  color: #0F172A;
+  text-align: center;
+}
+
+/* 下拉框样式 */
+.picker-dropdown {
+  margin-top: 24rpx;
+  position: relative;
+}
+
+.picker-dropdown-input {
+  display: flex;
+  align-items: center;
+  border: 2rpx solid rgba(15, 23, 42, 0.12);
+  border-radius: 14rpx;
+  background: #fff;
+}
+
+.picker-dropdown-input .picker-input {
+  flex: 1;
+  height: 78rpx;
+  padding: 0 18rpx;
+  font-size: 28rpx;
+  box-sizing: border-box;
+  border: none;
+  background: transparent;
+}
+
+.picker-dropdown-input .picker-input-text {
+  display: flex;
+  align-items: center;
+}
+
+.picker-dropdown-input .picker-input-text .is-placeholder {
+  color: rgba(15, 23, 42, 0.45);
+}
+
+.picker-dropdown-arrow {
+  width: 60rpx;
+  height: 78rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.arrow-icon {
+  font-size: 36rpx;
+  color: rgba(15, 23, 42, 0.5);
+}
+
+.picker-actions {
+  margin-top: 18rpx;
+  display: flex;
+  gap: 16rpx;
+}
+
+.picker-btn {
+  flex: 1;
+  height: 78rpx;
+  border-radius: 999rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.picker-btn-cancel {
+  background: transparent;
+  color: rgba(15, 23, 42, 0.82);
+  border: 2rpx solid rgba(15, 23, 42, 0.18);
+}
+
+.picker-btn-ok {
+  background: #2F6B3D;
+  color: #FFFFFF;
+  border: 1rpx solid #2F6B3D;
+}

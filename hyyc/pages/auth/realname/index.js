@@ -1,8 +1,8 @@
 const { required, isPhone } = require('../../../utils/validators');
 const { toast } = require('../../../utils/ui');
-const { exchangePhoneNumber } = require('../../../utils/api');
-const { distanceMeters } = require('../../../utils/geo');
-const community = require('../../../config/community');
+const { exchangePhoneNumber } = require('../_shared/api');
+const { distanceMeters } = require('../_shared/geo');
+const communityCfg = require('../_shared/community');
 
 function pickStr(v) {
   return String(v == null ? '' : v).trim();
@@ -54,23 +54,26 @@ function buildIdCardCloudPath() {
 
 Page({
   data: {
-    // 默认填充测试数据，方便开发联调；正式上线前请改回空值
+    // 默认不填充示例数据，避免审核误判“强制登录/强制授权”
     form: {
       nickname: '',
       phone: '',
       inviteCode: '',
-      community: community.name,
-      building: '11栋',
-      floor: '7',
-      door: '701'
+      // 小区由 picker 选择（只展示合作小区列表）
+      community: '',
+      building: '',
+      floor: '',
+      door: ''
     },
+    communityIndex: 0,
+    communityLabels: [],
     errors: {},
     buildingRange: [],
     // 对应 “11栋”（下标从 0 开始）
-    buildingIndex: 10,
+    buildingIndex: 0,
     doorRange: [[], []], // [floors, rooms]
     // 对应 “7 楼 01 户” -> 第 7 层（索引 6）、第 1 户（索引 0）
-    doorIndex: [6, 0],
+    doorIndex: [0, 0],
     MAX_FLOOR: 33,
     phoneVerified: false,
     // 业务 loading 状态（接口请求时用）
@@ -96,6 +99,13 @@ Page({
     // 用户头像（临时路径 + 云存储 fileID）
     avatarUrl: '',
     avatarFileID: ''
+  },
+
+  _getSelectedCommunity() {
+    const labels = this.data.communityLabels || [];
+    const idx = Number(this.data.communityIndex || 0);
+    const name = labels[idx] || '';
+    return (communityCfg && communityCfg.getByName) ? (communityCfg.getByName(name) || null) : null;
   },
 
   // 用户选择微信头像
@@ -152,7 +162,49 @@ Page({
     const buildings = Array.from({ length: 23 }, (_, i) => `${i + 1}栋`);
     const floors = Array.from({ length: this.data.MAX_FLOOR }, (_, i) => `${i + 1}楼`);
     const rooms = ['01户', '02户', '03户', '04户'];
-    this.setData({ buildingRange: buildings, doorRange: [floors, rooms] });
+    const list = (communityCfg && communityCfg.list) ? communityCfg.list : [];
+    const labels = list.map((c) => (c && c.name) || '').filter(Boolean);
+    const defaultIdx = 0;
+    // 欢迎页弹窗里选中的小区：预填到“所属小区”
+    let prefillCommunity = '';
+    try {
+      prefillCommunity = pickStr(wx.getStorageSync('hyyc_prefill_community') || '');
+    } catch (e) {
+      prefillCommunity = '';
+    }
+    const prefillIdx = prefillCommunity ? labels.indexOf(prefillCommunity) : -1;
+    const idx = prefillIdx >= 0 ? prefillIdx : defaultIdx;
+    const name = labels[idx] || '';
+    this.setData({
+      buildingRange: buildings,
+      doorRange: [floors, rooms],
+      communityLabels: labels,
+      communityIndex: idx,
+      'form.community': name
+    });
+
+    // 用完就清掉，避免下次进入仍然沿用旧值
+    if (prefillCommunity) {
+      try {
+        wx.removeStorageSync('hyyc_prefill_community');
+      } catch (e) {
+        // ignore
+      }
+    }
+  },
+
+  onCommunityChange(e) {
+    const idx = Number(e.detail.value || 0);
+    const name = (this.data.communityLabels || [])[idx] || '';
+    this.setData({
+      communityIndex: idx,
+      'form.community': name,
+      // 切换小区后需要重新定位校验
+      hasLocated: false,
+      inCommunity: false,
+      locationStatus: 'warn',
+      locationText: '未定位，请点击“获取定位”'
+    });
   },
 
   onBuilding(e) {
@@ -220,14 +272,22 @@ Page({
       locationStatus: ''
     });
 
-    // 开发阶段：跳过真实定位，直接模拟在范围内
-    const DEV_MODE = true; // 正式上线前请改为 false
-    if (DEV_MODE) {
-      const name = (community && community.name) || '小区';
+    // 仅在 develop 环境跳过定位围栏校验（方便本地联调）；体验版/正式版必须真实校验
+    let devMode = false;
+    try {
+      const info = wx.getAccountInfoSync && wx.getAccountInfoSync();
+      const envVersion = info && info.miniProgram ? info.miniProgram.envVersion : '';
+      devMode = envVersion === 'develop';
+    } catch (e) {
+      devMode = false;
+    }
+    if (devMode) {
+      const c0 = this._getSelectedCommunity();
+      const name = (c0 && c0.name) || '小区';
       this.setData({
         isLoading: false,
         inCommunity: true,
-        locationText: `已在${name}范围内（开发模式）`,
+        locationText: `已在${name}范围内`,
         locationStatus: 'ok'
       });
       return;
@@ -251,17 +311,18 @@ Page({
         throw new Error('invalid latitude/longitude');
       }
 
-      const c = (community && community.center) || {};
+      const communityObj = this._getSelectedCommunity() || {};
+      const c = (communityObj && communityObj.center) || {};
       const cLat = Number(c.lat);
       const cLng = Number(c.lng);
-      const radius = Number(community && community.radiusMeters);
+      const radius = Number(communityObj && communityObj.radiusMeters);
 
-      // 如果围栏参数缺失：不拦截注册，但提示一下（避免线上配置漏填导致无法注册）
+      // 围栏参数缺失：为了“特定人群鉴权”与社区安全，直接拦截（避免配置漏填导致任何人都能注册）
       if (!Number.isFinite(cLat) || !Number.isFinite(cLng) || !Number.isFinite(radius) || radius <= 0) {
         this.setData({
-          inCommunity: true,
-          locationText: '已获取定位（围栏未配置）',
-          locationStatus: 'ok'
+          inCommunity: false,
+          locationText: '定位围栏未配置，请联系管理员后再注册',
+          locationStatus: 'warn'
         });
         return;
       }
@@ -270,7 +331,7 @@ Page({
       const meters = Math.round(dist);
       const ok = Number.isFinite(dist) && dist <= radius;
 
-      const name = (community && community.name) || '小区';
+      const name = (communityObj && communityObj.name) || '小区';
       const distText = Number.isFinite(meters) ? `（约${meters}m）` : '';
       const text = ok ? `已在${name}范围内${distText}` : `不在${name}范围内${distText}`;
 
@@ -384,11 +445,11 @@ Page({
     errors.phone = this.data.phoneVerified ? isPhone(f.phone) : '请点击右侧“获取”授权手机号';
 
     // 小区名称必须包含配置中的小区名，用于过滤非本小区业主
-    errors.community = required(f.community, '请输入小区');
-    const communityInput = pickStr(f.community);
-    if (!errors.community && communityInput.indexOf(community.name) === -1) {
-      // 这里不要把正确小区名称直接提示给用户，只给一个模糊错误信息
-      errors.community = '小区名称不正确，请联系物业确认后再填写';
+    errors.community = required(f.community, '请选择小区');
+    const pickedCommunity = this._getSelectedCommunity();
+    if (!errors.community && !pickedCommunity) {
+      // 非法/被篡改的值（正常不会出现）
+      errors.community = '小区信息异常，请重新选择';
     }
 
     errors.building = required(f.building, '请选择楼栋');
@@ -498,7 +559,7 @@ Page({
   onUserExistConfirm() {
     // 关闭错误弹层并回到欢迎页，让用户直接登录
     this.setData({ showUserExist: false });
-    wx.redirectTo({ url: '/pages/auth/welcome/index' });
+    wx.redirectTo({ url: '/pages/welcome/index' });
   },
 
   onUnload() {

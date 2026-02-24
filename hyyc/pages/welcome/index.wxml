@@ -1,0 +1,91 @@
+<view class="welcome-page">
+  <view class="hero-lottie-box">
+    <image
+      class="hero-lottie-canvas"
+      src="/assets/pages/auth/Welcome-cuate.svg"
+      mode="aspectFit"
+      style="width: 660rpx; height: 643rpx; display: block; box-sizing: border-box; position: relative; left: 0rpx; top: -79rpx"
+    ></image>
+  </view>
+
+  <view class="bottom">
+    <view class="hero-text">
+      <!-- 标题连点 5 次：打开管理员登录（不展示文案入口） -->
+      <text class="hero-title" bindtap="onHeroTitleTap">在温馨客厅里管理你的社区生活</text>
+    </view>
+
+    <!-- 审核说明放在欢迎页：特定人群使用 + 账号鉴权 -->
+    <view class="notice-card">
+      <view class="notice-title">{{homepageNotice.title}}</view>
+      <view class="notice-text">{{homepageNotice.text}}</view>
+    </view>
+
+    <view class="actions">
+      <!-- 合并为一个按钮：已注册 -> 登录；未注册 -> 选择小区后进入注册页 -->
+      <view class="action-btn action-login" bindtap="onStartTap">
+        <block wx:if="{{isLoading}}">处理中…</block>
+        <block wx:else>登录 / 注册</block>
+      </view>
+
+      <view class="action-btn action-exit" bindtap="onExitTap">退出小程序</view>
+    </view>
+
+    <!-- 管理员登录弹窗：账号/密码输入 -->
+    <view wx:if="{{showAdminLogin}}" class="admin-modal-mask" catchtouchmove="noop" bindtap="closeAdminLogin">
+      <view class="admin-modal" catchtap="noop">
+        <view class="admin-modal-title">管理员登录</view>
+        <view class="admin-modal-form">
+          <view class="admin-field">
+            <text class="admin-label">账号</text>
+            <input
+              class="admin-input"
+              value="{{adminForm.username}}"
+              placeholder="请输入账号"
+              data-k="username"
+              bindinput="onAdminInput"
+            />
+          </view>
+          <view class="admin-field">
+            <text class="admin-label">密码</text>
+            <input
+              class="admin-input"
+              value="{{adminForm.password}}"
+              placeholder="请输入密码"
+              password="{{true}}"
+              data-k="password"
+              bindinput="onAdminInput"
+            />
+          </view>
+        </view>
+        <view class="admin-modal-actions">
+          <view class="admin-btn admin-btn-cancel" bindtap="closeAdminLogin">取消</view>
+          <view class="admin-btn admin-btn-ok" bindtap="onAdminLoginTap">登录</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 未注册时：小区选择弹窗（系统 picker） -->
+    <view wx:if="{{showCommunityPicker}}" class="picker-mask" catchtouchmove="noop" bindtap="closeCommunityPicker">
+      <view class="picker-modal" catchtap="noop">
+        <view class="picker-title">选择所属小区</view>
+
+        <!-- 用系统 picker：更统一、更不容易出点击/焦点/滚动兼容 bug；默认也不会“展开列表” -->
+        <picker mode="selector" range="{{allowedCommunities}}" value="{{communityPickerIndex}}" bindchange="onCommunityPickerChange">
+          <view class="picker-dropdown-input">
+            <view class="picker-input picker-input-text">
+              <text class="{{communitySelected ? '' : 'is-placeholder'}}">{{communitySelected || '请选择小区'}}</text>
+            </view>
+            <view class="picker-dropdown-arrow">
+              <text class="arrow-icon">›</text>
+            </view>
+          </view>
+        </picker>
+
+        <view class="picker-actions">
+          <view class="picker-btn picker-btn-cancel" bindtap="closeCommunityPicker">取消</view>
+          <view class="picker-btn picker-btn-ok" bindtap="confirmCommunityPicker">确定并去注册</view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>
