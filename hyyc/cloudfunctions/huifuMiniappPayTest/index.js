@@ -138,6 +138,28 @@ function calcPlatformFeeCents({ totalCents, feeRate = 0.03 }) {
   return Math.round(t * r);
 }
 
+function buildSplitBunch({ totalCents, feeRate, platformHuifuId, sellerHuifuId }) {
+  const feeCents = calcPlatformFeeCents({ totalCents, feeRate });
+  if (feeCents == null) return { ok: false, err: { code: 'INVALID_FEE_RATE', msg: '平台费率不合法' } };
+  const sellerCents = totalCents - feeCents;
+  if (sellerCents <= 0) return { ok: false, err: { code: 'FEE_TOO_HIGH', msg: '平台手续费过高，卖家应得金额<=0' } };
+
+  const acctSplitBunchObj = {
+    acct_infos: [
+      { huifu_id: platformHuifuId, div_amt: centsToYuanStr(feeCents) },
+      { huifu_id: sellerHuifuId, div_amt: centsToYuanStr(sellerCents) },
+    ],
+  };
+
+  return {
+    ok: true,
+    feeCents,
+    sellerCents,
+    acctSplitBunchObj,
+    acctSplitBunch: JSON.stringify(acctSplitBunchObj),
+  };
+}
+
 function sortObjectByAsciiKeys(obj) {
   const o = obj && typeof obj === 'object' ? obj : {};
   const keys = Object.keys(o).sort(); // ASCII 字典序
@@ -446,26 +468,91 @@ exports.main = async (event = {}) => {
     }
 
     const feeRate = resolvePlatformFeeRate(event);
-    const feeCents = calcPlatformFeeCents({ totalCents, feeRate });
-    if (feeCents == null) return { ok: false, err: { code: 'INVALID_FEE_RATE', msg: '平台费率不合法' } };
-
-    const sellerCents = totalCents - feeCents;
-    if (sellerCents <= 0) return { ok: false, err: { code: 'FEE_TOO_HIGH', msg: '平台手续费过高，卖家应得金额<=0' } };
-
-    const acctSplitBunch = JSON.stringify({
-      acct_infos: [
-        { huifu_id: cfg.huifuId, div_amt: centsToYuanStr(feeCents) },
-        { huifu_id: sellerHuifuUserId, div_amt: centsToYuanStr(sellerCents) },
-      ],
+    const split = buildSplitBunch({
+      totalCents,
+      feeRate,
+      platformHuifuId: cfg.huifuId,
+      sellerHuifuId: sellerHuifuUserId,
     });
+    if (!split.ok) return { ok: false, err: split.err };
 
     return await doJspay({
       transAmtYuan: totalCents / 100,
       goodsDesc: pickStr(goods.title, goods.desc, '商品购买'),
       reqSeqIdInput: event.reqSeqId,
       delayAcctFlag: 'N',
-      acctSplitBunch,
+      acctSplitBunch: split.acctSplitBunch,
     });
+  }
+
+  if (action === 'delay_jspay_goods') {
+    const goodsId = pickStr(event.goodsId);
+    if (!goodsId) return { ok: false, err: { code: 'MISSING_GOODS_ID', msg: '缺少 goodsId' } };
+
+    const goods = await getGoodsById(goodsId);
+    if (!goods) return { ok: false, err: { code: 'GOODS_NOT_FOUND', msg: '商品不存在' } };
+
+    const status = pickStr(goods.status) || 'posted';
+    if (status !== 'posted') {
+      return { ok: false, err: { code: 'NOT_FOR_SALE', msg: '该商品当前不可购买', status } };
+    }
+
+    const sellerOpenid = pickStr(goods._openid);
+    if (!sellerOpenid) return { ok: false, err: { code: 'MISSING_SELLER', msg: '商品缺少发布者信息' } };
+    if (OPENID && sellerOpenid === OPENID) {
+      return { ok: false, err: { code: 'CANNOT_BUY_SELF', msg: '不能购买自己发布的商品' } };
+    }
+
+    const totalCents = yuanToCents(goods.price);
+    if (!totalCents) return { ok: false, err: { code: 'INVALID_PRICE', msg: '商品价格不合法' } };
+
+    const sellerUser = await getUserInfoByOpenid(sellerOpenid);
+    const sellerHuifuUserId = getHuifuUserIdFromUserDoc(sellerUser || {});
+    if (!sellerHuifuUserId) {
+      return {
+        ok: false,
+        err: {
+          code: 'SELLER_NOT_ONBOARDED',
+          msg: '卖家暂未开通收款（未绑定汇付账户），无法完成分账',
+          hint: '需要卖家先完成“个人用户开户 + 用户业务入驻（绑卡/结算配置）”。'
+        }
+      };
+    }
+
+    const feeRate = resolvePlatformFeeRate(event);
+    const split = buildSplitBunch({
+      totalCents,
+      feeRate,
+      platformHuifuId: cfg.huifuId,
+      sellerHuifuId: sellerHuifuUserId,
+    });
+    if (!split.ok) return { ok: false, err: split.err };
+
+    const ret = await doJspay({
+      transAmtYuan: totalCents / 100,
+      goodsDesc: pickStr(goods.title, goods.desc, '商品购买'),
+      reqSeqIdInput: event.reqSeqId,
+      delayAcctFlag: 'Y',
+      acctSplitBunch: '',
+    });
+    if (!ret || !ret.ok) return ret;
+
+    return {
+      ...ret,
+      splitPreview: {
+        totalCents,
+        feeRate,
+        feeCents: split.feeCents,
+        sellerCents: split.sellerCents,
+        platformHuifuId: cfg.huifuId,
+        sellerHuifuUserId,
+      },
+      delayConfirm: {
+        orgReqDate: ret.reqDate,
+        orgReqSeqId: ret.reqSeqId,
+        acctSplitBunch: split.acctSplitBunchObj,
+      },
+    };
   }
 
   if (action === 'user_indv_open') {
