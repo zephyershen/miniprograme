@@ -14,9 +14,70 @@ const USER_COLLECTION = 'userInfo';
 const USER_COMMUNITY_COLLECTION = 'user_community';
 const LEGAL_COLLECTION = 'legal_docs';
 const VERIFY_LOG_COLLECTION = 'realname_verify_logs';
+const BUILD_TAG = 'registerUserByIdCard@2026-02-27.1';
 
-function pickStr(v) {
-  return String(v == null ? '' : v).trim();
+function pickStr(...vals) {
+  for (const v of vals) {
+    const s = String(v == null ? '' : v).trim();
+    if (s) return s;
+  }
+  return '';
+}
+
+function normalizeCertDateInput(v) {
+  const s = pickStr(v);
+  if (!s) return '';
+  if (/^\d{8}$/.test(s)) return s;
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) return `${m[1]}${m[2]}${m[3]}`;
+  return '';
+}
+
+function getHuifuUserIdFromResp(resp) {
+  const r = resp && typeof resp === 'object' ? resp : {};
+  return pickStr(
+    r.user_huifu_id,
+    r.huifu_id,
+    r.huifuId,
+    r.userHuifuId,
+    r.huifuUserId
+  );
+}
+
+function getHuifuRespCodeDesc(resp) {
+  const r = resp && typeof resp === 'object' ? resp : null;
+  const code = pickStr(r && (r.resp_code || r.return_code || r.code || r.err_code));
+  const desc = pickStr(r && (r.resp_desc || r.resp_msg || r.return_msg || r.message || r.err_msg));
+  return { code, desc };
+}
+
+function summarizeHuifuFailReason({ err, result, respData }) {
+  if (typeof err === 'string' && err.trim()) return err.trim();
+  const errObj = err && typeof err === 'object' ? err : null;
+  const fromErr = pickStr(errObj && (errObj.msg || errObj.code));
+  if (fromErr) return fromErr;
+  const fromResult = pickStr(result && (result.msg || result.code));
+  if (fromResult) return fromResult;
+  const { code, desc } = getHuifuRespCodeDesc(respData);
+  if (code || desc) return code ? `${code}${desc ? `:${desc}` : ''}` : desc;
+  try {
+    const resp = respData && typeof respData === 'object' ? respData : null;
+    const s = resp ? JSON.stringify(resp) : '';
+    if (s && s !== '{}') return s.slice(0, 180);
+  } catch (e) {
+    // ignore
+  }
+  return '开户失败';
+}
+
+function safeJsonStringifyBrief(v, maxLen = 240) {
+  try {
+    const s = JSON.stringify(v);
+    if (!s) return '';
+    return s.length <= maxLen ? s : `${s.slice(0, maxLen)}...`;
+  } catch (e) {
+    return '';
+  }
 }
 
 function getAllowedCommunities() {
@@ -176,6 +237,9 @@ exports.main = async (event, context) => {
   const community = pickStr(form.community);
   const building = pickStr(form.building);
   const door = pickStr(form.door);
+  const certValidityTypeRaw = pickStr(form.certValidityType);
+  const certBeginDateRaw = pickStr(form.certBeginDate);
+  const certEndDateRaw = pickStr(form.certEndDate);
 
   // 无论成功/失败都删照片：用 finally 兜底
   try {
@@ -189,6 +253,12 @@ exports.main = async (event, context) => {
 
     if (!idCardFrontFileID || !phone || !community || !building || !door) {
       return { ok: false, code: 'INVALID_PARAM', msg: '缺少必要参数' };
+    }
+    if (!certBeginDateRaw || (certValidityTypeRaw !== 'long' && !certEndDateRaw)) {
+      return { ok: false, code: 'CERT_VALIDITY_REQUIRED', msg: '请先选择身份证有效期' };
+    }
+    if (certValidityTypeRaw !== 'long' && certEndDateRaw < certBeginDateRaw) {
+      return { ok: false, code: 'CERT_VALIDITY_INVALID', msg: '身份证有效期结束日期不能早于开始日期' };
     }
 
     // 特定人群鉴权：仅允许合作小区注册（服务端强校验）
@@ -330,6 +400,8 @@ exports.main = async (event, context) => {
         _openid: openid,
         realname: true,
         verified: true,
+        // 注册后自动开户：先标记为 pending，后续再更新成功/失败
+        huifu_open_status: 'pending',
         legalAcceptance,
         createdAt: now
       };
@@ -363,7 +435,86 @@ exports.main = async (event, context) => {
       };
     });
 
-    return txRes;
+    if (!txRes || !txRes.ok) return txRes;
+
+    // 5) 注册后自动开户（失败不影响注册）
+    const certValidityType = certValidityTypeRaw === 'long' ? 'long' : 'fixed';
+    const certBeginDate = normalizeCertDateInput(certBeginDateRaw);
+    const certEndDate = normalizeCertDateInput(certEndDateRaw);
+    const huifuCertValidityType = certValidityType === 'long' ? '1' : '0';
+
+    let huifuOpen = null;
+    let huifuPatch = null;
+    try {
+      const callRes = await cloud.callFunction({
+        name: 'huifuMiniappPay',
+        data: {
+          action: 'user_indv_open',
+          name,
+          certNo: idNumber,
+          certType: '00',
+          certValidityType: huifuCertValidityType,
+          certBeginDate,
+          certEndDate: certValidityType === 'long' ? '' : certEndDate,
+          mobileNo: phone
+        }
+      });
+      const result = (callRes && callRes.result) || callRes || null;
+      const respData = result && result.huifuResp;
+      const huifuId = getHuifuUserIdFromResp(respData);
+      const { code: respCode, desc: respDesc } = getHuifuRespCodeDesc(respData);
+      // 这里的 ok 仅代表“云函数调用成功/HTTP 成功”，不等同于业务成功。
+      const bizOk = respCode ? respCode === '00000000' : !!(result && result.ok && huifuId);
+
+      if (bizOk && huifuId) {
+        huifuPatch = {
+          huifu_id: huifuId,
+          huifu_open_status: 'success',
+          huifu_opened_at: new Date(),
+          huifu_open_fail_reason: ''
+        };
+      } else {
+        const err = result && result.err;
+        let reason = summarizeHuifuFailReason({ err, result, respData });
+        // 出现“返回成功但我们没拿到 huifu_id”的情况时，给出更直白的原因，避免误判。
+        if (bizOk && !huifuId) {
+          reason = `开户返回成功${respCode ? `(${respCode}${respDesc ? `:${respDesc}` : ''})` : ''}，但未获取到 huifu_id`;
+        }
+        if (reason === '开户失败') {
+          const brief = safeJsonStringifyBrief(result, 260);
+          if (brief) reason = `开户失败:${brief}`;
+        }
+        huifuPatch = {
+          huifu_open_status: 'failed',
+          huifu_open_fail_reason: reason
+        };
+      }
+      console.error('[huifuOpen] result=', safeJsonStringifyBrief(result, 600));
+      huifuOpen = { ok: !!(result && result.ok), bizOk, huifuId, respCode, raw: result };
+    } catch (err) {
+      const reason = pickStr(err && (err.errMsg || err.message) || '开户失败');
+      huifuPatch = {
+        huifu_open_status: 'failed',
+        huifu_open_fail_reason: reason
+      };
+      huifuOpen = { ok: false, bizOk: false, huifuId: '', respCode: '', raw: { err: reason } };
+      console.error('自动开户失败', err);
+    }
+
+    if (huifuPatch && txRes.id) {
+      try {
+        await db.collection(USER_COLLECTION).doc(txRes.id).update({ data: huifuPatch });
+      } catch (err) {
+        console.error('写入 huifu 开户结果失败', err);
+      }
+    }
+
+    return {
+      ...txRes,
+      buildTag: BUILD_TAG,
+      user: { ...(txRes.user || {}), ...(huifuPatch || {}) },
+      huifuOpen
+    };
   } catch (err) {
     console.error('registerUserByIdCard 失败', err);
     return {

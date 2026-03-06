@@ -356,6 +356,29 @@ Page({
       return;
     }
 
+    const editId = this.data.editTaskId;
+    const amountYuan = Number(f.amount);
+
+    // 新建任务：先确认“需要先付款”
+    if (!editId) {
+      if (!Number.isFinite(amountYuan) || amountYuan <= 0) {
+        toast('佣金不合法');
+        return;
+      }
+
+      const okPay = await new Promise((resolve) => {
+        wx.showModal({
+          title: '发布任务需先付款',
+          content: `发布任务需要先支付 ¥${amountYuan.toFixed(2)}。\n任务完成后：96% 给接单人，平台收 4%。\n是否继续？`,
+          confirmText: '去支付',
+          cancelText: '取消',
+          success: (res) => resolve(!!(res && res.confirm)),
+          fail: () => resolve(false)
+        });
+      });
+      if (!okPay) return;
+    }
+
     this.setData({ isLoading: true });
 
     try {
@@ -373,8 +396,6 @@ Page({
       });
       const fileIDs = await Promise.all(uploadTasks);
 
-      // 2. 根据是否有 editTaskId 决定是「新建」还是「更新」
-      const editId = this.data.editTaskId;
       if (editId) {
         // 编辑已有任务：只更新可修改的字段
         await db.collection(TASK_COLLECTION).doc(editId).update({
@@ -393,29 +414,76 @@ Page({
         });
         toast('已更新');
       } else {
-        // 新建任务：写入一条新记录
-        await db.collection(TASK_COLLECTION).add({
+        // 新建任务：走“先创建(pay_pending) -> 下单拿 pay_info -> 拉起支付 -> 支付后改为 posted”
+
+        // 取小程序 appid（用于 Huifu 的 wx_data.sub_appid）
+        let appid = '';
+        try {
+          const info = wx.getAccountInfoSync && wx.getAccountInfoSync();
+          appid = info && info.miniProgram ? (info.miniProgram.appId || '') : '';
+        } catch (e) {
+          // ignore
+        }
+
+        wx.showLoading({ title: '创建任务', mask: true });
+        const createRes = await wx.cloud.callFunction({
+          name: 'taskCreate',
           data: {
             title: f.title,
             desc: f.desc,
-            amount: Number(f.amount),
+            amount: amountYuan,
             deadline: deadlineTs,
-            community: u.community || '',
             building: f.building,
-            // 只在任务集合里保存楼栋和门牌号（door），不再拆出单独的户号字段
             door: f.door,
             address: f.address,
-            // 任务地点类型：小区内/小区外；未选择则为空字符串
             locationType: f.locationType || '',
-            images: fileIDs,
-            ownerId: u.id || '',
-            ownerName: u.name || '',
-            ownerNickname: u.nickname || '',
-            status: 'posted',
-            createdAt: db.serverDate()
+            images: fileIDs
           }
         });
-        toast('已发布');
+        const cr = createRes && createRes.result ? createRes.result : null;
+        if (!cr || !cr.ok || !cr.taskId) {
+          wx.hideLoading();
+          this.setData({ isLoading: false });
+          toast((cr && cr.msg) || '创建任务失败');
+          return;
+        }
+        const taskId = cr.taskId;
+
+        wx.showLoading({ title: '生成 pay_info', mask: true });
+        const payRes = await wx.cloud.callFunction({
+          name: 'huifuMiniappPay',
+          data: {
+            action: 'delay_jspay_task',
+            taskId,
+            subAppid: appid || undefined,
+          }
+        });
+        const pr = payRes && payRes.result ? payRes.result : null;
+        if (!pr || !pr.ok) {
+          wx.hideLoading();
+          this.setData({ isLoading: false });
+          const msg = (pr && pr.err)
+            ? (typeof pr.err === 'string' ? pr.err : (pr.err.msg || '下单失败'))
+            : '下单失败';
+          toast(msg);
+          return;
+        }
+
+        wx.showLoading({ title: '调起支付', mask: true });
+        await wx.requestPayment({ ...(pr.payParams || {}) });
+
+        wx.showLoading({ title: '发布任务', mask: true });
+        const payOkRes = await wx.cloud.callFunction({
+          name: 'taskPaySuccess',
+          data: { taskId }
+        });
+        const por = payOkRes && payOkRes.result ? payOkRes.result : null;
+        wx.hideLoading();
+        if (!por || !por.ok) {
+          toast('支付成功，但发布状态更新失败（可稍后在“我的任务”查看）');
+        } else {
+          toast('已发布');
+        }
       }
 
       // 发布 / 更新成功后：
@@ -427,8 +495,10 @@ Page({
       wx.switchTab({ url: '/pages/home/index/index' });
     } catch (err) {
       console.error('发布任务失败', err);
+      wx.hideLoading();
       this.setData({ isLoading: false });
-      toast('发布失败，请稍后重试');
+      const msg = (err && err.errMsg && String(err.errMsg).indexOf('cancel') > -1) ? '支付已取消' : '发布失败，请稍后重试';
+      toast(msg);
     }
   },
   onBuilding(e){

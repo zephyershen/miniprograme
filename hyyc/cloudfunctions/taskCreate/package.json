@@ -1,0 +1,10 @@
+{
+  "name": "taskCreate",
+  "version": "1.0.0",
+  "description": "Create a task in pay_pending status (publisher pays first, then task becomes posted)",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}
+

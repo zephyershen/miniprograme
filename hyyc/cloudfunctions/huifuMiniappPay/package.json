@@ -1,5 +1,5 @@
 {
-  "name": "huifuMiniappPayTest",
+  "name": "huifuMiniappPay",
   "version": "1.0.0",
   "description": "Huifu (斗拱) 聚合正扫 - 微信小程序支付云函数",
   "main": "index.js",

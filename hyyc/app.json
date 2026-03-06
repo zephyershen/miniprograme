@@ -10,7 +10,8 @@
     "pages/profile/index/index",
     "pages/profile/account/index",
     "pages/profile/tasks/index",
-    "pages/profile/goods/index"
+    "pages/profile/goods/index",
+    "pages/profile/wallet/index"
   ],
   "subPackages": [
     {

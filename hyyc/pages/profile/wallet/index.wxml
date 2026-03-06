@@ -1,0 +1,39 @@
+<ui-loading show="{{isLoading}}" />
+
+<view class="wallet-page">
+  <!-- 余额卡片 -->
+  <view class="balance-card">
+    <view class="balance-header">
+      <image class="wallet-icon" src="/assets/pages/profile/wallet.svg" mode="aspectFit"></image>
+      <text class="balance-title">账户余额（元）</text>
+    </view>
+    <text class="balance-amount">{{balanceText}}</text>
+    <view class="balance-tip">
+      <text class="balance-tip-text">满 {{withdrawMin}} 元可提现</text>
+    </view>
+    <view
+      class="withdraw-btn {{canWithdraw ? '' : 'withdraw-btn-disabled'}}"
+      bindtap="onWithdraw">
+      申请提现
+    </view>
+  </view>
+
+  <!-- 交易记录 -->
+  <view class="section">
+    <text class="section-title">收支明细</text>
+
+    <view wx:if="{{!isLoading && (!transactions || transactions.length === 0)}}" class="empty-box">
+      <text class="c-muted">暂无记录</text>
+    </view>
+
+    <view class="tx-list" wx:if="{{transactions.length}}">
+      <view class="tx-item" wx:for="{{transactions}}" wx:key="id">
+        <view class="tx-left">
+          <text class="tx-type">{{item.typeText}}</text>
+          <text class="tx-time">{{item.timeText}}</text>
+        </view>
+        <text class="tx-amount {{item.isIncome ? 'tx-income' : 'tx-expense'}}">{{item.amountText}}</text>
+      </view>
+    </view>
+  </view>
+</view>

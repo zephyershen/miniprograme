@@ -1,4 +1,4 @@
-// 云函数：huifuMiniappPayTest
+// 云函数：huifuMiniappPay
 // 用途：在本项目内快速验证“汇付(斗拱) 聚合正扫 -> 微信小程序支付”链路：
 // - 调用聚合正扫接口生成 pay_info
 // - 小程序端用 wx.requestPayment 拉起支付
@@ -24,6 +24,8 @@ const DEFAULT_HUIFU_SCANPAY_REFUND_PATH = '/v3/trade/payment/scanpay/refund';
 
 const USER_COLLECTION = 'userInfo';
 const GOODS_COLLECTION = 'goods';
+const TASK_COLLECTION = 'tasks';
+const BUILD_TAG = 'huifuMiniappPay@2026-02-26.1';
 
 function pickStr(...vals) {
   for (const v of vals) {
@@ -263,12 +265,13 @@ function resolveHuifuConfig(event = {}) {
 
 function resolvePlatformFeeRate(event = {}) {
   const raw = pickStr(process.env.HUIFU_PLATFORM_FEE_RATE, event.platformFeeRate);
-  if (!raw) return 0.03;
+  // 业务约定默认：平台收 4%，用户得 96%
+  if (!raw) return 0.04;
   const n = Number(raw);
-  if (!Number.isFinite(n)) return 0.03;
+  if (!Number.isFinite(n)) return 0.04;
   if (n > 0 && n < 1) return n; // 0.03
   if (n > 1 && n < 100) return n / 100; // 3 -> 0.03
-  return 0.03;
+  return 0.04;
 }
 
 function getHuifuUserIdFromUserDoc(user = {}) {
@@ -282,6 +285,13 @@ function getHuifuUserIdFromUserDoc(user = {}) {
   );
 }
 
+function isHuifuOpenSuccess(user = {}) {
+  const u = user && typeof user === 'object' ? user : {};
+  const s = pickStr(u.huifu_open_status);
+  if (!s) return true; // 兼容旧数据：没字段时先当作成功（仍会校验 huifu_id 是否存在）
+  return s === 'success';
+}
+
 async function getUserInfoByOpenid(openid) {
   const db = cloud.database();
   const res = await db.collection(USER_COLLECTION).where({ _openid: openid }).limit(1).get();
@@ -292,6 +302,12 @@ async function getUserInfoByOpenid(openid) {
 async function getGoodsById(goodsId) {
   const db = cloud.database();
   const res = await db.collection(GOODS_COLLECTION).doc(goodsId).get();
+  return (res && res.data) ? res.data : null;
+}
+
+async function getTaskById(taskId) {
+  const db = cloud.database();
+  const res = await db.collection(TASK_COLLECTION).doc(taskId).get();
   return (res && res.data) ? res.data : null;
 }
 
@@ -312,7 +328,7 @@ exports.main = async (event = {}) => {
   const cfg = resolveHuifuConfig(event);
 
   if (cfg.privateKeyFormatError) {
-    return { ok: false, err: cfg.privateKeyFormatError };
+    return { ok: false, err: cfg.privateKeyFormatError, buildTag: BUILD_TAG };
   }
   if (!cfg.sysId || !cfg.productId || !cfg.huifuId) {
     return {
@@ -322,20 +338,22 @@ exports.main = async (event = {}) => {
         msg: '缺少汇付配置：sysId/productId/huifuId 必填',
         got: { sysId: cfg.sysId, productId: cfg.productId, huifuId: cfg.huifuId },
       }
+      ,
+      buildTag: BUILD_TAG
     };
   }
 
   const hostName = pickStr(process.env.HUIFU_API_HOST, event.apiHost, DEFAULT_HUIFU_HOST);
   const action = pickStr(event.action, 'jspay');
 
-  async function doJspay({ transAmtYuan, goodsDesc, reqSeqIdInput, delayAcctFlag = 'N', acctSplitBunch = '' }) {
+  async function doJspay({ transAmtYuan, goodsDesc, reqSeqIdInput, reqDateInput, delayAcctFlag = 'N', acctSplitBunch = '' }) {
     const transAmt = formatYuan2(transAmtYuan);
     if (!transAmt) return { ok: false, err: 'invalid_transAmtYuan' };
 
     const feeFlag = pickStr(delayAcctFlag, 'N').toUpperCase();
     const delayAcct = feeFlag === 'Y' ? 'Y' : 'N';
 
-    const reqDate = yyyymmdd(new Date());
+    const reqDate = (/^\d{8}$/.test(pickStr(reqDateInput)) ? pickStr(reqDateInput) : yyyymmdd(new Date()));
     const reqSeqId = pickStr(reqSeqIdInput, event.reqSeqId, `HF${reqDate}${randomId(20)}`);
 
     const subAppid = pickStr(event.subAppid, cfg.subAppid);
@@ -365,6 +383,9 @@ exports.main = async (event = {}) => {
       wx_data: wxDataStr,
       delay_acct_flag: delayAcct,
     };
+
+    const notifyUrl = pickStr(process.env.HUIFU_NOTIFY_URL, event.notifyUrl, event.notify_url);
+    if (notifyUrl) data.notify_url = notifyUrl;
 
     const bunchStr = pickStr(acctSplitBunch);
     if (bunchStr) data.acct_split_bunch = bunchStr;
@@ -456,13 +477,13 @@ exports.main = async (event = {}) => {
 
     const sellerUser = await getUserInfoByOpenid(sellerOpenid);
     const sellerHuifuUserId = getHuifuUserIdFromUserDoc(sellerUser || {});
-    if (!sellerHuifuUserId) {
+    if (!sellerHuifuUserId || !isHuifuOpenSuccess(sellerUser || {})) {
       return {
         ok: false,
         err: {
           code: 'SELLER_NOT_ONBOARDED',
           msg: '卖家暂未开通收款（未绑定汇付账户），无法完成分账',
-          hint: '需要卖家先完成“个人用户开户 + 用户业务入驻（绑卡/结算配置）”。'
+          hint: '需要卖家先完成“个人用户开户”（注册会自动开户；如失败可重试开户）。'
         }
       };
     }
@@ -508,13 +529,13 @@ exports.main = async (event = {}) => {
 
     const sellerUser = await getUserInfoByOpenid(sellerOpenid);
     const sellerHuifuUserId = getHuifuUserIdFromUserDoc(sellerUser || {});
-    if (!sellerHuifuUserId) {
+    if (!sellerHuifuUserId || !isHuifuOpenSuccess(sellerUser || {})) {
       return {
         ok: false,
         err: {
           code: 'SELLER_NOT_ONBOARDED',
           msg: '卖家暂未开通收款（未绑定汇付账户），无法完成分账',
-          hint: '需要卖家先完成“个人用户开户 + 用户业务入驻（绑卡/结算配置）”。'
+          hint: '需要卖家先完成“个人用户开户”（注册会自动开户；如失败可重试开户）。'
         }
       };
     }
@@ -555,6 +576,225 @@ exports.main = async (event = {}) => {
     };
   }
 
+  if (action === 'delay_jspay_task') {
+    const taskId = pickStr(event.taskId, event.tid, event.id);
+    if (!taskId) return { ok: false, err: { code: 'MISSING_TASK_ID', msg: '缺少 taskId' }, buildTag: BUILD_TAG };
+
+    const task = await getTaskById(taskId);
+    if (!task) return { ok: false, err: { code: 'TASK_NOT_FOUND', msg: '任务不存在' }, buildTag: BUILD_TAG };
+
+    // 只能由发布者发起支付
+    if (pickStr(task._openid) !== pickStr(OPENID)) {
+      return { ok: false, err: { code: 'NOT_OWNER', msg: '只有发布者可以发起支付' }, buildTag: BUILD_TAG };
+    }
+
+    const status = pickStr(task.status) || '';
+    if (status && status !== 'pay_pending') {
+      return { ok: false, err: { code: 'INVALID_STATUS', msg: '当前任务状态不允许发起支付', status }, buildTag: BUILD_TAG };
+    }
+
+    const totalCents = yuanToCents(task.amount);
+    if (!totalCents) return { ok: false, err: { code: 'INVALID_AMOUNT', msg: '任务佣金不合法' }, buildTag: BUILD_TAG };
+
+    const existingPay = (task.pay && typeof task.pay === 'object') ? task.pay : {};
+    const reqDate = (/^\d{8}$/.test(pickStr(existingPay.reqDate)) ? pickStr(existingPay.reqDate) : yyyymmdd(new Date()));
+    const reqSeqId = pickStr(existingPay.reqSeqId) || `TK${reqDate}${String(taskId).slice(-16)}`;
+
+    const ret = await doJspay({
+      transAmtYuan: totalCents / 100,
+      goodsDesc: pickStr(task.title, task.desc, '任务支付'),
+      reqSeqIdInput: reqSeqId,
+      reqDateInput: reqDate,
+      delayAcctFlag: 'Y',
+      acctSplitBunch: '',
+    });
+    if (!ret || !ret.ok) return ret;
+
+    // 最佳努力写入：保存“原交易信息”，后续 delay_confirm 需要用到
+    try {
+      const db = cloud.database();
+      const resp = ret.huifuResp || {};
+      const orgHfSeqId = pickStr(resp.hf_seq_id, resp.hfSeqId, resp.org_hf_seq_id, resp.orgHfSeqId);
+      await db.collection(TASK_COLLECTION).doc(taskId).update({
+        data: {
+          pay: {
+            ...(existingPay || {}),
+            status: 'created',
+            delayAcctFlag: 'Y',
+            reqDate: ret.reqDate,
+            reqSeqId: ret.reqSeqId,
+            orgHfSeqId: orgHfSeqId || pickStr(existingPay.orgHfSeqId),
+            transAmtYuan: Number(task.amount),
+            createdAt: new Date(),
+          },
+          updatedAt: new Date(),
+        }
+      });
+    } catch (e) {
+      console.error('[delay_jspay_task] update task pay failed', e);
+    }
+
+    return { ...ret, taskId };
+  }
+
+  if (action === 'delay_confirm_task') {
+    const taskId = pickStr(event.taskId, event.tid, event.id);
+    if (!taskId) return { ok: false, err: { code: 'MISSING_TASK_ID', msg: '缺少 taskId' }, buildTag: BUILD_TAG };
+
+    const task = await getTaskById(taskId);
+    if (!task) return { ok: false, err: { code: 'TASK_NOT_FOUND', msg: '任务不存在' }, buildTag: BUILD_TAG };
+
+    if (pickStr(task._openid) !== pickStr(OPENID)) {
+      return { ok: false, err: { code: 'NOT_OWNER', msg: '只有发布者可以确认完成' }, buildTag: BUILD_TAG };
+    }
+
+    const status = pickStr(task.status) || '';
+    if (status === 'completed') return { ok: true, status: 'completed', already: true, buildTag: BUILD_TAG };
+    if (status !== 'submitted') {
+      return { ok: false, err: { code: 'INVALID_STATUS', msg: '当前任务还不能确认完成', status }, buildTag: BUILD_TAG };
+    }
+
+    const payObj = (task.pay && typeof task.pay === 'object') ? task.pay : {};
+    const orgReqDate = pickStr(payObj.reqDate);
+    const orgReqSeqId = pickStr(payObj.reqSeqId);
+    const orgHfSeqId = pickStr(payObj.orgHfSeqId);
+    if (!orgReqDate || (!orgReqSeqId && !orgHfSeqId)) {
+      return { ok: false, err: { code: 'MISSING_ORG_TRADE', msg: '缺少原交易信息（无法延时分账确认）' }, buildTag: BUILD_TAG };
+    }
+
+    const totalCents = yuanToCents(task.amount);
+    if (!totalCents) return { ok: false, err: { code: 'INVALID_AMOUNT', msg: '任务佣金不合法' }, buildTag: BUILD_TAG };
+
+    const workerHuifuId = pickStr(task.workerHuifuId);
+    const workerOpenid = pickStr(task.workerOpenid || task.worker_openid);
+
+    let finalWorkerHuifuId = workerHuifuId;
+    let workerUser = null;
+    if (!finalWorkerHuifuId && workerOpenid) {
+      workerUser = await getUserInfoByOpenid(workerOpenid);
+      finalWorkerHuifuId = getHuifuUserIdFromUserDoc(workerUser || {});
+    }
+
+    if (!finalWorkerHuifuId || (workerUser && !isHuifuOpenSuccess(workerUser || {}))) {
+      return {
+        ok: false,
+        err: { code: 'WORKER_NOT_HUIFU_READY', msg: '接单人暂未开通收款（汇付开户未成功），无法打款' },
+        buildTag: BUILD_TAG
+      };
+    }
+
+    const feeRate = resolvePlatformFeeRate(event);
+    const split = buildSplitBunch({
+      totalCents,
+      feeRate,
+      platformHuifuId: cfg.huifuId,
+      sellerHuifuId: finalWorkerHuifuId,
+    });
+    if (!split.ok) return { ok: false, err: split.err, buildTag: BUILD_TAG };
+
+    const data = {
+      req_seq_id: pickStr(event.reqSeqId, `DC${yyyymmdd(new Date())}${randomId(20)}`),
+      req_date: yyyymmdd(new Date()),
+      huifu_id: cfg.huifuId,
+      org_req_date: orgReqDate,
+      org_req_seq_id: orgReqSeqId,
+      org_hf_seq_id: orgHfSeqId,
+      acct_split_bunch: split.acctSplitBunch,
+    };
+
+    const pathName = pickStr(event.apiPath, DEFAULT_HUIFU_DELAY_CONFIRM_PATH);
+    const resp = await huifuCallSignedJson({ hostName, pathName, cfg, data });
+    const okHttp = resp.statusCode >= 200 && resp.statusCode < 300;
+    const rawTop = resp.json || {};
+    const respData = (rawTop && typeof rawTop === 'object' && rawTop.data) ? rawTop.data : rawTop;
+    if (!okHttp) return { ok: false, err: { code: 'HTTP_ERROR', statusCode: resp.statusCode, raw: resp.raw }, buildTag: BUILD_TAG };
+
+    const respCode = pickStr(respData && (respData.resp_code || respData.return_code || respData.code || respData.respCode));
+    const respDesc = pickStr(respData && (respData.resp_desc || respData.resp_msg || respData.return_msg || respData.message || respData.respDesc));
+    if (respCode && respCode !== '00000000') {
+      // 最佳努力记录失败原因，方便排查；不把任务标记为 completed
+      try {
+        const db = cloud.database();
+        await db.collection(TASK_COLLECTION).doc(taskId).update({
+          data: {
+            updatedAt: new Date(),
+            split: {
+              ...(task.split || {}),
+              mode: 'delay',
+              lastError: {
+                respCode,
+                respDesc,
+                at: new Date(),
+              },
+            }
+          }
+        });
+      } catch (e) {
+        console.error('[delay_confirm_task] save split error failed', e);
+      }
+
+      return {
+        ok: false,
+        err: {
+          code: 'HUIFU_BIZ_ERROR',
+          msg: respDesc ? `${respCode}:${respDesc}` : respCode,
+          respCode,
+          respDesc,
+          respData,
+        },
+        buildTag: BUILD_TAG
+      };
+    }
+
+    // 最佳努力回写任务状态
+    try {
+      const db = cloud.database();
+      await db.collection(TASK_COLLECTION).doc(taskId).update({
+        data: {
+          status: 'completed',
+          completedAt: new Date(),
+          updatedAt: new Date(),
+          split: {
+            mode: 'delay',
+            feeRate,
+            totalCents,
+            feeCents: split.feeCents,
+            workerCents: split.sellerCents,
+            platformHuifuId: cfg.huifuId,
+            workerHuifuId: finalWorkerHuifuId,
+            delayConfirm: {
+              reqDate: data.req_date,
+              reqSeqId: data.req_seq_id,
+              orgReqDate,
+              orgReqSeqId,
+              orgHfSeqId,
+            },
+            huifuResp: respData,
+          }
+        }
+      });
+    } catch (e) {
+      console.error('[delay_confirm_task] update task failed', e);
+    }
+
+    return {
+      ok: true,
+      apiPath: pathName,
+      reqSeqId: data.req_seq_id,
+      reqDate: data.req_date,
+      huifuResp: respData,
+      splitPreview: {
+        totalCents,
+        feeRate,
+        feeCents: split.feeCents,
+        workerCents: split.sellerCents,
+        platformHuifuId: cfg.huifuId,
+        workerHuifuId: finalWorkerHuifuId,
+      },
+      buildTag: BUILD_TAG
+    };
+  }
+
   if (action === 'user_indv_open') {
     const data = {
       req_seq_id: pickStr(event.reqSeqId, `UO${yyyymmdd(new Date())}${randomId(20)}`),
@@ -568,7 +808,7 @@ exports.main = async (event = {}) => {
       mobile_no: pickStr(event.mobileNo),
     };
     if (!data.name || !data.cert_no || !data.mobile_no) {
-      return { ok: false, err: { code: 'MISSING_PARAM', msg: '缺少 name/certNo/mobileNo' } };
+      return { ok: false, err: { code: 'MISSING_PARAM', msg: '缺少 name/certNo/mobileNo' }, buildTag: BUILD_TAG };
     }
 
     const pathName = pickStr(event.apiPath, DEFAULT_HUIFU_USER_INDV_OPEN_PATH);
@@ -576,8 +816,8 @@ exports.main = async (event = {}) => {
     const okHttp = resp.statusCode >= 200 && resp.statusCode < 300;
     const rawTop = resp.json || {};
     const respData = (rawTop && typeof rawTop === 'object' && rawTop.data) ? rawTop.data : rawTop;
-    if (!okHttp) return { ok: false, err: { code: 'HTTP_ERROR', statusCode: resp.statusCode, raw: resp.raw } };
-    return { ok: true, apiPath: pathName, reqSeqId: data.req_seq_id, reqDate: data.req_date, huifuResp: respData };
+    if (!okHttp) return { ok: false, err: { code: 'HTTP_ERROR', statusCode: resp.statusCode, raw: resp.raw }, buildTag: BUILD_TAG };
+    return { ok: true, apiPath: pathName, reqSeqId: data.req_seq_id, reqDate: data.req_date, huifuResp: respData, buildTag: BUILD_TAG };
   }
 
   if (action === 'user_busi_open') {
@@ -593,7 +833,7 @@ exports.main = async (event = {}) => {
     const cashConfig = event.cashConfig;
     const elecAcctConfig = event.elecAcctConfig;
 
-    if (!data.huifu_id) return { ok: false, err: { code: 'MISSING_PARAM', msg: '缺少 userHuifuId（用户汇付ID）' } };
+    if (!data.huifu_id) return { ok: false, err: { code: 'MISSING_PARAM', msg: '缺少 userHuifuId（用户汇付ID）' }, buildTag: BUILD_TAG };
 
     if (Array.isArray(settleConfigList) && settleConfigList.length) {
       data.settle_config_list = JSON.stringify(settleConfigList);
@@ -613,8 +853,8 @@ exports.main = async (event = {}) => {
     const okHttp = resp.statusCode >= 200 && resp.statusCode < 300;
     const rawTop = resp.json || {};
     const respData = (rawTop && typeof rawTop === 'object' && rawTop.data) ? rawTop.data : rawTop;
-    if (!okHttp) return { ok: false, err: { code: 'HTTP_ERROR', statusCode: resp.statusCode, raw: resp.raw } };
-    return { ok: true, apiPath: pathName, reqSeqId: data.req_seq_id, reqDate: data.req_date, huifuResp: respData };
+    if (!okHttp) return { ok: false, err: { code: 'HTTP_ERROR', statusCode: resp.statusCode, raw: resp.raw }, buildTag: BUILD_TAG };
+    return { ok: true, apiPath: pathName, reqSeqId: data.req_seq_id, reqDate: data.req_date, huifuResp: respData, buildTag: BUILD_TAG };
   }
 
   if (action === 'delay_confirm') {
@@ -633,7 +873,7 @@ exports.main = async (event = {}) => {
     if (acctSplitBunch) data.acct_split_bunch = acctSplitBunch;
 
     if (!data.org_req_date || (!data.org_req_seq_id && !data.org_hf_seq_id)) {
-      return { ok: false, err: { code: 'MISSING_PARAM', msg: '缺少 orgReqDate + (orgReqSeqId 或 orgHfSeqId)' } };
+      return { ok: false, err: { code: 'MISSING_PARAM', msg: '缺少 orgReqDate + (orgReqSeqId 或 orgHfSeqId)' }, buildTag: BUILD_TAG };
     }
 
     const pathName = pickStr(event.apiPath, DEFAULT_HUIFU_DELAY_CONFIRM_PATH);
@@ -641,13 +881,13 @@ exports.main = async (event = {}) => {
     const okHttp = resp.statusCode >= 200 && resp.statusCode < 300;
     const rawTop = resp.json || {};
     const respData = (rawTop && typeof rawTop === 'object' && rawTop.data) ? rawTop.data : rawTop;
-    if (!okHttp) return { ok: false, err: { code: 'HTTP_ERROR', statusCode: resp.statusCode, raw: resp.raw } };
-    return { ok: true, apiPath: pathName, reqSeqId: data.req_seq_id, reqDate: data.req_date, huifuResp: respData };
+    if (!okHttp) return { ok: false, err: { code: 'HTTP_ERROR', statusCode: resp.statusCode, raw: resp.raw }, buildTag: BUILD_TAG };
+    return { ok: true, apiPath: pathName, reqSeqId: data.req_seq_id, reqDate: data.req_date, huifuResp: respData, buildTag: BUILD_TAG };
   }
 
   if (action === 'scanpay_refund') {
     const ordAmt = formatYuan2(event.ordAmtYuan);
-    if (!ordAmt) return { ok: false, err: { code: 'INVALID_ORD_AMT', msg: '退款金额不合法' } };
+    if (!ordAmt) return { ok: false, err: { code: 'INVALID_ORD_AMT', msg: '退款金额不合法' }, buildTag: BUILD_TAG };
 
     const data = {
       req_seq_id: pickStr(event.reqSeqId, `RF${yyyymmdd(new Date())}${randomId(20)}`),
@@ -661,7 +901,7 @@ exports.main = async (event = {}) => {
     };
 
     if (!data.org_req_date || (!data.org_req_seq_id && !data.org_hf_seq_id)) {
-      return { ok: false, err: { code: 'MISSING_PARAM', msg: '缺少 orgReqDate + (orgReqSeqId 或 orgHfSeqId)' } };
+      return { ok: false, err: { code: 'MISSING_PARAM', msg: '缺少 orgReqDate + (orgReqSeqId 或 orgHfSeqId)' }, buildTag: BUILD_TAG };
     }
 
     const pathName = pickStr(event.apiPath, DEFAULT_HUIFU_SCANPAY_REFUND_PATH);
@@ -669,9 +909,9 @@ exports.main = async (event = {}) => {
     const okHttp = resp.statusCode >= 200 && resp.statusCode < 300;
     const rawTop = resp.json || {};
     const respData = (rawTop && typeof rawTop === 'object' && rawTop.data) ? rawTop.data : rawTop;
-    if (!okHttp) return { ok: false, err: { code: 'HTTP_ERROR', statusCode: resp.statusCode, raw: resp.raw } };
-    return { ok: true, apiPath: pathName, reqSeqId: data.req_seq_id, reqDate: data.req_date, huifuResp: respData };
+    if (!okHttp) return { ok: false, err: { code: 'HTTP_ERROR', statusCode: resp.statusCode, raw: resp.raw }, buildTag: BUILD_TAG };
+    return { ok: true, apiPath: pathName, reqSeqId: data.req_seq_id, reqDate: data.req_date, huifuResp: respData, buildTag: BUILD_TAG };
   }
 
-  return { ok: false, err: `unsupported_action: ${action}` };
+  return { ok: false, err: `unsupported_action: ${action}`, buildTag: BUILD_TAG };
 };

@@ -19,7 +19,7 @@
   - 调云函数时从 `action: 'jspay'` 改为 `action: 'jspay_goods'`
   - 下单失败时会把云函数返回的错误信息 toast 出来（例如“卖家未开通收款”）
 
-- 云函数改动：`hyyc/cloudfunctions/huifuMiniappPayTest/index.js`
+- 云函数改动：`hyyc/cloudfunctions/huifuMiniappPay/index.js`
   - 新增 `action: 'jspay_goods'`：云函数会
     - 读取商品价格
     - 找到卖家（goods._openid 对应的 userInfo）
@@ -33,7 +33,7 @@
 > 简单例子：买家付 100 元 -> 平台 3 元 + 卖家 97 元（分账在“下单时”一起完成）。
 
 ### 2) 云函数里已补齐一些“后续会用到的接口动作”（但目前还没接到业务流）
-仍在同一个云函数 `huifuMiniappPayTest` 里，新增了这些 action（方便后续联调）：
+仍在同一个云函数 `huifuMiniappPay` 里，新增了这些 action（方便后续联调）：
 
 - `user_indv_open`：个人用户基本信息开户（`/v2/user/basicdata/indv`）
 - `user_busi_open`：用户业务入驻（`/v2/user/busi/open`，含 `upper_huifu_id`）
@@ -120,6 +120,5 @@
 - 所有关键接口做幂等（用 req_seq_id 做幂等键）
 
 ## 备注（今天改动涉及的文件）
-- `hyyc/cloudfunctions/huifuMiniappPayTest/index.js`
+- `hyyc/cloudfunctions/huifuMiniappPay/index.js`
 - `hyyc/pages/goods/detail/index.js`
-

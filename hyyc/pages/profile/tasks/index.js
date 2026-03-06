@@ -51,6 +51,18 @@ Page({
           const docs = res.data || [];
 
           const list = docs.map(doc => {
+            const statusRaw = (doc.status == null ? '' : String(doc.status).trim());
+            const statusMap = {
+              '': '已发布',
+              posted: '已发布',
+              pay_pending: '待付款',
+              accepted: '已接单',
+              submitted: '待确认',
+              completed: '已完成',
+              cancelled: '已取消'
+            };
+            const statusText = statusMap[statusRaw] || statusRaw || '已发布';
+
             const rawDeadline = doc.deadline;
             const createdAt = doc.createdAt;
             const createdTs = createdAt && createdAt.getTime ? createdAt.getTime() : null;
@@ -65,6 +77,9 @@ Page({
               ...doc,
               id: doc._id,
               amountText: formatMoney(doc.amount),
+              statusRaw,
+              statusText,
+              canPay: statusRaw === 'pay_pending',
               // 未设置截止时间时，展示默认过期时间
               deadlineText: hasDeadline ? formatDateTime(effectiveDeadline) : '默认 7 天内有效',
               isActive,
@@ -151,6 +166,67 @@ Page({
       wx.setStorageSync('hyyc_edit_task_data', task);
     }
     wx.switchTab({ url: '/pages/publish/index/index' });
+  },
+  // 对“待付款(pay_pending)”的任务，继续拉起支付
+  async onPayTask(e){
+    const id = e.currentTarget.dataset.id;
+    if (!id) return;
+
+    const ok = await confirm('该任务还未付款，继续支付后才会对外展示。是否继续？', '继续支付');
+    if (!ok) return;
+
+    // 取小程序 appid（用于 Huifu 的 wx_data.sub_appid）
+    let appid = '';
+    try {
+      const info = wx.getAccountInfoSync && wx.getAccountInfoSync();
+      appid = info && info.miniProgram ? (info.miniProgram.appId || '') : '';
+    } catch (e2) {
+      // ignore
+    }
+
+    wx.showLoading({ title: '生成 pay_info', mask: true });
+    try {
+      const payRes = await wx.cloud.callFunction({
+        name: 'huifuMiniappPay',
+        data: {
+          action: 'delay_jspay_task',
+          taskId: id,
+          subAppid: appid || undefined,
+        }
+      });
+      const pr = payRes && payRes.result ? payRes.result : null;
+      if (!pr || !pr.ok) {
+        wx.hideLoading();
+        const msg = (pr && pr.err)
+          ? (typeof pr.err === 'string' ? pr.err : (pr.err.msg || '下单失败'))
+          : '下单失败';
+        toast(msg);
+        return;
+      }
+
+      wx.showLoading({ title: '调起支付', mask: true });
+      await wx.requestPayment({ ...(pr.payParams || {}) });
+
+      wx.showLoading({ title: '更新状态', mask: true });
+      const payOkRes = await wx.cloud.callFunction({
+        name: 'taskPaySuccess',
+        data: { taskId: id }
+      });
+      const por = payOkRes && payOkRes.result ? payOkRes.result : null;
+      wx.hideLoading();
+      if (!por || !por.ok) {
+        toast('支付成功，但状态更新失败（稍后刷新重试）');
+        return;
+      }
+
+      toast('已发布');
+      this.load();
+    } catch (err) {
+      console.error('继续支付失败', err);
+      wx.hideLoading();
+      const msg = (err && err.errMsg && String(err.errMsg).indexOf('cancel') > -1) ? '支付已取消' : '支付失败';
+      toast(msg);
+    }
   },
   // 查看我发布的任务详情：与任务广场的详情逻辑保持一致
   toDetailOwner(e){

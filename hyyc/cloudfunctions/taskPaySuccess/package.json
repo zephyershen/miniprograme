@@ -1,0 +1,10 @@
+{
+  "name": "taskPaySuccess",
+  "version": "1.0.0",
+  "description": "Mark a task as posted after publisher completes payment (best-effort, idempotent)",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}
+

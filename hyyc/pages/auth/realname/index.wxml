@@ -74,6 +74,38 @@
     </view>
 
     <view class="group">
+      <text class="label">身份证有效期<text class="label-star">*</text></text>
+      <view class="row space-between cert-row">
+        <text class="hint">长期有效</text>
+        <switch
+          checked="{{form.certValidityType === 'long'}}"
+          bindchange="onCertValidityLongChange"
+          color="#B95E49"
+        />
+      </view>
+      <view class="row gap cert-range">
+        <picker mode="date" value="{{form.certBeginDate}}" bindchange="onCertBeginDate">
+          <view class="control row space-between">
+            <text>{{form.certBeginDate || '开始日期'}}</text>
+            <text>›</text>
+          </view>
+        </picker>
+        <text class="cert-sep">至</text>
+        <picker wx:if="{{form.certValidityType !== 'long'}}" mode="date" value="{{form.certEndDate}}" bindchange="onCertEndDate">
+          <view class="control row space-between">
+            <text>{{form.certEndDate || '结束日期'}}</text>
+            <text>›</text>
+          </view>
+        </picker>
+        <view wx:else class="control control-disabled row space-between">
+          <text>长期有效</text>
+        </view>
+      </view>
+      <text class="error" wx:if="{{errors.certBeginDate}}">{{errors.certBeginDate}}</text>
+      <text class="error" wx:if="{{errors.certEndDate}}">{{errors.certEndDate}}</text>
+    </view>
+
+    <view class="group">
       <text class="label">手机号<text class="label-star">*</text></text>
       <view class="row">
         <input class="control control-disabled" style="flex:1; min-width:0" placeholder="请点击右侧“获取”授权获取手机号" placeholder-class="placeholder-disabled" disabled="{{true}}" value="{{form.phone}}" />

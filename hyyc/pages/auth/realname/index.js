@@ -63,7 +63,11 @@ Page({
       community: '',
       building: '',
       floor: '',
-      door: ''
+      door: '',
+      // 身份证有效期（用户手动选择）
+      certValidityType: 'fixed', // fixed | long
+      certBeginDate: '',
+      certEndDate: ''
     },
     communityIndex: 0,
     communityLabels: [],
@@ -157,6 +161,14 @@ Page({
     this.setData(patch);
   },
 
+  _clearError(key) {
+    const curErrors = this.data.errors || {};
+    if (!curErrors[key]) return;
+    const nextErrors = { ...curErrors };
+    delete nextErrors[key];
+    this.setData({ errors: nextErrors });
+  },
+
   onLoad() {
     // 初始化楼栋（1-23栋）与门号（1-MAX_FLOOR 楼 × 01-04 户）
     const buildings = Array.from({ length: 23 }, (_, i) => `${i + 1}栋`);
@@ -223,6 +235,29 @@ Page({
       'form.floor': `${floorNum}`,
       'form.door': door
     });
+  },
+
+  onCertValidityLongChange(e) {
+    const isLong = !!(e && e.detail && e.detail.value);
+    const nextType = isLong ? 'long' : 'fixed';
+    const patch = { 'form.certValidityType': nextType };
+    if (isLong) patch['form.certEndDate'] = '';
+    this.setData(patch);
+    this._clearError('certValidityType');
+    this._clearError('certBeginDate');
+    this._clearError('certEndDate');
+  },
+
+  onCertBeginDate(e) {
+    const value = (e && e.detail && e.detail.value) || '';
+    this.setData({ 'form.certBeginDate': value });
+    this._clearError('certBeginDate');
+  },
+
+  onCertEndDate(e) {
+    const value = (e && e.detail && e.detail.value) || '';
+    this.setData({ 'form.certEndDate': value });
+    this._clearError('certEndDate');
   },
 
   async onGetPhoneNumber(e) {
@@ -454,6 +489,16 @@ Page({
 
     errors.building = required(f.building, '请选择楼栋');
     errors.door = required(f.door, '请选择门号');
+
+    // 身份证有效期：必须选择起始日期；非长期还要选择结束日期
+    const isLong = f.certValidityType === 'long';
+    errors.certBeginDate = required(f.certBeginDate, '请选择证件有效期开始日期');
+    if (!isLong) {
+      errors.certEndDate = required(f.certEndDate, '请选择证件有效期结束日期');
+      if (!errors.certBeginDate && !errors.certEndDate && f.certEndDate < f.certBeginDate) {
+        errors.certEndDate = '结束日期不能早于开始日期';
+      }
+    }
 
     Object.keys(errors).forEach((k) => {
       if (!errors[k]) delete errors[k];

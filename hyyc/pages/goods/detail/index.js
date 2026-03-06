@@ -424,7 +424,7 @@ Page({
         wx.showLoading({ title: '生成 pay_info', mask: true });
         try {
           const r = await wx.cloud.callFunction({
-            name: 'huifuMiniappPayTest',
+            name: 'huifuMiniappPay',
             data: {
               action: 'jspay_goods',
               goodsId: goods.id || goods._id || '',

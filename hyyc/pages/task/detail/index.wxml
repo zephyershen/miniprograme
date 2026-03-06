@@ -51,7 +51,7 @@
 
     <!-- 后续功能开启时，再展示完整流程按钮 -->
     <view wx:else>
-      <view class="row space-between mt-16" wx:if="{{!isOwner && !accepted}}">
+      <view class="row space-between mt-16" wx:if="{{!isOwner && canAccept}}">
         <view class="btn btn-primary" bindtap="accept">接受任务</view>
         <view class="btn btn-outline" bindtap="toChat" style="position:relative;">
           先沟通
@@ -63,9 +63,21 @@
           </view>
         </view>
       </view>
-      <view class="row space-between mt-16" wx:if="{{!isOwner && accepted}}">
+      <view class="row space-between mt-16" wx:if="{{!isOwner && canSubmit}}">
         <view class="btn btn-primary" bindtap="toSubmit">提交完成</view>
         <view class="btn btn-outline" bindtap="toChat" style="position:relative;">
+          与业主聊天
+          <view
+            wx:if="{{peerUnreadCount > 0}}"
+            class="chat-unread-badge"
+          >
+            {{ peerUnreadCount > 99 ? '99+' : peerUnreadCount }}
+          </view>
+        </view>
+      </view>
+      <!-- 非发布者，但也不是“可接单/可提交”的状态：只保留聊天 -->
+      <view class="row space-between mt-16" wx:if="{{!isOwner && !canAccept && !canSubmit}}">
+        <view class="btn btn-primary" bindtap="toChat" style="position:relative;">
           与业主聊天
           <view
             wx:if="{{peerUnreadCount > 0}}"
@@ -87,7 +99,7 @@
             {{ unreadCount > 99 ? '99+' : unreadCount }}
           </view>
         </view>
-        <view class="btn btn-primary" bindtap="approve">确认完成</view>
+        <view wx:if="{{canApprove}}" class="btn btn-primary" bindtap="approve">确认完成</view>
       </view>
     </view>
   </view>

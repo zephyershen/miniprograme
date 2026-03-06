@@ -12,6 +12,10 @@ Page({
 		    task: {},
 	    isOwner: false,
 	    accepted: false,
+	    isWorker: false,
+	    canAccept: false,
+	    canSubmit: false,
+	    canApprove: false,
 	    isLoading: true,
 	    workflowEnabled: !!(access && access.features && access.features.taskWorkflow),
 	    // 任务发布者视角下，该任务下所有会话的未读消息总数（以“有未读的会话数量”计）
@@ -51,6 +55,18 @@ Page({
           : (createdTs ? (createdTs + ONE_WEEK) : null);
         const isExpired = effectiveDeadline != null && effectiveDeadline <= now;
 
+        const statusRaw = (t.status == null ? '' : String(t.status).trim());
+        const statusMap = {
+          '': '已发布',
+          posted: '已发布',
+          pay_pending: '待付款',
+          accepted: '已接单',
+          submitted: '待确认',
+          completed: '已完成',
+          cancelled: '已取消'
+        };
+        const statusText = isExpired ? '已过期' : (statusMap[statusRaw] || statusRaw || '已发布');
+
         const task = {
           ...t,
           id,
@@ -58,19 +74,27 @@ Page({
           // 截止时间：未设置则展示默认过期时间
           deadlineText: effectiveDeadline ? formatDateTime(effectiveDeadline) : '默认 7 天内有效',
           // 状态：如果已过期，优先展示“已过期”
-          statusText: isExpired ? '已过期' : (t.status === 'posted' ? '已发布' : (t.status || '')),
+          statusText,
           locationText
         };
 
         // 是否为任务发布人：根据 ownerId 和当前登录用户 id 判断
 		        const isOwner = !!(myId && t.ownerId && myId === t.ownerId);
-        // 是否已接受：目前还没有真正写入 workerId，这里兼容 query 参数
-        const accepted = q.accepted === '1';
+        const isWorker = !!(myId && t.workerId && myId === t.workerId);
+
+        const canAccept = !isOwner && !isExpired && (statusRaw === '' || statusRaw === 'posted');
+        const canSubmit = !isOwner && isWorker && statusRaw === 'accepted';
+        const canApprove = isOwner && statusRaw === 'submitted';
+        const accepted = isWorker && (statusRaw === 'accepted' || statusRaw === 'submitted');
 
 	        this.setData({
 	          task,
 	          isOwner,
 	          accepted,
+	          isWorker,
+	          canAccept,
+	          canSubmit,
+	          canApprove,
 	          isLoading: false
 	        });
 
@@ -253,8 +277,27 @@ Page({
       toast('这是你发布的任务，无需自己接受');
       return;
     }
-    toast('已接受');
-    this.setData({ accepted: true });
+    const task = this.data.task || {};
+    if (!task.id) return toast('缺少任务 ID');
+    wx.showLoading({ title: '接单中', mask: true });
+    wx.cloud.callFunction({
+      name: 'taskAccept',
+      data: { taskId: task.id }
+    }).then((res) => {
+      const r = res && res.result ? res.result : null;
+      wx.hideLoading();
+      if (!r || !r.ok) {
+        const msg = (r && r.msg) || (r && r.code === 'ALREADY_ACCEPTED' ? '任务已被别人接走了' : '接单失败');
+        toast(msg);
+        return;
+      }
+      toast('已接单');
+      wx.redirectTo({ url: '/pages/task/detail/index?id=' + task.id });
+    }).catch((err) => {
+      console.error('接单失败', err);
+      wx.hideLoading();
+      toast('接单失败');
+    });
   },
   toChat(){ wx.navigateTo({ url: '/pages/chat/room/index?tid=' + this.data.task.id }); },
   // 任务发布者查看该任务下所有聊天会话列表
@@ -280,7 +323,46 @@ Page({
       toast('当前操作暂未开放');
       return;
     }
+    if (!this.data.isOwner) {
+      toast('只有发布者可以确认完成');
+      return;
+    }
+    if (!this.data.canApprove) {
+      toast('请先等待对方提交完成');
+      return;
+    }
     const ok = await confirm('确认任务已完成并打款给对方？');
-    if (ok) { toast('已确认完成'); }
+    if (!ok) return;
+
+    const task = this.data.task || {};
+    if (!task.id) return toast('缺少任务 ID');
+
+    wx.showLoading({ title: '确认并打款', mask: true });
+    try {
+      const r = await wx.cloud.callFunction({
+        name: 'huifuMiniappPay',
+        data: {
+          action: 'delay_confirm_task',
+          taskId: task.id
+        }
+      });
+      const ret = r && r.result ? r.result : null;
+      wx.hideLoading();
+
+      if (!ret || !ret.ok) {
+        const msg = (ret && ret.err)
+          ? (typeof ret.err === 'string' ? ret.err : (ret.err.msg || '打款失败'))
+          : '打款失败';
+        toast(msg);
+        return;
+      }
+
+      toast('已确认完成');
+      wx.redirectTo({ url: '/pages/task/detail/index?id=' + task.id });
+    } catch (err) {
+      console.error('确认完成失败', err);
+      wx.hideLoading();
+      toast('确认完成失败');
+    }
   }
 });

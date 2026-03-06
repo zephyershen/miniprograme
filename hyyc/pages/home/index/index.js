@@ -75,6 +75,12 @@ Page({
         // - 没有设置截止时间：默认从创建时间起 7 天内有效，超过则视为过期。
         let list = (res.data || [])
           .filter(doc => {
+            // 任务广场只展示“可接单”的任务：
+            // - 旧数据 status 为空：当作 posted
+            // - 新增 pay_pending/accepted/submitted/completed：都不在广场展示
+            const s = (doc && doc.status) ? String(doc.status).trim() : '';
+            if (s && s !== 'posted') return false;
+
             const rawDeadline = doc.deadline;
             const createdAt = doc.createdAt;
             const createdTs = createdAt && createdAt.getTime ? createdAt.getTime() : null;

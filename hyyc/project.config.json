@@ -3,7 +3,10 @@
   "libVersion": "3.12.0",
   "packOptions": {
     "ignore": [
-      { "type": "folder", "value": "node_modules" }
+      {
+        "value": "node_modules",
+        "type": "folder"
+      }
     ],
     "include": []
   },

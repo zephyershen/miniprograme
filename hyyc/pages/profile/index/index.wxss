@@ -164,6 +164,18 @@
   box-shadow: none;
 }
 
+.quick-icon-wallet {
+  width: 80rpx;
+  height: 80rpx;
+  background: none;
+  box-shadow: none;
+}
+
+.quick-icon-wallet .quick-icon-svg {
+  width: 80rpx;
+  height: 80rpx;
+}
+
 .quick-icon-png {
   width: 72rpx;
   height: 72rpx;

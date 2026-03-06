@@ -57,10 +57,17 @@
                 <view
                   class="{{item.isExpired ? 'my-task-status-text-expired' : 'my-task-status-text'}}"
                 >
-                  {{item.isExpired ? '已过期' : '生效中'}}
+                  {{item.isExpired ? '已过期' : item.statusText}}
                 </view>
               </view>
               <!-- 非批量模式下显示操作按钮 -->
+              <view
+                wx:if="{{tab === 'owner' && !batchMode && item.canPay}}"
+                class="btn btn-primary btn-sm row-gap-item"
+                data-id="{{item.id}}"
+                bindtap="onPayTask">
+                去付款
+              </view>
               <view
                 wx:if="{{tab === 'owner' && !batchMode}}"
                 class="btn btn-outline btn-sm row-gap-item"
@@ -69,7 +76,7 @@
                 删除
               </view>
               <view
-                wx:if="{{tab === 'owner' && !batchMode}}"
+                wx:if="{{tab === 'owner' && !batchMode && !item.canPay}}"
                 class="btn btn-outline btn-sm row-gap-item"
                 data-id="{{item.id}}"
                 bindtap="onEditTask">

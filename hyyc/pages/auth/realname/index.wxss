@@ -224,6 +224,26 @@ picker .control text:first-child {
   display: block;
 }
 
+.cert-row {
+  align-items: center;
+}
+
+.cert-range {
+  align-items: center;
+}
+
+.cert-range picker,
+.cert-range .control {
+  flex: 1;
+  min-width: 0;
+}
+
+.cert-sep {
+  margin: 0 12rpx;
+  color: #6B7280;
+  font-size: 26rpx;
+}
+
 .hint.ok {
   color: #447244;
 }
