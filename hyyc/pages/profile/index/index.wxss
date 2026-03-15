@@ -171,6 +171,18 @@
   box-shadow: none;
 }
 
+.quick-icon-favorite {
+  width: 80rpx;
+  height: 80rpx;
+  background: none;
+  box-shadow: none;
+}
+
+.quick-icon-favorite .quick-icon-svg {
+  width: 72rpx;
+  height: 72rpx;
+}
+
 .quick-icon-wallet .quick-icon-svg {
   width: 80rpx;
   height: 80rpx;

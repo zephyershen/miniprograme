@@ -1,9 +1,12 @@
 const { formatMoney } = require('../../../utils/format');
+const { confirm } = require('../../../utils/ui');
+const { setGoodsFavorite, syncGoodsBrowseState } = require('../../../utils/userGoodsStore');
 const access = require('../../../config/access');
 
 const db = wx.cloud.database();
 const GOODS_COLLECTION = 'goods';
-const USERS_COLLECTION = 'users';
+const MSG_COLLECTION = 'messages';
+const USER_COLLECTION = 'userInfo';
 const GOODS_THUMB_STYLE = 'goods_thumb';
 const TEMP_URL_BATCH_SIZE = 50;
 // 支付/购买完成后，用于触发商品列表刷新（商品列表页会对该 token 做“仅刷新一次”的处理）
@@ -40,8 +43,12 @@ const GOODS_TRADE_LABEL_MAP = {
   mail: '邮寄'
 };
 
-function pickStr(v) {
-  return String(v == null ? '' : v).trim();
+function pickStr(...vals) {
+  for (let i = 0; i < vals.length; i += 1) {
+    const s = String(vals[i] == null ? '' : vals[i]).trim();
+    if (s) return s;
+  }
+  return '';
 }
 
 function clampStr(s = '', maxLen = 120) {
@@ -80,8 +87,11 @@ Page({
     currentImage: 0,
     isLoading: true,
     isFavorite: false,
-    // 商品“聊一聊”入口开关：未接入前隐藏
+    canOwnerManage: false,
+    ownerActionText: '',
+    // 商品“聊一聊”入口开关
     goodsChatEnabled: !!(access && access.features && access.features.goodsChat),
+    goodsChatUnreadCount: 0,
     // 当前用户是否为商品发布者
     isOwner: false,
     // 是否允许购买（非本人 + status=posted）
@@ -158,11 +168,27 @@ Page({
   async _getSellerInfo(openid) {
     if (!openid) return null;
     try {
-      const res = await db.collection(USERS_COLLECTION)
+      const fnRes = await wx.cloud.callFunction({
+        name: 'getUserPublicProfile',
+        data: { openid }
+      });
+      const result = (fnRes && fnRes.result) || null;
+      const profile = result && result.profile;
+      if (result && result.ok && profile && pickStr(profile._openid) === pickStr(openid)) {
+        return profile;
+      }
+    } catch (e) {
+      console.warn('通过云函数获取卖家信息失败，尝试直接查询', e);
+    }
+
+    try {
+      const res = await db.collection(USER_COLLECTION)
         .where({ _openid: openid })
         .limit(1)
         .get();
-      return (res && res.data && res.data[0]) ? res.data[0] : null;
+      const doc = (res && res.data && res.data[0]) ? res.data[0] : null;
+      if (doc && pickStr(doc._openid) === pickStr(openid)) return doc;
+      return null;
     } catch (e) {
       console.error('获取卖家信息失败', e);
       return null;
@@ -199,12 +225,12 @@ Page({
     }
 
     // 卖家信息
-    let sellerAvatar = '';
-    let sellerName = '匿名用户';
+    let sellerAvatar = pickStr(doc.ownerAvatarFileID, doc.ownerAvatarUrl);
+    let sellerName = pickStr(doc.ownerNickname, doc.ownerName, '匿名用户');
     if (seller) {
-      sellerAvatar = seller.avatarUrl || '';
+      sellerAvatar = seller.avatarFileID || seller.avatarUrl || '';
       // 兼容不同字段：前端实名页/账户页使用 nickname，微信用户信息常见字段是 nickName
-      sellerName = seller.nickname || seller.nickName || seller.name || '匿名用户';
+      sellerName = seller.nickname || seller.nickName || seller.name || seller.realname || sellerName || '匿名用户';
     }
 
     return {
@@ -286,14 +312,27 @@ Page({
       const seller = await this._getSellerInfo(doc._openid);
 
       // 获取卖家头像临时URL
-      if (seller && seller.avatarUrl && this._isCloudFileID(seller.avatarUrl)) {
+      const sellerAvatar = seller && (seller.avatarFileID || seller.avatarUrl);
+      if (sellerAvatar && this._isCloudFileID(sellerAvatar)) {
         try {
-          const avatarMap = await this._getTempFileURLMap([seller.avatarUrl], '');
-          if (avatarMap[seller.avatarUrl]) {
-            seller.avatarUrl = avatarMap[seller.avatarUrl];
+          const avatarMap = await this._getTempFileURLMap([sellerAvatar], '');
+          if (avatarMap[sellerAvatar]) {
+            seller.avatarFileID = avatarMap[sellerAvatar];
+            seller.avatarUrl = avatarMap[sellerAvatar];
           }
         } catch (e) {
           console.error('获取卖家头像失败', e);
+        }
+      }
+
+      if ((!seller || !pickStr(seller.avatarFileID, seller.avatarUrl)) && doc.ownerAvatarFileID && this._isCloudFileID(doc.ownerAvatarFileID)) {
+        try {
+          const ownerAvatarMap = await this._getTempFileURLMap([doc.ownerAvatarFileID], '');
+          if (ownerAvatarMap[doc.ownerAvatarFileID]) {
+            doc.ownerAvatarFileID = ownerAvatarMap[doc.ownerAvatarFileID];
+          }
+        } catch (e) {
+          console.error('获取商品快照头像失败', e);
         }
       }
 
@@ -314,25 +353,135 @@ Page({
       const isOwner2 = (openid && doc._openid && String(doc._openid) === String(openid))
         || (meId && doc.ownerId && String(doc.ownerId) === meId);
       const st2 = pickStr(doc.status) || 'posted';
-      const canBuy = !isOwner2 && (!st2 || st2 === 'posted');
-      const buyButtonText = isOwner2
-        ? '我的商品'
-        : (st2 === 'sold' ? '已售出' : (canBuy ? '立即购买' : '不可购买'));
+      const canOwnerManage = isOwner2 && (st2 === 'posted' || st2 === 'off_shelf');
+      const ownerActionText = st2 === 'off_shelf' ? '重新上架' : '下架商品';
+      const canBuy = !isOwner2 && st2 === 'posted';
+      const buyButtonText = st2 === 'sold'
+        ? '已售出'
+        : (canBuy ? '立即购买' : (isOwner2 ? '我的商品' : '不可购买'));
 
       this.setData({
         goods,
         imagesPreview: goods.imagesPreview || [],
         isOwner: isOwner2,
+        canOwnerManage,
+        ownerActionText,
         canBuy,
         buyButtonText,
         isLoading: false
       });
+
+      this.syncGoodsUserState(goods);
+      if (isOwner2 && this.data.goodsChatEnabled) {
+        this.loadGoodsChatUnread(goods);
+        this.openGoodsChatBadgeWatch(goods);
+      } else {
+        this.clearGoodsChatBadgeWatch();
+        this.setData({ goodsChatUnreadCount: 0 });
+      }
     } catch (err) {
       console.error('加载商品详情失败', err);
       this.setData({ isLoading: false, goods: null, imagesPreview: [] });
+      this.clearGoodsChatBadgeWatch();
+      this.setData({ goodsChatUnreadCount: 0 });
       wx.showToast({ title: '加载失败，请稍后重试', icon: 'none' });
     } finally {
       if (fromPullDown) wx.stopPullDownRefresh();
+    }
+  },
+  _buildGoodsChatWhere(goods = {}) {
+    const gid = pickStr(goods && (goods.id || goods._id));
+    const sellerOpenid = pickStr(goods && goods._openid);
+    const sellerId = pickStr(goods && goods.ownerId);
+    if (!gid) return null;
+    const where = {
+      bizType: 'goods',
+      gid,
+    };
+    if (sellerOpenid) {
+      where.sellerOpenid = sellerOpenid;
+    } else if (sellerId) {
+      where.sellerId = sellerId;
+    } else {
+      return null;
+    }
+    return where;
+  },
+  _isGoodsSellerMessage(doc = {}, goods = {}) {
+    const sellerOpenid = pickStr(goods && goods._openid);
+    const sellerId = pickStr(goods && goods.ownerId);
+    if (sellerOpenid) {
+      return pickStr(doc && doc.fromOpenid) === sellerOpenid;
+    }
+    return !!(sellerId && pickStr(doc && doc.fromUserId) === sellerId);
+  },
+  _computeGoodsChatUnreadCount(docs = [], goods = {}) {
+    return (Array.isArray(docs) ? docs : []).filter((doc) => {
+      if (this._isGoodsSellerMessage(doc, goods)) return false;
+      return doc && doc.readBySeller !== true;
+    }).length;
+  },
+  _applyGoodsChatUnreadCount(unreadCount = 0, goods = {}) {
+    const gid = pickStr(goods && (goods.id || goods._id), this.data.goods && this.data.goods.id);
+    const currentGoodsId = pickStr(this.data.goods && this.data.goods.id);
+    if (gid && currentGoodsId && gid !== currentGoodsId) return;
+    this.setData({ goodsChatUnreadCount: Number(unreadCount) || 0 });
+  },
+  loadGoodsChatUnread(goods = {}) {
+    const where = this._buildGoodsChatWhere(goods);
+    if (!where) {
+      this.setData({ goodsChatUnreadCount: 0 });
+      return;
+    }
+    db.collection(MSG_COLLECTION)
+      .where(where)
+      .limit(500)
+      .get({
+        success: (res) => {
+          const docs = (res && res.data) || [];
+          this._applyGoodsChatUnreadCount(this._computeGoodsChatUnreadCount(docs, goods), goods);
+        },
+        fail: (err) => {
+          console.error('加载商品咨询未读失败', err);
+          this._applyGoodsChatUnreadCount(0, goods);
+        }
+      });
+  },
+  openGoodsChatBadgeWatch(goods = {}) {
+    const where = this._buildGoodsChatWhere(goods);
+    if (!where) {
+      this.clearGoodsChatBadgeWatch();
+      this.setData({ goodsChatUnreadCount: 0 });
+      return;
+    }
+    this.clearGoodsChatBadgeWatch();
+    this._goodsChatBadgeWatcher = db.collection(MSG_COLLECTION)
+      .where(where)
+      .watch({
+        onChange: (snapshot) => {
+          const docs = (snapshot && snapshot.docs) || [];
+          this._applyGoodsChatUnreadCount(this._computeGoodsChatUnreadCount(docs, goods), goods);
+        },
+        onError: (err) => {
+          console.error('商品详情咨询未读 watch error', err);
+        }
+      });
+  },
+  clearGoodsChatBadgeWatch() {
+    if (this._goodsChatBadgeWatcher && this._goodsChatBadgeWatcher.close) {
+      this._goodsChatBadgeWatcher.close();
+    }
+    this._goodsChatBadgeWatcher = null;
+  },
+  async syncGoodsUserState(goods) {
+    if (!goods || !goods.id) return;
+    try {
+      const state = await syncGoodsBrowseState(goods);
+      if ((this.data.goods && this.data.goods.id) === goods.id) {
+        this.setData({ isFavorite: !!(state && state.isFavorite) });
+      }
+    } catch (err) {
+      console.warn('同步商品收藏/浏览状态失败', err);
     }
   },
   async previewImage(e) {
@@ -368,16 +517,114 @@ Page({
     wx.showToast({ title: '查看卖家主页', icon: 'none' });
   },
   onFavoriteTap() {
-    const isFavorite = !this.data.isFavorite;
-    this.setData({ isFavorite });
-    wx.showToast({
-      title: isFavorite ? '已收藏' : '已取消收藏',
-      icon: 'none'
-    });
-    // TODO: 实际收藏逻辑
+    this.toggleFavorite();
+  },
+  async toggleFavorite() {
+    if (this._favoriteUpdating) return;
+    const goods = this.data.goods || null;
+    if (!goods || !goods.id) return;
+
+    const nextState = !this.data.isFavorite;
+    this._favoriteUpdating = true;
+    this.setData({ isFavorite: nextState });
+
+    try {
+      await setGoodsFavorite(goods, nextState);
+      wx.showToast({
+        title: nextState ? '已收藏' : '已取消收藏',
+        icon: 'none'
+      });
+    } catch (err) {
+      console.error('切换收藏状态失败', err);
+      this.setData({ isFavorite: !nextState });
+      wx.showToast({ title: '操作失败，请稍后重试', icon: 'none' });
+    } finally {
+      this._favoriteUpdating = false;
+    }
   },
   onChatTap() {
-    wx.showToast({ title: '当前操作暂未开放', icon: 'none' });
+    const goods = this.data.goods || null;
+    if (!this.data.goodsChatEnabled) {
+      wx.showToast({ title: '当前操作暂未开放', icon: 'none' });
+      return;
+    }
+    if (!goods || !goods.id) {
+      wx.showToast({ title: '商品信息缺失', icon: 'none' });
+      return;
+    }
+
+    const url = this.data.isOwner
+      ? `/pages/chat/goods-sessions/index?gid=${goods.id}&ownerId=${encodeURIComponent(pickStr(goods.ownerId))}&ownerOpenid=${encodeURIComponent(pickStr(goods._openid))}&title=${encodeURIComponent(pickStr(goods.title, goods.desc, '商品咨询'))}`
+      : `/pages/chat/goods-room/index?gid=${goods.id}`;
+    wx.navigateTo({ url });
+  },
+  async onOwnerActionTap() {
+    const goods = this.data.goods || null;
+    if (!goods || !goods.id || !this.data.isOwner) return;
+
+    const currentStatus = pickStr(goods.status);
+    if (currentStatus !== 'posted' && currentStatus !== 'off_shelf') return;
+
+    const nextStatus = currentStatus === 'posted' ? 'off_shelf' : 'posted';
+    const ok = await confirm(
+      nextStatus === 'off_shelf'
+        ? '下架后商品会从商品广场隐藏，但仍保留在“我的商品”里。'
+        : '重新上架后，商品会重新出现在商品广场。',
+      nextStatus === 'off_shelf' ? '下架商品' : '重新上架'
+    );
+    if (!ok) return;
+
+    wx.showLoading({
+      title: nextStatus === 'off_shelf' ? '下架中...' : '上架中...',
+      mask: true
+    });
+
+    try {
+      const openid = await this._ensureOpenid();
+      if (!openid) throw new Error('获取用户身份失败，请重新登录');
+
+      const updateData = {
+        status: nextStatus,
+        updatedAt: db.serverDate()
+      };
+      if (nextStatus === 'off_shelf') {
+        updateData.offShelfAt = db.serverDate();
+      } else {
+        updateData.repostedAt = db.serverDate();
+      }
+
+      const res = await db.collection(GOODS_COLLECTION)
+        .where({ _id: goods.id, _openid: openid, status: currentStatus })
+        .update({ data: updateData });
+      const updated = Number(res && res.stats && res.stats.updated) || 0;
+      if (!updated) throw new Error('商品状态已变更，请刷新后重试');
+
+      try {
+        wx.setStorageSync(GOODS_REFRESH_TOKEN_KEY, Date.now());
+      } catch (e) {
+        // ignore
+      }
+
+      this.setData({
+        'goods.status': nextStatus,
+        canOwnerManage: true,
+        ownerActionText: nextStatus === 'off_shelf' ? '重新上架' : '下架商品',
+        canBuy: false,
+        buyButtonText: '我的商品'
+      });
+      wx.showToast({
+        title: nextStatus === 'off_shelf' ? '已下架' : '已重新上架',
+        icon: 'none'
+      });
+    } catch (err) {
+      console.error('商品上下架失败', err);
+      wx.showToast({
+        title: String(err && err.message ? err.message : '操作失败，请稍后重试'),
+        icon: 'none'
+      });
+    } finally {
+      wx.hideLoading();
+    }
   },
   async onBuyTap() {
     if (this._buying) return;
@@ -516,5 +763,18 @@ Page({
         }
       }
     });
+  },
+  onShow() {
+    const goods = this.data.goods || null;
+    if (this.data.isOwner && this.data.goodsChatEnabled && goods && goods.id) {
+      this.loadGoodsChatUnread(goods);
+      this.openGoodsChatBadgeWatch(goods);
+    }
+  },
+  onHide() {
+    this.clearGoodsChatBadgeWatch();
+  },
+  onUnload() {
+    this.clearGoodsChatBadgeWatch();
   }
 });

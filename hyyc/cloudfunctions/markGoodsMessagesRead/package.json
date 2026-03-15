@@ -1,0 +1,9 @@
+{
+  "name": "markGoodsMessagesRead",
+  "version": "1.0.0",
+  "description": "云函数：把某个商品聊天房间的消息标记为买家或卖家已读",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

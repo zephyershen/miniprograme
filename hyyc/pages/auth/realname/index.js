@@ -2,7 +2,7 @@ const { required, isPhone } = require('../../../utils/validators');
 const { toast } = require('../../../utils/ui');
 const { exchangePhoneNumber } = require('../_shared/api');
 const { distanceMeters } = require('../_shared/geo');
-const communityCfg = require('../_shared/community');
+const communityCfg = require('../../../config/community');
 
 function pickStr(v) {
   return String(v == null ? '' : v).trim();
@@ -47,9 +47,9 @@ async function safeDeleteCloudFile(fileID) {
   }
 }
 
-function buildIdCardCloudPath() {
+function buildIdCardCloudPath(side = 'front') {
   const rand = Math.random().toString(16).slice(2, 8);
-  return `idcard/${Date.now()}_${rand}_front.jpg`;
+  return `idcard/${Date.now()}_${rand}_${side}.jpg`;
 }
 
 Page({
@@ -92,7 +92,11 @@ Page({
     // 身份证正面（人像面）
     idCardFrontFileID: '',
     idCardFrontPreview: '',
+    // 身份证反面（国徽面）
+    idCardBackFileID: '',
+    idCardBackPreview: '',
     idCardUploading: false,
+    preserveIdCardFiles: false,
 
     // 定位校验：用于验证用户是否在配置的小区范围内
     hasLocated: false,
@@ -159,6 +163,7 @@ Page({
     // 用户手动改了手机号后，就不再算“一键获取过”
     if (key === 'phone') patch.phoneVerified = false;
     this.setData(patch);
+    this._clearError(key);
   },
 
   _clearError(key) {
@@ -422,7 +427,7 @@ Page({
     wx.navigateBack({ fail: () => wx.switchTab({ url: '/pages/home/index/index' }) });
   },
 
-  async chooseIdCardFront() {
+  async chooseIdCardImage(side = 'front') {
     if (this.data.isLoading || this.data.idCardUploading) return;
     try {
       const res = await chooseSingleImage();
@@ -431,28 +436,39 @@ Page({
       if (!rawPath) return;
 
       // 如果之前上传过，先尽力删除（避免云端残留）
-      const oldFileID = this.data.idCardFrontFileID;
+      const fileKey = side === 'back' ? 'idCardBackFileID' : 'idCardFrontFileID';
+      const previewKey = side === 'back' ? 'idCardBackPreview' : 'idCardFrontPreview';
+      const errorKey = side === 'back' ? 'idCardBack' : 'idCardFront';
+      const oldFileID = this.data[fileKey];
       if (oldFileID) safeDeleteCloudFile(oldFileID);
 
       const compressedPath = await compressImage(rawPath, 60);
 
       // 页面缩略图使用压缩后的图片，保证“看到的”和“上传的”一致
       this.setData({
-        idCardFrontPreview: compressedPath,
-        idCardFrontFileID: ''
+        [previewKey]: compressedPath,
+        [fileKey]: ''
       });
 
       // 清掉这项的错误提示
       const curErrors = this.data.errors || {};
-      if (curErrors.idCardFront) {
+      if (curErrors[errorKey]) {
         const nextErrors = { ...curErrors };
-        delete nextErrors.idCardFront;
+        delete nextErrors[errorKey];
         this.setData({ errors: nextErrors });
       }
     } catch (err) {
       // 用户取消选择也会进 fail，这里不打扰用户
-      console.warn('chooseIdCardFront 失败', err);
+      console.warn('chooseIdCardImage 失败', err);
     }
+  },
+
+  chooseIdCardFront() {
+    return this.chooseIdCardImage('front');
+  },
+
+  chooseIdCardBack() {
+    return this.chooseIdCardImage('back');
   },
 
   previewIdCardFront() {
@@ -461,9 +477,21 @@ Page({
     wx.previewImage({ urls: [src], current: src });
   },
 
+  previewIdCardBack() {
+    const src = this.data.idCardBackPreview;
+    if (!src) return;
+    wx.previewImage({ urls: [src], current: src });
+  },
+
   async removeIdCardFront() {
     const oldFileID = this.data.idCardFrontFileID;
     this.setData({ idCardFrontPreview: '', idCardFrontFileID: '' });
+    if (oldFileID) await safeDeleteCloudFile(oldFileID);
+  },
+
+  async removeIdCardBack() {
+    const oldFileID = this.data.idCardBackFileID;
+    this.setData({ idCardBackPreview: '', idCardBackFileID: '' });
     if (oldFileID) await safeDeleteCloudFile(oldFileID);
   },
 
@@ -475,6 +503,7 @@ Page({
 
     // 必须上传身份证正面照片（人像面）
     errors.idCardFront = required(this.data.idCardFrontPreview, '请上传身份证正面照片');
+    errors.idCardBack = required(this.data.idCardBackPreview, '请上传身份证反面照片');
 
     // 手机号输入框已禁用，只允许走「获取手机号」授权
     errors.phone = this.data.phoneVerified ? isPhone(f.phone) : '请点击右侧“获取”授权手机号';
@@ -489,7 +518,6 @@ Page({
 
     errors.building = required(f.building, '请选择楼栋');
     errors.door = required(f.door, '请选择门号');
-
     // 身份证有效期：必须选择起始日期；非长期还要选择结束日期
     const isLong = f.certValidityType === 'long';
     errors.certBeginDate = required(f.certBeginDate, '请选择证件有效期开始日期');
@@ -525,19 +553,30 @@ Page({
 
     this.setData({ isLoading: true, idCardUploading: true });
 
-    let uploadedFileID = '';
+    let uploadedFrontFileID = '';
+    let uploadedBackFileID = '';
     try {
       // 1) 上传身份证照片到云存储（只在点“继续”时上传，避免云端残留）
-      const upRes = await wx.cloud.uploadFile({
-        cloudPath: buildIdCardCloudPath(),
+      const frontRes = await wx.cloud.uploadFile({
+        cloudPath: buildIdCardCloudPath('front'),
         filePath: this.data.idCardFrontPreview
       });
-      uploadedFileID = (upRes && upRes.fileID) || '';
-      if (!uploadedFileID) {
+      uploadedFrontFileID = (frontRes && frontRes.fileID) || '';
+
+      const backRes = await wx.cloud.uploadFile({
+        cloudPath: buildIdCardCloudPath('back'),
+        filePath: this.data.idCardBackPreview
+      });
+      uploadedBackFileID = (backRes && backRes.fileID) || '';
+
+      if (!uploadedFrontFileID || !uploadedBackFileID) {
         toast('上传失败，请重试');
         return;
       }
-      this.setData({ idCardFrontFileID: uploadedFileID });
+      this.setData({
+        idCardFrontFileID: uploadedFrontFileID,
+        idCardBackFileID: uploadedBackFileID
+      });
 
       // 2) 调云函数：fileID -> 临时链接 -> 腾讯核验 -> 通过才注册（云端会删除照片）
       let regResult;
@@ -545,7 +584,8 @@ Page({
         const fnRes = await wx.cloud.callFunction({
           name: 'registerUserByIdCard',
           data: {
-            idCardFrontFileID: uploadedFileID,
+            idCardFrontFileID: uploadedFrontFileID,
+            idCardBackFileID: uploadedBackFileID,
             avatarFileID: this.data.avatarFileID,
             form: f,
             agree: this.data.agreeChecked
@@ -556,8 +596,9 @@ Page({
         console.error('调用 registerUserByIdCard 失败', err);
         toast('身份校验失败，请稍后重试');
         // 云函数调用失败：前端兜底删图，避免云端残留
-        await safeDeleteCloudFile(uploadedFileID);
-        this.setData({ idCardFrontFileID: '' });
+        await safeDeleteCloudFile(uploadedFrontFileID);
+        await safeDeleteCloudFile(uploadedBackFileID);
+        this.setData({ idCardFrontFileID: '', idCardBackFileID: '' });
         return;
       }
 
@@ -573,7 +614,12 @@ Page({
 
         // 核验失败：清空照片（不展示识别结果）
         if (code === 'VERIFY_FAIL' || code === 'API_FAIL' || code === 'TEMP_URL_FAIL') {
-          this.setData({ idCardFrontPreview: '', idCardFrontFileID: '' });
+          this.setData({
+            idCardFrontPreview: '',
+            idCardFrontFileID: '',
+            idCardBackPreview: '',
+            idCardBackFileID: ''
+          });
         }
 
         toast(msg);
@@ -588,14 +634,16 @@ Page({
       } catch (e) {
         console.error('缓存实名用户信息失败', e);
       }
+      this.setData({ preserveIdCardFiles: true });
 
       toast('实名完成');
       wx.switchTab({ url: '/pages/home/index/index' });
     } catch (err) {
       console.error('实名提交失败', err);
       toast('身份校验失败，请稍后重试');
-      if (uploadedFileID) await safeDeleteCloudFile(uploadedFileID);
-      this.setData({ idCardFrontFileID: '' });
+      if (uploadedFrontFileID) await safeDeleteCloudFile(uploadedFrontFileID);
+      if (uploadedBackFileID) await safeDeleteCloudFile(uploadedBackFileID);
+      this.setData({ idCardFrontFileID: '', idCardBackFileID: '' });
     } finally {
       this.setData({ isLoading: false, idCardUploading: false });
     }
@@ -609,7 +657,10 @@ Page({
 
   onUnload() {
     // 兜底删除：如果页面退出时仍然有 fileID，尽力删一次，避免云端残留
-    const fid = this.data.idCardFrontFileID;
-    if (fid) safeDeleteCloudFile(fid);
+    if (this.data.preserveIdCardFiles) return;
+    const front = this.data.idCardFrontFileID;
+    const back = this.data.idCardBackFileID;
+    if (front) safeDeleteCloudFile(front);
+    if (back) safeDeleteCloudFile(back);
   }
 });

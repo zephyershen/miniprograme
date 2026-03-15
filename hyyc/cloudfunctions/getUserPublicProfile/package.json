@@ -1,0 +1,9 @@
+{
+  "name": "getUserPublicProfile",
+  "version": "1.0.0",
+  "description": "按 openid 读取用户公开资料（昵称/头像）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

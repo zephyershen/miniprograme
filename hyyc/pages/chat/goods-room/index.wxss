@@ -1,0 +1,99 @@
+@import "../../../styles/shadcn.wxss";
+
+.chat-container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chat-header {
+  flex-shrink: 0;
+  height: 88rpx;
+  background: #F2F3F5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: constant(safe-area-inset-top);
+  padding-top: env(safe-area-inset-top);
+}
+
+.chat-header-main {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  min-width: 0;
+}
+
+.chat-header-avatar {
+  width: 56rpx;
+  height: 56rpx;
+  flex-shrink: 0;
+}
+
+.chat-header-title {
+  font-size: 34rpx;
+  font-weight: 500;
+  color: #111827;
+}
+
+.chat-scroll {
+  flex: 1;
+  min-height: 0;
+  padding: 16rpx 24rpx;
+  box-sizing: border-box;
+}
+
+.chat-scroll-hidden {
+  opacity: 0;
+}
+
+.chat-input-safe {
+  flex-shrink: 0;
+  background: #ffffff;
+  border-top: 1px solid #EDEFF2;
+  padding-bottom: 16rpx;
+}
+
+.chat-input-bar {
+  padding: 12rpx 16rpx;
+}
+
+.chat-plus-btn {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  border: 2rpx solid #d1d5db;
+  position: relative;
+  margin-right: 16rpx;
+  box-sizing: border-box;
+}
+
+.chat-plus-btn:active {
+  background-color: #F2F3F5;
+}
+
+.chat-plus-line {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  background-color: #4b5563;
+  border-radius: 999px;
+}
+
+.chat-plus-line-h {
+  width: 32rpx;
+  height: 4rpx;
+  transform: translate(-50%, -50%);
+}
+
+.chat-plus-line-v {
+  width: 4rpx;
+  height: 32rpx;
+  transform: translate(-50%, -50%);
+}
+
+.chat-input {
+  flex: 1;
+  margin-right: 12rpx;
+}

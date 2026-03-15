@@ -20,6 +20,20 @@
   /* 适配状态栏 */
   padding-top: constant(safe-area-inset-top);
   padding-top: env(safe-area-inset-top);
+  position: relative;
+}
+
+.chat-header-main {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  min-width: 0;
+}
+
+.chat-header-avatar {
+  width: 56rpx;
+  height: 56rpx;
+  flex-shrink: 0;
 }
 
 .chat-header-title {
@@ -27,6 +41,69 @@
   font-weight: 500;
   /* 灰色背景下使用深色文字，保证可读性 */
   color: #111827;
+}
+
+.chat-header-action {
+  position: absolute;
+  right: 24rpx;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 8rpx 18rpx;
+  border-radius: 999rpx;
+  background: #B95E49;
+  color: #ffffff;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.chat-header-action-muted {
+  background: #E5E7EB;
+  color: #6B7280;
+}
+
+.task-cancel-approve-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 16rpx 24rpx;
+  background: linear-gradient(180deg, #FFF8F4 0%, #FFF3EC 100%);
+  border-bottom: 1rpx solid #F2D3C7;
+}
+
+.task-cancel-approve-copy {
+  flex: 1;
+  min-width: 0;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: #7C4235;
+}
+
+.task-cancel-approve-btn {
+  flex-shrink: 0;
+  height: 64rpx;
+  line-height: 64rpx;
+  padding: 0 24rpx;
+  border-radius: 999rpx;
+  background: #B95E49;
+  color: #ffffff;
+  font-size: 24rpx;
+  font-weight: 600;
+  border: 0;
+}
+
+.task-cancel-approve-btn::after {
+  border: 0;
+}
+
+.task-cancel-approve-btn-hover {
+  opacity: 0.92;
+}
+
+.task-cancel-approve-btn-disabled {
+  background: #C8B0A6;
+  color: #ffffff;
 }
 
 /* 聊天消息滚动区域 */
@@ -95,4 +172,39 @@
 .chat-input {
   flex: 1;
   margin-right: 12rpx;
+}
+
+.task-cancel-message {
+  padding: 12rpx 0;
+}
+
+.task-cancel-card {
+  background: linear-gradient(180deg, #FFF8F4 0%, #FFFFFF 100%);
+  border: 1rpx solid #F2D3C7;
+  border-radius: 24rpx;
+  padding: 24rpx;
+  box-shadow: 0 8rpx 20rpx rgba(185, 94, 73, 0.08);
+}
+
+.task-cancel-card-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1F2937;
+}
+
+.task-cancel-card-text {
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  line-height: 1.7;
+  color: #4B5563;
+}
+
+.task-cancel-card-status {
+  margin-top: 16rpx;
+  font-size: 24rpx;
+  color: #B95E49;
+}
+
+.task-cancel-card-status-success {
+  color: #2F7D4A;
 }

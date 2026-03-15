@@ -1,38 +1,101 @@
 <ui-loading show="{{isLoading}}" />
 
-<view class="wallet-page">
-  <!-- 余额卡片 -->
+<view class="wallet-page wallet-error-page" wx:if="{{!isLoading && loadError}}">
+  <view class="error-card">
+    <text class="error-title">钱包加载失败</text>
+    <text class="error-text">{{errorText || '请稍后重试'}}</text>
+    <view class="error-btn" bindtap="onRetryLoad">重新加载</view>
+  </view>
+</view>
+
+<view class="wallet-page" wx:if="{{!isLoading && !loadError}}">
   <view class="balance-card">
     <view class="balance-header">
       <image class="wallet-icon" src="/assets/pages/profile/wallet.svg" mode="aspectFit"></image>
-      <text class="balance-title">账户余额（元）</text>
+      <text class="balance-title">可提现余额（元）</text>
     </view>
     <text class="balance-amount">{{balanceText}}</text>
     <view class="balance-tip">
-      <text class="balance-tip-text">满 {{withdrawMin}} 元可提现</text>
+      <text class="balance-tip-text">{{balancePrimaryTip}}</text>
+      <text class="balance-tip-text">{{balanceSecondaryTip}}</text>
+      <text class="balance-alert" wx:if="{{balanceAlertText}}">{{balanceAlertText}}</text>
     </view>
     <view
-      class="withdraw-btn {{canWithdraw ? '' : 'withdraw-btn-disabled'}}"
+      class="withdraw-btn"
       bindtap="onWithdraw">
-      申请提现
+      提现/绑卡
     </view>
   </view>
 
-  <!-- 交易记录 -->
   <view class="section">
-    <text class="section-title">收支明细</text>
-
-    <view wx:if="{{!isLoading && (!transactions || transactions.length === 0)}}" class="empty-box">
-      <text class="c-muted">暂无记录</text>
+    <view class="section-head">
+      <text class="section-title">收支明细</text>
+      <text class="section-desc">这里会展示余额变动和消费记录</text>
     </view>
 
-    <view class="tx-list" wx:if="{{transactions.length}}">
-      <view class="tx-item" wx:for="{{transactions}}" wx:key="id">
-        <view class="tx-left">
-          <text class="tx-type">{{item.typeText}}</text>
-          <text class="tx-time">{{item.timeText}}</text>
+    <view class="filter-row">
+      <view
+        wx:for="{{filterOptions}}"
+        wx:key="key"
+        class="filter-chip {{activeFilter === item.key ? 'filter-chip-active' : ''}} {{isPanelLoading ? 'filter-chip-disabled' : ''}}"
+        data-key="{{item.key}}"
+        bindtap="onFilterTap">
+        {{item.label}}
+      </view>
+    </view>
+
+    <view class="section-panel">
+      <view class="tx-scroll-wrap">
+        <scroll-view
+          class="tx-scroll"
+          scroll-y
+          enhanced
+          show-scrollbar="{{false}}"
+          lower-threshold="120"
+          bindscroll="onTxScroll"
+          bindscrolltolower="onLoadMore">
+          <view class="tx-scroll-inner" style="padding-bottom: {{bottomSpacerPx}}px;">
+            <view wx:if="{{!transactions || transactions.length === 0}}" class="empty-box">
+              <text class="c-muted">{{emptyText}}</text>
+            </view>
+
+            <view class="tx-list" wx:if="{{transactions.length}}">
+              <view class="tx-item" wx:for="{{transactions}}" wx:key="id">
+                <view class="tx-main">
+                  <view class="tx-top">
+                    <text class="tx-type">{{item.typeText}}</text>
+                    <text class="tx-amount {{item.isIncome ? 'tx-income' : 'tx-expense'}}">{{item.amountText}}</text>
+                  </view>
+                  <text wx:if="{{item.summaryText}}" class="tx-summary">{{item.summaryText}}</text>
+                  <view class="tx-meta">
+                    <text class="tx-scope {{item.scopeClass}}">{{item.scopeText}}</text>
+                    <text class="tx-channel">{{item.channelText}}</text>
+                  </view>
+                  <text class="tx-impact">{{item.impactText}}</text>
+                  <text class="tx-time">{{item.timeText}}</text>
+                </view>
+              </view>
+            </view>
+
+            <view class="load-more-wrap" wx:if="{{transactions.length}}">
+              <text class="load-more-text" wx:if="{{isLoadingMore}}">加载中...</text>
+              <text class="load-more-text" wx:if="{{hasMore && !isLoadingMore}}">上滑继续查看</text>
+              <text class="load-more-text" wx:if="{{!hasMore && !isLoadingMore && transactions.length >= pageSize}}">已显示全部记录</text>
+            </view>
+          </view>
+        </scroll-view>
+
+        <view class="tx-scrollbar" wx:if="{{showCustomScrollbar}}">
+          <view
+            class="tx-scrollbar-thumb"
+            style="height: {{scrollThumbHeight}}px; transform: translateY({{scrollThumbTop}}px);">
+          </view>
         </view>
-        <text class="tx-amount {{item.isIncome ? 'tx-income' : 'tx-expense'}}">{{item.amountText}}</text>
+
+        <view class="panel-loading-mask" wx:if="{{isPanelLoading}}">
+          <view class="panel-loading-spinner"></view>
+          <text class="panel-loading-text">加载中...</text>
+        </view>
       </view>
     </view>
   </view>

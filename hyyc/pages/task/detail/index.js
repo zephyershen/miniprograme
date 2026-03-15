@@ -6,6 +6,69 @@ const access = require('../../../config/access');
 const db = wx.cloud.database();
 const TASK_COLLECTION = 'tasks';
 const MSG_COLLECTION = 'messages';
+const REFUND_SYNC_INTERVAL_MS = 3000;
+const TEMP_URL_BATCH_SIZE = 20;
+
+function pickStr(...vals) {
+  for (const v of vals) {
+    const s = String(v == null ? '' : v).trim();
+    if (s) return s;
+  }
+  return '';
+}
+
+function isCloudFileID(v = '') {
+  return String(v || '').indexOf('cloud://') === 0;
+}
+
+function normalizeImageList(list = []) {
+  return (Array.isArray(list) ? list : [])
+    .map((item) => pickStr(item))
+    .filter(Boolean);
+}
+
+function safeFormatDateTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  if (!d || Number.isNaN(d.getTime())) return '';
+  return formatDateTime(d);
+}
+
+function resolveTaskCancelState(task = {}) {
+  const t = task && typeof task === 'object' ? task : {};
+  const pay = t.pay && typeof t.pay === 'object' ? t.pay : {};
+  const cancelRequest = t.cancelRequest && typeof t.cancelRequest === 'object' ? t.cancelRequest : {};
+  const refund = (pay.refund && typeof pay.refund === 'object')
+    ? pay.refund
+    : ((cancelRequest.refund && typeof cancelRequest.refund === 'object') ? cancelRequest.refund : {});
+  let statusRaw = pickStr(t.status);
+  let payStatus = pickStr(pay.status);
+  let cancelStatus = pickStr(cancelRequest.status);
+  const refundStatus = pickStr(refund.status);
+  const hasApprovalMarker = !!(
+    cancelRequest.approvedAt
+    || pickStr(cancelRequest.approvedByUserId, cancelRequest.approvedByOpenid, cancelRequest.approvedByName)
+  );
+  const hasRefundRequest = !!pickStr(refund.reqSeqId, refund.reqDate);
+
+  if (cancelStatus === 'pending' && hasApprovalMarker) {
+    if (payStatus === 'refunded' || refundStatus === 'success') {
+      cancelStatus = 'approved';
+    } else if (payStatus === 'refund_pending' || refundStatus === 'processing' || refundStatus === 'requested' || hasRefundRequest) {
+      cancelStatus = 'refund_pending';
+    }
+  }
+
+  if (cancelStatus === 'approved') {
+    statusRaw = 'cancelled';
+    payStatus = payStatus || 'refunded';
+  } else if (cancelStatus === 'refund_pending') {
+    statusRaw = 'cancelled';
+    if (payStatus !== 'refunded') payStatus = 'refund_pending';
+  }
+
+  return { statusRaw, payStatus, cancelStatus };
+}
 
 Page({
 		  data: {
@@ -23,124 +86,263 @@ Page({
 	    // 普通住户视角：当前任务下，与业主聊天的未读消息条数
 	    peerUnreadCount: 0
 	  },
-		  onLoad(q){
-    this.setData({ isLoading: true });
-    const id = q.id;
+  _refundSyncing: false,
+  _refundSyncTimer: null,
+  async _getTempFileURLMap(fileIDs = []) {
+    const uniq = [];
+    const seen = {};
+    normalizeImageList(fileIDs).forEach((fileID) => {
+      if (!isCloudFileID(fileID) || seen[fileID]) return;
+      seen[fileID] = true;
+      uniq.push(fileID);
+    });
+    if (!uniq.length) return {};
+
+    const map = {};
+    for (let i = 0; i < uniq.length; i += TEMP_URL_BATCH_SIZE) {
+      const res = await wx.cloud.getTempFileURL({
+        fileList: uniq.slice(i, i + TEMP_URL_BATCH_SIZE).map((fileID) => ({
+          fileID,
+          maxAge: 60 * 30,
+        }))
+      });
+      const list = (res && res.fileList) || [];
+      list.forEach((item) => {
+        if (item && item.fileID && item.tempFileURL) {
+          map[item.fileID] = item.tempFileURL;
+        }
+      });
+    }
+    return map;
+  },
+  _resolveImageURLs(images = [], urlMap = {}) {
+    return normalizeImageList(images).map((item) => {
+      if (!isCloudFileID(item)) return item;
+      return pickStr(urlMap[item], item);
+    });
+  },
+  async _hydrateTaskMedia(taskId = '', task = {}) {
+    const currentTaskId = pickStr(taskId, task && task.id);
+    if (!currentTaskId) return;
+
+    const taskImages = normalizeImageList(task.images);
+    const submitView = task.submitView && typeof task.submitView === 'object' ? task.submitView : null;
+    const submitImages = normalizeImageList(submitView && submitView.images);
+    const fileIDs = taskImages.concat(submitImages).filter((item) => isCloudFileID(item));
+
+    if (!fileIDs.length) return;
+
+    try {
+      const urlMap = await this._getTempFileURLMap(fileIDs);
+      if (pickStr(this.data.task && this.data.task.id) !== currentTaskId) return;
+
+      const patch = {
+        'task.images': this._resolveImageURLs(taskImages, urlMap),
+      };
+      if (submitView) {
+        patch['task.submitView.images'] = this._resolveImageURLs(submitImages, urlMap);
+      }
+      this.setData(patch);
+    } catch (err) {
+      console.warn('加载任务详情图片失败', err);
+    }
+  },
+  _applyTaskDetailDoc(t = {}, id = '', myId = '') {
+    // 地址展示优先使用「楼栋 + 房门号」，如果没有门牌号，则退回到原来的 address 文本
+    const locationText = (t.building && t.door)
+      ? `${t.building} ${t.door}`
+      : (t.address || '');
+
+    const now = Date.now();
+    const ONE_DAY = 24 * 60 * 60 * 1000;
+    const ONE_WEEK = 7 * ONE_DAY;
+    const rawDeadline = t.deadline;
+    const createdAt = t.createdAt;
+    const createdTs = createdAt && createdAt.getTime ? createdAt.getTime() : null;
+    // 未设置截止时间时，默认从创建时间起 7 天内有效
+    const effectiveDeadline = rawDeadline != null
+      ? rawDeadline
+      : (createdTs ? (createdTs + ONE_WEEK) : null);
+    const isExpired = effectiveDeadline != null && effectiveDeadline <= now;
+
+    const resolvedCancelState = resolveTaskCancelState(t);
+    const statusRaw = resolvedCancelState.statusRaw;
+    const payStatus = resolvedCancelState.payStatus;
+    const statusMap = {
+      '': '已发布',
+      posted: '已发布',
+      pay_pending: '待付款',
+      accepted: '已接单',
+      submitted: '待确认',
+      completed: '已完成',
+      cancelled: '已取消'
+    };
+    const statusText = isExpired
+      ? '已过期'
+      : (statusRaw === 'cancelled' && payStatus === 'refund_pending'
+        ? '退款中'
+        : (statusMap[statusRaw] || statusRaw || '已发布'));
+    const taskImages = normalizeImageList(t.images);
+    const submitSource = t.submit && typeof t.submit === 'object' ? t.submit : {};
+    const submitNote = pickStr(submitSource.note);
+    const submitImages = normalizeImageList(submitSource.images);
+    const submittedAtText = safeFormatDateTime(submitSource.submittedAt);
+    const hasSubmitRecord = !!(submitNote || submitImages.length || submittedAtText);
+
+    const task = {
+      ...t,
+      id,
+      images: taskImages,
+      amountText: formatMoney(t.amount),
+      statusRaw,
+      payStatus,
+      // 截止时间：未设置则展示默认过期时间
+      deadlineText: effectiveDeadline ? formatDateTime(effectiveDeadline) : '默认 7 天内有效',
+      // 状态：如果已过期，优先展示“已过期”
+      statusText,
+      locationText,
+      submitView: hasSubmitRecord ? {
+        note: submitNote,
+        images: submitImages,
+        submittedAtText,
+      } : null
+    };
+
+    // 是否为任务发布人：根据 ownerId 和当前登录用户 id 判断
+    const isOwner = !!(myId && t.ownerId && myId === t.ownerId);
+    const isWorker = !!(myId && t.workerId && myId === t.workerId);
+
+    const canAccept = !isOwner && !isExpired && (statusRaw === '' || statusRaw === 'posted');
+    const canSubmit = !isOwner && isWorker && statusRaw === 'accepted';
+    const canApprove = isOwner && statusRaw === 'submitted';
+    const accepted = isWorker && (statusRaw === 'accepted' || statusRaw === 'submitted');
+
+    this.setData({
+      task,
+      isOwner,
+      accepted,
+      isWorker,
+      canAccept,
+      canSubmit,
+      canApprove,
+      isLoading: false
+    });
+    this._hydrateTaskMedia(id, task);
+    this._maybeSyncPendingRefund(t);
+
+    // 根据当前身份分别统计未读：
+    // - 任务发布者：统计所有住户会话的未读数量（以会话计）
+    // - 普通住户：统计自己与业主会话中的未读消息条数
+    if (isOwner) {
+      this.loadUnreadCount(task.id, myId);
+      this.setupBadgeWatch(task, myId, true);
+    } else if (t.ownerId) {
+      this.loadPeerUnread(task.id, t.ownerId, myId);
+      this.setupBadgeWatch(task, myId, false);
+    }
+  },
+  _loadTaskDetail(taskId = '', options = {}) {
+    const id = pickStr(taskId, this.data.task && this.data.task.id);
+    const silent = !!(options && options.silent);
     if (!id) {
-      toast('缺少任务 ID');
-      this.setData({ isLoading: false });
+      if (!silent) {
+        toast('缺少任务 ID');
+        this.setData({ isLoading: false });
+      }
       return;
     }
 
     const me = wx.getStorageSync('hyyc_user') || {};
     const myId = me.id || '';
 
+    if (!silent) {
+      this.setData({ isLoading: true });
+    }
+
     db.collection(TASK_COLLECTION).doc(id).get({
       success: (res) => {
-        const t = res.data || {};
-        // 地址展示优先使用「楼栋 + 房门号」，如果没有门牌号，则退回到原来的 address 文本
-        const locationText = (t.building && t.door)
-          ? `${t.building} ${t.door}`
-          : (t.address || '');
-
-        const now = Date.now();
-        const ONE_DAY = 24 * 60 * 60 * 1000;
-        const ONE_WEEK = 7 * ONE_DAY;
-        const rawDeadline = t.deadline;
-        const createdAt = t.createdAt;
-        const createdTs = createdAt && createdAt.getTime ? createdAt.getTime() : null;
-        // 未设置截止时间时，默认从创建时间起 7 天内有效
-        const effectiveDeadline = rawDeadline != null
-          ? rawDeadline
-          : (createdTs ? (createdTs + ONE_WEEK) : null);
-        const isExpired = effectiveDeadline != null && effectiveDeadline <= now;
-
-        const statusRaw = (t.status == null ? '' : String(t.status).trim());
-        const statusMap = {
-          '': '已发布',
-          posted: '已发布',
-          pay_pending: '待付款',
-          accepted: '已接单',
-          submitted: '待确认',
-          completed: '已完成',
-          cancelled: '已取消'
-        };
-        const statusText = isExpired ? '已过期' : (statusMap[statusRaw] || statusRaw || '已发布');
-
-        const task = {
-          ...t,
-          id,
-          amountText: formatMoney(t.amount),
-          // 截止时间：未设置则展示默认过期时间
-          deadlineText: effectiveDeadline ? formatDateTime(effectiveDeadline) : '默认 7 天内有效',
-          // 状态：如果已过期，优先展示“已过期”
-          statusText,
-          locationText
-        };
-
-        // 是否为任务发布人：根据 ownerId 和当前登录用户 id 判断
-		        const isOwner = !!(myId && t.ownerId && myId === t.ownerId);
-        const isWorker = !!(myId && t.workerId && myId === t.workerId);
-
-        const canAccept = !isOwner && !isExpired && (statusRaw === '' || statusRaw === 'posted');
-        const canSubmit = !isOwner && isWorker && statusRaw === 'accepted';
-        const canApprove = isOwner && statusRaw === 'submitted';
-        const accepted = isWorker && (statusRaw === 'accepted' || statusRaw === 'submitted');
-
-	        this.setData({
-	          task,
-	          isOwner,
-	          accepted,
-	          isWorker,
-	          canAccept,
-	          canSubmit,
-	          canApprove,
-	          isLoading: false
-	        });
-
-		        // 根据当前身份分别统计未读：
-		        // - 任务发布者：统计所有住户会话的未读数量（以会话计）
-		        // - 普通住户：统计自己与业主会话中的未读消息条数
-		        if (isOwner) {
-		          this.loadUnreadCount(task.id, myId);
-		          this.setupBadgeWatch(task, myId, true);
-		        } else if (t.ownerId) {
-		          this.loadPeerUnread(task.id, t.ownerId, myId);
-		          this.setupBadgeWatch(task, myId, false);
-		        }
+        this._applyTaskDetailDoc((res && res.data) || {}, id, myId);
       },
       fail: (err) => {
         console.error('加载任务详情失败', err);
         this.setData({ isLoading: false });
-        toast('任务不存在或已被删除');
+        if (!silent) {
+          toast('任务不存在或已被删除');
+        }
       }
     });
   },
+		  onLoad(q){
+    const id = q.id;
+    this._loadTaskDetail(id);
+		  },
+  _maybeSyncPendingRefund(task = {}) {
+    const resolved = resolveTaskCancelState(task);
+    if (pickStr(resolved.payStatus) !== 'refund_pending') {
+      this._clearRefundSyncTimer();
+      return;
+    }
+    const taskId = pickStr(task._id, task.id, this.data.task && this.data.task.id);
+    if (!taskId) return;
+    if (!this._refundSyncTimer) {
+      this._refundSyncTimer = setInterval(() => {
+        this._runRefundSync(taskId);
+      }, REFUND_SYNC_INTERVAL_MS);
+    }
+    this._runRefundSync(taskId);
+  },
+  _clearRefundSyncTimer() {
+    if (this._refundSyncTimer) {
+      clearInterval(this._refundSyncTimer);
+      this._refundSyncTimer = null;
+    }
+  },
+  _runRefundSync(taskId = '') {
+    const currentTaskId = pickStr(taskId, this.data.task && this.data.task.id);
+    if (!currentTaskId || this._refundSyncing) return;
+    const task = this.data.task || {};
+    if (pickStr(task.payStatus) !== 'refund_pending' && pickStr(task.statusText) !== '退款中') {
+      this._clearRefundSyncTimer();
+      return;
+    }
+    this._refundSyncing = true;
+    wx.cloud.callFunction({
+      name: 'taskCancelFlow',
+      data: {
+        action: 'sync_refund_status',
+        taskId: currentTaskId,
+      }
+    }).then((res) => {
+      const ret = (res && res.result) || {};
+      if (ret && ret.ok && (ret.already || (ret.refund && pickStr(ret.refund.status) === 'success'))) {
+        this._clearRefundSyncTimer();
+        this._loadTaskDetail(currentTaskId, { silent: true });
+      }
+      if (ret && ret.ok === false && pickStr(ret.code) === 'MISSING_REFUND_META') {
+        this._clearRefundSyncTimer();
+      }
+    }).catch((err) => {
+      console.warn('同步退款状态失败', err);
+    }).finally(() => {
+      this._refundSyncing = false;
+    });
+  },
 		  onShow(){
-		    // 从其它页面返回时刷新未读数 + 重新挂载实时监听
+		    // 从其它页面返回时重新拉最新任务状态，避免按钮沿用旧缓存
 		    const task = this.data.task || {};
 		    if (!task.id) return;
-		    const me = wx.getStorageSync('hyyc_user') || {};
-		    const myId = me.id || '';
-		    if (!myId) return;
-		    if (this.data.isOwner) {
-		      // 任务发布者：刷新所有住户会话的未读数量（以会话计数）
-		      this.loadUnreadCount(task.id, myId);
-		      this.setupBadgeWatch(task, myId, true);
-		    } else {
-		      // 普通住户：刷新自己这一端的未读消息数量
-		      this.loadPeerUnread(task.id, task.ownerId, myId);
-		      this.setupBadgeWatch(task, myId, false);
-		    }
+        this._loadTaskDetail(task.id, { silent: true });
 		  },
 
 		  onHide(){
 		    // 离开详情页时关闭监听，避免重复监听和资源浪费
 		    this.clearBadgeWatch();
+        this._clearRefundSyncTimer();
 		  },
 
 		  onUnload(){
 		    this.clearBadgeWatch();
+        this._clearRefundSyncTimer();
 		  },
 	  // 统计当前任务下，发布者视角的未读消息总数（按“消息条数”统计）
 	  loadUnreadCount(tid, ownerId){
@@ -267,6 +469,16 @@ Page({
       urls: images
     });
   },
+  previewSubmitImage(e){
+    const idx = Number(e.currentTarget.dataset.index || 0);
+    const submitView = this.data.task && this.data.task.submitView;
+    const images = normalizeImageList(submitView && submitView.images);
+    if (!images.length) return;
+    wx.previewImage({
+      current: images[idx] || images[0],
+      urls: images
+    });
+  },
   accept(){
     if (!this.data.workflowEnabled) {
       toast('当前操作暂未开放');
@@ -299,7 +511,23 @@ Page({
       toast('接单失败');
     });
   },
-  toChat(){ wx.navigateTo({ url: '/pages/chat/room/index?tid=' + this.data.task.id }); },
+  toChat(){
+    const task = this.data.task || {};
+    const tid = task.id || '';
+    if (!tid) {
+      toast('缺少任务 ID');
+      return;
+    }
+    const peerUserId = this.data.isOwner ? pickStr(task.workerId) : '';
+    if (this.data.isOwner && !peerUserId) {
+      toast('还没有接单人');
+      return;
+    }
+    const url = peerUserId
+      ? `/pages/chat/room/index?tid=${tid}&peerUserId=${peerUserId}`
+      : `/pages/chat/room/index?tid=${tid}`;
+    wx.navigateTo({ url });
+  },
   // 任务发布者查看该任务下所有聊天会话列表
   toChatSessions(){
     const task = this.data.task || {};

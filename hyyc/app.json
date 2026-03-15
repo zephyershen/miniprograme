@@ -11,7 +11,9 @@
     "pages/profile/account/index",
     "pages/profile/tasks/index",
     "pages/profile/goods/index",
-    "pages/profile/wallet/index"
+    "pages/profile/favorites/index",
+    "pages/profile/wallet/index",
+    "pages/profile/withdraw/index"
   ],
   "subPackages": [
     {
@@ -32,7 +34,15 @@
       "root": "pages/chat",
       "pages": [
         "room/index",
-        "sessions/index"
+        "sessions/index",
+        "goods-room/index",
+        "goods-sessions/index"
+      ]
+    },
+    {
+      "root": "pages/user",
+      "pages": [
+        "profile/index"
       ]
     }
   ],

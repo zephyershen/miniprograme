@@ -1,0 +1,42 @@
+<ui-loading show="{{isLoading}}" />
+
+<view wx:if="{{profile}}" class="profile-page">
+  <view class="profile-hero">
+    <image wx:if="{{profile.avatarUrl}}" class="profile-avatar" src="{{profile.avatarUrl}}" mode="aspectFill" />
+    <view wx:else class="avatar profile-avatar"></view>
+    <text class="profile-name">{{profile.nickname || profile.nameMasked || '用户'}}</text>
+    <text class="profile-sub">{{profile.nameMasked || '已实名用户'}}</text>
+  </view>
+
+  <view class="info-card">
+    <view class="info-row">
+      <text class="info-label">小区</text>
+      <text class="info-value">{{profile.community || '未公开'}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">楼栋</text>
+      <text class="info-value">{{profile.building || '未公开'}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">门牌</text>
+      <text class="info-value">{{profile.door || '未公开'}}</text>
+    </view>
+    <view class="info-row">
+      <text class="info-label">手机号</text>
+      <text class="info-value {{profile.phoneVisible ? 'info-value-strong' : ''}}">
+        {{profile.phoneVisible ? profile.phone : (profile.phoneMasked || '未公开')}}
+      </text>
+    </view>
+  </view>
+
+  <view class="tip-card">{{requestText}}</view>
+
+  <button
+    wx:if="{{showRequestButton}}"
+    class="phone-request-btn {{requesting ? 'phone-request-btn-disabled' : ''}}"
+    bindtap="onRequestPhone"
+    disabled="{{requesting}}"
+  >
+    {{requesting ? '提交中...' : '申请查看'}}
+  </button>
+</view>

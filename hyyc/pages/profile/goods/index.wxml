@@ -6,6 +6,7 @@
     <view class="tab {{tab==='pending' ? 'tab-active' : ''}}" data-k="pending" bindtap="setTab">审核中</view>
     <view class="tab {{tab==='need_fix' ? 'tab-active' : ''}}" data-k="need_fix" bindtap="setTab">需修改</view>
     <view class="tab {{tab==='posted' ? 'tab-active' : ''}}" data-k="posted" bindtap="setTab">已上架</view>
+    <view class="tab {{tab==='off_shelf' ? 'tab-active' : ''}}" data-k="off_shelf" bindtap="setTab">已下架</view>
     <view class="tab {{tab==='sold' ? 'tab-active' : ''}}" data-k="sold" bindtap="setTab">已售出</view>
   </view>
 
@@ -52,12 +53,38 @@
             重新审核
           </view>
           <view
-            wx:if="{{item.status==='posted' || item.status==='sold'}}"
+            wx:if="{{item.status==='posted' || item.status==='off_shelf' || item.status==='sold'}}"
             class="btn btn-primary row-gap-item"
             data-id="{{item.id}}"
             bindtap="onView"
           >
             查看
+          </view>
+          <view
+            wx:if="{{goodsChatEnabled && (item.status==='posted' || item.status==='off_shelf' || item.status==='sold')}}"
+            class="btn btn-outline row-gap-item goods-chat-btn"
+            data-id="{{item.id}}"
+            data-owner-id="{{item.ownerId}}"
+            data-owner-openid="{{item._openid}}"
+            data-title="{{item.title || item.desc || '商品咨询'}}"
+            bindtap="onConsultSessions"
+          >
+            咨询会话
+            <view
+              wx:if="{{item.goodsChatUnreadCount > 0}}"
+              class="goods-chat-badge"
+            >
+              {{item.goodsChatUnreadCount > 99 ? '99+' : item.goodsChatUnreadCount}}
+            </view>
+          </view>
+          <view
+            wx:if="{{item.status==='posted' || item.status==='off_shelf'}}"
+            class="btn btn-outline row-gap-item"
+            data-id="{{item.id}}"
+            data-status="{{item.status}}"
+            bindtap="onToggleShelf"
+          >
+            {{item.status==='posted' ? '下架' : '重新上架'}}
           </view>
         </view>
       </view>

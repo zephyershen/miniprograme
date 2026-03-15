@@ -10,8 +10,8 @@ module.exports = {
   features: {
     // 任务“接单-提交-确认完成/打款”闭环
     taskWorkflow: true,
-    // 二手商品“聊一聊”：未接入前先隐藏
-    goodsChat: false
+    // 二手商品“聊一聊”与卖家咨询会话
+    goodsChat: true
   },
 
   // 首页说明（用于应对审核要求：特定人群使用 + 账号鉴权）

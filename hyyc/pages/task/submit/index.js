@@ -32,12 +32,19 @@ Page({
       return;
     }
 
+    const note = String(this.data.note || '').trim();
+    const images = Array.isArray(this.data.images) ? this.data.images.filter(Boolean) : [];
+    if (!note && !images.length) {
+      toast('请填写完成说明或上传至少 1 张凭证');
+      return;
+    }
+
     const me = wx.getStorageSync('hyyc_user') || {};
 
     this.setData({ isLoading: true });
     wx.showLoading({ title: '提交中', mask: true });
     try {
-      const tempImages = (this.data.images || []).slice();
+      const tempImages = images.slice();
       const uploadTasks = tempImages.map((p, idx) => {
         if (typeof p === 'string' && p.indexOf('cloud://') === 0) return Promise.resolve(p);
         return wx.cloud.uploadFile({
@@ -51,7 +58,7 @@ Page({
         name: 'taskSubmit',
         data: {
           taskId: tid,
-          note: this.data.note || '',
+          note,
           images: fileIDs
         }
       });
@@ -61,7 +68,9 @@ Page({
       this.setData({ isLoading: false });
 
       if (!ret || !ret.ok) {
-        const msg = (ret && ret.code === 'NOT_WORKER') ? '你不是该任务的接单人，不能提交' : '提交失败';
+        const msg = (ret && ret.code === 'NOT_WORKER')
+          ? '你不是该任务的接单人，不能提交'
+          : ((ret && ret.msg) || '提交失败');
         toast(msg);
         return;
       }

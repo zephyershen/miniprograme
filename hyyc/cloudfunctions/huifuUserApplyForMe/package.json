@@ -1,0 +1,9 @@
+{
+  "name": "huifuUserApplyForMe",
+  "version": "1.0.0",
+  "description": "为当前实名用户处理汇付个人开户与用户业务入驻",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

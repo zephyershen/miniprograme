@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "用户资料",
+  "usingComponents": {
+    "ui-loading": "/components/ui/loading/index"
+  }
+}

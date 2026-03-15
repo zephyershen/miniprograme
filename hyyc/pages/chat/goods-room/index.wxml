@@ -1,0 +1,42 @@
+<ui-loading show="{{isLoading}}" />
+<view class="chat-container">
+  <view class="chat-header">
+    <view class="chat-header-main">
+      <image wx:if="{{peerProfile.avatarUrl}}" class="chat-header-avatar" src="{{peerProfile.avatarUrl}}" mode="aspectFill"></image>
+      <view wx:else class="avatar chat-header-avatar"></view>
+      <view class="chat-header-title">{{peerDisplayName || '对方'}}</view>
+    </view>
+  </view>
+
+  <scroll-view
+    class="chat-scroll {{contentReady ? '' : 'chat-scroll-hidden'}}"
+    scroll-y
+    show-scrollbar="{{false}}"
+    scroll-with-animation="{{scrollWithAnimation}}"
+    scroll-top="{{scrollTop}}"
+    bindscroll="onScroll"
+  >
+    <block wx:for="{{msgs}}" wx:key="id">
+      <chat-bubble
+        id="m{{item.id}}"
+        mine="{{item.mine}}"
+        type="{{item.type}}"
+        text="{{item.text}}"
+        image-url="{{item.imageUrl}}"
+        avatar-url="{{item.avatarUrl}}"
+        avatar-clickable="{{false}}"
+      />
+    </block>
+  </scroll-view>
+
+  <view class="chat-input-safe" style="padding-bottom: calc(16rpx + {{keyboardHeight}}px + env(safe-area-inset-bottom));">
+    <view class="row chat-input-bar">
+      <view class="chat-plus-btn" bindtap="openMediaActions">
+        <view class="chat-plus-line chat-plus-line-h"></view>
+        <view class="chat-plus-line chat-plus-line-v"></view>
+      </view>
+      <input class="input chat-input" placeholder="输入消息" value="{{text}}" bindinput="onInput" adjust-position="{{false}}" hold-keyboard="{{true}}" />
+      <view class="btn btn-primary btn-sm" bindtap="send">发送</view>
+    </view>
+  </view>
+</view>

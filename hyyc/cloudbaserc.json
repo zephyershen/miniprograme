@@ -1,0 +1,55 @@
+{
+  "version": "2.0",
+  "envId": "{{env.CLOUDBASE_ENV_ID}}",
+  "functionRoot": "./cloudfunctions",
+  "functions": [
+    {
+      "name": "registerUserByIdCard",
+      "timeout": 60
+    },
+    {
+      "name": "huifuUserApplyForMe",
+      "timeout": 60
+    },
+    {
+      "name": "huifuMiniappPay",
+      "timeout": 60
+    },
+    {
+      "name": "taskCreate",
+      "timeout": 60
+    },
+    {
+      "name": "taskPaySuccess",
+      "timeout": 60
+    },
+    {
+      "name": "taskAccept",
+      "timeout": 60
+    },
+    {
+      "name": "taskSubmit",
+      "timeout": 60
+    },
+    {
+      "name": "taskCancelFlow",
+      "timeout": 60
+    },
+    {
+      "name": "deleteTaskWithMessages",
+      "timeout": 60
+    },
+    {
+      "name": "goodsPurchase",
+      "timeout": 60
+    },
+    {
+      "name": "walletWithdraw",
+      "timeout": 60
+    },
+    {
+      "name": "huifuPayNotify",
+      "timeout": 60
+    }
+  ]
+}

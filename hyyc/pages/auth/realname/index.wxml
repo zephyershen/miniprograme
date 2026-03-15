@@ -74,6 +74,27 @@
     </view>
 
     <view class="group">
+      <text class="label">身份证反面（国徽面）<text class="label-star">*</text></text>
+      <view class="idcard-box">
+        <view wx:if="{{!idCardBackPreview}}" class="idcard-empty">
+          <view class="btn btn-outline btn-sm" bindtap="chooseIdCardBack">上传照片</view>
+          <view class="idcard-tips">
+            <text class="hint">请拍清楚、不要反光、别遮挡四角</text>
+            <text class="hint">请上传本人身份证</text>
+          </view>
+        </view>
+        <view wx:else class="idcard-preview">
+          <image class="idcard-image" src="{{idCardBackPreview}}" mode="aspectFill" bindtap="previewIdCardBack" />
+          <view class="row gap idcard-actions">
+            <view class="btn btn-outline btn-sm" bindtap="chooseIdCardBack">重传</view>
+            <view class="btn btn-outline btn-sm" bindtap="removeIdCardBack">删除</view>
+          </view>
+        </view>
+      </view>
+      <text class="error" wx:if="{{errors.idCardBack}}">{{errors.idCardBack}}</text>
+    </view>
+
+    <view class="group">
       <text class="label">身份证有效期<text class="label-star">*</text></text>
       <view class="row space-between cert-row">
         <text class="hint">长期有效</text>

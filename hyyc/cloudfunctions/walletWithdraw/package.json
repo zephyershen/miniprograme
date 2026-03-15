@@ -1,0 +1,9 @@
+{
+  "name": "walletWithdraw",
+  "version": "1.0.0",
+  "description": "Wallet withdraw orchestration for Huifu bind-card, balance query and encashment",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

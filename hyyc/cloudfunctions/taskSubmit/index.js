@@ -23,6 +23,9 @@ exports.main = async (event = {}) => {
 
   const note = pickStr(event.note);
   const images = Array.isArray(event.images) ? event.images.filter(Boolean) : [];
+  if (!note && !images.length) {
+    return { ok: false, code: 'MISSING_PROOF', msg: '请填写完成说明或上传至少 1 张凭证' };
+  }
   const now = new Date();
 
   try {
@@ -57,4 +60,3 @@ exports.main = async (event = {}) => {
     return { ok: false, code: 'TX_ERROR', err: String(e && e.message ? e.message : e) };
   }
 };
-

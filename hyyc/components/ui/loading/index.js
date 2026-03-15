@@ -11,30 +11,51 @@ Component({
     show: { type: Boolean, value: false },
     text: { type: String, value: '正在加载' }
   },
+  data: {
+    rendered: false
+  },
   observers: {
-    // show 打开时启动动画，关闭时暂停动画（不要反复 destroy，避免累计监听器）
+    // canvas 原生层在 hidden 切换下可能残影，改成显示时创建、隐藏时销毁。
     show(val) {
       if (val) {
-        this.playLottie();
+        this._ensureRenderedAndPlay();
       } else {
-        this.pauseLottie();
+        this.hideLottie();
       }
     }
   },
   lifetimes: {
     ready() {
-      // 组件渲染完成后，如一开始就需要展示，也补播一次
       if (this.properties.show) {
-        this.playLottie();
+        this._ensureRenderedAndPlay();
       }
     },
     detached() {
-      // 组件离开页面时再真正销毁，释放内存
       this.destroyLottie();
     }
   },
   methods: {
+    _ensureRenderedAndPlay() {
+      if (this.data.rendered) {
+        this.playLottie();
+        return;
+      }
+      this.setData({ rendered: true }, () => {
+        if (wx.nextTick) {
+          wx.nextTick(() => {
+            if (!this.properties.show) return;
+            this.playLottie();
+          });
+        } else {
+          setTimeout(() => {
+            if (!this.properties.show) return;
+            this.playLottie();
+          }, 0);
+        }
+      });
+    },
     playLottie() {
+      if (!this.properties.show || !this.data.rendered) return;
       // 已经有实例就直接继续播放，不重复创建
       if (this._lottieInstance) {
         if (this._lottieInstance.play) this._lottieInstance.play();
@@ -42,10 +63,11 @@ Component({
       }
 
       this.createSelectorQuery()
-        .select('#loading-canvas')
+        .select('.lottie-canvas')
         .node(res => {
           if (!res || !res.node) return;
           const canvas = res.node;
+          this._canvasNode = canvas;
 
           // 解决人物被“拉长/压扁”的问题：
           // 使用推荐的 getWindowInfo 获取像素比和屏幕宽度，
@@ -60,6 +82,7 @@ Component({
 
           const context = canvas.getContext('2d');
           context.scale(dpr, dpr);
+          this._canvasContext = context;
 
           lottie.setup(canvas);
           this._lottieInstance = lottie.loadAnimation({
@@ -72,6 +95,12 @@ Component({
         })
         .exec();
     },
+    hideLottie() {
+      this.destroyLottie();
+      if (this.data.rendered) {
+        this.setData({ rendered: false });
+      }
+    },
     pauseLottie() {
       if (!this._lottieInstance) return;
       // 有的版本支持 pause，有的只有 stop；优先 pause
@@ -82,10 +111,19 @@ Component({
       }
     },
     destroyLottie() {
+      if (this._canvasContext && this._canvasNode) {
+        try {
+          this._canvasContext.clearRect(0, 0, this._canvasNode.width, this._canvasNode.height);
+        } catch (e) {
+          // ignore
+        }
+      }
       if (this._lottieInstance && this._lottieInstance.destroy) {
         this._lottieInstance.destroy();
       }
       this._lottieInstance = null;
+      this._canvasContext = null;
+      this._canvasNode = null;
     }
   }
 });

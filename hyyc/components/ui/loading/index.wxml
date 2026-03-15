@@ -1,12 +1,8 @@
-<!--
-  不要用 wx:if 反复创建/销毁节点：
-  在开发者工具里频繁 show/hide 可能会累计事件监听，出现“possibly causing memory leak”的提示。
-  用 hidden 保留节点，配合 JS 里 pause/resume 动画即可。
--->
-<view class="loading-mask" hidden="{{!show}}">
+<!-- canvas 原生层在 hidden 切换时可能留下残影，因此这里改成显隐时直接挂载/销毁 -->
+<view wx:if="{{rendered}}" class="loading-mask">
   <view class="loading-card card">
     <view class="lottie-box">
-      <canvas type="2d" id="loading-canvas" class="lottie-canvas"></canvas>
+      <canvas type="2d" class="lottie-canvas"></canvas>
     </view>
     <view class="loading-text-row">
       <text class="loading-text">{{text}}</text>

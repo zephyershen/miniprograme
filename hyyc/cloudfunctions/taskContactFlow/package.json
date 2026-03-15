@@ -1,0 +1,9 @@
+{
+  "name": "taskContactFlow",
+  "version": "1.0.0",
+  "description": "任务聊天手机号查看申请流程",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

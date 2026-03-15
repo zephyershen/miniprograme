@@ -7,7 +7,7 @@
 
     <view class="hero-inner">
       <view class="user-strip" bindtap="gotoAccount">
-        <image wx:if="{{user.avatarFileID}}" class="avatar avatar-lg" src="{{user.avatarFileID}}" mode="aspectFill"></image>
+        <image wx:if="{{user.avatarDisplayUrl || user.avatarFileID}}" class="avatar avatar-lg" src="{{user.avatarDisplayUrl || user.avatarFileID}}" mode="aspectFill"></image>
         <view wx:else class="avatar avatar-lg"></view>
         <view class="user-text">
           <text class="user-name">{{user.nickname||'未实名'}}</text>
@@ -34,6 +34,12 @@
             <image class="quick-icon-png" src="/assets/tabbar/goods-unclick.png" mode="aspectFit"></image>
           </view>
           <text class="quick-label">商品</text>
+        </view>
+        <view class="quick-item" bindtap="gotoFavorites">
+          <view class="quick-icon quick-icon-favorite">
+            <image class="quick-icon-svg" src="/assets/pages/goods/detail/favorite-clicked.svg" mode="aspectFit"></image>
+          </view>
+          <text class="quick-label">收藏</text>
         </view>
         <view class="quick-item" bindtap="gotoWallet">
           <view class="quick-icon quick-icon-wallet">

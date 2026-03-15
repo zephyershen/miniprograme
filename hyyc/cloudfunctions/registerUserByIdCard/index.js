@@ -1,8 +1,8 @@
 // 云函数：registerUserByIdCard
 // 作用：
-// - 前端只上传身份证正面（人像面）照片到云存储，传 fileID 过来；
-// - 云函数把 fileID 转成临时链接（ImageUrl），调用腾讯 FaceID 的 IdCardOCRVerification 做识别+核验；
-// - 核验通过才注册；成功/失败都删除云存储里的身份证照片（不落库）。
+// - 前端上传身份证正反面照片到云存储，传 fileID 过来；
+// - 云函数把身份证正面 fileID 转成临时链接（ImageUrl），调用腾讯 FaceID 的 IdCardOCRVerification 做识别+核验；
+// - 核验通过才注册；注册成功后保留身份证正反面 fileID，供后续汇付开户注册复用；失败时删除云存储里的身份证照片。
 
 const cloud = require('wx-server-sdk');
 
@@ -14,7 +14,7 @@ const USER_COLLECTION = 'userInfo';
 const USER_COMMUNITY_COLLECTION = 'user_community';
 const LEGAL_COLLECTION = 'legal_docs';
 const VERIFY_LOG_COLLECTION = 'realname_verify_logs';
-const BUILD_TAG = 'registerUserByIdCard@2026-02-27.1';
+const BUILD_TAG = 'registerUserByIdCard@2026-03-13.3';
 
 function pickStr(...vals) {
   for (const v of vals) {
@@ -49,6 +49,26 @@ function getHuifuRespCodeDesc(resp) {
   const code = pickStr(r && (r.resp_code || r.return_code || r.code || r.err_code));
   const desc = pickStr(r && (r.resp_desc || r.resp_msg || r.return_msg || r.message || r.err_msg));
   return { code, desc };
+}
+
+function safeJsonParse(v, label = 'JSON') {
+  if (v == null || v === '') return null;
+  if (typeof v === 'object') return v;
+  const s = pickStr(v);
+  if (!s) return null;
+  try {
+    return JSON.parse(s);
+  } catch (e) {
+    throw new Error(`${label} 不是合法 JSON`);
+  }
+}
+
+function getUserBusiStatusByResp(result = {}) {
+  const resp = result && result.huifuResp ? result.huifuResp : {};
+  const { code } = getHuifuRespCodeDesc(resp);
+  if (code === '00000000' || (!code && result && result.ok === true)) return 'success';
+  if (code === '90000000') return 'pending';
+  return 'failed';
 }
 
 function summarizeHuifuFailReason({ err, result, respData }) {
@@ -230,8 +250,10 @@ exports.main = async (event, context) => {
 
   const agree = !!(event && event.agree);
   const idCardFrontFileID = pickStr(event && event.idCardFrontFileID);
+  const idCardBackFileID = pickStr(event && event.idCardBackFileID);
   const avatarFileID = pickStr(event && event.avatarFileID);
   const form = (event && event.form) || {};
+  let keepIdCardFiles = false;
 
   const phone = pickStr(form.phone);
   const community = pickStr(form.community);
@@ -241,7 +263,6 @@ exports.main = async (event, context) => {
   const certBeginDateRaw = pickStr(form.certBeginDate);
   const certEndDateRaw = pickStr(form.certEndDate);
 
-  // 无论成功/失败都删照片：用 finally 兜底
   try {
     if (!agree) {
       return { ok: false, code: 'AGREEMENT_REQUIRED', msg: '请先阅读并同意用户协议和隐私政策' };
@@ -251,7 +272,7 @@ exports.main = async (event, context) => {
       return { ok: false, code: 'NO_OPENID', msg: '获取用户身份失败' };
     }
 
-    if (!idCardFrontFileID || !phone || !community || !building || !door) {
+    if (!idCardFrontFileID || !idCardBackFileID || !phone || !community || !building || !door) {
       return { ok: false, code: 'INVALID_PARAM', msg: '缺少必要参数' };
     }
     if (!certBeginDateRaw || (certValidityTypeRaw !== 'long' && !certEndDateRaw)) {
@@ -317,6 +338,7 @@ exports.main = async (event, context) => {
     const resultNum = Number(apiRes && apiRes.Result);
     const name = pickStr(apiRes && apiRes.Name);
     const idNumber = pickStr((apiRes && (apiRes.IdCard || apiRes.IdNumber)) || '');
+    const ocrLegalAddr = pickStr(apiRes && apiRes.Address, apiRes && apiRes.address, form.legalAddr);
 
     if (resultNum !== 0 || !name || !idNumber) {
       await safeAddVerifyLog({
@@ -394,6 +416,9 @@ exports.main = async (event, context) => {
         community,
         name,
         idNumber,
+        legalAddr: ocrLegalAddr,
+        idCardFrontFileID,
+        idCardBackFileID,
         // 用户头像（云存储 fileID）
         avatarFileID,
         // 为了兼容登录流程中通过 _openid 查询 userInfo，这里手动写入 _openid
@@ -436,6 +461,7 @@ exports.main = async (event, context) => {
     });
 
     if (!txRes || !txRes.ok) return txRes;
+    keepIdCardFiles = true;
 
     // 5) 注册后自动开户（失败不影响注册）
     const certValidityType = certValidityTypeRaw === 'long' ? 'long' : 'fixed';
@@ -444,6 +470,7 @@ exports.main = async (event, context) => {
     const huifuCertValidityType = certValidityType === 'long' ? '1' : '0';
 
     let huifuOpen = null;
+    let userBusiOpen = null;
     let huifuPatch = null;
     try {
       const callRes = await cloud.callFunction({
@@ -471,7 +498,9 @@ exports.main = async (event, context) => {
           huifu_id: huifuId,
           huifu_open_status: 'success',
           huifu_opened_at: new Date(),
-          huifu_open_fail_reason: ''
+          huifu_open_fail_reason: '',
+          user_busi_status: 'pending',
+          user_busi_fail_reason: ''
         };
       } else {
         const err = result && result.err;
@@ -486,7 +515,9 @@ exports.main = async (event, context) => {
         }
         huifuPatch = {
           huifu_open_status: 'failed',
-          huifu_open_fail_reason: reason
+          huifu_open_fail_reason: reason,
+          user_busi_status: 'failed',
+          user_busi_fail_reason: '个人开户失败，未发起用户业务入驻'
         };
       }
       console.error('[huifuOpen] result=', safeJsonStringifyBrief(result, 600));
@@ -495,10 +526,72 @@ exports.main = async (event, context) => {
       const reason = pickStr(err && (err.errMsg || err.message) || '开户失败');
       huifuPatch = {
         huifu_open_status: 'failed',
-        huifu_open_fail_reason: reason
+        huifu_open_fail_reason: reason,
+        user_busi_status: 'failed',
+        user_busi_fail_reason: '个人开户失败，未发起用户业务入驻'
       };
       huifuOpen = { ok: false, bizOk: false, huifuId: '', respCode: '', raw: { err: reason } };
       console.error('自动开户失败', err);
+    }
+
+    if (huifuPatch && txRes.id && pickStr(huifuPatch.huifu_open_status) === 'success' && pickStr(huifuPatch.huifu_id)) {
+      try {
+        const callRes = await cloud.callFunction({
+          name: 'huifuMiniappPay',
+          data: {
+            action: 'user_busi_open',
+            userHuifuId: pickStr(huifuPatch.huifu_id),
+            upperHuifuId: pickStr(process.env.HUIFU_UPPER_HUIFU_ID),
+          }
+        });
+        const result = (callRes && callRes.result) || callRes || null;
+        const respData = result && result.huifuResp;
+        const { code: respCode, desc: respDesc } = getHuifuRespCodeDesc(respData);
+        const userBusiStatus = getUserBusiStatusByResp(result);
+        const failReason = userBusiStatus === 'failed'
+          ? pickStr(respCode ? `${respCode}${respDesc ? `:${respDesc}` : ''}` : '', '用户业务入驻失败')
+          : '';
+
+        huifuPatch = {
+          ...huifuPatch,
+          user_busi_status: userBusiStatus,
+          user_busi_fail_reason: failReason,
+          user_busi_req_seq_id: pickStr(result && result.reqSeqId),
+          user_busi_req_date: pickStr(result && result.reqDate),
+          user_busi_updated_at: new Date(),
+          userBusiApply: {
+            status: userBusiStatus,
+            reqSeqId: pickStr(result && result.reqSeqId),
+            reqDate: pickStr(result && result.reqDate),
+            respCode,
+            respDesc,
+            updatedAt: new Date(),
+            lastError: failReason,
+            huifuResp: respData,
+          }
+        };
+        userBusiOpen = {
+          ok: !!(result && result.ok),
+          status: userBusiStatus,
+          respCode,
+          raw: result,
+        };
+      } catch (err) {
+        const reason = pickStr(err && (err.errMsg || err.message), '用户业务入驻失败');
+        huifuPatch = {
+          ...huifuPatch,
+          user_busi_status: 'failed',
+          user_busi_fail_reason: reason,
+          user_busi_updated_at: new Date(),
+          userBusiApply: {
+            status: 'failed',
+            updatedAt: new Date(),
+            lastError: reason,
+          }
+        };
+        userBusiOpen = { ok: false, status: 'failed', respCode: '', raw: { err: reason } };
+        console.error('自动用户业务入驻失败', err);
+      }
     }
 
     if (huifuPatch && txRes.id) {
@@ -513,7 +606,8 @@ exports.main = async (event, context) => {
       ...txRes,
       buildTag: BUILD_TAG,
       user: { ...(txRes.user || {}), ...(huifuPatch || {}) },
-      huifuOpen
+      huifuOpen,
+      userBusiOpen
     };
   } catch (err) {
     console.error('registerUserByIdCard 失败', err);
@@ -523,7 +617,9 @@ exports.main = async (event, context) => {
       msg: err && err.errMsg ? err.errMsg : '注册失败，请稍后重试'
     };
   } finally {
-    // 成功/失败都删：不保存身份证照片
-    await safeDeleteFile(idCardFrontFileID);
+    if (!keepIdCardFiles) {
+      await safeDeleteFile(idCardFrontFileID);
+      await safeDeleteFile(idCardBackFileID);
+    }
   }
 };

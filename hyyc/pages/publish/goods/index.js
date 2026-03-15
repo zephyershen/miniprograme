@@ -382,13 +382,13 @@ Page({
       // 写库：先保存为 pending（审核中），通过审核后再变成 posted（可见）
       const editId = String(this.data.editGoodsId || '').trim();
       let goodsId = editId;
+      const openid = await this._ensureOpenid();
+      if (!openid) {
+        this.setData({ isLoading: false });
+        toast('获取用户身份失败，请重新登录');
+        return;
+      }
       if (editId) {
-        const openid = await this._ensureOpenid();
-        if (!openid) {
-          this.setData({ isLoading: false });
-          toast('获取用户身份失败，请重新登录');
-          return;
-        }
 
         // 注意：安全规则里 update 往往会用到 doc._openid == auth.openid，
         // 这里用 {_id, _openid} 精确匹配，避免被判定为“不安全更新”而拒绝。
@@ -407,8 +407,10 @@ Page({
             community: String(u.community || '').trim(),
             building: f.building || '',
             ownerId: u.id || '',
+            ownerOpenid: openid,
             ownerName: u.name || '',
             ownerNickname: u.nickname || '',
+            ownerAvatarFileID: u.avatarFileID || '',
             status: 'pending',
             updatedAt: db.serverDate()
           }
@@ -435,8 +437,10 @@ Page({
             community: String(u.community || '').trim(),
             building: f.building || '',
             ownerId: u.id || '',
+            ownerOpenid: openid,
             ownerName: u.name || '',
             ownerNickname: u.nickname || '',
+            ownerAvatarFileID: u.avatarFileID || '',
             status: 'pending',
             createdAt: db.serverDate()
           }

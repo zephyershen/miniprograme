@@ -1,5 +1,12 @@
 <view class="row" style="margin: 8rpx 0; justify-content: {{mine?'flex-end':'flex-start'}};">
-  <view wx:if="{{!mine}}" class="avatar chat-avatar" style="margin-right:12rpx;"></view>
+  <view
+    wx:if="{{!mine}}"
+    class="chat-avatar-wrap"
+    bindtap="onAvatarTap"
+  >
+    <image wx:if="{{avatarUrl}}" class="avatar chat-avatar" src="{{avatarUrl}}" mode="aspectFill" style="margin-right:12rpx;"></image>
+    <view wx:else class="avatar chat-avatar" style="margin-right:12rpx;"></view>
+  </view>
   <view class="bubble {{mine?'bubble-mine':'bubble-other'}}">
     <block wx:if="{{type === 'text'}}">
       <text class="text-base">{{text}}</text>
@@ -13,5 +20,8 @@
       />
     </block>
   </view>
-  <view wx:if="{{mine}}" class="avatar chat-avatar" style="margin-left:12rpx;"></view>
+  <view wx:if="{{mine}}" class="chat-avatar-wrap">
+    <image wx:if="{{avatarUrl}}" class="avatar chat-avatar" src="{{avatarUrl}}" mode="aspectFill" style="margin-left:12rpx;"></image>
+    <view wx:else class="avatar chat-avatar" style="margin-left:12rpx;"></view>
+  </view>
 </view>

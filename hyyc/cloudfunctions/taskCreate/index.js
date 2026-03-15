@@ -71,6 +71,7 @@ exports.main = async (event = {}) => {
       ownerId: pickStr(user._id || user.id),
       ownerName: pickStr(user.name),
       ownerNickname: pickStr(user.nickname),
+      ownerAvatarFileID: pickStr(user.avatarFileID, user.avatarUrl),
 
       status: 'pay_pending',
       createdAt: now,

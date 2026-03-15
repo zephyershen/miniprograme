@@ -1,0 +1,55 @@
+<ui-loading show="{{isLoading}}" />
+
+<view class="favorites-page px-24 py-16">
+  <view class="tabs">
+    <view class="tab {{tab==='favorite' ? 'tab-active' : ''}}" data-tab="favorite" bindtap="setTab">收藏</view>
+    <view class="tab {{tab==='history' ? 'tab-active' : ''}}" data-tab="history" bindtap="setTab">浏览记录</view>
+  </view>
+
+  <view wx:if="{{!isLoading && (!list || !list.length)}}" class="empty card">
+    <text class="empty-title">{{tab==='favorite' ? '暂无收藏商品' : '还没有浏览记录'}}</text>
+    <text class="empty-sub">{{tab==='favorite' ? '在商品详情页点一下收藏，商品会保存到这里。' : '浏览过的商品会自动保存在这里。'}}</text>
+  </view>
+
+  <view wx:if="{{list && list.length}}" class="goods-list">
+    <block wx:for="{{list}}" wx:key="goodsId">
+      <view class="goods-card card">
+        <view class="goods-main" data-id="{{item.id}}" bindtap="onOpenGoods">
+          <block wx:if="{{item.coverImage}}">
+            <image class="goods-cover" src="{{item.coverImage}}" mode="aspectFill" lazy-load="true" />
+          </block>
+          <block wx:else>
+            <view class="goods-cover goods-cover-empty">
+              <text>暂无图片</text>
+            </view>
+          </block>
+
+          <view class="goods-body">
+            <view class="goods-title-row">
+              <text class="goods-title">{{item.title || '未命名商品'}}</text>
+              <text class="goods-status">{{item.statusText}}</text>
+            </view>
+
+            <view class="goods-price-row">
+              <text class="goods-price">¥{{item.priceText || '0.00'}}</text>
+              <text wx:if="{{item.originalPriceText}}" class="goods-original">¥{{item.originalPriceText}}</text>
+            </view>
+
+            <text wx:if="{{item.subText}}" class="goods-sub">{{item.subText}}</text>
+            <text wx:if="{{item.timeText}}" class="goods-time">{{item.timeLabel}} {{item.timeText}}</text>
+          </view>
+        </view>
+
+        <view class="goods-actions">
+          <view
+            class="action-btn {{item.isFavorite ? 'action-btn-active' : ''}}"
+            data-id="{{item.id}}"
+            bindtap="onToggleFavorite"
+          >
+            {{tab==='favorite' ? '取消收藏' : (item.isFavorite ? '取消收藏' : '收藏')}}
+          </view>
+        </view>
+      </view>
+    </block>
+  </view>
+</view>

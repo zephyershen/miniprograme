@@ -122,6 +122,7 @@ Page({
     this._thumbPrefetching = {};
     this._thumbPrefetchTimer = null;
     this._thumbErrorRefreshTried = {};
+    this._pendingStopPullDownRefresh = false;
   },
   onShow() {
     this._isVisible = true;
@@ -166,6 +167,9 @@ Page({
   },
   onReachBottom() {
     this.loadMoreGoods();
+  },
+  onPullDownRefresh() {
+    this._refreshGoodsFromTop({ stopPullDown: true });
   },
   onHide() {
     this._isVisible = false;
@@ -271,8 +275,18 @@ Page({
     if (!this.data.showNewGoodsTip) this.setData({ showNewGoodsTip: true });
   },
   onTapNewGoodsTip() {
+    this._refreshGoodsFromTop();
+  },
+  _finishPullDownRefresh() {
+    if (!this._pendingStopPullDownRefresh) return;
+    this._pendingStopPullDownRefresh = false;
+    wx.stopPullDownRefresh();
+  },
+  _refreshGoodsFromTop(options = {}) {
+    const stopPullDown = !!(options && options.stopPullDown);
+    if (stopPullDown) this._pendingStopPullDownRefresh = true;
+
     this.setData({ showNewGoodsTip: false }, () => {
-      // 点击提示条后，回到顶部并刷新第一页
       if (wx.pageScrollTo) {
         wx.pageScrollTo({
           scrollTop: 0,
@@ -1199,6 +1213,7 @@ Page({
         isLoading: false,
         isLoadingMore: false
       }, () => {
+        if (isFirstPage) this._finishPullDownRefresh();
         // 首次加载需要测容器位置；后续 load more 直接刷新可视范围即可
         if (this._virtualContainerTopPx == null) {
           wx.nextTick(() => {
@@ -1220,6 +1235,7 @@ Page({
         loadMoreError: 'load_failed'
       });
       if (isFirstPage) {
+        this._finishPullDownRefresh();
         wx.showToast({ title: '商品加载失败', icon: 'none' });
       }
     } finally {

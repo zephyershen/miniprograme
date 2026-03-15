@@ -15,6 +15,10 @@ const TASK_COLLECTION = 'tasks';
 const MSG_COLLECTION = 'messages';
 const USER_COLLECTION = 'userInfo';
 
+function pickStr(v) {
+  return String(v == null ? '' : v).trim();
+}
+
 exports.main = async (event, context) => {
   const { tid } = event || {};
 
@@ -84,6 +88,26 @@ exports.main = async (event, context) => {
         ok: false,
         code: 'NOT_OWNER',
         msg: '只有任务发布者可以删除任务及相关聊天记录',
+      };
+    }
+
+    const status = pickStr(task.status);
+    const pay = task.pay && typeof task.pay === 'object' ? task.pay : {};
+    const payStatus = pickStr(pay.status);
+    const canDeleteRefundedCancelled = status === 'cancelled' && payStatus === 'refunded';
+    const canDeleteCompleted = status === 'completed';
+    const hasPaymentTrace = !!(
+      task.paidAt
+      || pickStr(pay.reqDate)
+      || pickStr(pay.reqSeqId)
+      || pickStr(pay.orgHfSeqId)
+      || payStatus
+    );
+    if (!canDeleteRefundedCancelled && !canDeleteCompleted && (status !== 'pay_pending' || hasPaymentTrace)) {
+      return {
+        ok: false,
+        code: 'PAID_TASK_DELETE_FORBIDDEN',
+        msg: '该任务已发起或完成支付，当前删除不会自动退款，已禁止删除。请先走退款/取消流程。',
       };
     }
 

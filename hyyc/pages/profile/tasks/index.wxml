@@ -21,7 +21,7 @@
         <text wx:if="{{isAllSelected}}">✓</text>
         <text wx:elif="{{isPartialSelected}}">-</text>
       </view>
-      <text class="batch-bar-text">全选 ({{selectedIds.length}}/{{list.length}})</text>
+      <text class="batch-bar-text">全选 ({{selectedIds.length}}/{{deletableCount}})</text>
     </view>
     <view
       class="btn btn-danger btn-sm {{selectedIds.length ? '' : 'btn-disabled'}}"
@@ -35,7 +35,7 @@
       <!-- 批量模式下显示复选框 -->
       <view
         wx:if="{{batchMode}}"
-        class="batch-checkbox-wrap"
+        class="batch-checkbox-wrap {{!item.canDeleteRecord ? 'batch-checkbox-wrap-disabled' : ''}}"
         data-id="{{item.id}}"
         bindtap="toggleSelect">
         <view class="batch-checkbox {{item.selected ? 'batch-checkbox-checked' : ''}}">
@@ -69,14 +69,14 @@
                 去付款
               </view>
               <view
-                wx:if="{{tab === 'owner' && !batchMode}}"
+                wx:if="{{tab === 'owner' && !batchMode && item.ownerActionText}}"
                 class="btn btn-outline btn-sm row-gap-item"
                 data-id="{{item.id}}"
                 bindtap="onDeleteTask">
-                删除
+                {{item.ownerActionText}}
               </view>
               <view
-                wx:if="{{tab === 'owner' && !batchMode && !item.canPay}}"
+                wx:if="{{tab === 'owner' && !batchMode && item.canEdit}}"
                 class="btn btn-outline btn-sm row-gap-item"
                 data-id="{{item.id}}"
                 bindtap="onEditTask">

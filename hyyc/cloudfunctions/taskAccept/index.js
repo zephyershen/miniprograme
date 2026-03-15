@@ -1,7 +1,7 @@
 // 云函数：taskAccept
 // 作用：
 // - 住户接单：把任务从 posted -> accepted，并写入 worker 信息
-// - 同时做一个关键校验：接单人必须已完成“汇付开户成功”，否则后续无法打款
+// - 同时做关键校验：接单人必须已完成“汇付个人开户 + 用户业务入驻”
 
 const cloud = require('wx-server-sdk');
 
@@ -12,8 +12,12 @@ const db = cloud.database();
 const TASK_COLLECTION = 'tasks';
 const USER_COLLECTION = 'userInfo';
 
-function pickStr(v) {
-  return String(v == null ? '' : v).trim();
+function pickStr(...vals) {
+  for (const v of vals) {
+    const s = String(v == null ? '' : v).trim();
+    if (s) return s;
+  }
+  return '';
 }
 
 function getHuifuUserIdFromUserDoc(user = {}) {
@@ -28,9 +32,19 @@ function getHuifuUserIdFromUserDoc(user = {}) {
 }
 
 function isHuifuOpenSuccess(user = {}) {
-  const s = pickStr(user.huifu_open_status);
-  if (!s) return true; // 兼容旧数据：没有字段时先放行（有 huifu_id 才会通过后续校验）
-  return s === 'success';
+  return pickStr(user.huifu_open_status) === 'success';
+}
+
+function isUserBusiOpenSuccess(user = {}) {
+  const u = user && typeof user === 'object' ? user : {};
+  const userBusiObj = u.userBusiApply && typeof u.userBusiApply === 'object' ? u.userBusiApply : null;
+  return pickStr(u.user_busi_status, userBusiObj && userBusiObj.status) === 'success';
+}
+
+function isReceiverReady(user = {}) {
+  return Boolean(getHuifuUserIdFromUserDoc(user))
+    && isHuifuOpenSuccess(user)
+    && isUserBusiOpenSuccess(user);
 }
 
 async function getUserByOpenid(openid) {
@@ -66,12 +80,12 @@ exports.main = async (event = {}) => {
   }
 
   const workerHuifuId = getHuifuUserIdFromUserDoc(worker);
-  if (!workerHuifuId || !isHuifuOpenSuccess(worker)) {
+  if (!workerHuifuId || !isReceiverReady(worker)) {
     return {
       ok: false,
       code: 'WORKER_NOT_HUIFU_READY',
-      msg: '你还没开通收款（汇付开户未成功），暂时不能接单',
-      hint: '请先完成实名注册（会自动开户）；如开户失败，可在“我的-账户”里尝试补偿开户。'
+      msg: '收款未就绪，暂时不能接单',
+      hint: '请联系管理员处理。'
     };
   }
 
@@ -83,7 +97,6 @@ exports.main = async (event = {}) => {
       const task = docRes && docRes.data ? docRes.data : null;
       if (!task) return { ok: false, code: 'TASK_NOT_FOUND' };
 
-      // 不能接自己的单
       if (pickStr(task._openid) && pickStr(task._openid) === OPENID) return { ok: false, code: 'CANNOT_ACCEPT_SELF' };
 
       const status = pickStr(task.status) || '';
@@ -104,6 +117,7 @@ exports.main = async (event = {}) => {
           workerId: pickStr(worker._id || worker.id),
           workerName: pickStr(worker.name),
           workerNickname: pickStr(worker.nickname),
+          workerAvatarFileID: pickStr(worker.avatarFileID, worker.avatarUrl),
           workerHuifuId,
           acceptedAt: now,
           updatedAt: now,
@@ -117,4 +131,3 @@ exports.main = async (event = {}) => {
     return { ok: false, code: 'TX_ERROR', err: String(e && e.message ? e.message : e) };
   }
 };
-

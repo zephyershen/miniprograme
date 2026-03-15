@@ -12,9 +12,21 @@ Component({
     imageUrl: {
       type: String,
       value: ''
+    },
+    avatarUrl: {
+      type: String,
+      value: ''
+    },
+    avatarClickable: {
+      type: Boolean,
+      value: false
     }
   },
   methods: {
+    onAvatarTap() {
+      if (!this.data.avatarClickable) return;
+      this.triggerEvent('avatartap');
+    },
     // 点击图片放大预览
     onImageTap() {
       const url = this.data.imageUrl;

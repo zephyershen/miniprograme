@@ -1,0 +1,9 @@
+{
+  "name": "taskCancelFlow",
+  "version": "1.0.0",
+  "description": "任务取消申请/同意退款流程",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

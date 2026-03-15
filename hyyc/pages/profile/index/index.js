@@ -1,16 +1,44 @@
+const { isCloudFileID, resolveAvatarURL, saveAvatarTempURL } = require('../../../utils/avatarCache');
+
 Page({
   data: {
     user: {},
-    isLoading: true,
+    isLoading: false,
   },
   onShow(){
-    this.setData({ isLoading: true });
-    setTimeout(() => {
-      this.setData({
-        user: wx.getStorageSync('hyyc_user')||{},
-        isLoading: false,
+    const rawUser = wx.getStorageSync('hyyc_user') || {};
+    const avatarDisplayUrl = resolveAvatarURL(rawUser.avatarFileID, rawUser.avatarUrl);
+    this.setData({
+      user: {
+        ...rawUser,
+        avatarDisplayUrl,
+      },
+      isLoading: false,
+    });
+    this._hydrateAvatar(rawUser);
+  },
+  async _hydrateAvatar(user = {}) {
+    const avatarFileID = String(user && user.avatarFileID || '').trim();
+    if (!avatarFileID || !isCloudFileID(avatarFileID)) return;
+    if (resolveAvatarURL(avatarFileID)) return;
+
+    try {
+      const res = await wx.cloud.getTempFileURL({
+        fileList: [{ fileID: avatarFileID, maxAge: 60 * 30 }]
       });
-    }, 500);
+      const file = res && res.fileList && res.fileList[0];
+      const tempURL = file && file.tempFileURL ? file.tempFileURL : '';
+      if (!tempURL) return;
+
+      saveAvatarTempURL(avatarFileID, tempURL, 60 * 30);
+      const currentUser = wx.getStorageSync('hyyc_user') || {};
+      if (String(currentUser.avatarFileID || '').trim() !== avatarFileID) return;
+      this.setData({
+        'user.avatarDisplayUrl': tempURL
+      });
+    } catch (err) {
+      console.warn('加载我的头像失败', err);
+    }
   },
   // 点击“账户信息”卡片，进入账户详情页
   gotoAccount(){
@@ -18,6 +46,7 @@ Page({
   },
   gotoMyTasks(){ wx.navigateTo({ url: '/pages/profile/tasks/index' }); },
   gotoMyGoods(){ wx.navigateTo({ url: '/pages/profile/goods/index' }); },
+  gotoFavorites(){ wx.navigateTo({ url: '/pages/profile/favorites/index' }); },
   gotoWallet(){ wx.navigateTo({ url: '/pages/profile/wallet/index' }); },
 
   // 退出登录：清掉本地缓存的用户信息，并回到欢迎页

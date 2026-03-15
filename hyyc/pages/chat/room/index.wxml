@@ -3,29 +3,87 @@
 <view class="chat-container">
   <!-- 头部：显示对方昵称/姓名 -->
   <view class="chat-header">
-    <view class="chat-header-title">{{peerDisplayName || '对方'}}</view>
+    <view class="chat-header-main" bindtap="openPeerProfile">
+      <image wx:if="{{peerProfile.avatarUrl}}" class="chat-header-avatar" src="{{peerProfile.avatarUrl}}" mode="aspectFill"></image>
+      <view wx:else class="avatar chat-header-avatar"></view>
+      <view class="chat-header-title">{{peerDisplayName || '对方'}}</view>
+    </view>
+    <view wx:if="{{canRequestTaskCancel}}" class="chat-header-action" bindtap="requestTaskCancel">申请取消</view>
+    <view wx:elif="{{hasPendingTaskCancel}}" class="chat-header-action chat-header-action-muted">已发起取消</view>
   </view>
 
   <!-- 聊天消息区域：内部滚动 -->
   <scroll-view
     class="chat-scroll {{contentReady ? '' : 'chat-scroll-hidden'}}"
     scroll-y
-    enhanced="{{true}}"
     show-scrollbar="{{false}}"
     scroll-with-animation="{{scrollWithAnimation}}"
     scroll-top="{{scrollTop}}"
     bindscroll="onScroll"
   >
     <block wx:for="{{msgs}}" wx:key="id">
-      <chat-bubble
-        id="m{{item.id}}"
-        mine="{{item.mine}}"
-        type="{{item.type}}"
-        text="{{item.text}}"
-        image-url="{{item.imageUrl}}"
-      />
+      <block wx:if="{{item.type === 'task_cancel_request'}}">
+        <view class="task-cancel-message">
+          <view class="task-cancel-card">
+            <view class="task-cancel-card-title">任务取消申请</view>
+            <view class="task-cancel-card-text">{{item.taskCancelText}}</view>
+            <view class="{{item.taskCancelStatusClass}}">{{item.taskCancelStatusText}}</view>
+          </view>
+        </view>
+      </block>
+      <block wx:elif="{{item.type === 'contact_request'}}">
+        <view class="task-cancel-message">
+          <view class="task-cancel-card">
+            <view class="task-cancel-card-title">手机号查看申请</view>
+            <view class="task-cancel-card-text">{{item.contactRequestText}}</view>
+            <view class="{{item.contactRequestStatusClass}}">{{item.contactRequestStatusText}}</view>
+          </view>
+        </view>
+      </block>
+      <block wx:else>
+        <chat-bubble
+          id="m{{item.id}}"
+          mine="{{item.mine}}"
+          type="{{item.type}}"
+          text="{{item.text}}"
+          image-url="{{item.imageUrl}}"
+          avatar-url="{{item.avatarUrl}}"
+          avatar-clickable="{{item.avatarClickable}}"
+          bindavatartap="onBubbleAvatarTap"
+        />
+      </block>
     </block>
   </scroll-view>
+
+  <view wx:if="{{canApproveTaskCancel}}" class="task-cancel-approve-bar">
+    <view class="task-cancel-approve-copy">
+      卖家申请取消任务
+    </view>
+    <button
+      class="task-cancel-approve-btn {{approveTaskCancelSubmitting ? 'task-cancel-approve-btn-disabled' : ''}}"
+      data-request-id="{{pendingTaskCancelRequestId}}"
+      bindtap="approveTaskCancel"
+      hover-class="task-cancel-approve-btn-hover"
+      disabled="{{approveTaskCancelSubmitting}}"
+    >
+      {{approveTaskCancelSubmitting ? '处理中...' : '同意取消'}}
+    </button>
+  </view>
+
+  <view wx:if="{{canApproveContactRequest}}" class="task-cancel-approve-bar">
+    <view class="task-cancel-approve-copy">
+      对方申请查看你的手机号
+    </view>
+    <button
+      class="task-cancel-approve-btn {{approveContactRequestSubmitting ? 'task-cancel-approve-btn-disabled' : ''}}"
+      data-request-id="{{pendingContactRequestId}}"
+      bindtap="approveContactRequest"
+      hover-class="task-cancel-approve-btn-hover"
+      disabled="{{approveContactRequestSubmitting}}"
+    >
+      {{approveContactRequestSubmitting ? '处理中...' : '同意查看'}}
+    </button>
+  </view>
 
   <!-- 底部输入栏，使用 flex 布局而非 fixed 定位 -->
   <view class="chat-input-safe" style="padding-bottom: calc(16rpx + {{keyboardHeight}}px + env(safe-area-inset-bottom));">

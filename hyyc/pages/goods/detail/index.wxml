@@ -77,16 +77,23 @@
 <view wx:if="{{goods}}" class="footer-bar safe">
   <view class="footer-left">
     <view class="footer-icon-btn" bindtap="onFavoriteTap">
-      <image class="footer-icon" src="{{isFavorite ? '/assets/pages/goods/detail/icon-star-filled.svg' : '/assets/pages/goods/detail/icon-star.svg'}}" mode="aspectFit" />
+      <image class="footer-icon" src="{{isFavorite ? '/assets/pages/goods/detail/favorite-clicked.svg' : '/assets/pages/goods/detail/favorite.svg'}}" mode="aspectFit" />
       <text class="footer-icon-text">收藏</text>
     </view>
   </view>
   <view class="footer-right">
-    <view wx:if="{{canBuy}}" class="btn-buy" bindtap="onBuyTap">{{buyButtonText || '立即购买'}}</view>
-    <view wx:else class="btn-buy btn-buy-disabled">{{buyButtonText || '不可购买'}}</view>
+    <view wx:if="{{isOwner && canOwnerManage}}" class="btn-buy" bindtap="onOwnerActionTap">{{ownerActionText}}</view>
+    <view wx:elif="{{canBuy}}" class="btn-buy" bindtap="onBuyTap">{{buyButtonText || '立即购买'}}</view>
+    <view wx:else class="btn-buy btn-buy-disabled">{{buyButtonText || (isOwner ? '我的商品' : '不可购买')}}</view>
     <view wx:if="{{goodsChatEnabled}}" class="btn-chat" bindtap="onChatTap">
       <image class="chat-icon" src="/assets/pages/goods/detail/icon-chat.svg" mode="aspectFit" />
-      <text>聊一聊</text>
+      <text>{{isOwner ? '咨询会话' : '聊一聊'}}</text>
+      <view
+        wx:if="{{isOwner && goodsChatUnreadCount > 0}}"
+        class="btn-chat-badge"
+      >
+        {{goodsChatUnreadCount > 99 ? '99+' : goodsChatUnreadCount}}
+      </view>
     </view>
   </view>
 </view>

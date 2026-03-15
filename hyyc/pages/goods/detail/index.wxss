@@ -279,6 +279,7 @@
 }
 
 .btn-chat {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8rpx;
@@ -293,4 +294,21 @@
 .chat-icon {
   width: 36rpx;
   height: 36rpx;
+}
+
+.btn-chat-badge {
+  position: absolute;
+  top: -10rpx;
+  right: -10rpx;
+  min-width: 36rpx;
+  height: 36rpx;
+  padding: 0 10rpx;
+  border-radius: 999rpx;
+  background: #E85D4A;
+  color: #ffffff;
+  font-size: 20rpx;
+  line-height: 36rpx;
+  text-align: center;
+  box-shadow: 0 0 0 4rpx #ffffff;
+  box-sizing: border-box;
 }

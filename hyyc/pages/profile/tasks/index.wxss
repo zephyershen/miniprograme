@@ -130,6 +130,10 @@
   padding-right: 16rpx;
 }
 
+.batch-checkbox-wrap-disabled {
+  opacity: 0.35;
+}
+
 .batch-item-card {
   flex: 1;
 }

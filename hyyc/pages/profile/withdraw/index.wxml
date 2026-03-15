@@ -1,0 +1,82 @@
+<ui-loading show="{{isLoading}}" />
+
+<view class="withdraw-page">
+  <view class="hero-card">
+    <text class="hero-label">可提现余额（元）</text>
+    <text class="hero-amount">{{availableBalanceText}}</text>
+    <text class="hero-sub">消费记录会显示在钱包明细里，但不会影响这里的余额</text>
+    <text class="hero-sub warning" wx:if="{{activeWithdraw}}">当前有一笔提现处理中，可点下面按钮刷新状态</text>
+    <view class="btn-secondary {{isSyncingWithdraw ? 'btn-secondary-disabled' : ''}}" wx:if="{{activeWithdraw}}" bindtap="onSyncActiveWithdraw">
+      {{isSyncingWithdraw ? '同步中...' : '立即同步提现状态'}}
+    </view>
+  </view>
+
+  <view class="section-card">
+    <view class="section-head">
+      <text class="section-title">步骤1：绑定提现银行卡</text>
+      <text class="status-tag status-{{cardStatus}}">{{cardStatusText}}</text>
+    </view>
+
+    <view class="tip-box subtle">
+      <text class="tip-text">{{hasBoundCard ? '已绑定后也可以直接修改下面的信息。保存后会自动更新提现设置。' : '请填写你要收款的银行卡信息。保存后系统会自动开通提现功能。'}}</text>
+    </view>
+    <view class="tip-box subtle">
+      <text class="tip-text">仅支持绑定本人银行卡；预留手机号请填写这张银行卡在银行登记的手机号。</text>
+    </view>
+
+    <view class="field-row">
+      <text class="field-label">银行卡号</text>
+      <input class="field-input" value="{{form.cardNo}}" bindinput="onInput" data-key="cardNo" type="number" placeholder="输入要绑定的银行卡号" />
+    </view>
+    <view class="field-row">
+      <text class="field-label">预留手机号</text>
+      <input class="field-input" value="{{form.bankMobile}}" bindinput="onInput" data-key="bankMobile" type="number" placeholder="银行卡预留手机号" />
+    </view>
+    <view class="field-row">
+      <text class="field-label">开户地址(省)</text>
+      <picker mode="selector" range="{{provinceNames}}" value="{{provinceIndex}}" bindchange="onProvinceChange">
+        <view class="field-select">
+          <text>{{form.provName || '请选择省份'}}</text>
+          <text class="select-arrow">›</text>
+        </view>
+      </picker>
+    </view>
+    <view class="field-row">
+      <text class="field-label">开户地址(市)</text>
+      <picker mode="selector" range="{{cityNames}}" value="{{cityIndex}}" bindchange="onCityChange">
+        <view class="field-select">
+          <text>{{form.areaName || '请选择城市'}}</text>
+          <text class="select-arrow">›</text>
+        </view>
+      </picker>
+    </view>
+    <view class="btn-primary" bindtap="onBindCard">{{hasBoundCard ? '保存并更新银行卡' : '绑定银行卡'}}</view>
+  </view>
+
+  <view class="section-card">
+    <view class="section-head">
+      <text class="section-title">步骤2：申请提现</text>
+    </view>
+
+    <view class="tip-box" wx:if="{{!hasBoundCard}}">
+      <text class="tip-text">先完成上一步绑定银行卡。</text>
+    </view>
+    <view class="tip-box" wx:elif="{{activeWithdraw}}">
+      <text class="tip-text">当前有一笔提现处理中，可先同步状态再试。</text>
+    </view>
+    <block wx:else>
+      <view class="tip-box subtle" wx:if="{{!isSelectedCashTypeOpened}}">
+        <text class="tip-text">系统正在准备提现功能，首次使用时可能会慢一点。</text>
+      </view>
+      <view class="field-row">
+        <text class="field-label">提现金额</text>
+        <input class="field-input" value="{{form.amount}}" bindinput="onInput" data-key="amount" type="digit" placeholder="最低 1 元" />
+      </view>
+      <view class="amount-actions">
+        <text class="amount-hint">最低提现 {{withdrawMin}} 元</text>
+        <text class="fill-all" bindtap="onFillAll">全部提现</text>
+      </view>
+      <view class="btn-primary" bindtap="onSubmitWithdraw">确认提现</view>
+    </block>
+  </view>
+</view>
