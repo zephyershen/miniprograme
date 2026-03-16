@@ -11,9 +11,18 @@ function pickStr(...vals) {
   return '';
 }
 
+function stringifyResult(v) {
+  try {
+    return JSON.stringify(v, null, 2);
+  } catch (err) {
+    return String(v == null ? '' : v);
+  }
+}
+
 Page({
   data: {
     isLoading: true,
+    isSuperAdmin: false,
     userDocId: '',
     form: {
       nickname: '',
@@ -21,6 +30,13 @@ Page({
       floor: '',
       door: ''
     },
+    financeForm: {
+      username: '',
+      password: '',
+      limit: '30',
+    },
+    financeRunning: '',
+    financeResultText: '',
     buildingRange: [],
     buildingIndex: 0,
     doorRange: [[], []],
@@ -45,7 +61,7 @@ Page({
         const list = (queryRes && queryRes.data) || [];
         if (list.length) {
           const doc = list[0];
-          u = { ...doc, id: doc._id || doc.id };
+          u = { ...doc, id: doc._id || doc.id, isSuperAdmin: !!u.isSuperAdmin };
           wx.setStorageSync('hyyc_user', u);
         }
       } catch (err) {
@@ -66,6 +82,7 @@ Page({
     const roomIdx = Math.max(0, Math.min(3, roomNo - 1));
 
     this.setData({
+      isSuperAdmin: !!u.isSuperAdmin,
       form: {
         nickname: u.nickname || '',
         building: u.building || '',
@@ -92,6 +109,13 @@ Page({
       buildingIndex: idx,
       'form.building': val
     });
+  },
+
+  onFinanceInput(e) {
+    const key = e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.key;
+    if (!key) return;
+    const value = e && e.detail ? e.detail.value : '';
+    this.setData({ [`financeForm.${key}`]: value });
   },
 
   onDoorChange(e) {
@@ -148,6 +172,84 @@ Page({
     }
   },
 
+  async onFinanceDryRunTap() {
+    await this._runFinanceCompensate(true);
+  },
+
+  async onFinanceRunTap() {
+    await this._runFinanceCompensate(false);
+  },
+
+  async _runFinanceCompensate(dryRun) {
+    if (!this.data.isSuperAdmin) {
+      toast('仅管理员可用');
+      return;
+    }
+    if (this.data.financeRunning) return;
+
+    const financeForm = this.data.financeForm || {};
+    const username = pickStr(financeForm.username);
+    const password = pickStr(financeForm.password);
+    const limit = Math.max(1, Math.min(200, Number(financeForm.limit) || 30));
+    if (!username || !password) {
+      toast('请输入管理员账号和密码');
+      return;
+    }
+
+    const financeRunning = dryRun ? 'dryRun' : 'run';
+    const title = dryRun ? '预检查中...' : '执行补偿中...';
+    this.setData({
+      financeRunning,
+      financeResultText: `${dryRun ? '准备执行预检查' : '准备执行真实补偿'}...\nlimit=${limit}\n时间=${new Date().toLocaleString()}`,
+    });
+    wx.showLoading({ title, mask: true });
+
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'adminFinanceCompensate',
+        data: {
+          username,
+          password,
+          action: 'run_all',
+          dryRun: !!dryRun,
+          limit,
+        }
+      });
+      const ret = (res && res.result) || res || null;
+      console.log('[account] adminFinanceCompensate result', ret);
+
+      const output = {
+        calledAt: new Date().toISOString(),
+        dryRun: !!dryRun,
+        limit,
+        ret,
+      };
+      this.setData({
+        financeResultText: stringifyResult(output),
+      });
+
+      if (ret && ret.ok) {
+        toast(dryRun ? '预检查完成' : '补偿执行完成');
+      } else {
+        toast(pickStr(ret && ret.msg, ret && ret.financeResult && ret.financeResult.msg, '补偿执行失败'));
+      }
+    } catch (err) {
+      console.error('[account] adminFinanceCompensate failed', err);
+      this.setData({
+        financeResultText: stringifyResult({
+          calledAt: new Date().toISOString(),
+          dryRun: !!dryRun,
+          limit,
+          error: pickStr(err && err.message, err),
+        }),
+      });
+      toast('调用失败，请查看结果区和日志');
+    } finally {
+      wx.hideLoading();
+      this.setData({ financeRunning: '' });
+    }
+  },
+
   async _ensureOpenid() {
     const u = wx.getStorageSync('hyyc_user') || {};
     let openid = pickStr(u._openid, u.openid, u.openId);
@@ -176,7 +278,7 @@ Page({
 
     const doc = list[0];
     const docId = pickStr(doc._id, doc.id);
-    const nextUser = { ...cached, ...doc, id: docId };
+    const nextUser = { ...cached, ...doc, id: docId, isSuperAdmin: !!cached.isSuperAdmin };
     this.setData({ userDocId: docId });
     wx.setStorageSync('hyyc_user', nextUser);
     return docId;

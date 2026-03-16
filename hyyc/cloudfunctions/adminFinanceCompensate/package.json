@@ -1,0 +1,9 @@
+{
+  "name": "adminFinanceCompensate",
+  "version": "1.0.0",
+  "description": "管理员临时触发 financeCompensate",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

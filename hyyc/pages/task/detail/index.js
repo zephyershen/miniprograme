@@ -585,6 +585,12 @@ Page({
         return;
       }
 
+      if (ret.pending) {
+        toast(ret.msg || '正在确认打款，请稍后刷新');
+        wx.redirectTo({ url: '/pages/task/detail/index?id=' + task.id });
+        return;
+      }
+
       toast('已确认完成');
       wx.redirectTo({ url: '/pages/task/detail/index?id=' + task.id });
     } catch (err) {

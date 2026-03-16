@@ -16,6 +16,7 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
 const db = cloud.database();
 
+const GOODS_COLLECTION = 'goods';
 const TASK_COLLECTION = 'tasks';
 const MSG_COLLECTION = 'messages';
 const USER_COLLECTION = 'userInfo';
@@ -77,10 +78,149 @@ function roundMoney(v) {
   return Math.round(n * 100) / 100;
 }
 
+function toWalletDateMs(v) {
+  if (!v) return 0;
+  if (v instanceof Date) return v.getTime();
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const t = Date.parse(v);
+  return Number.isFinite(t) ? t : 0;
+}
+
+function getPrimaryWalletId(openid) {
+  return pickStr(openid);
+}
+
+function isLegacyShadowWallet(wallet = {}) {
+  const role = pickStr(wallet && wallet.walletRole).toLowerCase();
+  return role === 'legacy_shadow' || !!pickStr(wallet && wallet.shadowOf);
+}
+
+function sumWalletAmount(walletDocs = [], field = 'balance') {
+  return roundMoney((Array.isArray(walletDocs) ? walletDocs : []).reduce((sum, item) => (
+    sum + Number(item && item[field] ? item[field] : 0)
+  ), 0));
+}
+
+function pickWalletBoundaryDate(walletDocs = [], field = 'updatedAt', mode = 'max', fallback = new Date()) {
+  const list = Array.isArray(walletDocs) ? walletDocs : [];
+  let chosen = fallback;
+  let chosenMs = toWalletDateMs(fallback);
+  for (const item of list) {
+    const value = item && item[field];
+    const ms = toWalletDateMs(value);
+    if (!ms) continue;
+    if (!chosenMs) {
+      chosen = value;
+      chosenMs = ms;
+      continue;
+    }
+    if (mode === 'min' ? ms < chosenMs : ms > chosenMs) {
+      chosen = value;
+      chosenMs = ms;
+    }
+  }
+  return chosen || fallback;
+}
+
+function buildPrimaryWalletSnapshot(openid, walletDocs = [], now = new Date()) {
+  const ownerOpenid = pickStr(openid);
+  const docs = (Array.isArray(walletDocs) ? walletDocs : []).filter((item) => item && pickStr(item._openid) === ownerOpenid);
+  const primaryId = getPrimaryWalletId(ownerOpenid);
+  const primaryDoc = docs.find((item) => pickStr(item._id) === primaryId) || null;
+  const mergeDocs = docs.filter((item) => item && (pickStr(item._id) === primaryId || !isLegacyShadowWallet(item)));
+  const legacyDocs = docs.filter((item) => pickStr(item._id) && pickStr(item._id) !== primaryId);
+  const aggregateDocs = mergeDocs.length ? mergeDocs : docs;
+  return {
+    _openid: ownerOpenid,
+    balance: sumWalletAmount(aggregateDocs, 'balance'),
+    incomeTotal: sumWalletAmount(aggregateDocs, 'incomeTotal'),
+    expenseTotal: sumWalletAmount(aggregateDocs, 'expenseTotal'),
+    createdAt: primaryDoc && primaryDoc.createdAt
+      ? primaryDoc.createdAt
+      : pickWalletBoundaryDate(docs, 'createdAt', 'min', now),
+    updatedAt: now,
+    walletRole: 'primary',
+    isPrimary: true,
+    shadowedWalletIds: legacyDocs.map((item) => pickStr(item._id)).filter(Boolean),
+    ...(legacyDocs.length ? { mergedAt: now } : {}),
+  };
+}
+
+async function markLegacyWalletDocs(tx, legacyDocs = [], primaryId = '', now = new Date()) {
+  for (const item of Array.isArray(legacyDocs) ? legacyDocs : []) {
+    const legacyId = pickStr(item && item._id);
+    if (!legacyId || legacyId === primaryId) continue;
+    await tx.collection(WALLET_COLLECTION).doc(legacyId).update({
+      data: {
+        walletRole: 'legacy_shadow',
+        isPrimary: false,
+        shadowOf: primaryId,
+        shadowedAt: now,
+        updatedAt: now,
+      }
+    });
+  }
+}
+
+async function ensurePrimaryWalletDoc(tx, openid, now = new Date()) {
+  const ownerOpenid = pickStr(openid);
+  const primaryId = getPrimaryWalletId(ownerOpenid);
+  if (!ownerOpenid || !primaryId) return { walletId: '', wallet: null, legacyDocs: [] };
+
+  const walletRes = await tx.collection(WALLET_COLLECTION)
+    .where({ _openid: ownerOpenid })
+    .limit(20)
+    .get();
+  const walletDocs = (walletRes && walletRes.data) || [];
+  if (!walletDocs.length) return { walletId: primaryId, wallet: null, legacyDocs: [] };
+
+  const primaryDoc = walletDocs.find((item) => pickStr(item._id) === primaryId) || null;
+  const legacyDocs = walletDocs.filter((item) => pickStr(item._id) && pickStr(item._id) !== primaryId);
+  const actionableLegacyDocs = legacyDocs.filter((item) => !isLegacyShadowWallet(item) || pickStr(item.shadowOf) !== primaryId);
+  if (!primaryDoc || actionableLegacyDocs.length) {
+    const snapshot = buildPrimaryWalletSnapshot(ownerOpenid, walletDocs, now);
+    if (primaryDoc && primaryDoc._id) {
+      await tx.collection(WALLET_COLLECTION).doc(primaryId).update({
+        data: {
+          balance: snapshot.balance,
+          incomeTotal: snapshot.incomeTotal,
+          expenseTotal: snapshot.expenseTotal,
+          createdAt: snapshot.createdAt,
+          updatedAt: now,
+          walletRole: 'primary',
+          isPrimary: true,
+          shadowedWalletIds: snapshot.shadowedWalletIds,
+          mergedAt: snapshot.mergedAt || now,
+        }
+      });
+    } else {
+      await tx.collection(WALLET_COLLECTION).doc(primaryId).set({ data: snapshot });
+    }
+    await markLegacyWalletDocs(tx, legacyDocs, primaryId, now);
+    return { walletId: primaryId, wallet: { ...(primaryDoc || {}), ...snapshot, _id: primaryId }, legacyDocs };
+  }
+  return { walletId: primaryId, wallet: primaryDoc, legacyDocs };
+}
+
+function safeNumber(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 function formatMoney(v) {
   const n = Number(v);
   if (!Number.isFinite(n)) return '0.00';
   return (Math.round(n * 100) / 100).toFixed(2);
+}
+
+function resolvePlatformFeeRate() {
+  const raw = pickStr(process.env.HUIFU_PLATFORM_FEE_RATE);
+  if (!raw) return 0.04;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return 0.04;
+  if (n > 0 && n < 1) return n;
+  if (n > 1 && n < 100) return n / 100;
+  return 0.04;
 }
 
 function buildTopLevelMessageForSign(top = {}) {
@@ -330,30 +470,38 @@ async function recordWalletTransaction({
     const existsList = (existsRes && existsRes.data) || [];
     if (existsList.length) return { ok: true, existed: true };
 
-    const walletRes = await tx.collection(WALLET_COLLECTION)
-      .where({ _openid: ownerOpenid })
-      .limit(1)
-      .get();
-    const walletList = (walletRes && walletRes.data) || [];
-    const walletDoc = walletList[0] || null;
+    const createdAt = new Date();
+    const walletState = await ensurePrimaryWalletDoc(tx, ownerOpenid, createdAt);
+    const walletDoc = walletState && walletState.wallet ? walletState.wallet : null;
+    const walletId = pickStr(walletState && walletState.walletId);
     const currentBalance = Number(walletDoc && walletDoc.balance || 0);
     const nextBalance = roundMoney(currentBalance + delta);
-    const createdAt = new Date();
+    const incomeDelta = delta > 0 ? delta : 0;
+    const expenseDelta = delta < 0 ? Math.abs(delta) : 0;
 
-    if (walletDoc && walletDoc._id) {
-      await tx.collection(WALLET_COLLECTION).doc(walletDoc._id).update({
+    if (walletDoc && walletId) {
+      await tx.collection(WALLET_COLLECTION).doc(walletId).update({
         data: {
           balance: nextBalance,
+          incomeTotal: roundMoney(Number(walletDoc.incomeTotal || 0) + incomeDelta),
+          expenseTotal: roundMoney(Number(walletDoc.expenseTotal || 0) + expenseDelta),
+          walletRole: 'primary',
+          isPrimary: true,
           updatedAt: createdAt,
         }
       });
     } else if (shouldAffectBalance) {
-      await tx.collection(WALLET_COLLECTION).add({
+      await tx.collection(WALLET_COLLECTION).doc(walletId || getPrimaryWalletId(ownerOpenid)).set({
         data: {
           _openid: ownerOpenid,
           balance: nextBalance,
+          incomeTotal: incomeDelta,
+          expenseTotal: expenseDelta,
           createdAt,
           updatedAt: createdAt,
+          walletRole: 'primary',
+          isPrimary: true,
+          shadowedWalletIds: [],
         }
       });
     }
@@ -386,10 +534,8 @@ async function tryMarkTaskPaidByReq({ reqDate, reqSeqId, huifuData, rawBody }) {
   const rs = pickStr(reqSeqId);
   if (!rd || !rs) return { ok: false, code: 'MISSING_REQ', msg: '缺少 req_date/req_seq_id' };
 
-  // 只处理“任务支付”的下单（我们在 delay_jspay_task 里写入 tasks.pay.reqDate/reqSeqId）
   const res = await db.collection(TASK_COLLECTION)
     .where({
-      status: 'pay_pending',
       'pay.reqDate': rd,
       'pay.reqSeqId': rs,
     })
@@ -397,44 +543,216 @@ async function tryMarkTaskPaidByReq({ reqDate, reqSeqId, huifuData, rawBody }) {
     .get();
 
   const list = (res && res.data) || [];
-  if (!list.length) return { ok: true, code: 'NO_TASK_MATCH', msg: '未找到匹配 pay_pending 任务（可能已处理）' };
+  if (!list.length) return { ok: true, code: 'NO_TASK_MATCH', msg: '未找到匹配任务支付记录' };
   if (list.length > 1) return { ok: false, code: 'MULTI_TASK_MATCH', msg: '存在多条任务匹配同一笔支付（需要人工处理）' };
 
-  const task = list[0] || {};
-  const taskId = pickStr(task._id);
-  if (!taskId) return { ok: false, code: 'TASK_ID_MISSING', msg: '任务ID缺失' };
-
   const now = new Date();
-  await db.collection(TASK_COLLECTION).doc(taskId).update({
-    data: {
-      status: 'posted',
-      paidAt: now,
-      updatedAt: now,
-      pay: {
-        ...(task.pay || {}),
-        status: 'paid',
-        paidAt: now,
-        notify: {
-          at: now,
-          // 存一个摘要，方便排查
-          reqDate: rd,
-          reqSeqId: rs,
-          result: guessBizSuccess(huifuData),
-        }
-      },
-      // 留一份回调数据摘要（不建议存太大）
-      huifuNotify: (() => {
-        try {
-          const s = JSON.stringify(rawBody || {});
-          return s.length <= 2000 ? s : `${s.slice(0, 2000)}...`;
-        } catch (e) {
-          return '';
-        }
-      })(),
+  const orderAmtYuan = roundMoney(Number(huifuData && (huifuData.trans_amt || huifuData.ord_amt || 0)));
+  const feeAmtYuan = roundMoney(Number(huifuData && (huifuData.fee_amount || huifuData.fee_amt || 0)));
+  const unconfirmAmtYuan = roundMoney(Number(huifuData && (huifuData.unconfirm_amt || 0)));
+  const confirmableAmtYuan = unconfirmAmtYuan > 0
+    ? unconfirmAmtYuan
+    : roundMoney(Math.max(0, orderAmtYuan - feeAmtYuan));
+  const hfSeqId = pickStr(huifuData && (huifuData.hf_seq_id || huifuData.hfSeqId));
+  const txResult = await db.runTransaction(async (tx) => {
+    const taskId = pickStr(list[0] && list[0]._id);
+    if (!taskId) return { ok: false, code: 'TASK_ID_MISSING', msg: '任务ID缺失' };
+
+    const docRes = await tx.collection(TASK_COLLECTION).doc(taskId).get();
+    const task = docRes && docRes.data ? docRes.data : null;
+    if (!task) return { ok: false, code: 'TASK_NOT_FOUND', msg: '任务不存在' };
+
+    const status = pickStr(task.status);
+    if (status && status !== 'pay_pending' && status !== 'posted') {
+      return { ok: false, code: 'INVALID_STATUS', msg: '当前任务状态不支持支付回调收口', status };
     }
+
+    if (status === 'pay_pending') {
+      await tx.collection(TASK_COLLECTION).doc(taskId).update({
+        data: {
+          status: 'posted',
+          paidAt: now,
+          updatedAt: now,
+          pay: {
+            ...(task.pay || {}),
+            status: 'paid',
+            paidAt: now,
+            hfSeqId: hfSeqId || pickStr(task.pay && task.pay.hfSeqId, task.pay && task.pay.orgHfSeqId),
+            orgHfSeqId: hfSeqId || pickStr(task.pay && task.pay.orgHfSeqId),
+            orderAmtYuan: orderAmtYuan || roundMoney(Number(task.amount || 0)),
+            transAmtYuan: orderAmtYuan || roundMoney(Number(task.amount || 0)),
+            feeAmtYuan,
+            unconfirmAmtYuan: unconfirmAmtYuan || confirmableAmtYuan,
+            confirmableAmtYuan,
+            notify: {
+              at: now,
+              reqDate: rd,
+              reqSeqId: rs,
+              result: guessBizSuccess(huifuData),
+            }
+          },
+          huifuNotify: (() => {
+            try {
+              const s = JSON.stringify(rawBody || {});
+              return s.length <= 2000 ? s : `${s.slice(0, 2000)}...`;
+            } catch (e) {
+              return '';
+            }
+          })(),
+        }
+      });
+    }
+
+    return {
+      ok: true,
+      code: status === 'pay_pending' ? 'TASK_MARKED_POSTED' : 'TASK_ALREADY_POSTED',
+      msg: `任务已收口: ${taskId}`,
+      taskId,
+      ownerOpenid: pickStr(task._openid),
+      title: pickStr(task.title, task.desc, '任务付款'),
+      amount: roundMoney(task.amount),
+    };
   });
 
-  return { ok: true, code: 'TASK_MARKED_POSTED', msg: `任务已自动发布: ${taskId}` };
+  if (!txResult || !txResult.ok) return txResult;
+
+  const amount = roundMoney(txResult.amount);
+  if (txResult.ownerOpenid && amount > 0) {
+    await recordWalletTransaction({
+      openid: txResult.ownerOpenid,
+      amount: -amount,
+      balanceDelta: 0,
+      type: 'task_expense',
+      bizKey: `task_expense:${txResult.taskId}:${rs}`,
+      title: pickStr(txResult.title, '任务付款'),
+      summary: `通过微信支付发布任务 ¥${amount.toFixed(2)}，不扣汇付余额`,
+      relatedId: txResult.taskId,
+      affectsBalance: false,
+      fundChannel: 'wechat_pay',
+      extra: { reqDate: rd, reqSeqId: rs, notify: true },
+    });
+  }
+
+  return txResult;
+}
+
+async function tryMarkGoodsPaidByReq({ reqDate, reqSeqId, huifuData, rawBody }) {
+  const rd = pickStr(reqDate);
+  const rs = pickStr(reqSeqId);
+  if (!rd || !rs) return { ok: false, code: 'MISSING_REQ', msg: '缺少 req_date/req_seq_id' };
+
+  const res = await db.collection(GOODS_COLLECTION)
+    .where({
+      'paymentLock.reqDate': rd,
+      'paymentLock.reqSeqId': rs,
+    })
+    .limit(2)
+    .get();
+  const list = (res && res.data) || [];
+  if (!list.length) return { ok: true, code: 'NO_GOODS_MATCH', msg: '未找到匹配的商品支付记录' };
+  if (list.length > 1) return { ok: false, code: 'MULTI_GOODS_MATCH', msg: '存在多条商品匹配同一笔支付（需要人工处理）' };
+
+  const now = new Date();
+  const txResult = await db.runTransaction(async (tx) => {
+    const goodsId = pickStr(list[0] && list[0]._id);
+    if (!goodsId) return { ok: false, code: 'GOODS_ID_MISSING', msg: '商品ID缺失' };
+
+    const docRes = await tx.collection(GOODS_COLLECTION).doc(goodsId).get();
+    const goods = docRes && docRes.data ? docRes.data : null;
+    if (!goods) return { ok: false, code: 'GOODS_NOT_FOUND', msg: '商品不存在' };
+
+    const paymentLock = goods.paymentLock && typeof goods.paymentLock === 'object' ? goods.paymentLock : {};
+    const buyerOpenid = pickStr(paymentLock.buyerOpenid, goods.buyerOpenid, goods.buyer_openid);
+    if (!buyerOpenid) return { ok: false, code: 'BUYER_OPENID_MISSING', msg: '缺少买家信息' };
+    if (pickStr(paymentLock.status).toLowerCase() === 'released') {
+      return { ok: false, code: 'GOODS_LOCK_RELEASED', msg: '商品支付锁已释放，拒绝自动收口' };
+    }
+
+    const status = pickStr(goods.status) || 'posted';
+    const alreadySold = status === 'sold' && pickStr(goods.payReqSeqId) === rs && pickStr(goods.buyerOpenid) === buyerOpenid;
+    if (status && status !== 'posted' && !alreadySold) {
+      return { ok: false, code: 'INVALID_GOODS_STATUS', msg: '当前商品状态不支持支付回调收口', status };
+    }
+
+    if (!alreadySold) {
+      await tx.collection(GOODS_COLLECTION).doc(goodsId).update({
+        data: {
+          status: 'sold',
+          buyerOpenid,
+          soldAt: goods.soldAt || now,
+          payReqDate: rd,
+          payReqSeqId: rs,
+          payTransAmtYuan: safeNumber(huifuData && (huifuData.trans_amt || huifuData.transAmt)) || roundMoney(goods.price),
+          paymentLock: {
+            ...paymentLock,
+            status: 'paid',
+            paidAt: now,
+            notifyAt: now,
+            updatedAt: now,
+          },
+          updatedAt: now,
+          huifuNotify: (() => {
+            try {
+              const s = JSON.stringify(rawBody || {});
+              return s.length <= 2000 ? s : `${s.slice(0, 2000)}...`;
+            } catch (e) {
+              return '';
+            }
+          })(),
+        }
+      });
+    }
+
+    return {
+      ok: true,
+      code: alreadySold ? 'GOODS_ALREADY_SOLD' : 'GOODS_MARKED_SOLD',
+      msg: `商品已收口: ${goodsId}`,
+      goodsId,
+      sellerOpenid: pickStr(goods._openid),
+      buyerOpenid,
+      title: pickStr(goods.title, goods.desc, '商品购买'),
+      totalAmount: roundMoney(goods.price),
+    };
+  });
+
+  if (!txResult || !txResult.ok) return txResult;
+
+  const totalAmount = roundMoney(txResult.totalAmount);
+  const feeRate = resolvePlatformFeeRate();
+  const sellerIncome = roundMoney(totalAmount * (1 - feeRate));
+  const feeAmount = roundMoney(totalAmount - sellerIncome);
+
+  await Promise.allSettled([
+    txResult.buyerOpenid && totalAmount > 0
+      ? recordWalletTransaction({
+        openid: txResult.buyerOpenid,
+        amount: -totalAmount,
+        balanceDelta: 0,
+        type: 'goods_expense',
+        bizKey: `goods_expense:${txResult.goodsId}:${rs}`,
+        title: pickStr(txResult.title, '商品购买'),
+        summary: `通过微信支付购买商品 ¥${totalAmount.toFixed(2)}，不扣汇付余额`,
+        relatedId: txResult.goodsId,
+        affectsBalance: false,
+        fundChannel: 'wechat_pay',
+        extra: { reqDate: rd, reqSeqId: rs, notify: true },
+      })
+      : Promise.resolve({ ok: true }),
+    txResult.sellerOpenid && sellerIncome > 0
+      ? recordWalletTransaction({
+        openid: txResult.sellerOpenid,
+        amount: sellerIncome,
+        type: 'goods_income',
+        bizKey: `goods_income:${txResult.goodsId}:${rs}`,
+        title: pickStr(txResult.title, '商品购买'),
+        summary: `商品售出到账 ¥${sellerIncome.toFixed(2)}，已计入汇付余额，平台费 ¥${feeAmount.toFixed(2)}`,
+        relatedId: txResult.goodsId,
+        extra: { reqDate: rd, reqSeqId: rs, notify: true },
+      })
+      : Promise.resolve({ ok: true }),
+  ]);
+
+  return txResult;
 }
 
 async function tryMarkTaskRefundByReq({ reqDate, reqSeqId, huifuData, rawBody }) {
@@ -864,7 +1182,18 @@ exports.main = async (event = {}) => {
   let handled = { ok: true, code: 'ACK', msg: 'ack' };
   if (success === true && reqDate && reqSeqId) {
     try {
-      handled = await tryMarkTaskPaidByReq({ reqDate, reqSeqId, huifuData: data, rawBody: top });
+      const goodsPaid = await tryMarkGoodsPaidByReq({ reqDate, reqSeqId, huifuData: data, rawBody: top });
+      if (goodsPaid && goodsPaid.code !== 'NO_GOODS_MATCH') handled = goodsPaid;
+    } catch (e) {
+      console.error('[huifuPayNotify] mark goods paid failed', e);
+      handled = { ok: false, code: 'MARK_GOODS_FAILED', msg: String(e && e.message ? e.message : e) };
+    }
+  }
+
+  if (success === true && reqDate && reqSeqId) {
+    try {
+      const taskPaid = await tryMarkTaskPaidByReq({ reqDate, reqSeqId, huifuData: data, rawBody: top });
+      if (taskPaid && taskPaid.code !== 'NO_TASK_MATCH') handled = taskPaid;
     } catch (e) {
       console.error('[huifuPayNotify] mark task paid failed', e);
       handled = { ok: false, code: 'MARK_TASK_FAILED', msg: String(e && e.message ? e.message : e) };

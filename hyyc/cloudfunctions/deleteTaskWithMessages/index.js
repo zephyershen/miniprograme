@@ -19,6 +19,32 @@ function pickStr(v) {
   return String(v == null ? '' : v).trim();
 }
 
+function resolveTaskDeleteState(task = {}) {
+  const t = task && typeof task === 'object' ? task : {};
+  const pay = t.pay && typeof t.pay === 'object' ? t.pay : {};
+  const refund = pay.refund && typeof pay.refund === 'object' ? pay.refund : {};
+  const split = t.split && typeof t.split === 'object' ? t.split : {};
+
+  const status = pickStr(t.status);
+  const payStatus = pickStr(pay.status);
+  const refundStatus = pickStr(refund.status);
+  const splitStatus = pickStr(split.status);
+
+  const hasSettledPayment = !!(
+    t.paidAt
+    || ['paid', 'refund_pending', 'refunded'].includes(payStatus)
+  );
+
+  return {
+    status,
+    payStatus,
+    canDeletePendingUnpaid: status === 'pay_pending' && !hasSettledPayment,
+    canDeleteCompleted: status === 'completed' || splitStatus === 'completed' || !!t.completedAt,
+    canDeleteRefundedCancelled: status === 'cancelled' && (payStatus === 'refunded' || refundStatus === 'success'),
+    hasSettledPayment,
+  };
+}
+
 exports.main = async (event, context) => {
   const { tid } = event || {};
 
@@ -91,23 +117,18 @@ exports.main = async (event, context) => {
       };
     }
 
-    const status = pickStr(task.status);
-    const pay = task.pay && typeof task.pay === 'object' ? task.pay : {};
-    const payStatus = pickStr(pay.status);
-    const canDeleteRefundedCancelled = status === 'cancelled' && payStatus === 'refunded';
-    const canDeleteCompleted = status === 'completed';
-    const hasPaymentTrace = !!(
-      task.paidAt
-      || pickStr(pay.reqDate)
-      || pickStr(pay.reqSeqId)
-      || pickStr(pay.orgHfSeqId)
-      || payStatus
-    );
-    if (!canDeleteRefundedCancelled && !canDeleteCompleted && (status !== 'pay_pending' || hasPaymentTrace)) {
+    const deleteState = resolveTaskDeleteState(task);
+    if (
+      !deleteState.canDeletePendingUnpaid
+      && !deleteState.canDeleteCompleted
+      && !deleteState.canDeleteRefundedCancelled
+    ) {
       return {
         ok: false,
-        code: 'PAID_TASK_DELETE_FORBIDDEN',
-        msg: '该任务已发起或完成支付，当前删除不会自动退款，已禁止删除。请先走退款/取消流程。',
+        code: deleteState.hasSettledPayment ? 'PAID_TASK_DELETE_FORBIDDEN' : 'TASK_DELETE_FORBIDDEN',
+        msg: deleteState.hasSettledPayment
+          ? '该任务已发起或完成支付，当前删除不会自动退款，已禁止删除。请先走退款/取消流程。'
+          : '当前任务状态暂不允许删除。',
       };
     }
 

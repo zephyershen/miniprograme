@@ -82,6 +82,7 @@
             class="btn btn-outline row-gap-item"
             data-id="{{item.id}}"
             data-status="{{item.status}}"
+            data-payment-lock-active="{{item.paymentLockActive}}"
             bindtap="onToggleShelf"
           >
             {{item.status==='posted' ? '下架' : '重新上架'}}

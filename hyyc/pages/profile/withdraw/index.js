@@ -130,7 +130,6 @@ Page({
     cityIndex: 0,
     form: {
       cardNo: '',
-      bankMobile: '',
       amount: '',
       provId: '',
       areaId: '',
@@ -225,7 +224,6 @@ Page({
         }),
         form: {
           ...this.data.form,
-          bankMobile: pickStr(cardInfo.bankMobile, profile.phone),
           provId: pickStr(cardInfo.provId, this.data.form.provId),
           areaId: pickStr(cardInfo.areaId, this.data.form.areaId),
         }
@@ -435,15 +433,9 @@ Page({
 
     const f = this.data.form;
     const cardNo = digitsOnly(f.cardNo);
-    const bankMobile = digitsOnly(f.bankMobile);
-    if (!cardNo) {
+    if (!cardNo && !this.data.hasBoundCard) {
       this.setData({ debugInfoText: buildDebugText({ extra: 'local: bind_card blocked - missing cardNo' }) });
       toast('请输入银行卡号');
-      return;
-    }
-    if (!/^1\d{10}$/.test(bankMobile)) {
-      this.setData({ debugInfoText: buildDebugText({ extra: 'local: bind_card blocked - invalid bankMobile' }) });
-      toast('请输入正确的银行卡预留手机号');
       return;
     }
     if (!/^\d{6}$/.test(pickStr(f.provId)) || !/^\d{6}$/.test(pickStr(f.areaId))) {
@@ -459,7 +451,6 @@ Page({
         data: {
           action: 'bind_card',
           cardNo,
-          bankMobile,
           provId: f.provId,
           areaId: f.areaId,
         }

@@ -16,10 +16,144 @@ function pickStr(...vals) {
   return '';
 }
 
+function isSystemCompensateCall(event = {}) {
+  const token = pickStr(process.env.SYSTEM_COMPENSATE_TOKEN);
+  return !!(
+    event
+    && event.systemCompensate === true
+    && token
+    && pickStr(event.compensateToken) === token
+  );
+}
+
 function roundMoney(v) {
   const n = Number(v);
   if (!Number.isFinite(n)) return 0;
   return Math.round(n * 100) / 100;
+}
+
+function toWalletDateMs(v) {
+  if (!v) return 0;
+  if (v instanceof Date) return v.getTime();
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const t = Date.parse(v);
+  return Number.isFinite(t) ? t : 0;
+}
+
+function getPrimaryWalletId(openid) {
+  return pickStr(openid);
+}
+
+function isLegacyShadowWallet(wallet = {}) {
+  const role = pickStr(wallet && wallet.walletRole).toLowerCase();
+  return role === 'legacy_shadow' || !!pickStr(wallet && wallet.shadowOf);
+}
+
+function sumWalletAmount(walletDocs = [], field = 'balance') {
+  return roundMoney((Array.isArray(walletDocs) ? walletDocs : []).reduce((sum, item) => (
+    sum + Number(item && item[field] ? item[field] : 0)
+  ), 0));
+}
+
+function pickWalletBoundaryDate(walletDocs = [], field = 'updatedAt', mode = 'max', fallback = new Date()) {
+  const list = Array.isArray(walletDocs) ? walletDocs : [];
+  let chosen = fallback;
+  let chosenMs = toWalletDateMs(fallback);
+  for (const item of list) {
+    const value = item && item[field];
+    const ms = toWalletDateMs(value);
+    if (!ms) continue;
+    if (!chosenMs) {
+      chosen = value;
+      chosenMs = ms;
+      continue;
+    }
+    if (mode === 'min' ? ms < chosenMs : ms > chosenMs) {
+      chosen = value;
+      chosenMs = ms;
+    }
+  }
+  return chosen || fallback;
+}
+
+function buildPrimaryWalletSnapshot(openid, walletDocs = [], now = new Date()) {
+  const ownerOpenid = pickStr(openid);
+  const docs = (Array.isArray(walletDocs) ? walletDocs : []).filter((item) => item && pickStr(item._openid) === ownerOpenid);
+  const primaryId = getPrimaryWalletId(ownerOpenid);
+  const primaryDoc = docs.find((item) => pickStr(item._id) === primaryId) || null;
+  const mergeDocs = docs.filter((item) => item && (pickStr(item._id) === primaryId || !isLegacyShadowWallet(item)));
+  const legacyDocs = docs.filter((item) => pickStr(item._id) && pickStr(item._id) !== primaryId);
+  const aggregateDocs = mergeDocs.length ? mergeDocs : docs;
+  return {
+    _openid: ownerOpenid,
+    balance: sumWalletAmount(aggregateDocs, 'balance'),
+    incomeTotal: sumWalletAmount(aggregateDocs, 'incomeTotal'),
+    expenseTotal: sumWalletAmount(aggregateDocs, 'expenseTotal'),
+    createdAt: primaryDoc && primaryDoc.createdAt
+      ? primaryDoc.createdAt
+      : pickWalletBoundaryDate(docs, 'createdAt', 'min', now),
+    updatedAt: now,
+    walletRole: 'primary',
+    isPrimary: true,
+    shadowedWalletIds: legacyDocs.map((item) => pickStr(item._id)).filter(Boolean),
+    ...(legacyDocs.length ? { mergedAt: now } : {}),
+  };
+}
+
+async function markLegacyWalletDocs(tx, legacyDocs = [], primaryId = '', now = new Date()) {
+  for (const item of Array.isArray(legacyDocs) ? legacyDocs : []) {
+    const legacyId = pickStr(item && item._id);
+    if (!legacyId || legacyId === primaryId) continue;
+    await tx.collection(WALLET_COLLECTION).doc(legacyId).update({
+      data: {
+        walletRole: 'legacy_shadow',
+        isPrimary: false,
+        shadowOf: primaryId,
+        shadowedAt: now,
+        updatedAt: now,
+      }
+    });
+  }
+}
+
+async function ensurePrimaryWalletDoc(tx, openid, now = new Date()) {
+  const ownerOpenid = pickStr(openid);
+  const primaryId = getPrimaryWalletId(ownerOpenid);
+  if (!ownerOpenid || !primaryId) return { walletId: '', wallet: null, legacyDocs: [] };
+
+  const walletRes = await tx.collection(WALLET_COLLECTION)
+    .where({ _openid: ownerOpenid })
+    .limit(20)
+    .get();
+  const walletDocs = (walletRes && walletRes.data) || [];
+  if (!walletDocs.length) return { walletId: primaryId, wallet: null, legacyDocs: [] };
+
+  const primaryDoc = walletDocs.find((item) => pickStr(item._id) === primaryId) || null;
+  const legacyDocs = walletDocs.filter((item) => pickStr(item._id) && pickStr(item._id) !== primaryId);
+  const actionableLegacyDocs = legacyDocs.filter((item) => !isLegacyShadowWallet(item) || pickStr(item.shadowOf) !== primaryId);
+  if (!primaryDoc || actionableLegacyDocs.length) {
+    const snapshot = buildPrimaryWalletSnapshot(ownerOpenid, walletDocs, now);
+    if (primaryDoc && primaryDoc._id) {
+      await tx.collection(WALLET_COLLECTION).doc(primaryId).update({
+        data: {
+          balance: snapshot.balance,
+          incomeTotal: snapshot.incomeTotal,
+          expenseTotal: snapshot.expenseTotal,
+          createdAt: snapshot.createdAt,
+          updatedAt: now,
+          walletRole: 'primary',
+          isPrimary: true,
+          shadowedWalletIds: snapshot.shadowedWalletIds,
+          mergedAt: snapshot.mergedAt || now,
+        }
+      });
+    } else {
+      await tx.collection(WALLET_COLLECTION).doc(primaryId).set({ data: snapshot });
+    }
+    await markLegacyWalletDocs(tx, legacyDocs, primaryId, now);
+    return { walletId: primaryId, wallet: { ...(primaryDoc || {}), ...snapshot, _id: primaryId }, legacyDocs };
+  }
+  return { walletId: primaryId, wallet: primaryDoc, legacyDocs };
 }
 
 function randomId(len = 16) {
@@ -122,28 +256,27 @@ async function recordWalletTransaction({
     const existsList = (existsRes && existsRes.data) || [];
     if (existsList.length) return { ok: true, duplicated: true };
 
-    const walletRes = await tx.collection(WALLET_COLLECTION)
-      .where({ _openid: ownerOpenid })
-      .limit(1)
-      .get();
-    const walletList = (walletRes && walletRes.data) || [];
-    const wallet = walletList[0] || null;
+    const walletState = await ensurePrimaryWalletDoc(tx, ownerOpenid, createdAt);
+    const wallet = walletState && walletState.wallet ? walletState.wallet : null;
+    const walletId = pickStr(walletState && walletState.walletId);
     const currentBalance = roundMoney(wallet && wallet.balance);
     const nextBalance = roundMoney(currentBalance + delta);
     const incomeDelta = delta > 0 ? delta : 0;
     const expenseDelta = delta < 0 ? Math.abs(delta) : 0;
 
-    if (wallet && wallet._id) {
-      await tx.collection(WALLET_COLLECTION).doc(wallet._id).update({
+    if (walletId && wallet) {
+      await tx.collection(WALLET_COLLECTION).doc(walletId).update({
         data: {
           balance: nextBalance,
           incomeTotal: roundMoney(Number(wallet.incomeTotal || 0) + incomeDelta),
           expenseTotal: roundMoney(Number(wallet.expenseTotal || 0) + expenseDelta),
+          walletRole: 'primary',
+          isPrimary: true,
           updatedAt: createdAt,
         }
       });
     } else if (shouldAffectBalance) {
-      await tx.collection(WALLET_COLLECTION).add({
+      await tx.collection(WALLET_COLLECTION).doc(walletId || getPrimaryWalletId(ownerOpenid)).set({
         data: {
           _openid: ownerOpenid,
           balance: nextBalance,
@@ -151,6 +284,9 @@ async function recordWalletTransaction({
           expenseTotal: expenseDelta,
           createdAt,
           updatedAt: createdAt,
+          walletRole: 'primary',
+          isPrimary: true,
+          shadowedWalletIds: [],
         }
       });
     }
@@ -324,6 +460,155 @@ function buildPendingRefundMeta(task = {}, now = new Date()) {
     originalHfSeqId: pickStr(pay.orgHfSeqId),
     status: 'requested',
   };
+}
+
+async function prepareTaskRefundTransition({ taskId = '', action = '', openid = '', requestId = '', now = new Date() }) {
+  const normalizedTaskId = pickStr(taskId);
+  const normalizedAction = pickStr(action);
+  const normalizedOpenid = pickStr(openid);
+  const normalizedRequestId = pickStr(requestId);
+  if (!normalizedTaskId || !normalizedAction || !normalizedOpenid) {
+    return { ok: false, code: 'MISSING_PARAM', msg: '缺少退款预处理参数' };
+  }
+
+  return db.runTransaction(async (tx) => {
+    const docRes = await tx.collection(TASK_COLLECTION).doc(normalizedTaskId).get();
+    const task = docRes && docRes.data ? docRes.data : null;
+    if (!task) return { ok: false, code: 'TASK_NOT_FOUND', msg: '任务不存在' };
+
+    const taskStatus = pickStr(task.status);
+    const ownerOpenid = pickStr(task._openid);
+    const workerOpenid = pickStr(task.workerOpenid, task.worker_openid);
+    const workerId = pickStr(task.workerId);
+    const ownerId = pickStr(task.ownerId);
+    const requesterName = pickStr(task.ownerNickname, task.ownerName, '发布者');
+    const approvedByName = pickStr(task.workerNickname, task.workerName, '接单人');
+    const pay = task.pay && typeof task.pay === 'object' ? task.pay : {};
+    const payStatus = pickStr(pay.status);
+    const currentCancel = task.cancelRequest && typeof task.cancelRequest === 'object' ? task.cancelRequest : {};
+    const mergedExistingRefund = {
+      ...((currentCancel.refund && typeof currentCancel.refund === 'object') ? currentCancel.refund : {}),
+      ...((pay.refund && typeof pay.refund === 'object') ? pay.refund : {}),
+    };
+    const hasPreparedRefund = !!(pickStr(mergedExistingRefund.reqDate) && pickStr(mergedExistingRefund.reqSeqId));
+
+    if (normalizedAction === 'approve') {
+      if (normalizedOpenid !== workerOpenid) {
+        return { ok: false, code: 'NOT_WORKER', msg: '只有接单人可以同意取消' };
+      }
+      if (taskStatus === 'cancelled' && (payStatus === 'refunded' || payStatus === 'refund_pending')) {
+        return { ok: true, already: true, task, payStatus, refund: mergedExistingRefund, currentCancel, requesterName, approvedByName };
+      }
+      if (taskStatus !== 'accepted' && taskStatus !== 'submitted') {
+        return { ok: false, code: 'INVALID_STATUS', msg: '当前任务状态不支持取消退款', status: taskStatus };
+      }
+      if (pickStr(currentCancel.requestId) !== normalizedRequestId || pickStr(currentCancel.status) !== 'pending') {
+        return { ok: false, code: 'INVALID_CANCEL_REQUEST', msg: '取消申请不存在或已处理' };
+      }
+
+      const pendingRefund = hasPreparedRefund
+        ? { ...mergedExistingRefund, status: pickStr(mergedExistingRefund.status, 'requested') }
+        : buildPendingRefundMeta(task, now);
+      const nextCancel = {
+        ...(currentCancel || {}),
+        status: 'refund_pending',
+        approvedAt: now,
+        approvedByOpenid: normalizedOpenid,
+        approvedByUserId: workerId,
+        approvedByName,
+        refund: {
+          ...((currentCancel.refund && typeof currentCancel.refund === 'object') ? currentCancel.refund : {}),
+          ...pendingRefund,
+        },
+      };
+      const nextPay = {
+        ...(pay || {}),
+        status: 'refund_pending',
+        refund: {
+          ...((pay.refund && typeof pay.refund === 'object') ? pay.refund : {}),
+          ...pendingRefund,
+        },
+      };
+
+      await tx.collection(TASK_COLLECTION).doc(normalizedTaskId).update({
+        data: {
+          status: 'cancelled',
+          cancelledAt: task.cancelledAt || now,
+          updatedAt: now,
+          cancelRequest: nextCancel,
+          pay: nextPay,
+        }
+      });
+
+      return {
+        ok: true,
+        shouldCall: true,
+        task,
+        taskStatus,
+        pay,
+        payStatus,
+        currentCancel,
+        nextCancel,
+        nextPay,
+        pendingRefund,
+        requesterName,
+        approvedByName,
+        ownerOpenid,
+        workerOpenid,
+        workerId,
+      };
+    }
+
+    if (normalizedAction === 'cancel_direct') {
+      if (normalizedOpenid !== ownerOpenid) {
+        return { ok: false, code: 'NOT_OWNER', msg: '只有发布者可以取消任务' };
+      }
+      if (taskStatus === 'cancelled' && (payStatus === 'refunded' || payStatus === 'refund_pending')) {
+        return { ok: true, already: true, task, payStatus, refund: mergedExistingRefund, ownerOpenid };
+      }
+      if (taskStatus !== 'posted') {
+        return { ok: false, code: 'INVALID_STATUS', msg: '当前任务状态不支持直接取消退款', status: taskStatus };
+      }
+      if (workerOpenid || workerId) {
+        return { ok: false, code: 'TASK_ALREADY_ACCEPTED', msg: '任务已被接单，请先在聊天中发起取消申请' };
+      }
+
+      const pendingRefund = hasPreparedRefund
+        ? { ...mergedExistingRefund, status: pickStr(mergedExistingRefund.status, 'requested') }
+        : buildPendingRefundMeta(task, now);
+      const nextPay = {
+        ...(pay || {}),
+        status: 'refund_pending',
+        refund: {
+          ...((pay.refund && typeof pay.refund === 'object') ? pay.refund : {}),
+          ...pendingRefund,
+        },
+      };
+
+      await tx.collection(TASK_COLLECTION).doc(normalizedTaskId).update({
+        data: {
+          status: 'cancelled',
+          cancelledAt: task.cancelledAt || now,
+          updatedAt: now,
+          pay: nextPay,
+        }
+      });
+
+      return {
+        ok: true,
+        shouldCall: true,
+        task,
+        taskStatus,
+        pay,
+        payStatus,
+        pendingRefund,
+        nextPay,
+        ownerOpenid,
+      };
+    }
+
+    return { ok: false, code: 'UNSUPPORTED_ACTION', msg: '不支持的退款预处理动作' };
+  });
 }
 
 function buildPendingCancelRequest(cancelRequest = {}, extra = {}) {
@@ -525,9 +810,12 @@ async function applyRefundStateToTask({ taskId = '', task = {}, refund = {}, now
 
 exports.main = async (event = {}) => {
   const { OPENID } = cloud.getWXContext();
-  if (!OPENID) return { ok: false, code: 'MISSING_OPENID', msg: '缺少 OPENID' };
-
+  const systemCompensate = isSystemCompensateCall(event);
   const action = pickStr(event.action);
+  if (systemCompensate && action !== 'sync_refund_status') {
+    return { ok: false, code: 'SYSTEM_ACTION_NOT_ALLOWED', msg: '系统补偿仅支持退款状态同步' };
+  }
+  if (!OPENID && !systemCompensate) return { ok: false, code: 'MISSING_OPENID', msg: '缺少 OPENID' };
   const taskId = pickStr(event.taskId, event.tid, event.id);
   if (!taskId) return { ok: false, code: 'MISSING_TASK_ID', msg: '缺少 taskId' };
 
@@ -596,63 +884,45 @@ exports.main = async (event = {}) => {
     if (action === 'approve') {
       const requestId = pickStr(event.requestId);
       if (!requestId) return { ok: false, code: 'MISSING_REQUEST_ID', msg: '缺少 requestId' };
-      if (pickStr(OPENID) !== workerOpenid) {
-        return { ok: false, code: 'NOT_WORKER', msg: '只有接单人可以同意取消' };
-      }
-      if (taskStatus === 'cancelled' && (payStatus === 'refunded' || payStatus === 'refund_pending')) {
-        return { ok: true, already: true, status: 'cancelled', refundStatus: payStatus };
-      }
-      if (taskStatus !== 'accepted' && taskStatus !== 'submitted') {
-        return { ok: false, code: 'INVALID_STATUS', msg: '当前任务状态不支持取消退款', status: taskStatus };
-      }
-      if (pickStr(currentCancel.requestId) !== requestId || pickStr(currentCancel.status) !== 'pending') {
-        return { ok: false, code: 'INVALID_CANCEL_REQUEST', msg: '取消申请不存在或已处理' };
+      const prepared = await prepareTaskRefundTransition({
+        taskId,
+        action: 'approve',
+        openid: OPENID,
+        requestId,
+        now,
+      });
+      if (!prepared || !prepared.ok) return prepared;
+      if (prepared.already) {
+        return {
+          ok: true,
+          already: true,
+          status: 'cancelled',
+          refund: prepared.refund || {},
+          refundStatus: pickStr(prepared.payStatus, prepared.refund && prepared.refund.status),
+          msg: pickStr(prepared.payStatus) === 'refunded' ? '退款已完成' : '退款处理中',
+        };
       }
 
-      const approvedByName = pickStr(task.workerNickname, task.workerName, '接单人');
-      const pendingRefund = buildPendingRefundMeta(task, now);
+      const approvedByName = pickStr(prepared.approvedByName, task.workerNickname, task.workerName, '接单人');
+      const pendingRefund = prepared.pendingRefund || {};
+      const preparedTask = prepared.task || task;
+      const preparedCancel = prepared.currentCancel && typeof prepared.currentCancel === 'object'
+        ? prepared.currentCancel
+        : currentCancel;
       const pendingPayload = buildCancelMessagePayload({
-        task,
+        task: preparedTask,
         requestId,
         status: 'refund_pending',
-        requesterName: pickStr(currentCancel.requesterName, requesterName),
+        requesterName: pickStr(preparedCancel.requesterName, prepared.requesterName, requesterName),
         approvedByName,
         refund: pendingRefund,
       });
-
-      await db.collection(TASK_COLLECTION).doc(taskId).update({
-        data: {
-          status: 'cancelled',
-          cancelledAt: now,
-          updatedAt: now,
-          cancelRequest: {
-            ...(currentCancel || {}),
-            status: 'refund_pending',
-            approvedAt: now,
-            approvedByOpenid: OPENID,
-            approvedByUserId: workerId,
-            approvedByName,
-            refund: {
-              ...((currentCancel.refund && typeof currentCancel.refund === 'object') ? currentCancel.refund : {}),
-              ...pendingRefund,
-            },
-          },
-          pay: {
-            ...((task.pay && typeof task.pay === 'object') ? task.pay : {}),
-            status: 'refund_pending',
-            refund: {
-              ...(((task.pay && task.pay.refund) && typeof task.pay.refund === 'object') ? task.pay.refund : {}),
-              ...pendingRefund,
-            },
-          }
-        }
-      });
-      await syncCancelRequestMessage(pickStr(currentCancel.messageId), pendingPayload);
+      await syncCancelRequestMessage(pickStr(preparedCancel.messageId), pendingPayload);
 
       let refundRes = null;
       try {
         refundRes = await callRefund({
-          task,
+          task: preparedTask,
           reqDate: pendingRefund.reqDate,
           reqSeqId: pendingRefund.reqSeqId,
           refundDesc: `任务取消退款:${taskId}`,
@@ -672,29 +942,29 @@ exports.main = async (event = {}) => {
           await db.collection(TASK_COLLECTION).doc(taskId).update({
             data: {
               status: 'cancelled',
-              cancelledAt: now,
+              cancelledAt: preparedTask.cancelledAt || now,
               updatedAt: now,
               cancelRequest: {
-                ...(currentCancel || {}),
+                ...(preparedCancel || {}),
                 status: 'refund_pending',
                 approvedAt: now,
                 approvedByOpenid: OPENID,
-                approvedByUserId: workerId,
+                approvedByUserId: pickStr(prepared.workerId, workerId),
                 approvedByName,
                 refund: processingRefund,
               },
               pay: {
-                ...((task.pay && typeof task.pay === 'object') ? task.pay : {}),
+                ...((prepared.pay && typeof prepared.pay === 'object') ? prepared.pay : {}),
                 status: 'refund_pending',
                 refund: processingRefund,
               }
             }
           });
-          await syncCancelRequestMessage(pickStr(currentCancel.messageId), buildCancelMessagePayload({
-            task,
+          await syncCancelRequestMessage(pickStr(preparedCancel.messageId), buildCancelMessagePayload({
+            task: preparedTask,
             requestId,
             status: 'refund_pending',
-            requesterName: pickStr(currentCancel.requesterName, requesterName),
+            requesterName: pickStr(preparedCancel.requesterName, prepared.requesterName, requesterName),
             approvedByName,
             refund: processingRefund,
           }));
@@ -707,29 +977,29 @@ exports.main = async (event = {}) => {
         }
         await db.collection(TASK_COLLECTION).doc(taskId).update({
           data: {
-            status: taskStatus,
-            cancelledAt: task.cancelledAt || null,
+            status: prepared.taskStatus,
+            cancelledAt: preparedTask.cancelledAt || null,
             updatedAt: now,
-            cancelRequest: buildPendingCancelRequest(currentCancel, {
+            cancelRequest: buildPendingCancelRequest(preparedCancel, {
               refund: {
-                ...((currentCancel.refund && typeof currentCancel.refund === 'object') ? currentCancel.refund : {}),
+                ...((preparedCancel.refund && typeof preparedCancel.refund === 'object') ? preparedCancel.refund : {}),
                 ...pendingRefund,
               },
             }),
             pay: {
-              ...((task.pay && typeof task.pay === 'object') ? task.pay : {}),
+              ...((prepared.pay && typeof prepared.pay === 'object') ? prepared.pay : {}),
               refund: {
-                ...(((task.pay && task.pay.refund) && typeof task.pay.refund === 'object') ? task.pay.refund : {}),
+                ...(((prepared.pay && prepared.pay.refund) && typeof prepared.pay.refund === 'object') ? prepared.pay.refund : {}),
                 ...pendingRefund,
               },
             }
           }
         });
-        await syncCancelRequestMessage(pickStr(currentCancel.messageId), buildCancelMessagePayload({
-          task,
+        await syncCancelRequestMessage(pickStr(preparedCancel.messageId), buildCancelMessagePayload({
+          task: preparedTask,
           requestId,
           status: 'pending',
-          requesterName: pickStr(currentCancel.requesterName, requesterName),
+          requesterName: pickStr(preparedCancel.requesterName, prepared.requesterName, requesterName),
           refund: pendingRefund,
         }));
         return { ok: false, code: refundRes.err.code || 'REFUND_FAILED', msg: refundRes.err.msg || '退款失败', err: refundRes.err };
@@ -737,12 +1007,12 @@ exports.main = async (event = {}) => {
 
       const refund = refundRes.refund || {};
       const cancelStatus = refund.status === 'success' ? 'approved' : 'refund_pending';
-      const payStatus = refund.status === 'success' ? 'refunded' : 'refund_pending';
+      const nextPayStatus = refund.status === 'success' ? 'refunded' : 'refund_pending';
       const payload = buildCancelMessagePayload({
-        task,
+        task: preparedTask,
         requestId,
         status: cancelStatus,
-        requesterName: pickStr(currentCancel.requesterName, requesterName),
+        requesterName: pickStr(preparedCancel.requesterName, prepared.requesterName, requesterName),
         approvedByName,
         refund,
       });
@@ -750,41 +1020,41 @@ exports.main = async (event = {}) => {
       await db.collection(TASK_COLLECTION).doc(taskId).update({
         data: {
           status: 'cancelled',
-          cancelledAt: now,
+          cancelledAt: preparedTask.cancelledAt || now,
           updatedAt: now,
           cancelRequest: {
-            ...(currentCancel || {}),
+            ...(preparedCancel || {}),
             status: cancelStatus,
             approvedAt: now,
             approvedByOpenid: OPENID,
-            approvedByUserId: workerId,
+            approvedByUserId: pickStr(prepared.workerId, workerId),
             approvedByName,
             refund,
           },
           pay: {
-            ...((task.pay && typeof task.pay === 'object') ? task.pay : {}),
-            status: payStatus,
+            ...((prepared.pay && typeof prepared.pay === 'object') ? prepared.pay : {}),
+            status: nextPayStatus,
             refund,
           }
         }
       });
 
-      await syncCancelRequestMessage(pickStr(currentCancel.messageId), payload);
+      await syncCancelRequestMessage(pickStr(preparedCancel.messageId), payload);
 
       if (refund.status === 'success') {
         try {
-          const amount = roundMoney(task.amount);
-          if (ownerOpenid && amount > 0) {
+          const amount = roundMoney(preparedTask.amount);
+          if (pickStr(prepared.ownerOpenid, ownerOpenid) && amount > 0) {
             await recordWalletTransaction({
-              openid: ownerOpenid,
+              openid: pickStr(prepared.ownerOpenid, ownerOpenid),
               amount,
               balanceDelta: 0,
               type: 'refund',
               bizKey: `task_refund:${taskId}:${pickStr(refund.reqSeqId, requestId)}`,
-              title: pickStr(task.title, task.desc, '任务退款'),
+              title: pickStr(preparedTask.title, preparedTask.desc, '任务退款'),
               summary: `任务取消退款 ¥${amount.toFixed(2)}，原路退回支付账户`,
               relatedId: taskId,
-              counterpartOpenid: workerOpenid,
+              counterpartOpenid: pickStr(prepared.workerOpenid, workerOpenid),
               affectsBalance: false,
               fundChannel: 'wechat_pay_refund',
               createdAt: now,
@@ -804,40 +1074,31 @@ exports.main = async (event = {}) => {
     }
 
     if (action === 'cancel_direct') {
-      if (pickStr(OPENID) !== ownerOpenid) {
-        return { ok: false, code: 'NOT_OWNER', msg: '只有发布者可以取消任务' };
-      }
-      if (taskStatus === 'cancelled' && (payStatus === 'refunded' || payStatus === 'refund_pending')) {
-        return { ok: true, already: true, status: 'cancelled', refundStatus: payStatus };
-      }
-      if (taskStatus !== 'posted') {
-        return { ok: false, code: 'INVALID_STATUS', msg: '当前任务状态不支持直接取消退款', status: taskStatus };
-      }
-      if (workerOpenid || workerId) {
-        return { ok: false, code: 'TASK_ALREADY_ACCEPTED', msg: '任务已被接单，请先在聊天中发起取消申请' };
+      const prepared = await prepareTaskRefundTransition({
+        taskId,
+        action: 'cancel_direct',
+        openid: OPENID,
+        now,
+      });
+      if (!prepared || !prepared.ok) return prepared;
+      if (prepared.already) {
+        return {
+          ok: true,
+          already: true,
+          status: 'cancelled',
+          refund: prepared.refund || {},
+          refundStatus: pickStr(prepared.payStatus, prepared.refund && prepared.refund.status),
+          msg: pickStr(prepared.payStatus) === 'refunded' ? '退款已完成' : '退款处理中',
+        };
       }
 
-      const pendingRefund = buildPendingRefundMeta(task, now);
-      await db.collection(TASK_COLLECTION).doc(taskId).update({
-        data: {
-          status: 'cancelled',
-          cancelledAt: now,
-          updatedAt: now,
-          pay: {
-            ...((task.pay && typeof task.pay === 'object') ? task.pay : {}),
-            status: 'refund_pending',
-            refund: {
-              ...(((task.pay && task.pay.refund) && typeof task.pay.refund === 'object') ? task.pay.refund : {}),
-              ...pendingRefund,
-            },
-          }
-        }
-      });
+      const preparedTask = prepared.task || task;
+      const pendingRefund = prepared.pendingRefund || {};
 
       let refundRes = null;
       try {
         refundRes = await callRefund({
-          task,
+          task: preparedTask,
           reqDate: pendingRefund.reqDate,
           reqSeqId: pendingRefund.reqSeqId,
           refundDesc: `任务取消退款:${taskId}`,
@@ -857,10 +1118,10 @@ exports.main = async (event = {}) => {
           await db.collection(TASK_COLLECTION).doc(taskId).update({
             data: {
               status: 'cancelled',
-              cancelledAt: now,
+              cancelledAt: preparedTask.cancelledAt || now,
               updatedAt: now,
               pay: {
-                ...((task.pay && typeof task.pay === 'object') ? task.pay : {}),
+                ...((prepared.pay && typeof prepared.pay === 'object') ? prepared.pay : {}),
                 status: 'refund_pending',
                 refund: processingRefund,
               }
@@ -875,13 +1136,13 @@ exports.main = async (event = {}) => {
         }
         await db.collection(TASK_COLLECTION).doc(taskId).update({
           data: {
-            status: taskStatus,
-            cancelledAt: task.cancelledAt || null,
+            status: prepared.taskStatus,
+            cancelledAt: preparedTask.cancelledAt || null,
             updatedAt: now,
             pay: {
-              ...((task.pay && typeof task.pay === 'object') ? task.pay : {}),
+              ...((prepared.pay && typeof prepared.pay === 'object') ? prepared.pay : {}),
               refund: {
-                ...(((task.pay && task.pay.refund) && typeof task.pay.refund === 'object') ? task.pay.refund : {}),
+                ...(((prepared.pay && prepared.pay.refund) && typeof prepared.pay.refund === 'object') ? prepared.pay.refund : {}),
                 ...pendingRefund,
               },
             }
@@ -894,10 +1155,10 @@ exports.main = async (event = {}) => {
       await db.collection(TASK_COLLECTION).doc(taskId).update({
         data: {
           status: 'cancelled',
-          cancelledAt: now,
+          cancelledAt: preparedTask.cancelledAt || now,
           updatedAt: now,
           pay: {
-            ...((task.pay && typeof task.pay === 'object') ? task.pay : {}),
+            ...((prepared.pay && typeof prepared.pay === 'object') ? prepared.pay : {}),
             status: refund.status === 'success' ? 'refunded' : 'refund_pending',
             refund,
           }
@@ -906,15 +1167,15 @@ exports.main = async (event = {}) => {
 
       if (refund.status === 'success') {
         try {
-          const amount = roundMoney(task.amount);
-          if (ownerOpenid && amount > 0) {
+          const amount = roundMoney(preparedTask.amount);
+          if (pickStr(prepared.ownerOpenid, ownerOpenid) && amount > 0) {
             await recordWalletTransaction({
-              openid: ownerOpenid,
+              openid: pickStr(prepared.ownerOpenid, ownerOpenid),
               amount,
               balanceDelta: 0,
               type: 'refund',
               bizKey: `task_refund:${taskId}:${pickStr(refund.reqSeqId, taskId)}`,
-              title: pickStr(task.title, task.desc, '任务退款'),
+              title: pickStr(preparedTask.title, preparedTask.desc, '任务退款'),
               summary: `任务取消退款 ¥${amount.toFixed(2)}，原路退回支付账户`,
               relatedId: taskId,
               affectsBalance: false,
@@ -936,7 +1197,7 @@ exports.main = async (event = {}) => {
     }
 
     if (action === 'sync_refund_status') {
-      if (pickStr(OPENID) !== ownerOpenid && pickStr(OPENID) !== workerOpenid) {
+      if (!systemCompensate && pickStr(OPENID) !== ownerOpenid && pickStr(OPENID) !== workerOpenid) {
         return { ok: false, code: 'NO_PERMISSION', msg: '无权同步退款状态' };
       }
 

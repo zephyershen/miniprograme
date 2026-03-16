@@ -12,8 +12,8 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const USER_COLLECTION = 'userInfo';
 
-const ADMIN_USERNAME = 'adminhyyc';
-const ADMIN_PASSWORD = 'hyyc2026';
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'adminhyyc';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'hyyc2026';
 
 function pickStr(v) {
   return String(v == null ? '' : v).trim();

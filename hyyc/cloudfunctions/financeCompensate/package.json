@@ -1,0 +1,9 @@
+{
+  "name": "financeCompensate",
+  "version": "1.0.0",
+  "description": "资金补偿任务：钱包修复、锁释放、退款/提现/分账同步、账本补齐",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

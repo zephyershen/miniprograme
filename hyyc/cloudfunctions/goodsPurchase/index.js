@@ -31,6 +31,150 @@ function roundMoney(v) {
   return Math.round(n * 100) / 100;
 }
 
+function toDateMs(v) {
+  if (!v) return 0;
+  if (v instanceof Date) return v.getTime();
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const t = Date.parse(v);
+  return Number.isFinite(t) ? t : 0;
+}
+
+function toWalletDateMs(v) {
+  if (!v) return 0;
+  if (v instanceof Date) return v.getTime();
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const t = Date.parse(v);
+  return Number.isFinite(t) ? t : 0;
+}
+
+function getPrimaryWalletId(openid) {
+  return pickStr(openid);
+}
+
+function isLegacyShadowWallet(wallet = {}) {
+  const role = pickStr(wallet && wallet.walletRole).toLowerCase();
+  return role === 'legacy_shadow' || !!pickStr(wallet && wallet.shadowOf);
+}
+
+function sumWalletAmount(walletDocs = [], field = 'balance') {
+  return roundMoney((Array.isArray(walletDocs) ? walletDocs : []).reduce((sum, item) => (
+    sum + Number(item && item[field] ? item[field] : 0)
+  ), 0));
+}
+
+function pickWalletBoundaryDate(walletDocs = [], field = 'updatedAt', mode = 'max', fallback = new Date()) {
+  const list = Array.isArray(walletDocs) ? walletDocs : [];
+  let chosen = fallback;
+  let chosenMs = toWalletDateMs(fallback);
+  for (const item of list) {
+    const value = item && item[field];
+    const ms = toWalletDateMs(value);
+    if (!ms) continue;
+    if (!chosenMs) {
+      chosen = value;
+      chosenMs = ms;
+      continue;
+    }
+    if (mode === 'min' ? ms < chosenMs : ms > chosenMs) {
+      chosen = value;
+      chosenMs = ms;
+    }
+  }
+  return chosen || fallback;
+}
+
+function buildPrimaryWalletSnapshot(openid, walletDocs = [], now = new Date()) {
+  const ownerOpenid = pickStr(openid);
+  const docs = (Array.isArray(walletDocs) ? walletDocs : []).filter((item) => item && pickStr(item._openid) === ownerOpenid);
+  const primaryId = getPrimaryWalletId(ownerOpenid);
+  const primaryDoc = docs.find((item) => pickStr(item._id) === primaryId) || null;
+  const mergeDocs = docs.filter((item) => item && (pickStr(item._id) === primaryId || !isLegacyShadowWallet(item)));
+  const legacyDocs = docs.filter((item) => pickStr(item._id) && pickStr(item._id) !== primaryId);
+  const aggregateDocs = mergeDocs.length ? mergeDocs : docs;
+  return {
+    _openid: ownerOpenid,
+    balance: sumWalletAmount(aggregateDocs, 'balance'),
+    incomeTotal: sumWalletAmount(aggregateDocs, 'incomeTotal'),
+    expenseTotal: sumWalletAmount(aggregateDocs, 'expenseTotal'),
+    createdAt: primaryDoc && primaryDoc.createdAt
+      ? primaryDoc.createdAt
+      : pickWalletBoundaryDate(docs, 'createdAt', 'min', now),
+    updatedAt: now,
+    walletRole: 'primary',
+    isPrimary: true,
+    shadowedWalletIds: legacyDocs.map((item) => pickStr(item._id)).filter(Boolean),
+    ...(legacyDocs.length ? { mergedAt: now } : {}),
+  };
+}
+
+async function markLegacyWalletDocs(tx, legacyDocs = [], primaryId = '', now = new Date()) {
+  for (const item of Array.isArray(legacyDocs) ? legacyDocs : []) {
+    const legacyId = pickStr(item && item._id);
+    if (!legacyId || legacyId === primaryId) continue;
+    await tx.collection(WALLET_COLLECTION).doc(legacyId).update({
+      data: {
+        walletRole: 'legacy_shadow',
+        isPrimary: false,
+        shadowOf: primaryId,
+        shadowedAt: now,
+        updatedAt: now,
+      }
+    });
+  }
+}
+
+async function ensurePrimaryWalletDoc(tx, openid, now = new Date()) {
+  const ownerOpenid = pickStr(openid);
+  const primaryId = getPrimaryWalletId(ownerOpenid);
+  if (!ownerOpenid || !primaryId) return { walletId: '', wallet: null, legacyDocs: [] };
+
+  const walletRes = await tx.collection(WALLET_COLLECTION)
+    .where({ _openid: ownerOpenid })
+    .limit(20)
+    .get();
+  const walletDocs = (walletRes && walletRes.data) || [];
+  if (!walletDocs.length) return { walletId: primaryId, wallet: null, legacyDocs: [] };
+
+  const primaryDoc = walletDocs.find((item) => pickStr(item._id) === primaryId) || null;
+  const legacyDocs = walletDocs.filter((item) => pickStr(item._id) && pickStr(item._id) !== primaryId);
+  const actionableLegacyDocs = legacyDocs.filter((item) => !isLegacyShadowWallet(item) || pickStr(item.shadowOf) !== primaryId);
+  if (!primaryDoc || actionableLegacyDocs.length) {
+    const snapshot = buildPrimaryWalletSnapshot(ownerOpenid, walletDocs, now);
+    if (primaryDoc && primaryDoc._id) {
+      await tx.collection(WALLET_COLLECTION).doc(primaryId).update({
+        data: {
+          balance: snapshot.balance,
+          incomeTotal: snapshot.incomeTotal,
+          expenseTotal: snapshot.expenseTotal,
+          createdAt: snapshot.createdAt,
+          updatedAt: now,
+          walletRole: 'primary',
+          isPrimary: true,
+          shadowedWalletIds: snapshot.shadowedWalletIds,
+          mergedAt: snapshot.mergedAt || now,
+        }
+      });
+    } else {
+      await tx.collection(WALLET_COLLECTION).doc(primaryId).set({ data: snapshot });
+    }
+    await markLegacyWalletDocs(tx, legacyDocs, primaryId, now);
+    return { walletId: primaryId, wallet: { ...(primaryDoc || {}), ...snapshot, _id: primaryId }, legacyDocs };
+  }
+  return { walletId: primaryId, wallet: primaryDoc, legacyDocs };
+}
+
+function getGoodsPaymentLock(goods = {}) {
+  return goods && goods.paymentLock && typeof goods.paymentLock === 'object'
+    ? goods.paymentLock
+    : {};
+}
+
+function isGoodsPaymentLockActive(lock = {}, nowMs = Date.now()) {
+  const status = pickStr(lock.status).toLowerCase();
+  if (['paid', 'released', 'failed', 'expired'].includes(status)) return false;
+  return !!pickStr(lock.reqSeqId) && toDateMs(lock.expiresAt) > nowMs;
+}
+
 function resolvePlatformFeeRate() {
   const raw = pickStr(process.env.HUIFU_PLATFORM_FEE_RATE);
   if (!raw) return 0.04;
@@ -74,28 +218,27 @@ async function recordWalletTransaction({
     const existsList = (existsRes && existsRes.data) || [];
     if (existsList.length) return { ok: true, duplicated: true };
 
-    const walletRes = await tx.collection(WALLET_COLLECTION)
-      .where({ _openid: ownerOpenid })
-      .limit(1)
-      .get();
-    const walletList = (walletRes && walletRes.data) || [];
-    const wallet = walletList[0] || null;
+    const walletState = await ensurePrimaryWalletDoc(tx, ownerOpenid, createdAt);
+    const wallet = walletState && walletState.wallet ? walletState.wallet : null;
+    const walletId = pickStr(walletState && walletState.walletId);
     const currentBalance = roundMoney(wallet && wallet.balance);
     const nextBalance = roundMoney(currentBalance + delta);
     const incomeDelta = delta > 0 ? delta : 0;
     const expenseDelta = delta < 0 ? Math.abs(delta) : 0;
 
-    if (wallet && wallet._id) {
-      await tx.collection(WALLET_COLLECTION).doc(wallet._id).update({
+    if (walletId && wallet) {
+      await tx.collection(WALLET_COLLECTION).doc(walletId).update({
         data: {
           balance: nextBalance,
           incomeTotal: roundMoney(Number(wallet.incomeTotal || 0) + incomeDelta),
           expenseTotal: roundMoney(Number(wallet.expenseTotal || 0) + expenseDelta),
+          walletRole: 'primary',
+          isPrimary: true,
           updatedAt: createdAt,
         }
       });
     } else if (shouldAffectBalance) {
-      await tx.collection(WALLET_COLLECTION).add({
+      await tx.collection(WALLET_COLLECTION).doc(walletId || getPrimaryWalletId(ownerOpenid)).set({
         data: {
           _openid: ownerOpenid,
           balance: nextBalance,
@@ -103,6 +246,9 @@ async function recordWalletTransaction({
           expenseTotal: expenseDelta,
           createdAt,
           updatedAt: createdAt,
+          walletRole: 'primary',
+          isPrimary: true,
+          shadowedWalletIds: [],
         }
       });
     }
@@ -139,9 +285,11 @@ exports.main = async (event = {}) => {
 
   const buyerId = pickStr(event.buyerId);
   const transAmtYuan = safeNumber(event.transAmtYuan);
+  const reqDate = pickStr(event.reqDate);
   const reqSeqId = pickStr(event.reqSeqId);
 
   const now = new Date();
+  const nowMs = now.getTime();
 
   try {
     const txResult = await db.runTransaction(async (tx) => {
@@ -150,6 +298,10 @@ exports.main = async (event = {}) => {
       if (!goods) return { ok: false, code: 'GOODS_NOT_FOUND' };
 
       const status = pickStr(goods.status) || 'posted';
+      const paymentLock = getGoodsPaymentLock(goods);
+      const lockedBuyerOpenid = pickStr(paymentLock.buyerOpenid);
+      const lockedReqDate = pickStr(paymentLock.reqDate);
+      const lockedReqSeqId = pickStr(paymentLock.reqSeqId);
 
       // 不能购买自己的商品（按 _openid 判断更可靠）
       if (pickStr(goods._openid) && pickStr(goods._openid) === OPENID) {
@@ -159,7 +311,8 @@ exports.main = async (event = {}) => {
       // 幂等：如果已 sold，且买家就是当前用户，则当作成功（防止网络重试导致前端误报失败）
       if (status === 'sold') {
         const soldBuyerOpenid = pickStr(goods.buyerOpenid || goods.buyer_openid || goods.buyerOpenId);
-        if (soldBuyerOpenid && soldBuyerOpenid === OPENID) {
+        const soldReqSeqId = pickStr(goods.payReqSeqId);
+        if (soldBuyerOpenid && soldBuyerOpenid === OPENID && (!reqSeqId || !soldReqSeqId || soldReqSeqId === reqSeqId)) {
           return {
             ok: true,
             status: 'sold',
@@ -176,14 +329,39 @@ exports.main = async (event = {}) => {
         return { ok: false, code: 'NOT_FOR_SALE', status };
       }
 
+      if (lockedReqSeqId) {
+        if (lockedBuyerOpenid && lockedBuyerOpenid !== OPENID) {
+          return { ok: false, code: 'GOODS_LOCKED', status: 'locked' };
+        }
+        if (reqSeqId && lockedReqSeqId !== reqSeqId) {
+          return { ok: false, code: 'PAY_REQ_MISMATCH', status: 'locked' };
+        }
+        if (reqDate && lockedReqDate && lockedReqDate !== reqDate) {
+          return { ok: false, code: 'PAY_REQDATE_MISMATCH', status: 'locked' };
+        }
+        if (!isGoodsPaymentLockActive(paymentLock, nowMs)) {
+          return { ok: false, code: 'PAY_LOCK_EXPIRED', status: 'locked' };
+        }
+      }
+
       await tx.collection(GOODS_COLLECTION).doc(goodsId).update({
         data: {
           status: 'sold',
           buyerOpenid: OPENID,
           buyerId: buyerId || '',
           soldAt: now,
+          payReqDate: reqDate || lockedReqDate || '',
           payReqSeqId: reqSeqId || '',
           payTransAmtYuan: transAmtYuan,
+          paymentLock: {
+            ...paymentLock,
+            buyerOpenid: OPENID,
+            reqDate: reqDate || lockedReqDate || '',
+            reqSeqId: reqSeqId || lockedReqSeqId || '',
+            status: 'paid',
+            paidAt: now,
+            updatedAt: now,
+          },
           updatedAt: now
         }
       });

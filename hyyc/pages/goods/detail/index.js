@@ -58,6 +58,31 @@ function clampStr(s = '', maxLen = 120) {
   return `${t.slice(0, maxLen)}...`;
 }
 
+function toDateMs(v) {
+  if (!v) return 0;
+  if (typeof v.getTime === 'function') return v.getTime();
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const t = Date.parse(v);
+  return Number.isNaN(t) ? 0 : t;
+}
+
+function getActivePaymentLock(goods = {}, openid = '') {
+  const lock = goods && goods.paymentLock && typeof goods.paymentLock === 'object'
+    ? goods.paymentLock
+    : {};
+  const status = pickStr(lock.status).toLowerCase();
+  if (!pickStr(lock.reqSeqId)) return { active: false, ownedByMe: false };
+  if (['paid', 'released', 'failed', 'expired'].includes(status)) {
+    return { active: false, ownedByMe: false };
+  }
+  const expiresAtMs = toDateMs(lock.expiresAt);
+  const active = expiresAtMs > Date.now();
+  return {
+    active,
+    ownedByMe: active && pickStr(lock.buyerOpenid) === pickStr(openid),
+  };
+}
+
 // 格式化发布时间
 function formatPublishTime(date) {
   if (!date) return '';
@@ -353,12 +378,15 @@ Page({
       const isOwner2 = (openid && doc._openid && String(doc._openid) === String(openid))
         || (meId && doc.ownerId && String(doc.ownerId) === meId);
       const st2 = pickStr(doc.status) || 'posted';
-      const canOwnerManage = isOwner2 && (st2 === 'posted' || st2 === 'off_shelf');
+      const paymentLock = getActivePaymentLock(doc, openid);
+      const canOwnerManage = isOwner2 && (st2 === 'posted' || st2 === 'off_shelf') && !paymentLock.active;
       const ownerActionText = st2 === 'off_shelf' ? '重新上架' : '下架商品';
-      const canBuy = !isOwner2 && st2 === 'posted';
+      const canBuy = !isOwner2 && st2 === 'posted' && !paymentLock.active;
       const buyButtonText = st2 === 'sold'
         ? '已售出'
-        : (canBuy ? '立即购买' : (isOwner2 ? '我的商品' : '不可购买'));
+        : (paymentLock.active
+          ? (paymentLock.ownedByMe ? '支付处理中' : '支付中')
+          : (canBuy ? '立即购买' : (isOwner2 ? '我的商品' : '不可购买')));
 
       this.setData({
         goods,
@@ -561,6 +589,10 @@ Page({
   async onOwnerActionTap() {
     const goods = this.data.goods || null;
     if (!goods || !goods.id || !this.data.isOwner) return;
+    if (getActivePaymentLock(goods, pickStr(goods._openid)).active) {
+      wx.showToast({ title: '当前有买家正在支付，暂时不能上下架', icon: 'none' });
+      return;
+    }
 
     const currentStatus = pickStr(goods.status);
     if (currentStatus !== 'posted' && currentStatus !== 'off_shelf') return;
@@ -668,6 +700,9 @@ Page({
         if (!res.confirm) return;
 
         this._buying = true;
+        let payReqDate = '';
+        let payReqSeqId = '';
+        let paymentCompleted = false;
         wx.showLoading({ title: '生成 pay_info', mask: true });
         try {
           const r = await wx.cloud.callFunction({
@@ -688,14 +723,21 @@ Page({
               ? (typeof ret.err === 'string' ? ret.err : (ret.err.msg || '下单失败'))
               : '下单失败';
             wx.showToast({ title: msg, icon: 'none' });
+            if (ret && ret.err && ['GOODS_LOCKED', 'GOODS_PAY_PENDING'].includes(String(ret.err.code || ''))) {
+              this.loadGoodsDetail();
+            }
             return;
           }
+
+          payReqDate = pickStr(ret && ret.reqDate);
+          payReqSeqId = pickStr(ret && ret.reqSeqId);
 
           wx.hideLoading();
           wx.showLoading({ title: '调起支付', mask: true });
           await wx.requestPayment({
             ...(ret.payParams || {}),
           });
+          paymentCompleted = true;
 
           wx.hideLoading();
           wx.showLoading({ title: '更新商品状态', mask: true });
@@ -707,6 +749,7 @@ Page({
               goodsId: goods.id || goods._id || '',
               buyerId: (u && u.id) ? String(u.id) : '',
               transAmtYuan: amountYuan,
+              reqDate: payReqDate,
               reqSeqId: (ret && ret.reqSeqId) ? String(ret.reqSeqId) : ''
             }
           });
@@ -755,8 +798,25 @@ Page({
           }, 500);
         } catch (err) {
           console.error('汇付支付失败', err);
+          if (payReqSeqId && !paymentCompleted) {
+            try {
+              await wx.cloud.callFunction({
+                name: 'huifuMiniappPay',
+                data: {
+                  action: 'release_goods_lock',
+                  goodsId: goods.id || goods._id || '',
+                  reqDate: payReqDate,
+                  reqSeqId: payReqSeqId,
+                  reason: 'client_cancelled'
+                }
+              });
+            } catch (releaseErr) {
+              console.warn('释放商品支付锁失败', releaseErr);
+            }
+          }
           wx.hideLoading();
           wx.showToast({ title: '支付取消/失败', icon: 'none' });
+          this.loadGoodsDetail();
         } finally {
           this._buying = false;
           wx.hideLoading();

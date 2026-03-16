@@ -1,0 +1,9 @@
+{
+  "name": "financeCompensateTimer",
+  "version": "1.0.0",
+  "description": "定时触发 financeCompensate 的后台 wrapper",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

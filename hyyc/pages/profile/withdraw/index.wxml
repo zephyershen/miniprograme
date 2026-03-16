@@ -17,20 +17,13 @@
       <text class="status-tag status-{{cardStatus}}">{{cardStatusText}}</text>
     </view>
 
-    <view class="tip-box subtle">
-      <text class="tip-text">{{hasBoundCard ? '已绑定后也可以直接修改下面的信息。保存后会自动更新提现设置。' : '请填写你要收款的银行卡信息。保存后系统会自动开通提现功能。'}}</text>
+    <view class="info-row" wx:if="{{hasBoundCard && boundCardNoMask}}">
+      <text class="info-label">当前已绑卡</text>
+      <text class="info-value">{{boundCardNoMask}}</text>
     </view>
-    <view class="tip-box subtle">
-      <text class="tip-text">仅支持绑定本人银行卡；预留手机号请填写这张银行卡在银行登记的手机号。</text>
-    </view>
-
     <view class="field-row">
       <text class="field-label">银行卡号</text>
-      <input class="field-input" value="{{form.cardNo}}" bindinput="onInput" data-key="cardNo" type="number" placeholder="输入要绑定的银行卡号" />
-    </view>
-    <view class="field-row">
-      <text class="field-label">预留手机号</text>
-      <input class="field-input" value="{{form.bankMobile}}" bindinput="onInput" data-key="bankMobile" type="number" placeholder="银行卡预留手机号" />
+      <input class="field-input" value="{{form.cardNo}}" bindinput="onInput" data-key="cardNo" type="number" placeholder="{{hasBoundCard ? '不改卡号可留空；换卡请重新输入' : '输入要绑定的银行卡号'}}" />
     </view>
     <view class="field-row">
       <text class="field-label">开户地址(省)</text>

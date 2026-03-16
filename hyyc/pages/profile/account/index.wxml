@@ -43,5 +43,44 @@
         <text class="contact-item">微信：MrShenzf</text>
       </view>
     </view>
+
+    <view wx:if="{{isSuperAdmin}}" class="panel card card-glass finance-panel">
+      <text class="panel-title">资金补偿调试</text>
+
+      <view class="finance-tip">
+        <text class="finance-tip-text">只给管理员临时使用。点击后会调用 `financeCompensate`，结果会显示在这里，同时写入云函数日志。</text>
+      </view>
+
+      <view class="form">
+        <view class="field-row">
+          <text class="field-label">管理员账号</text>
+          <input class="field-input" value="{{financeForm.username}}" bindinput="onFinanceInput" data-key="username" placeholder="输入管理员账号" />
+        </view>
+
+        <view class="field-row">
+          <text class="field-label">管理员密码</text>
+          <input class="field-input" password value="{{financeForm.password}}" bindinput="onFinanceInput" data-key="password" placeholder="输入管理员密码" />
+        </view>
+
+        <view class="field-row">
+          <text class="field-label">扫描数量上限</text>
+          <input class="field-input" type="number" value="{{financeForm.limit}}" bindinput="onFinanceInput" data-key="limit" placeholder="默认 30" />
+        </view>
+      </view>
+
+      <view class="finance-actions">
+        <view class="finance-btn finance-btn-secondary {{financeRunning ? 'finance-btn-disabled' : ''}}" bindtap="onFinanceDryRunTap">
+          {{financeRunning === 'dryRun' ? '预检查中...' : '预检查'}}
+        </view>
+        <view class="finance-btn finance-btn-primary {{financeRunning ? 'finance-btn-disabled' : ''}}" bindtap="onFinanceRunTap">
+          {{financeRunning === 'run' ? '执行中...' : '执行补偿'}}
+        </view>
+      </view>
+
+      <view class="finance-result">
+        <text class="finance-result-title">返回结果</text>
+        <text selectable class="finance-result-text">{{financeResultText || '还没有执行。先点“预检查”，确认没问题再点“执行补偿”。'}}</text>
+      </view>
+    </view>
   </view>
 </view>

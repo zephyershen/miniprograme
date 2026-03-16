@@ -35,7 +35,9 @@ const WALLET_COLLECTION = 'wallets';
 const TRANSACTIONS_COLLECTION = 'wallet_transactions';
 const DEBUG_COLLECTION = 'function_debug_traces';
 const HUIFU_API_DEBUG_COLLECTION = 'huifu_api_debug_logs';
-const BUILD_TAG = 'huifuMiniappPay@2026-03-15.1';
+const BUILD_TAG = 'huifuMiniappPay@2026-03-15.4';
+const GOODS_PAYMENT_LOCK_TTL_MS = Math.max(60 * 1000, Number(process.env.GOODS_PAYMENT_LOCK_TTL_MS) || 15 * 60 * 1000);
+const TASK_DELAY_CONFIRM_LOCK_TTL_MS = Math.max(60 * 1000, Number(process.env.TASK_DELAY_CONFIRM_LOCK_TTL_MS) || 10 * 60 * 1000);
 
 const db = cloud.database();
 
@@ -45,6 +47,16 @@ function pickStr(...vals) {
     if (s && s.trim()) return s.trim();
   }
   return '';
+}
+
+function isSystemCompensateCall(event = {}) {
+  const token = pickStr(process.env.SYSTEM_COMPENSATE_TOKEN);
+  return !!(
+    event
+    && event.systemCompensate === true
+    && token
+    && pickStr(event.compensateToken) === token
+  );
 }
 
 async function ensureCollectionExists(name) {
@@ -246,6 +258,208 @@ function roundMoney(v) {
   return Math.round(n * 100) / 100;
 }
 
+function positiveMoney(v) {
+  const n = roundMoney(v);
+  return n > 0 ? n : 0;
+}
+
+function extractHuifuRespData(raw = {}) {
+  const parsed = typeof raw === 'string' ? safeJsonParse(raw) : raw;
+  const top = parsed && typeof parsed === 'object' ? parsed : {};
+  let body = top.body;
+  if (typeof body === 'string') {
+    body = safeJsonParse(body) || body;
+  }
+  let respData = top.resp_data != null
+    ? top.resp_data
+    : (top.respData != null
+      ? top.respData
+      : (body && typeof body === 'object' && body.data != null ? body.data : top.data));
+  if (respData == null) respData = top;
+  if (typeof respData === 'string') {
+    const parsedRespData = safeJsonParse(respData);
+    respData = parsedRespData && typeof parsedRespData === 'object' ? parsedRespData : {};
+  }
+  return respData && typeof respData === 'object' ? respData : {};
+}
+
+function resolveTaskPaymentAmounts(task = {}) {
+  const t = task && typeof task === 'object' ? task : {};
+  const pay = t.pay && typeof t.pay === 'object' ? t.pay : {};
+  const notifyData = extractHuifuRespData(t.huifuNotify);
+  const hasFeeMeta = !!(
+    (pay && Object.prototype.hasOwnProperty.call(pay, 'feeAmtYuan'))
+    || (notifyData && (Object.prototype.hasOwnProperty.call(notifyData, 'fee_amount') || Object.prototype.hasOwnProperty.call(notifyData, 'fee_amt')))
+  );
+
+  const orderAmtYuan = positiveMoney(
+    pay.orderAmtYuan
+    || pay.transAmtYuan
+    || notifyData.ord_amt
+    || notifyData.trans_amt
+    || t.amount
+    || 0
+  );
+  const feeAmtYuan = positiveMoney(
+    pay.feeAmtYuan
+    || notifyData.fee_amount
+    || notifyData.fee_amt
+    || 0
+  );
+  let confirmableAmtYuan = positiveMoney(
+    pay.confirmableAmtYuan
+    || pay.unconfirmAmtYuan
+    || notifyData.unconfirm_amt
+    || notifyData.unconfirmAmt
+    || 0
+  );
+  if (!confirmableAmtYuan && orderAmtYuan > 0 && hasFeeMeta) {
+    const netAmtYuan = roundMoney(orderAmtYuan - feeAmtYuan);
+    if (netAmtYuan > 0) confirmableAmtYuan = netAmtYuan;
+  }
+
+  return {
+    orderAmtYuan,
+    feeAmtYuan,
+    confirmableAmtYuan,
+    orderCents: yuanToCents(orderAmtYuan) || 0,
+    confirmableCents: yuanToCents(confirmableAmtYuan) || 0,
+    paymentFeeCents: yuanToCents(feeAmtYuan) || 0,
+  };
+}
+
+function toDateMs(v) {
+  if (!v) return 0;
+  if (v instanceof Date) return v.getTime();
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const t = Date.parse(v);
+  return Number.isFinite(t) ? t : 0;
+}
+
+function toWalletDateMs(v) {
+  if (!v) return 0;
+  if (v instanceof Date) return v.getTime();
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const t = Date.parse(v);
+  return Number.isFinite(t) ? t : 0;
+}
+
+function getPrimaryWalletId(openid) {
+  return pickStr(openid);
+}
+
+function isLegacyShadowWallet(wallet = {}) {
+  const role = pickStr(wallet && wallet.walletRole).toLowerCase();
+  return role === 'legacy_shadow' || !!pickStr(wallet && wallet.shadowOf);
+}
+
+function sumWalletAmount(walletDocs = [], field = 'balance') {
+  return roundMoney((Array.isArray(walletDocs) ? walletDocs : []).reduce((sum, item) => (
+    sum + Number(item && item[field] ? item[field] : 0)
+  ), 0));
+}
+
+function pickWalletBoundaryDate(walletDocs = [], field = 'updatedAt', mode = 'max', fallback = new Date()) {
+  const list = Array.isArray(walletDocs) ? walletDocs : [];
+  let chosen = fallback;
+  let chosenMs = toWalletDateMs(fallback);
+  for (const item of list) {
+    const value = item && item[field];
+    const ms = toWalletDateMs(value);
+    if (!ms) continue;
+    if (!chosenMs) {
+      chosen = value;
+      chosenMs = ms;
+      continue;
+    }
+    if (mode === 'min' ? ms < chosenMs : ms > chosenMs) {
+      chosen = value;
+      chosenMs = ms;
+    }
+  }
+  return chosen || fallback;
+}
+
+function buildPrimaryWalletSnapshot(openid, walletDocs = [], now = new Date()) {
+  const ownerOpenid = pickStr(openid);
+  const docs = (Array.isArray(walletDocs) ? walletDocs : []).filter((item) => item && pickStr(item._openid) === ownerOpenid);
+  const primaryId = getPrimaryWalletId(ownerOpenid);
+  const primaryDoc = docs.find((item) => pickStr(item._id) === primaryId) || null;
+  const mergeDocs = docs.filter((item) => item && (pickStr(item._id) === primaryId || !isLegacyShadowWallet(item)));
+  const legacyDocs = docs.filter((item) => pickStr(item._id) && pickStr(item._id) !== primaryId);
+  const aggregateDocs = mergeDocs.length ? mergeDocs : docs;
+  return {
+    _openid: ownerOpenid,
+    balance: sumWalletAmount(aggregateDocs, 'balance'),
+    incomeTotal: sumWalletAmount(aggregateDocs, 'incomeTotal'),
+    expenseTotal: sumWalletAmount(aggregateDocs, 'expenseTotal'),
+    createdAt: primaryDoc && primaryDoc.createdAt
+      ? primaryDoc.createdAt
+      : pickWalletBoundaryDate(docs, 'createdAt', 'min', now),
+    updatedAt: now,
+    walletRole: 'primary',
+    isPrimary: true,
+    shadowedWalletIds: legacyDocs.map((item) => pickStr(item._id)).filter(Boolean),
+    ...(legacyDocs.length ? { mergedAt: now } : {}),
+  };
+}
+
+async function markLegacyWalletDocs(tx, legacyDocs = [], primaryId = '', now = new Date()) {
+  for (const item of Array.isArray(legacyDocs) ? legacyDocs : []) {
+    const legacyId = pickStr(item && item._id);
+    if (!legacyId || legacyId === primaryId) continue;
+    await tx.collection(WALLET_COLLECTION).doc(legacyId).update({
+      data: {
+        walletRole: 'legacy_shadow',
+        isPrimary: false,
+        shadowOf: primaryId,
+        shadowedAt: now,
+        updatedAt: now,
+      }
+    });
+  }
+}
+
+async function ensurePrimaryWalletDoc(tx, openid, now = new Date()) {
+  const ownerOpenid = pickStr(openid);
+  const primaryId = getPrimaryWalletId(ownerOpenid);
+  if (!ownerOpenid || !primaryId) return { walletId: '', wallet: null, legacyDocs: [] };
+
+  const walletRes = await tx.collection(WALLET_COLLECTION)
+    .where({ _openid: ownerOpenid })
+    .limit(20)
+    .get();
+  const walletDocs = (walletRes && walletRes.data) || [];
+  if (!walletDocs.length) return { walletId: primaryId, wallet: null, legacyDocs: [] };
+
+  const primaryDoc = walletDocs.find((item) => pickStr(item._id) === primaryId) || null;
+  const legacyDocs = walletDocs.filter((item) => pickStr(item._id) && pickStr(item._id) !== primaryId);
+  const actionableLegacyDocs = legacyDocs.filter((item) => !isLegacyShadowWallet(item) || pickStr(item.shadowOf) !== primaryId);
+  if (!primaryDoc || actionableLegacyDocs.length) {
+    const snapshot = buildPrimaryWalletSnapshot(ownerOpenid, walletDocs, now);
+    if (primaryDoc && primaryDoc._id) {
+      await tx.collection(WALLET_COLLECTION).doc(primaryId).update({
+        data: {
+          balance: snapshot.balance,
+          incomeTotal: snapshot.incomeTotal,
+          expenseTotal: snapshot.expenseTotal,
+          createdAt: snapshot.createdAt,
+          updatedAt: now,
+          walletRole: 'primary',
+          isPrimary: true,
+          shadowedWalletIds: snapshot.shadowedWalletIds,
+          mergedAt: snapshot.mergedAt || now,
+        }
+      });
+    } else {
+      await tx.collection(WALLET_COLLECTION).doc(primaryId).set({ data: snapshot });
+    }
+    await markLegacyWalletDocs(tx, legacyDocs, primaryId, now);
+    return { walletId: primaryId, wallet: { ...(primaryDoc || {}), ...snapshot, _id: primaryId }, legacyDocs };
+  }
+  return { walletId: primaryId, wallet: primaryDoc, legacyDocs };
+}
+
 function calcPlatformFeeCents({ totalCents, feeRate = 0.04 }) {
   const t = Number(totalCents);
   const r = Number(feeRate);
@@ -272,6 +486,48 @@ function buildSplitBunch({ totalCents, feeRate, platformHuifuId, sellerHuifuId }
     ok: true,
     feeCents,
     sellerCents,
+    acctSplitBunchObj,
+    acctSplitBunch: JSON.stringify(acctSplitBunchObj),
+  };
+}
+
+function buildTaskDelayConfirmSplitBunch({ orderCents, confirmableCents, feeRate, platformHuifuId, sellerHuifuId }) {
+  const grossOrderCents = Number(orderCents);
+  const availableCents = Number(confirmableCents);
+  const grossFeeCents = calcPlatformFeeCents({ totalCents: grossOrderCents, feeRate });
+  if (!Number.isFinite(grossOrderCents) || grossOrderCents <= 0) {
+    return { ok: false, err: { code: 'INVALID_AMOUNT', msg: '任务佣金不合法' } };
+  }
+  if (!Number.isFinite(availableCents) || availableCents <= 0) {
+    return { ok: false, err: { code: 'INVALID_CONFIRMABLE_AMOUNT', msg: '当前支付单缺少可确认金额' } };
+  }
+  if (grossFeeCents == null) {
+    return { ok: false, err: { code: 'INVALID_FEE_RATE', msg: '平台费率不合法' } };
+  }
+
+  const sellerCents = grossOrderCents - grossFeeCents;
+  if (sellerCents <= 0) {
+    return { ok: false, err: { code: 'FEE_TOO_HIGH', msg: '平台手续费过高，接单人应得金额<=0' } };
+  }
+  if (availableCents < sellerCents) {
+    return { ok: false, err: { code: 'CONFIRMABLE_AMOUNT_TOO_LOW', msg: '可确认金额小于接单人应得金额，无法确认打款' } };
+  }
+
+  const platformCents = availableCents - sellerCents;
+  const acctInfos = [];
+  if (platformCents > 0) {
+    acctInfos.push({ huifu_id: platformHuifuId, div_amt: centsToYuanStr(platformCents) });
+  }
+  acctInfos.push({ huifu_id: sellerHuifuId, div_amt: centsToYuanStr(sellerCents) });
+
+  const acctSplitBunchObj = { acct_infos: acctInfos };
+  return {
+    ok: true,
+    feeCents: platformCents,
+    grossFeeCents,
+    sellerCents,
+    confirmableCents: availableCents,
+    paymentFeeCents: Math.max(0, grossOrderCents - availableCents),
     acctSplitBunchObj,
     acctSplitBunch: JSON.stringify(acctSplitBunchObj),
   };
@@ -437,10 +693,285 @@ async function getGoodsById(goodsId) {
   return (res && res.data) ? res.data : null;
 }
 
+function getGoodsPaymentLock(goods = {}) {
+  return goods && goods.paymentLock && typeof goods.paymentLock === 'object'
+    ? goods.paymentLock
+    : {};
+}
+
+function isGoodsPaymentLockActive(lock = {}, nowMs = Date.now()) {
+  const status = pickStr(lock.status).toLowerCase();
+  if (['paid', 'released', 'failed', 'expired'].includes(status)) return false;
+  const expiresAtMs = toDateMs(lock.expiresAt);
+  return !!pickStr(lock.reqSeqId) && expiresAtMs > nowMs;
+}
+
+async function acquireGoodsPaymentLock({ goodsId, buyerOpenid }) {
+  const normalizedGoodsId = pickStr(goodsId);
+  const normalizedBuyerOpenid = pickStr(buyerOpenid);
+  if (!normalizedGoodsId || !normalizedBuyerOpenid) {
+    return { ok: false, err: { code: 'MISSING_PARAM', msg: '缺少商品或买家信息' } };
+  }
+
+  const now = new Date();
+  const nowMs = now.getTime();
+  const reqDate = yyyymmdd(now);
+  const reqSeqId = `GD${reqDate}${randomId(20)}`;
+  const expiresAt = new Date(nowMs + GOODS_PAYMENT_LOCK_TTL_MS);
+
+  return db.runTransaction(async (tx) => {
+    const docRes = await tx.collection(GOODS_COLLECTION).doc(normalizedGoodsId).get();
+    const goods = docRes && docRes.data ? docRes.data : null;
+    if (!goods) return { ok: false, err: { code: 'GOODS_NOT_FOUND', msg: '商品不存在' } };
+
+    const status = pickStr(goods.status) || 'posted';
+    if (status !== 'posted') {
+      return { ok: false, err: { code: status === 'sold' ? 'ALREADY_SOLD' : 'NOT_FOR_SALE', msg: '该商品当前不可购买', status } };
+    }
+
+    const sellerOpenid = pickStr(goods._openid);
+    if (!sellerOpenid) return { ok: false, err: { code: 'MISSING_SELLER', msg: '商品缺少发布者信息' } };
+    if (sellerOpenid === normalizedBuyerOpenid) {
+      return { ok: false, err: { code: 'CANNOT_BUY_SELF', msg: '不能购买自己发布的商品' } };
+    }
+
+    const existingLock = getGoodsPaymentLock(goods);
+    if (isGoodsPaymentLockActive(existingLock, nowMs)) {
+      const sameBuyer = pickStr(existingLock.buyerOpenid) === normalizedBuyerOpenid;
+      return {
+        ok: false,
+        err: {
+          code: sameBuyer ? 'GOODS_PAY_PENDING' : 'GOODS_LOCKED',
+          msg: sameBuyer
+            ? '你有一笔商品支付正在处理中，请稍后再试'
+            : '该商品已有用户正在支付，请稍后重试'
+        }
+      };
+    }
+
+    await tx.collection(GOODS_COLLECTION).doc(normalizedGoodsId).update({
+      data: {
+        paymentLock: {
+          buyerOpenid: normalizedBuyerOpenid,
+          reqDate,
+          reqSeqId,
+          status: 'locked',
+          createdAt: now,
+          updatedAt: now,
+          expiresAt,
+        },
+        updatedAt: now,
+      }
+    });
+
+    return {
+      ok: true,
+      goods,
+      reqDate,
+      reqSeqId,
+      expiresAt,
+    };
+  });
+}
+
+async function updateGoodsPaymentLock(goodsId, patch = {}) {
+  const normalizedGoodsId = pickStr(goodsId);
+  if (!normalizedGoodsId || !patch || typeof patch !== 'object') return;
+  const goods = await getGoodsById(normalizedGoodsId);
+  if (!goods) return;
+  const prevLock = getGoodsPaymentLock(goods);
+  await db.collection(GOODS_COLLECTION).doc(normalizedGoodsId).update({
+    data: {
+      paymentLock: {
+        ...prevLock,
+        ...patch,
+        updatedAt: new Date(),
+      },
+      updatedAt: new Date(),
+    }
+  });
+}
+
+async function releaseGoodsPaymentLock({ goodsId, buyerOpenid, reqSeqId = '', reqDate = '', reason = '' }) {
+  const normalizedGoodsId = pickStr(goodsId);
+  const normalizedBuyerOpenid = pickStr(buyerOpenid);
+  if (!normalizedGoodsId || !normalizedBuyerOpenid) {
+    return { ok: false, err: { code: 'MISSING_PARAM', msg: '缺少商品或买家信息' } };
+  }
+
+  return db.runTransaction(async (tx) => {
+    const docRes = await tx.collection(GOODS_COLLECTION).doc(normalizedGoodsId).get();
+    const goods = docRes && docRes.data ? docRes.data : null;
+    if (!goods) return { ok: false, err: { code: 'GOODS_NOT_FOUND', msg: '商品不存在' } };
+    if (pickStr(goods.status) === 'sold') return { ok: true, already: true };
+
+    const lock = getGoodsPaymentLock(goods);
+    if (!pickStr(lock.reqSeqId)) return { ok: true, already: true };
+    if (pickStr(lock.buyerOpenid) && pickStr(lock.buyerOpenid) !== normalizedBuyerOpenid) {
+      return { ok: false, err: { code: 'LOCK_OWNER_MISMATCH', msg: '当前支付锁不属于你' } };
+    }
+    if (pickStr(reqSeqId) && pickStr(lock.reqSeqId) !== pickStr(reqSeqId)) {
+      return { ok: false, err: { code: 'LOCK_REQ_MISMATCH', msg: '支付锁请求号不匹配' } };
+    }
+    if (pickStr(reqDate) && pickStr(lock.reqDate) && pickStr(lock.reqDate) !== pickStr(reqDate)) {
+      return { ok: false, err: { code: 'LOCK_REQDATE_MISMATCH', msg: '支付锁日期不匹配' } };
+    }
+
+    const now = new Date();
+    await tx.collection(GOODS_COLLECTION).doc(normalizedGoodsId).update({
+      data: {
+        paymentLock: {
+          ...lock,
+          status: 'released',
+          releaseReason: pickStr(reason, 'client_cancelled'),
+          releasedAt: now,
+          expiresAt: now,
+          updatedAt: now,
+        },
+        updatedAt: now,
+      }
+    });
+    return { ok: true };
+  });
+}
+
+async function prepareTaskDelayConfirmLock({ taskId, ownerOpenid }) {
+  const normalizedTaskId = pickStr(taskId);
+  const normalizedOwnerOpenid = pickStr(ownerOpenid);
+  if (!normalizedTaskId || !normalizedOwnerOpenid) {
+    return { ok: false, err: { code: 'MISSING_PARAM', msg: '缺少任务或用户信息' } };
+  }
+
+  const now = new Date();
+  const nowMs = now.getTime();
+
+  return db.runTransaction(async (tx) => {
+    const docRes = await tx.collection(TASK_COLLECTION).doc(normalizedTaskId).get();
+    const task = docRes && docRes.data ? docRes.data : null;
+    if (!task) return { ok: false, err: { code: 'TASK_NOT_FOUND', msg: '任务不存在' } };
+    if (pickStr(task._openid) !== normalizedOwnerOpenid) {
+      return { ok: false, err: { code: 'NOT_OWNER', msg: '只有发布者可以确认完成' } };
+    }
+
+    const status = pickStr(task.status);
+    if (status === 'completed') return { ok: true, task, alreadyCompleted: true };
+    if (status !== 'submitted') {
+      return { ok: false, err: { code: 'INVALID_STATUS', msg: '当前任务还不能确认完成', status } };
+    }
+
+    const split = task.split && typeof task.split === 'object' ? task.split : {};
+    const delayConfirm = split.delayConfirm && typeof split.delayConfirm === 'object' ? split.delayConfirm : {};
+    const existingReqDate = pickStr(delayConfirm.reqDate);
+    const existingReqSeqId = pickStr(delayConfirm.reqSeqId);
+    const lockExpiresAtMs = toDateMs(delayConfirm.lockExpiresAt);
+    const hasInFlightLock = pickStr(split.status) === 'confirming' && existingReqDate && existingReqSeqId && lockExpiresAtMs > nowMs;
+
+    if (hasInFlightLock) {
+      return {
+        ok: true,
+        task,
+        pending: true,
+        reqDate: existingReqDate,
+        reqSeqId: existingReqSeqId,
+      };
+    }
+
+    const reqDate = existingReqDate || yyyymmdd(now);
+    const reqSeqId = existingReqSeqId || `DC${reqDate}${randomId(20)}`;
+    const payObj = task.pay && typeof task.pay === 'object' ? task.pay : {};
+    const nextDelayConfirm = {
+      ...delayConfirm,
+      reqDate,
+      reqSeqId,
+      orgReqDate: pickStr(delayConfirm.orgReqDate, payObj.reqDate),
+      orgReqSeqId: pickStr(delayConfirm.orgReqSeqId, payObj.reqSeqId),
+      orgHfSeqId: pickStr(delayConfirm.orgHfSeqId, payObj.orgHfSeqId),
+      requestedAt: delayConfirm.requestedAt || now,
+      lockExpiresAt: new Date(nowMs + TASK_DELAY_CONFIRM_LOCK_TTL_MS),
+    };
+
+    await tx.collection(TASK_COLLECTION).doc(normalizedTaskId).update({
+      data: {
+        split: {
+          ...split,
+          status: 'confirming',
+          delayConfirm: nextDelayConfirm,
+          lastError: null,
+        },
+        updatedAt: now,
+      }
+    });
+
+    return {
+      ok: true,
+      task: {
+        ...task,
+        split: {
+          ...split,
+          status: 'confirming',
+          delayConfirm: nextDelayConfirm,
+        }
+      },
+      reqDate,
+      reqSeqId,
+    };
+  });
+}
+
 async function getTaskById(taskId) {
   const db = cloud.database();
   const res = await db.collection(TASK_COLLECTION).doc(taskId).get();
   return (res && res.data) ? res.data : null;
+}
+
+async function markTaskDelayConfirmFailed({
+  taskId,
+  task,
+  code = '',
+  msg = '',
+  respCode = '',
+  respDesc = '',
+  reqDate = '',
+  reqSeqId = '',
+  resetReq = false,
+  extra = {},
+}) {
+  const normalizedTaskId = pickStr(taskId);
+  if (!normalizedTaskId) return;
+  const split = task && task.split && typeof task.split === 'object' ? task.split : {};
+  const delayConfirm = split.delayConfirm && typeof split.delayConfirm === 'object' ? split.delayConfirm : {};
+  const now = new Date();
+
+  try {
+    await db.collection(TASK_COLLECTION).doc(normalizedTaskId).update({
+      data: {
+        updatedAt: now,
+        split: {
+          ...split,
+          mode: 'delay',
+          status: 'failed',
+          lastError: {
+            code: pickStr(code, respCode),
+            respCode: pickStr(respCode),
+            respDesc: pickStr(respDesc, msg),
+            at: now,
+          },
+          delayConfirm: {
+            ...delayConfirm,
+            lastReqDate: pickStr(reqDate, delayConfirm.lastReqDate, delayConfirm.reqDate),
+            lastReqSeqId: pickStr(reqSeqId, delayConfirm.lastReqSeqId, delayConfirm.reqSeqId),
+            lastFailedAt: now,
+            lockExpiresAt: now,
+            reqDate: resetReq ? '' : pickStr(delayConfirm.reqDate),
+            reqSeqId: resetReq ? '' : pickStr(delayConfirm.reqSeqId),
+          },
+          ...extra,
+        }
+      }
+    });
+  } catch (e) {
+    console.error('[delay_confirm_task] mark failure failed', e);
+  }
 }
 
 async function recordWalletTransaction({
@@ -477,28 +1008,27 @@ async function recordWalletTransaction({
     const existsList = (existsRes && existsRes.data) || [];
     if (existsList.length) return { ok: true, duplicated: true };
 
-    const walletRes = await tx.collection(WALLET_COLLECTION)
-      .where({ _openid: ownerOpenid })
-      .limit(1)
-      .get();
-    const walletList = (walletRes && walletRes.data) || [];
-    const wallet = walletList[0] || null;
+    const walletState = await ensurePrimaryWalletDoc(tx, ownerOpenid, createdAt);
+    const wallet = walletState && walletState.wallet ? walletState.wallet : null;
+    const walletId = pickStr(walletState && walletState.walletId);
     const currentBalance = roundMoney(wallet && wallet.balance);
     const nextBalance = roundMoney(currentBalance + delta);
     const incomeDelta = delta > 0 ? delta : 0;
     const expenseDelta = delta < 0 ? Math.abs(delta) : 0;
 
-    if (wallet && wallet._id) {
-      await tx.collection(WALLET_COLLECTION).doc(wallet._id).update({
+    if (walletId && wallet) {
+      await tx.collection(WALLET_COLLECTION).doc(walletId).update({
         data: {
           balance: nextBalance,
           incomeTotal: roundMoney(Number(wallet.incomeTotal || 0) + incomeDelta),
           expenseTotal: roundMoney(Number(wallet.expenseTotal || 0) + expenseDelta),
+          walletRole: 'primary',
+          isPrimary: true,
           updatedAt: createdAt,
         }
       });
     } else if (shouldAffectBalance) {
-      await tx.collection(WALLET_COLLECTION).add({
+      await tx.collection(WALLET_COLLECTION).doc(walletId || getPrimaryWalletId(ownerOpenid)).set({
         data: {
           _openid: ownerOpenid,
           balance: nextBalance,
@@ -506,6 +1036,9 @@ async function recordWalletTransaction({
           expenseTotal: expenseDelta,
           createdAt,
           updatedAt: createdAt,
+          walletRole: 'primary',
+          isPrimary: true,
+          shadowedWalletIds: [],
         }
       });
     }
@@ -607,14 +1140,22 @@ function unwrapHuifuResp(resp = {}) {
 
 exports.main = async (event = {}) => {
   const { OPENID } = cloud.getWXContext();
-  const cfg = resolveHuifuConfig(event);
   const action = pickStr(event.action, 'jspay');
+  const systemCompensate = isSystemCompensateCall(event);
+  if (systemCompensate && action !== 'delay_confirm_task') {
+    return { ok: false, err: { code: 'SYSTEM_ACTION_NOT_ALLOWED', msg: '系统补偿仅支持任务确认打款' }, buildTag: BUILD_TAG };
+  }
+  const debugOpenid = pickStr(OPENID, systemCompensate ? event.ownerOpenid : '', systemCompensate ? event.targetOpenid : '');
+  const cfg = resolveHuifuConfig(event);
   const debugTraceId = await recordDebugTrace({
     functionName: 'huifuMiniappPay',
     buildTag: BUILD_TAG,
     action,
-    openid: OPENID,
+    openid: debugOpenid,
     event,
+    extra: {
+      systemCompensate,
+    },
   });
 
   if (cfg.privateKeyFormatError) {
@@ -643,7 +1184,7 @@ exports.main = async (event = {}) => {
     copyLogLabel,
     debugMeta: {
       action,
-      openid: OPENID,
+      openid: debugOpenid,
       buildTag: BUILD_TAG,
       reqDate: pickStr(data && data.req_date),
       reqSeqId: pickStr(data && data.req_seq_id),
@@ -778,51 +1319,113 @@ exports.main = async (event = {}) => {
     const goodsId = pickStr(event.goodsId);
     if (!goodsId) return { ok: false, err: { code: 'MISSING_GOODS_ID', msg: '缺少 goodsId' } };
 
-    const goods = await getGoodsById(goodsId);
-    if (!goods) return { ok: false, err: { code: 'GOODS_NOT_FOUND', msg: '商品不存在' } };
+    const lockRes = await acquireGoodsPaymentLock({ goodsId, buyerOpenid: OPENID });
+    if (!lockRes || !lockRes.ok) return lockRes || { ok: false, err: { code: 'LOCK_FAILED', msg: '商品锁单失败' } };
+    try {
+      const goods = lockRes.goods || {};
+      const totalCents = yuanToCents(goods.price);
+      if (!totalCents) {
+        await releaseGoodsPaymentLock({
+          goodsId,
+          buyerOpenid: OPENID,
+          reqDate: lockRes.reqDate,
+          reqSeqId: lockRes.reqSeqId,
+          reason: 'invalid_price',
+        });
+        return { ok: false, err: { code: 'INVALID_PRICE', msg: '商品价格不合法' } };
+      }
 
-    const status = pickStr(goods.status) || 'posted';
-    if (status !== 'posted') {
-      return { ok: false, err: { code: 'NOT_FOR_SALE', msg: '该商品当前不可购买', status } };
-    }
+      const sellerOpenid = pickStr(goods._openid);
+      const sellerUser = await getUserInfoByOpenid(sellerOpenid);
+      const sellerHuifuUserId = getReceiverHuifuIdFromUserDoc(sellerUser || {});
+      if (!sellerHuifuUserId || !isReceiverReady(sellerUser || {})) {
+        await releaseGoodsPaymentLock({
+          goodsId,
+          buyerOpenid: OPENID,
+          reqDate: lockRes.reqDate,
+          reqSeqId: lockRes.reqSeqId,
+          reason: 'seller_not_ready',
+        });
+        return {
+          ok: false,
+          err: {
+            code: 'SELLER_NOT_ONBOARDED',
+            msg: '卖家暂未开通收款，无法完成分账',
+            hint: '请稍后再试或联系管理员处理。'
+          }
+        };
+      }
 
-    const sellerOpenid = pickStr(goods._openid);
-    if (!sellerOpenid) return { ok: false, err: { code: 'MISSING_SELLER', msg: '商品缺少发布者信息' } };
-    if (OPENID && sellerOpenid === OPENID) {
-      return { ok: false, err: { code: 'CANNOT_BUY_SELF', msg: '不能购买自己发布的商品' } };
-    }
+      const feeRate = resolvePlatformFeeRate(event);
+      const split = buildSplitBunch({
+        totalCents,
+        feeRate,
+        platformHuifuId: cfg.huifuId,
+        sellerHuifuId: sellerHuifuUserId,
+      });
+      if (!split.ok) {
+        await releaseGoodsPaymentLock({
+          goodsId,
+          buyerOpenid: OPENID,
+          reqDate: lockRes.reqDate,
+          reqSeqId: lockRes.reqSeqId,
+          reason: 'split_build_failed',
+        });
+        return { ok: false, err: split.err };
+      }
 
-    const totalCents = yuanToCents(goods.price);
-    if (!totalCents) return { ok: false, err: { code: 'INVALID_PRICE', msg: '商品价格不合法' } };
+      const ret = await doJspay({
+        transAmtYuan: totalCents / 100,
+        goodsDesc: pickStr(goods.title, goods.desc, '商品购买'),
+        reqSeqIdInput: lockRes.reqSeqId,
+        reqDateInput: lockRes.reqDate,
+        delayAcctFlag: 'N',
+        acctSplitBunch: split.acctSplitBunch,
+      });
+      if (!ret || !ret.ok) {
+        await releaseGoodsPaymentLock({
+          goodsId,
+          buyerOpenid: OPENID,
+          reqDate: lockRes.reqDate,
+          reqSeqId: lockRes.reqSeqId,
+          reason: 'order_create_failed',
+        });
+        return ret;
+      }
 
-    const sellerUser = await getUserInfoByOpenid(sellerOpenid);
-    const sellerHuifuUserId = getReceiverHuifuIdFromUserDoc(sellerUser || {});
-    if (!sellerHuifuUserId || !isReceiverReady(sellerUser || {})) {
+      await updateGoodsPaymentLock(goodsId, {
+        status: 'request_sent',
+        reqDate: pickStr(ret.reqDate, lockRes.reqDate),
+        reqSeqId: pickStr(ret.reqSeqId, lockRes.reqSeqId),
+        requestedAt: new Date(),
+        expiresAt: lockRes.expiresAt,
+      });
+
       return {
-        ok: false,
-        err: {
-          code: 'SELLER_NOT_ONBOARDED',
-          msg: '卖家暂未开通收款，无法完成分账',
-          hint: '请稍后再试或联系管理员处理。'
-        }
+        ...ret,
+        goodsId,
       };
+    } catch (e) {
+      await releaseGoodsPaymentLock({
+        goodsId,
+        buyerOpenid: OPENID,
+        reqDate: lockRes.reqDate,
+        reqSeqId: lockRes.reqSeqId,
+        reason: 'jspay_goods_exception',
+      });
+      throw e;
     }
+  }
 
-    const feeRate = resolvePlatformFeeRate(event);
-    const split = buildSplitBunch({
-      totalCents,
-      feeRate,
-      platformHuifuId: cfg.huifuId,
-      sellerHuifuId: sellerHuifuUserId,
-    });
-    if (!split.ok) return { ok: false, err: split.err };
-
-    return await doJspay({
-      transAmtYuan: totalCents / 100,
-      goodsDesc: pickStr(goods.title, goods.desc, '商品购买'),
-      reqSeqIdInput: event.reqSeqId,
-      delayAcctFlag: 'N',
-      acctSplitBunch: split.acctSplitBunch,
+  if (action === 'release_goods_lock') {
+    const goodsId = pickStr(event.goodsId);
+    if (!goodsId) return { ok: false, err: { code: 'MISSING_GOODS_ID', msg: '缺少 goodsId' } };
+    return await releaseGoodsPaymentLock({
+      goodsId,
+      buyerOpenid: OPENID,
+      reqDate: pickStr(event.reqDate),
+      reqSeqId: pickStr(event.reqSeqId),
+      reason: pickStr(event.reason, 'client_cancelled'),
     });
   }
 
@@ -935,6 +1538,10 @@ exports.main = async (event = {}) => {
       const db = cloud.database();
       const resp = ret.huifuResp || {};
       const orgHfSeqId = pickStr(resp.hf_seq_id, resp.hfSeqId, resp.org_hf_seq_id, resp.orgHfSeqId);
+      const orderAmtYuan = positiveMoney(resp.trans_amt || resp.transAmt || task.amount || 0);
+      const feeAmtYuan = positiveMoney(resp.fee_amt || resp.fee_amount || existingPay.feeAmtYuan || 0);
+      const unconfirmAmtYuan = positiveMoney(resp.unconfirm_amt || resp.unconfirmAmt || existingPay.unconfirmAmtYuan || 0);
+      const confirmableAmtYuan = unconfirmAmtYuan || positiveMoney(orderAmtYuan - feeAmtYuan);
       await db.collection(TASK_COLLECTION).doc(taskId).update({
         data: {
           pay: {
@@ -944,7 +1551,12 @@ exports.main = async (event = {}) => {
             reqDate: ret.reqDate,
             reqSeqId: ret.reqSeqId,
             orgHfSeqId: orgHfSeqId || pickStr(existingPay.orgHfSeqId),
-            transAmtYuan: Number(task.amount),
+            hfSeqId: orgHfSeqId || pickStr(existingPay.hfSeqId),
+            orderAmtYuan: orderAmtYuan || positiveMoney(task.amount),
+            transAmtYuan: orderAmtYuan || positiveMoney(task.amount),
+            feeAmtYuan,
+            unconfirmAmtYuan: unconfirmAmtYuan || confirmableAmtYuan,
+            confirmableAmtYuan,
             createdAt: new Date(),
           },
           updatedAt: new Date(),
@@ -960,16 +1572,20 @@ exports.main = async (event = {}) => {
   if (action === 'delay_confirm_task') {
     const taskId = pickStr(event.taskId, event.tid, event.id);
     if (!taskId) return { ok: false, err: { code: 'MISSING_TASK_ID', msg: '缺少 taskId' }, buildTag: BUILD_TAG };
-
-    const task = await getTaskById(taskId);
-    if (!task) return { ok: false, err: { code: 'TASK_NOT_FOUND', msg: '任务不存在' }, buildTag: BUILD_TAG };
-
-    if (pickStr(task._openid) !== pickStr(OPENID)) {
-      return { ok: false, err: { code: 'NOT_OWNER', msg: '只有发布者可以确认完成' }, buildTag: BUILD_TAG };
+    const confirmOwnerOpenid = systemCompensate ? pickStr(event.ownerOpenid) : pickStr(OPENID);
+    if (!confirmOwnerOpenid) {
+      return { ok: false, err: { code: 'MISSING_OWNER_OPENID', msg: '缺少任务发布者身份' }, buildTag: BUILD_TAG };
     }
 
+    const preparedConfirm = await prepareTaskDelayConfirmLock({ taskId, ownerOpenid: confirmOwnerOpenid });
+    if (!preparedConfirm || !preparedConfirm.ok) {
+      return { ...(preparedConfirm || { ok: false, err: { code: 'PREPARE_FAILED', msg: '确认打款预处理失败' } }), buildTag: BUILD_TAG };
+    }
+
+    const task = preparedConfirm.task || {};
+
     const status = pickStr(task.status) || '';
-    if (status === 'completed') {
+    if (preparedConfirm.alreadyCompleted || status === 'completed') {
       try {
         const completedSplit = task.split && typeof task.split === 'object' ? task.split : {};
         const completedWorkerOpenid = pickStr(task.workerOpenid || task.worker_openid);
@@ -991,6 +1607,17 @@ exports.main = async (event = {}) => {
       }
       return { ok: true, status: 'completed', already: true, buildTag: BUILD_TAG };
     }
+    if (preparedConfirm.pending) {
+      return {
+        ok: true,
+        status: 'confirming',
+        pending: true,
+        reqDate: pickStr(preparedConfirm.reqDate),
+        reqSeqId: pickStr(preparedConfirm.reqSeqId),
+        msg: '任务正在确认打款，请稍后刷新查看结果',
+        buildTag: BUILD_TAG
+      };
+    }
     if (status !== 'submitted') {
       return { ok: false, err: { code: 'INVALID_STATUS', msg: '当前任务还不能确认完成', status }, buildTag: BUILD_TAG };
     }
@@ -1000,11 +1627,17 @@ exports.main = async (event = {}) => {
     const orgReqSeqId = pickStr(payObj.reqSeqId);
     const orgHfSeqId = pickStr(payObj.orgHfSeqId);
     if (!orgReqDate || (!orgReqSeqId && !orgHfSeqId)) {
+      await markTaskDelayConfirmFailed({
+        taskId,
+        task,
+        code: 'MISSING_ORG_TRADE',
+        msg: '缺少原交易信息（无法延时分账确认）',
+        reqDate: pickStr(preparedConfirm.reqDate),
+        reqSeqId: pickStr(preparedConfirm.reqSeqId),
+        resetReq: true,
+      });
       return { ok: false, err: { code: 'MISSING_ORG_TRADE', msg: '缺少原交易信息（无法延时分账确认）' }, buildTag: BUILD_TAG };
     }
-
-    const totalCents = yuanToCents(task.amount);
-    if (!totalCents) return { ok: false, err: { code: 'INVALID_AMOUNT', msg: '任务佣金不合法' }, buildTag: BUILD_TAG };
 
     const workerHuifuId = pickStr(task.workerHuifuId);
     const workerOpenid = pickStr(task.workerOpenid || task.worker_openid);
@@ -1017,6 +1650,15 @@ exports.main = async (event = {}) => {
     }
 
     if (!finalWorkerHuifuId || (workerUser && !isReceiverReady(workerUser || {}))) {
+      await markTaskDelayConfirmFailed({
+        taskId,
+        task,
+        code: 'WORKER_NOT_HUIFU_READY',
+        msg: '接单人暂未开通收款，无法打款',
+        reqDate: pickStr(preparedConfirm.reqDate),
+        reqSeqId: pickStr(preparedConfirm.reqSeqId),
+        resetReq: true,
+      });
       return {
         ok: false,
         err: { code: 'WORKER_NOT_HUIFU_READY', msg: '接单人暂未开通收款，无法打款' },
@@ -1024,18 +1666,49 @@ exports.main = async (event = {}) => {
       };
     }
 
+    const payAmounts = resolveTaskPaymentAmounts(task);
+    const orderCents = payAmounts.orderCents || yuanToCents(task.amount);
+    if (!orderCents) {
+      await markTaskDelayConfirmFailed({
+        taskId,
+        task,
+        code: 'INVALID_AMOUNT',
+        msg: '任务佣金不合法',
+        reqDate: pickStr(preparedConfirm.reqDate),
+        reqSeqId: pickStr(preparedConfirm.reqSeqId),
+        resetReq: true,
+      });
+      return { ok: false, err: { code: 'INVALID_AMOUNT', msg: '任务佣金不合法' }, buildTag: BUILD_TAG };
+    }
+    const confirmableCents = payAmounts.confirmableCents;
     const feeRate = resolvePlatformFeeRate(event);
-    const split = buildSplitBunch({
-      totalCents,
+    const split = buildTaskDelayConfirmSplitBunch({
+      orderCents,
+      confirmableCents,
       feeRate,
       platformHuifuId: cfg.huifuId,
       sellerHuifuId: finalWorkerHuifuId,
     });
-    if (!split.ok) return { ok: false, err: split.err, buildTag: BUILD_TAG };
+    if (!split.ok) {
+      await markTaskDelayConfirmFailed({
+        taskId,
+        task,
+        code: pickStr(split.err && split.err.code, 'SPLIT_BUILD_FAILED'),
+        msg: pickStr(split.err && split.err.msg, '确认打款金额构造失败'),
+        reqDate: pickStr(preparedConfirm.reqDate),
+        reqSeqId: pickStr(preparedConfirm.reqSeqId),
+        resetReq: true,
+        extra: {
+          confirmableCents,
+          paymentFeeCents: payAmounts.paymentFeeCents,
+        },
+      });
+      return { ok: false, err: split.err, buildTag: BUILD_TAG };
+    }
 
     const data = {
-      req_seq_id: pickStr(event.reqSeqId, `DC${yyyymmdd(new Date())}${randomId(20)}`),
-      req_date: yyyymmdd(new Date()),
+      req_seq_id: pickStr(preparedConfirm.reqSeqId, event.reqSeqId),
+      req_date: pickStr(preparedConfirm.reqDate, yyyymmdd(new Date())),
       huifu_id: cfg.huifuId,
       org_req_date: orgReqDate,
       org_req_seq_id: orgReqSeqId,
@@ -1053,26 +1726,21 @@ exports.main = async (event = {}) => {
     const respCode = pickStr(respData && (respData.resp_code || respData.return_code || respData.code || respData.respCode));
     const respDesc = pickStr(respData && (respData.resp_desc || respData.resp_msg || respData.return_msg || respData.message || respData.respDesc));
     if (respCode && respCode !== '00000000') {
-      // 最佳努力记录失败原因，方便排查；不把任务标记为 completed
-      try {
-        const db = cloud.database();
-        await db.collection(TASK_COLLECTION).doc(taskId).update({
-          data: {
-            updatedAt: new Date(),
-            split: {
-              ...(task.split || {}),
-              mode: 'delay',
-              lastError: {
-                respCode,
-                respDesc,
-                at: new Date(),
-              },
-            }
-          }
-        });
-      } catch (e) {
-        console.error('[delay_confirm_task] save split error failed', e);
-      }
+      await markTaskDelayConfirmFailed({
+        taskId,
+        task,
+        code: 'HUIFU_BIZ_ERROR',
+        msg: respDesc ? `${respCode}:${respDesc}` : respCode,
+        respCode,
+        respDesc,
+        reqDate: data.req_date,
+        reqSeqId: data.req_seq_id,
+        resetReq: true,
+        extra: {
+          confirmableCents: split.confirmableCents,
+          paymentFeeCents: split.paymentFeeCents,
+        },
+      });
 
       return {
         ok: false,
@@ -1097,10 +1765,14 @@ exports.main = async (event = {}) => {
           updatedAt: new Date(),
           split: {
             mode: 'delay',
+            status: 'completed',
             feeRate,
-            totalCents,
+            totalCents: orderCents,
+            confirmableCents: split.confirmableCents,
             feeCents: split.feeCents,
+            grossFeeCents: split.grossFeeCents,
             workerCents: split.sellerCents,
+            paymentFeeCents: split.paymentFeeCents,
             platformHuifuId: cfg.huifuId,
             workerHuifuId: finalWorkerHuifuId,
             delayConfirm: {
@@ -1109,6 +1781,8 @@ exports.main = async (event = {}) => {
               orgReqDate,
               orgReqSeqId,
               orgHfSeqId,
+              confirmedAt: new Date(),
+              lockExpiresAt: new Date(),
             },
             huifuResp: respData,
           }
@@ -1127,7 +1801,7 @@ exports.main = async (event = {}) => {
           type: 'task_income',
           bizKey: `task_income:${taskId}:${data.req_seq_id}`,
           title: pickStr(task.title, task.desc, '任务收入'),
-          summary: `任务完成到账 ¥${workerIncome.toFixed(2)}，已计入汇付余额，平台费 ¥${roundMoney(split.feeCents / 100).toFixed(2)}`,
+          summary: `任务完成到账 ¥${workerIncome.toFixed(2)}，已计入汇付余额，平台分成 ¥${roundMoney(split.feeCents / 100).toFixed(2)}，支付手续费 ¥${roundMoney(split.paymentFeeCents / 100).toFixed(2)}`,
           relatedId: taskId,
           counterpartOpenid: pickStr(task._openid),
           createdAt: new Date(),
@@ -1144,10 +1818,13 @@ exports.main = async (event = {}) => {
       reqDate: data.req_date,
       huifuResp: respData,
       splitPreview: {
-        totalCents,
+        totalCents: orderCents,
+        confirmableCents: split.confirmableCents,
         feeRate,
         feeCents: split.feeCents,
+        grossFeeCents: split.grossFeeCents,
         workerCents: split.sellerCents,
+        paymentFeeCents: split.paymentFeeCents,
         platformHuifuId: cfg.huifuId,
         workerHuifuId: finalWorkerHuifuId,
       },

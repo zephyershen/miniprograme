@@ -24,8 +24,27 @@ function formatCreatedAt(v) {
   return '';
 }
 
-function statusText(s) {
+function toDateMs(v) {
+  if (!v) return 0;
+  if (typeof v.getTime === 'function') return v.getTime();
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const t = Date.parse(v);
+  return Number.isNaN(t) ? 0 : t;
+}
+
+function hasActivePaymentLock(doc = {}) {
+  const lock = doc && doc.paymentLock && typeof doc.paymentLock === 'object'
+    ? doc.paymentLock
+    : {};
+  const status = pickStr(lock.status).toLowerCase();
+  if (!pickStr(lock.reqSeqId)) return false;
+  if (['paid', 'released', 'failed', 'expired'].includes(status)) return false;
+  return toDateMs(lock.expiresAt) > Date.now();
+}
+
+function statusText(s, paymentLockActive = false) {
   const st = pickStr(s);
+  if (paymentLockActive && st === 'posted') return { text: '支付中', badge: 'badge-outline' };
   if (st === 'pending') return { text: '审核中', badge: 'badge-outline' };
   if (st === 'need_fix') return { text: '需修改', badge: 'badge-outline' };
   if (st === 'posted') return { text: '已上架', badge: 'badge-primary' };
@@ -197,7 +216,8 @@ Page({
 
       const docs = (res && res.data) ? res.data : [];
       const list = docs.map((doc) => {
-        const st = statusText(doc.status);
+        const paymentLockActive = hasActivePaymentLock(doc);
+        const st = statusText(doc.status, paymentLockActive);
         const needFixIdx = Array.isArray(doc.auditNeedFixIdx) ? doc.auditNeedFixIdx : [];
         const needFixText = (doc.status === 'need_fix' && needFixIdx.length)
           ? `请替换第 ${needFixIdx.map((i) => Number(i) + 1).join('、')} 张图片`
@@ -212,6 +232,7 @@ Page({
           createdAtText: formatCreatedAt(doc.createdAt || doc._createTime),
           needFixText,
           auditError: pickStr(doc.auditError),
+          paymentLockActive,
           goodsChatUnreadCount: Number((this._goodsUnreadMap || {})[pickStr(doc._id)]) || 0
         };
       });
@@ -277,7 +298,12 @@ Page({
   async onToggleShelf(e) {
     const id = (e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id) || '';
     const status = pickStr(e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.status);
+    const paymentLockActive = !!(e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.paymentLockActive);
     if (!id || (status !== 'posted' && status !== 'off_shelf')) return;
+    if (paymentLockActive) {
+      toast('当前有买家正在支付，暂时不能上下架');
+      return;
+    }
 
     const nextStatus = status === 'posted' ? 'off_shelf' : 'posted';
     const modalTitle = nextStatus === 'off_shelf' ? '下架商品' : '重新上架';
