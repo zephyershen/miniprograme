@@ -270,6 +270,24 @@ Page({
       }
     }
 
+    if (!goods) {
+      try {
+        const res = await wx.cloud.callFunction({
+          name: 'getGoodsProfile',
+          data: {
+            action: 'get_goods_detail',
+            goodsId
+          }
+        });
+        const result = (res && res.result) || {};
+        if (result && result.ok && result.doc) {
+          goods = result.doc;
+        }
+      } catch (err) {
+        console.warn('通过云函数兜底读取商品聊天信息失败', err);
+      }
+    }
+
     return goods;
   },
 

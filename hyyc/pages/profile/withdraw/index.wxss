@@ -54,12 +54,27 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 20rpx;
+  gap: 16rpx;
 }
 
 .section-title {
   font-size: 30rpx;
   font-weight: 700;
   color: #1F2328;
+  flex: 1;
+}
+
+.section-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.section-toggle {
+  flex-shrink: 0;
+  font-size: 24rpx;
+  color: #B95E49;
+  font-weight: 700;
 }
 
 .status-tag {

@@ -83,6 +83,63 @@ function getActivePaymentLock(goods = {}, openid = '') {
   };
 }
 
+function buildNeedFixText(doc = {}) {
+  const needFixIdx = Array.isArray(doc.auditNeedFixIdx) ? doc.auditNeedFixIdx : [];
+  if (!needFixIdx.length) return '';
+  return `请替换第 ${needFixIdx.map((i) => Number(i) + 1).join('、')} 张图片后重新提交审核`;
+}
+
+function buildGoodsStatusSummary(doc = {}, { isOwner = false, isBuyer = false, paymentLockActive = false } = {}) {
+  const status = pickStr(doc.status, 'posted');
+  const needFixText = buildNeedFixText(doc);
+
+  if (paymentLockActive && status === 'posted') {
+    return {
+      text: '支付处理中',
+      note: '当前有买家正在支付，暂时不能修改或上下架。',
+      tone: 'warn'
+    };
+  }
+  if (status === 'pending') {
+    return {
+      text: '审核中',
+      note: isOwner ? '商品正在审核中，暂不会出现在商品广场。' : '商品正在审核中。',
+      tone: 'warn'
+    };
+  }
+  if (status === 'need_fix') {
+    return {
+      text: '需修改',
+      note: needFixText || '请调整商品信息后重新提交审核。',
+      tone: 'danger'
+    };
+  }
+  if (status === 'off_shelf') {
+    return {
+      text: '已下架',
+      note: isOwner ? '商品当前仅自己可见，可以直接重新上架或编辑后重新审核。' : '商品当前已下架。',
+      tone: 'muted'
+    };
+  }
+  if (status === 'sold') {
+    return {
+      text: isBuyer ? '已购买' : '已售出',
+      note: isBuyer ? '你已购买该商品，可继续联系卖家。' : '该商品交易已完成。',
+      tone: 'success'
+    };
+  }
+  return {
+    text: '在售',
+    note: isOwner ? '商品已上架，你可以编辑信息后重新送审，或先下架。' : '商品当前可正常购买。',
+    tone: 'success'
+  };
+}
+
+function isGoodsUnavailableCode(code = '') {
+  const value = pickStr(code).toUpperCase();
+  return ['GOODS_NOT_FOUND', 'GOODS_HIDDEN', 'NO_PERMISSION'].includes(value);
+}
+
 // 格式化发布时间
 function formatPublishTime(date) {
   if (!date) return '';
@@ -113,12 +170,14 @@ Page({
     isLoading: true,
     isFavorite: false,
     canOwnerManage: false,
+    canEditGoods: false,
     ownerActionText: '',
     // 商品“聊一聊”入口开关
     goodsChatEnabled: !!(access && access.features && access.features.goodsChat),
     goodsChatUnreadCount: 0,
     // 当前用户是否为商品发布者
     isOwner: false,
+    isBuyer: false,
     // 是否允许购买（非本人 + status=posted）
     canBuy: false,
     buyButtonText: '立即购买'
@@ -134,6 +193,27 @@ Page({
   },
   onPullDownRefresh() {
     this.loadGoodsDetail(true);
+  },
+  _showGoodsUnavailable() {
+    this.setData({ isLoading: false, goods: null, imagesPreview: [] });
+    this.clearGoodsChatBadgeWatch();
+    this.setData({ goodsChatUnreadCount: 0 });
+  },
+  async _loadGoodsDetailViaCloud(goodsId = '') {
+    const res = await wx.cloud.callFunction({
+      name: 'getGoodsProfile',
+      data: {
+        action: 'get_goods_detail',
+        goodsId
+      }
+    });
+    const result = (res && res.result) || {};
+    if (!result.ok) {
+      const err = new Error(pickStr(result.message, '商品不存在或已下架'));
+      err.code = pickStr(result.code);
+      throw err;
+    }
+    return result.doc || null;
   },
   async _ensureOpenid() {
     // 数据库安全规则里用 auth.openid 判断“是不是本人”，这里需要拿到 openid 才能做“本人查询”。
@@ -292,6 +372,7 @@ Page({
       // 在云开发里，这里的 doc 更像“查询条件”，所以我们必须把条件写到 where 里，才能通过权限校验。
       // 1) 先按“本人”查：允许查看自己 pending/need_fix 的商品
       // 2) 再按“公开”查：只允许查看 posted 且同小区的商品
+      // 3) 其余情况交给云函数兜底：包括买家查看已购商品、卖家已删记录后的空态判断
       let doc = null;
       if (openid) {
         try {
@@ -305,13 +386,27 @@ Page({
         }
       }
       if (!doc && community) {
-        const r2 = await db.collection(GOODS_COLLECTION)
-          .where({ _id: id, status: 'posted', community })
-          .limit(1)
-          .get();
-        doc = (r2 && r2.data && r2.data[0]) ? r2.data[0] : null;
+        try {
+          const r2 = await db.collection(GOODS_COLLECTION)
+            .where({ _id: id, status: 'posted', community })
+            .limit(1)
+            .get();
+          doc = (r2 && r2.data && r2.data[0]) ? r2.data[0] : null;
+        } catch (e) {
+          console.warn('按公开商品查询失败', e);
+        }
       }
-      if (!doc) throw new Error('goods not found');
+      if (!doc) {
+        try {
+          doc = await this._loadGoodsDetailViaCloud(id);
+        } catch (e) {
+          if (isGoodsUnavailableCode(e && e.code)) {
+            this._showGoodsUnavailable();
+            return;
+          }
+          throw e;
+        }
+      }
 
       // 保护：审核中/需修改的商品，不允许“非本人”查看详情
       // （本人在“我的商品”里可以查看/修改）
@@ -319,17 +414,11 @@ Page({
       // 以 openid 为主（更可靠），兼容历史数据用 ownerId 辅助判断
       const isOwner = (openid && doc._openid && String(doc._openid) === String(openid))
         || (meId && doc.ownerId && String(doc.ownerId) === meId);
+      const isBuyer = openid && pickStr(doc.buyerOpenid, doc.buyer_openid, doc.buyerOpenId) === pickStr(openid);
+      const sellerDeleted = !!doc.sellerDeletedAt;
       const st = doc.status || '';
-      if (st && st !== 'posted' && !isOwner) {
-        this.setData({ isLoading: false, goods: null, imagesPreview: [] });
-        wx.showModal({
-          title: '暂不可查看',
-          content: '该商品正在审核中或需要修改，请稍后再试。',
-          showCancel: false,
-          success: () => {
-            wx.navigateBack({ delta: 1 });
-          }
-        });
+      if ((sellerDeleted && !isOwner) || (st && st !== 'posted' && !isOwner && !isBuyer)) {
+        this._showGoodsUnavailable();
         return;
       }
 
@@ -377,22 +466,38 @@ Page({
       // 统一在详情页里计算“是否本人/是否可购买”，避免 WXML 里堆复杂判断
       const isOwner2 = (openid && doc._openid && String(doc._openid) === String(openid))
         || (meId && doc.ownerId && String(doc.ownerId) === meId);
+      const isBuyer2 = openid && pickStr(doc.buyerOpenid, doc.buyer_openid, doc.buyerOpenId) === pickStr(openid);
       const st2 = pickStr(doc.status) || 'posted';
       const paymentLock = getActivePaymentLock(doc, openid);
       const canOwnerManage = isOwner2 && (st2 === 'posted' || st2 === 'off_shelf') && !paymentLock.active;
+      const canEditGoods = isOwner2 && !paymentLock.active && ['pending', 'need_fix', 'posted', 'off_shelf'].includes(st2);
       const ownerActionText = st2 === 'off_shelf' ? '重新上架' : '下架商品';
-      const canBuy = !isOwner2 && st2 === 'posted' && !paymentLock.active;
+      const canBuy = !isOwner2 && !isBuyer2 && st2 === 'posted' && !paymentLock.active;
       const buyButtonText = st2 === 'sold'
-        ? '已售出'
+        ? (isBuyer2 ? '已购买' : '已售出')
         : (paymentLock.active
           ? (paymentLock.ownedByMe ? '支付处理中' : '支付中')
           : (canBuy ? '立即购买' : (isOwner2 ? '我的商品' : '不可购买')));
+      const statusSummary = buildGoodsStatusSummary(doc, {
+        isOwner: isOwner2,
+        isBuyer: isBuyer2,
+        paymentLockActive: paymentLock.active
+      });
 
       this.setData({
-        goods,
+        goods: {
+          ...goods,
+          statusText: statusSummary.text,
+          statusNote: statusSummary.note,
+          statusTone: statusSummary.tone,
+          needFixText: buildNeedFixText(doc),
+          auditError: pickStr(doc.auditError)
+        },
         imagesPreview: goods.imagesPreview || [],
         isOwner: isOwner2,
+        isBuyer: !!isBuyer2,
         canOwnerManage,
+        canEditGoods,
         ownerActionText,
         canBuy,
         buyButtonText,
@@ -409,10 +514,12 @@ Page({
       }
     } catch (err) {
       console.error('加载商品详情失败', err);
-      this.setData({ isLoading: false, goods: null, imagesPreview: [] });
-      this.clearGoodsChatBadgeWatch();
-      this.setData({ goodsChatUnreadCount: 0 });
-      wx.showToast({ title: '加载失败，请稍后重试', icon: 'none' });
+      if (isGoodsUnavailableCode(err && err.code) || /goods not found/i.test(pickStr(err && err.message))) {
+        this._showGoodsUnavailable();
+      } else {
+        this._showGoodsUnavailable();
+        wx.showToast({ title: '加载失败，请稍后重试', icon: 'none' });
+      }
     } finally {
       if (fromPullDown) wx.stopPullDownRefresh();
     }
@@ -586,6 +693,23 @@ Page({
       : `/pages/chat/goods-room/index?gid=${goods.id}`;
     wx.navigateTo({ url });
   },
+  async onEditTap() {
+    const goods = this.data.goods || null;
+    if (!goods || !goods.id || !this.data.isOwner || !this.data.canEditGoods) return;
+
+    const status = pickStr(goods.status);
+    if (status === 'posted' || status === 'off_shelf') {
+      const ok = await confirm(
+        '修改后商品会重新进入审核，审核通过后再重新上架。',
+        '编辑商品'
+      );
+      if (!ok) return;
+    }
+
+    wx.navigateTo({
+      url: `/pages/publish/goods/index?id=${goods.id}`
+    });
+  },
   async onOwnerActionTap() {
     const goods = this.data.goods || null;
     if (!goods || !goods.id || !this.data.isOwner) return;
@@ -637,9 +761,19 @@ Page({
         // ignore
       }
 
+      const statusSummary = buildGoodsStatusSummary({ ...goods, status: nextStatus }, {
+        isOwner: true,
+        isBuyer: false,
+        paymentLockActive: false
+      });
+
       this.setData({
         'goods.status': nextStatus,
+        'goods.statusText': statusSummary.text,
+        'goods.statusNote': statusSummary.note,
+        'goods.statusTone': statusSummary.tone,
         canOwnerManage: true,
+        canEditGoods: true,
         ownerActionText: nextStatus === 'off_shelf' ? '重新上架' : '下架商品',
         canBuy: false,
         buyButtonText: '我的商品'
@@ -787,8 +921,12 @@ Page({
           // 本地也同步一下，避免用户还停留在详情页时显示“可购买”
           this.setData({
             'goods.status': 'sold',
+            'goods.statusText': '已购买',
+            'goods.statusNote': '你已购买该商品，可继续联系卖家。',
+            'goods.statusTone': 'success',
+            isBuyer: true,
             canBuy: false,
-            buyButtonText: '已售出'
+            buyButtonText: '已购买'
           });
 
           try { wx.setStorageSync(GOODS_REFRESH_TOKEN_KEY, Date.now()); } catch (e) { /* ignore */ }

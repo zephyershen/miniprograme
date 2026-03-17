@@ -104,6 +104,7 @@ Page({
   mapGoodsList(list = [], tab = 'favorite', favoriteIdMap = {}) {
     return (Array.isArray(list) ? list : []).map((item) => {
       const goodsId = pickStr(item.goodsId, item.id, item._id);
+      const status = pickStr(item.status, 'posted');
       const price = Number(item.price);
       const originalPrice = item.originalPrice;
       const timeMs = tab === 'favorite' ? toTimeMs(item.favoritedAtTs) : toTimeMs(item.viewedAtTs);
@@ -121,11 +122,14 @@ Page({
         originalPriceText: (originalPrice != null && originalPrice !== '' && Number.isFinite(Number(originalPrice)))
           ? formatMoney(Number(originalPrice))
           : '',
-        statusText: STATUS_TEXT_MAP[pickStr(item.status, 'posted')] || '已保存',
+        statusText: item.isBuyer && status === 'sold'
+          ? '已购买'
+          : (STATUS_TEXT_MAP[status] || '已保存'),
         timeText: timeMs ? formatDateTime(timeMs) : '',
         timeLabel: tab === 'favorite' ? '收藏于' : '浏览于',
         subText: subParts.join(' · '),
-        isFavorite: !!favoriteIdMap[goodsId]
+        isFavorite: !!favoriteIdMap[goodsId],
+        canView: item.canView !== false
       };
     });
   },
@@ -136,7 +140,7 @@ Page({
   async load() {
     this.setData({ isLoading: true });
     try {
-      const { favorites, history } = await loadGoodsCollections();
+      const { favorites, history } = await loadGoodsCollections({ refreshLatest: true });
       const favoriteIdMap = {};
       favorites.forEach((item) => {
         const goodsId = pickStr(item && item.goodsId);
@@ -171,6 +175,12 @@ Page({
   onOpenGoods(e) {
     const id = pickStr(e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id);
     if (!id) return;
+    const list = Array.isArray(this.data.list) ? this.data.list : [];
+    const current = list.find((item) => pickStr(item && item.id, item && item.goodsId) === id);
+    if (current && current.canView === false) {
+      toast('该商品已售出或已下架，暂不可查看详情');
+      return;
+    }
     wx.navigateTo({ url: `/pages/goods/detail/index?id=${id}` });
   },
   async onToggleFavorite(e) {

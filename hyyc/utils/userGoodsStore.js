@@ -26,6 +26,17 @@ function toMoneyValue(v) {
   return Number.isFinite(n) ? n : null;
 }
 
+function isFunctionNotFoundError(err = {}) {
+  const text = pickStr(
+    err && err.errMsg,
+    err && err.message,
+    err
+  );
+  return text.includes('FunctionName parameter could not be found')
+    || text.includes('FUNCTION_NOT_FOUND')
+    || text.includes('-501000');
+}
+
 function buildGoodsSnapshot(goods = {}) {
   const images = Array.isArray(goods.images) ? goods.images.filter(Boolean) : [];
   const coverImage = pickStr(goods.coverImage, goods.image, images[0]);
@@ -48,10 +59,53 @@ function buildGoodsSnapshot(goods = {}) {
     ownerId: pickStr(goods.ownerId),
     ownerOpenid: pickStr(goods._openid, goods.ownerOpenid),
     ownerName: pickStr(goods.ownerNickname, goods.sellerName, goods.ownerName, goods.name),
+    ownerAvatarFileID: pickStr(goods.ownerAvatarFileID, goods.ownerAvatarUrl),
+    isOwner: goods.isOwner === true,
+    isBuyer: goods.isBuyer === true,
+    canView: goods.canView !== false,
     favoritedAtTs: toTimeMs(goods.favoritedAtTs),
     viewedAtTs: toTimeMs(goods.viewedAtTs),
     updatedAtTs: toTimeMs(goods.updatedAtTs || goods.updatedAt || goods.createdAt || goods._createTime)
   };
+}
+
+async function fetchLatestGoodsSnapshotMap(goodsIds = []) {
+  const ids = [];
+  const seen = {};
+  (Array.isArray(goodsIds) ? goodsIds : []).forEach((item) => {
+    const goodsId = pickStr(item);
+    if (!goodsId || seen[goodsId]) return;
+    seen[goodsId] = true;
+    ids.push(goodsId);
+  });
+
+  if (!ids.length) return {};
+
+  try {
+    const res = await wx.cloud.callFunction({
+      name: 'getGoodsProfile',
+      data: {
+        action: 'get_goods_snapshots',
+        ids
+      }
+    });
+    const result = (res && res.result) || {};
+    if (result && result.ok === false) {
+      return {};
+    }
+    const list = Array.isArray(result.items) ? result.items : [];
+    const map = {};
+    list.forEach((item) => {
+      const goodsId = pickStr(item && (item.goodsId || item._id || item.id));
+      if (goodsId) map[goodsId] = item;
+    });
+    return map;
+  } catch (err) {
+    if (!isFunctionNotFoundError(err)) {
+      console.warn('获取最新商品快照失败，回退本地缓存', err);
+    }
+    return {};
+  }
 }
 
 function normalizeGoodsList(list = [], maxCount = 0, timeField = '') {
@@ -91,6 +145,26 @@ function mergeGoodsList(list = [], goods = {}, timeField = '', maxCount = 0) {
     return pickStr(item && item.goodsId, item && item.id, item && item._id) !== goodsId;
   }));
 
+  return normalizeGoodsList(next, maxCount, timeField);
+}
+
+function mergeLatestSnapshotList(list = [], latestMap = {}, timeField = '', maxCount = 0) {
+  const source = Array.isArray(list) ? list : [];
+  const next = source.map((item) => {
+    const goodsId = pickStr(item && item.goodsId, item && item.id, item && item._id);
+    const latest = latestMap && latestMap[goodsId];
+    if (!latest) return buildGoodsSnapshot(item);
+
+    const merged = buildGoodsSnapshot({
+      ...item,
+      ...latest,
+      goodsId
+    });
+    if (timeField) {
+      merged[timeField] = toTimeMs(item && item[timeField]);
+    }
+    return merged;
+  });
   return normalizeGoodsList(next, maxCount, timeField);
 }
 
@@ -159,12 +233,51 @@ function saveCachedUserPatch(docId = '', patch = {}) {
   }
 }
 
-async function loadGoodsCollections() {
+async function loadGoodsCollections(options = {}) {
   const { docId, userDoc, cachedUser } = await resolveUserDoc();
   const source = userDoc || cachedUser || {};
   const favorites = normalizeGoodsList(source.goodsFavorites, GOODS_FAVORITES_MAX, 'favoritedAtTs');
   const history = normalizeGoodsList(source.goodsBrowseHistory, GOODS_HISTORY_MAX, 'viewedAtTs');
-  return { docId, favorites, history, userDoc, cachedUser };
+  const refreshLatest = !!(options && options.refreshLatest);
+
+  if (!refreshLatest) {
+    return { docId, favorites, history, userDoc, cachedUser };
+  }
+
+  const goodsIds = favorites
+    .concat(history)
+    .map((item) => pickStr(item && item.goodsId))
+    .filter(Boolean);
+  const latestMap = await fetchLatestGoodsSnapshotMap(goodsIds);
+  if (!Object.keys(latestMap).length) {
+    return { docId, favorites, history, userDoc, cachedUser };
+  }
+
+  const nextFavorites = mergeLatestSnapshotList(favorites, latestMap, 'favoritedAtTs', GOODS_FAVORITES_MAX);
+  const nextHistory = mergeLatestSnapshotList(history, latestMap, 'viewedAtTs', GOODS_HISTORY_MAX);
+  const favoritesChanged = JSON.stringify(nextFavorites) !== JSON.stringify(favorites);
+  const historyChanged = JSON.stringify(nextHistory) !== JSON.stringify(history);
+
+  if (docId && (favoritesChanged || historyChanged)) {
+    const patch = {};
+    if (favoritesChanged) patch.goodsFavorites = nextFavorites;
+    if (historyChanged) patch.goodsBrowseHistory = nextHistory;
+    await db.collection(USER_COLLECTION).doc(docId).update({ data: patch });
+    saveCachedUserPatch(docId, patch);
+  } else if (favoritesChanged || historyChanged) {
+    const patch = {};
+    if (favoritesChanged) patch.goodsFavorites = nextFavorites;
+    if (historyChanged) patch.goodsBrowseHistory = nextHistory;
+    saveCachedUserPatch(docId, patch);
+  }
+
+  return {
+    docId,
+    favorites: nextFavorites,
+    history: nextHistory,
+    userDoc,
+    cachedUser
+  };
 }
 
 async function syncGoodsBrowseState(goods = {}) {

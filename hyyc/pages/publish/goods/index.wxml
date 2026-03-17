@@ -1,6 +1,9 @@
 <ui-loading show="{{isLoading}}" />
 <view class="px-24 py-16">
   <view class="card">
+    <view wx:if="{{editGoodsId}}" class="mb-12 c-muted" style="font-size: 24rpx; line-height: 1.6;">
+      修改已上架或已下架的商品后，会重新进入审核；审核通过后再重新上架。
+    </view>
     <view class="gap-12">
       <view class="gap-item">
         <ui-field label="图片" hint="建议至少 1 张，最多 {{MAX_IMAGES}} 张" error="{{errors.images || ''}}" required="{{true}}">
@@ -106,7 +109,7 @@
 
     <view class="btn-bar">
       <view class="btn btn-outline btn-flex" bindtap="reset">清空</view>
-      <view class="btn btn-primary btn-flex2" bindtap="submit">发布商品</view>
+      <view class="btn btn-primary btn-flex2" bindtap="submit">{{editGoodsId ? '保存修改并重新审核' : '发布商品'}}</view>
     </view>
   </view>
 </view>

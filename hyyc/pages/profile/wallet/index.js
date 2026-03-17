@@ -1,4 +1,4 @@
-const { formatMoney, formatDateTime } = require('../../../utils/format');
+const { formatMoney, formatDate, formatDateTime } = require('../../../utils/format');
 const { toast } = require('../../../utils/ui');
 
 const db = wx.cloud.database();
@@ -12,6 +12,13 @@ const FILTER_OPTIONS = [
   { key: 'balance', label: '余额变动' },
   { key: 'external', label: '消费记录' },
 ];
+const DATE_FILTER_OPTIONS = [
+  { key: 'all', label: '全部时间' },
+  { key: 'today', label: '今天' },
+  { key: 'seven', label: '近7天' },
+  { key: 'thirty', label: '近30天' },
+  { key: 'custom', label: '自定义' },
+];
 const EXTERNAL_PAYMENT_TYPES = ['goods_expense', 'task_expense'];
 const BALANCE_CHANGE_TYPES = ['goods_income', 'task_income', 'withdraw', 'withdraw_fee', 'withdraw_refund', 'refund'];
 
@@ -21,6 +28,56 @@ function pickStr(...vals) {
     if (s) return s;
   }
   return '';
+}
+
+function startOfDay(date = new Date()) {
+  const d = date instanceof Date ? new Date(date.getTime()) : new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function addDays(date, days) {
+  const next = new Date(date.getTime());
+  next.setDate(next.getDate() + Number(days || 0));
+  return next;
+}
+
+function parseDateValue(dateText = '') {
+  const safe = pickStr(dateText);
+  if (!safe) return null;
+  const parsed = new Date(`${safe}T00:00:00`);
+  return Number.isFinite(parsed.getTime()) ? parsed : null;
+}
+
+function formatRangeLabel(startDate = '', endDate = '') {
+  const start = pickStr(startDate);
+  const end = pickStr(endDate);
+  if (!start || !end) return '自定义';
+  if (start === end) return start.slice(5).replace('-', '/');
+  return `${start.slice(5).replace('-', '/')} - ${end.slice(5).replace('-', '/')}`;
+}
+
+function todayDateText() {
+  return formatDate(Date.now());
+}
+
+function normalizeTransactionSummary(type = '', summary = '') {
+  const raw = pickStr(summary);
+  if (!raw) return '';
+  let normalized = raw
+    .replace(/[，,]\s*不扣汇付余额/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  if (pickStr(type) !== 'withdraw') return normalized;
+
+  return normalized
+    .replace(/到账方式\s*D1/gi, '预计次日到账')
+    .replace(/到账方式\s*DM/gi, '预计当天到账')
+    .replace(/到账方式\s*T1/gi, '预计次工作日到账')
+    .replace(/[，,]\s*预计预计/g, '，预计')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 }
 
 Page({
@@ -39,12 +96,23 @@ Page({
     canWithdraw: false,
     withdrawMin: WITHDRAW_MIN,
     balancePrimaryTip: '最低提现 1 元',
-    balanceSecondaryTip: '消费记录会显示在明细里，但不会影响可提现余额',
+    balanceSecondaryTip: '',
     balanceAlertText: '',
     transactions: [],
     filterOptions: FILTER_OPTIONS,
+    dateFilterOptions: DATE_FILTER_OPTIONS,
     activeFilter: 'all',
+    activeDateFilter: 'all',
+    activeDateLabel: '全部时间',
+    dateRangeStart: '',
+    dateRangeEnd: '',
+    showDateFilterSheet: false,
+    pendingDateFilter: 'all',
+    pendingStartDate: '',
+    pendingEndDate: '',
+    maxFilterDate: todayDateText(),
     hasMore: false,
+    nextCursor: null,
     pageSize: PAGE_SIZE,
     totalLoaded: 0,
     emptyText: '暂无收支记录'
@@ -68,6 +136,7 @@ Page({
 
     const previousFilter = this.data.activeFilter || 'all';
     const activeFilter = filterKey || this.data.activeFilter || 'all';
+    const activeDateState = this._activeDateState();
     if (reset) {
       this.setData(panelOnly ? {
         isPanelLoading: true,
@@ -75,6 +144,7 @@ Page({
         activeFilter,
         emptyText: this._emptyText(activeFilter),
         showCustomScrollbar: false,
+        nextCursor: null,
       } : {
         isLoading: true,
         isPanelLoading: false,
@@ -84,6 +154,7 @@ Page({
         activeFilter,
         transactions: [],
         hasMore: false,
+        nextCursor: null,
         totalLoaded: 0,
         emptyText: this._emptyText(activeFilter),
         showCustomScrollbar: false,
@@ -109,20 +180,25 @@ Page({
         return;
       }
 
-      const offset = reset ? 0 : Number(this.data.totalLoaded || 0);
       if (reset) {
         const [txRes, balanceProfile] = await Promise.all([
-          this._fetchTransactions({ openid, filterKey: activeFilter, offset, limit: PAGE_SIZE }),
+          this._fetchTransactions({
+            openid,
+            filterKey: activeFilter,
+            limit: PAGE_SIZE,
+            dateState: activeDateState,
+          }),
           reloadBalance ? this._loadBalanceProfile() : Promise.resolve(null)
         ]);
         if (reloadBalance && (!balanceProfile || !balanceProfile.ok)) {
           throw new Error(pickStr(balanceProfile && balanceProfile.err && balanceProfile.err.msg, '钱包加载失败，请重试'));
         }
-        const nextTransactions = (txRes.data || []).map(doc => this._mapTransaction(doc));
+        const nextTransactions = (txRes.items || []).map(doc => this._mapTransaction(doc));
         this.setData({
           ...(reloadBalance ? this._buildBalanceView(balanceProfile) : {}),
           transactions: nextTransactions,
-          hasMore: nextTransactions.length === PAGE_SIZE,
+          hasMore: !!txRes.hasMore,
+          nextCursor: txRes.nextCursor || null,
           totalLoaded: nextTransactions.length,
           emptyText: this._emptyText(activeFilter),
           isLoading: false,
@@ -133,12 +209,19 @@ Page({
         }, () => this._measureScrollArea());
         return;
       }
-      const txRes = await this._fetchTransactions({ openid, filterKey: activeFilter, offset, limit: PAGE_SIZE });
-      const nextTransactions = (txRes.data || []).map(doc => this._mapTransaction(doc));
+      const txRes = await this._fetchTransactions({
+        openid,
+        filterKey: activeFilter,
+        cursor: this.data.nextCursor,
+        limit: PAGE_SIZE,
+        dateState: activeDateState,
+      });
+      const nextTransactions = (txRes.items || []).map(doc => this._mapTransaction(doc));
       const transactions = this.data.transactions.concat(nextTransactions);
       this.setData({
         transactions,
-        hasMore: nextTransactions.length === PAGE_SIZE,
+        hasMore: !!txRes.hasMore,
+        nextCursor: txRes.nextCursor || null,
         totalLoaded: transactions.length,
         emptyText: this._emptyText(activeFilter),
         isLoading: false,
@@ -194,24 +277,106 @@ Page({
     }
     return { ok: false, err: { msg: '钱包加载失败，请重试' } };
   },
-  async _fetchTransactions({ openid, filterKey = 'all', offset = 0, limit = PAGE_SIZE } = {}) {
-    let query = db.collection(TRANSACTIONS_COLLECTION)
-      .where(this._buildTransactionWhere(openid, filterKey))
+  async _fetchTransactions({ openid, filterKey = 'all', cursor = null, limit = PAGE_SIZE, dateState = null } = {}) {
+    const where = this._buildTransactionWhere(openid, filterKey, dateState, cursor);
+    let query = db.collection(TRANSACTIONS_COLLECTION);
+    if (where) query = query.where(where);
+    const result = await query
       .orderBy('createdAt', 'desc')
-      .limit(limit);
-    if (offset > 0) query = query.skip(offset);
-    return query.get();
+      .limit(Math.max(1, Number(limit) || PAGE_SIZE) + 1)
+      .get();
+    const rows = (result && result.data) || [];
+    const hasMore = rows.length > limit;
+    const items = hasMore ? rows.slice(0, limit) : rows;
+    const last = items.length ? items[items.length - 1] : null;
+    return {
+      items,
+      hasMore,
+      nextCursor: hasMore && last
+        ? { createdAt: last.createdAt || last.updatedAt || null }
+        : null,
+    };
   },
-  _buildTransactionWhere(openid, filterKey) {
-    const where = { _openid: openid };
+  _buildTransactionWhere(openid, filterKey, dateState = null, cursor = null) {
+    const andParts = [{ _openid: openid }];
     const typeList = this._filterTypes(filterKey);
-    if (typeList && typeList.length) where.type = _.in(typeList);
-    return where;
+    if (typeList && typeList.length) andParts.push({ type: _.in(typeList) });
+
+    const range = this._resolveDateRange(dateState || this._activeDateState());
+    if (range.startAt) andParts.push({ createdAt: _.gte(range.startAt) });
+    if (range.endAt) andParts.push({ createdAt: _.lt(range.endAt) });
+
+    const cursorWhere = this._buildCursorWhere(cursor);
+    if (cursorWhere) andParts.push(cursorWhere);
+
+    return andParts.length === 1 ? andParts[0] : _.and(andParts);
   },
   _filterTypes(filterKey) {
     if (filterKey === 'balance') return BALANCE_CHANGE_TYPES;
     if (filterKey === 'external') return EXTERNAL_PAYMENT_TYPES;
     return null;
+  },
+  _buildCursorWhere(cursor = null) {
+    if (!cursor || !cursor.createdAt) return null;
+    return { createdAt: _.lt(cursor.createdAt) };
+  },
+  _activeDateState() {
+    return {
+      key: pickStr(this.data.activeDateFilter, 'all'),
+      startDate: pickStr(this.data.dateRangeStart),
+      endDate: pickStr(this.data.dateRangeEnd),
+    };
+  },
+  _resolveDateRange(dateState = {}) {
+    const key = pickStr(dateState && dateState.key, 'all');
+    const today = startOfDay();
+    if (key === 'today') {
+      return { startAt: today, endAt: addDays(today, 1) };
+    }
+    if (key === 'seven') {
+      return { startAt: addDays(today, -6), endAt: addDays(today, 1) };
+    }
+    if (key === 'thirty') {
+      return { startAt: addDays(today, -29), endAt: addDays(today, 1) };
+    }
+    if (key === 'custom') {
+      const startAt = parseDateValue(dateState && dateState.startDate);
+      const endAtBase = parseDateValue(dateState && dateState.endDate);
+      return {
+        startAt,
+        endAt: endAtBase ? addDays(endAtBase, 1) : null,
+      };
+    }
+    return { startAt: null, endAt: null };
+  },
+  _normalizeDateFilter({ key = 'all', startDate = '', endDate = '' } = {}) {
+    const nextKey = pickStr(key, 'all');
+    if (nextKey === 'today') {
+      const today = todayDateText();
+      return { key: nextKey, startDate: today, endDate: today, label: '今天' };
+    }
+    if (nextKey === 'seven') {
+      const endDateText = todayDateText();
+      const startDateText = formatDate(addDays(startOfDay(), -6).getTime());
+      return { key: nextKey, startDate: startDateText, endDate: endDateText, label: '近7天' };
+    }
+    if (nextKey === 'thirty') {
+      const endDateText = todayDateText();
+      const startDateText = formatDate(addDays(startOfDay(), -29).getTime());
+      return { key: nextKey, startDate: startDateText, endDate: endDateText, label: '近30天' };
+    }
+    if (nextKey === 'custom') {
+      const today = todayDateText();
+      const safeStart = pickStr(startDate, today);
+      const safeEnd = pickStr(endDate, safeStart);
+      return {
+        key: nextKey,
+        startDate: safeStart,
+        endDate: safeEnd,
+        label: formatRangeLabel(safeStart, safeEnd),
+      };
+    }
+    return { key: 'all', startDate: '', endDate: '', label: '全部时间' };
   },
   _buildBalanceView(profileResult) {
     if (profileResult && profileResult.ok && profileResult.profile) {
@@ -222,7 +387,7 @@ Page({
         balanceText: pickStr(profile.availableBalanceText, formatMoney(balance)),
         canWithdraw: balance >= WITHDRAW_MIN,
         balancePrimaryTip: '最低提现 1 元',
-        balanceSecondaryTip: '消费记录会显示在明细里，但不会影响可提现余额',
+        balanceSecondaryTip: '',
         balanceAlertText: '',
       };
     }
@@ -231,7 +396,7 @@ Page({
       balanceText: '--',
       canWithdraw: false,
       balancePrimaryTip: '暂时无法查询余额',
-      balanceSecondaryTip: '明细仍会正常展示',
+      balanceSecondaryTip: '',
       balanceAlertText: pickStr(profileResult && profileResult.err && profileResult.err.msg),
     };
   },
@@ -323,8 +488,6 @@ Page({
   },
   _mapTransaction(doc = {}) {
     const amount = Number(doc.amount || 0);
-    const balanceDelta = this._resolveBalanceDelta(doc, amount);
-    const affectsBalance = this._resolveAffectsBalance(doc, balanceDelta);
     const timeValue = this._extractTime(doc.createdAt || doc.updatedAt);
     const isIncome = amount >= 0;
 
@@ -334,25 +497,9 @@ Page({
       typeText: this._typeLabel(doc.type),
       amountText: this._signedMoney(amount),
       isIncome,
-      summaryText: pickStr(doc.summary, doc.title),
+      summaryText: normalizeTransactionSummary(doc.type, pickStr(doc.summary, doc.title)),
       timeText: timeValue ? formatDateTime(timeValue) : '',
-      scopeText: affectsBalance ? '余额变动' : '消费记录',
-      scopeClass: affectsBalance ? 'tx-scope-balance' : 'tx-scope-external',
-      impactText: affectsBalance
-        ? `本次${balanceDelta >= 0 ? '计入' : '扣减'}可提现余额 ${this._signedMoney(balanceDelta)}`
-        : '仅记录本次消费，不影响可提现余额',
-      channelText: affectsBalance ? '可提现余额变动' : '仅供查看',
     };
-  },
-  _resolveBalanceDelta(doc = {}, amount = 0) {
-    const raw = Number(doc.balanceDelta);
-    if (Number.isFinite(raw)) return raw;
-    if (EXTERNAL_PAYMENT_TYPES.includes(pickStr(doc.type))) return 0;
-    return amount;
-  },
-  _resolveAffectsBalance(doc = {}, balanceDelta = 0) {
-    if (typeof doc.affectsBalance === 'boolean') return doc.affectsBalance;
-    return Math.abs(Number(balanceDelta || 0)) > 0.0001;
   },
   _extractTime(raw) {
     if (!raw) return 0;
@@ -404,6 +551,89 @@ Page({
     if (this.data.isLoading) return;
     this.loadWallet({ reset: true, filterKey: this.data.activeFilter });
   },
+  onDateFilterTap() {
+    if (this.data.isLoading || this.data.isPanelLoading) return;
+    const pendingState = this._normalizeDateFilter({
+      key: this.data.activeDateFilter,
+      startDate: this.data.dateRangeStart,
+      endDate: this.data.dateRangeEnd,
+    });
+    this.setData({
+      showDateFilterSheet: true,
+      pendingDateFilter: pendingState.key,
+      pendingStartDate: pendingState.startDate,
+      pendingEndDate: pendingState.endDate,
+    });
+  },
+  onCloseDateFilter() {
+    this.setData({ showDateFilterSheet: false });
+  },
+  onDatePresetTap(e) {
+    const key = pickStr(e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.key, 'all');
+    const next = this._normalizeDateFilter({
+      key,
+      startDate: this.data.pendingStartDate,
+      endDate: this.data.pendingEndDate,
+    });
+    this.setData({
+      pendingDateFilter: next.key,
+      pendingStartDate: next.startDate,
+      pendingEndDate: next.endDate,
+    });
+  },
+  onPendingStartDateChange(e) {
+    const value = pickStr(e && e.detail && e.detail.value);
+    const endDate = pickStr(this.data.pendingEndDate);
+    this.setData({
+      pendingDateFilter: 'custom',
+      pendingStartDate: value,
+      pendingEndDate: endDate && endDate < value ? value : endDate,
+    });
+  },
+  onPendingEndDateChange(e) {
+    const value = pickStr(e && e.detail && e.detail.value);
+    const startDate = pickStr(this.data.pendingStartDate);
+    this.setData({
+      pendingDateFilter: 'custom',
+      pendingStartDate: startDate && startDate > value ? value : startDate,
+      pendingEndDate: value,
+    });
+  },
+  onResetDateFilter() {
+    const next = this._normalizeDateFilter({ key: 'all' });
+    this.setData({
+      activeDateFilter: next.key,
+      activeDateLabel: next.label,
+      dateRangeStart: next.startDate,
+      dateRangeEnd: next.endDate,
+      showDateFilterSheet: false,
+      pendingDateFilter: next.key,
+      pendingStartDate: next.startDate,
+      pendingEndDate: next.endDate,
+    }, () => {
+      this.loadWallet({ reset: true, filterKey: this.data.activeFilter, panelOnly: true, reloadBalance: false });
+    });
+  },
+  onApplyDateFilter() {
+    const next = this._normalizeDateFilter({
+      key: this.data.pendingDateFilter,
+      startDate: this.data.pendingStartDate,
+      endDate: this.data.pendingEndDate,
+    });
+    if (next.key === 'custom' && next.startDate > next.endDate) {
+      toast('结束日期不能早于开始日期');
+      return;
+    }
+    this.setData({
+      activeDateFilter: next.key,
+      activeDateLabel: next.label,
+      dateRangeStart: next.startDate,
+      dateRangeEnd: next.endDate,
+      showDateFilterSheet: false,
+    }, () => {
+      this.loadWallet({ reset: true, filterKey: this.data.activeFilter, panelOnly: true, reloadBalance: false });
+    });
+  },
   async _ensureOpenid() {
     const u = wx.getStorageSync('hyyc_user') || {};
     let openid = String(u._openid || u.openid || u.openId || '').trim();
@@ -419,5 +649,6 @@ Page({
   },
   onWithdraw() {
     wx.navigateTo({ url: '/pages/profile/withdraw/index' });
-  }
+  },
+  noop() {}
 });

@@ -9,6 +9,10 @@
   gap: 6rpx;
 }
 
+.mode-tabs {
+  margin-bottom: 16rpx;
+}
+
 .tab {
   flex: 1;
   height: 64rpx;
@@ -31,26 +35,28 @@
 }
 
 .goods-item {
-  padding: 18rpx 18rpx;
+  padding: 22rpx 22rpx;
+  border-radius: 28rpx;
 }
 
 .goods-top {
   gap: 12rpx;
+  align-items: flex-start;
 }
 
 .goods-title {
   font-size: 30rpx;
   font-weight: 700;
   color: #1F2328;
-  max-width: 460rpx;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.35;
 }
 
 .goods-sub {
   font-size: 24rpx;
   color: #6B7280;
+  line-height: 1.5;
 }
 
 .sep {
@@ -60,6 +66,47 @@
 .need-fix {
   font-size: 24rpx;
   color: #EF4444;
+  line-height: 1.5;
+}
+
+.goods-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.action-chip {
+  position: relative;
+  min-width: 132rpx;
+  height: 60rpx;
+  padding: 0 24rpx;
+  border-radius: 999rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  font-size: 24rpx;
+  font-weight: 600;
+  background: #F4E8E2;
+  color: #B95E49;
+}
+
+.action-chip-primary {
+  background: linear-gradient(135deg, #C86B4D 0%, #B95E49 100%);
+  color: #ffffff;
+  box-shadow: 0 12rpx 24rpx rgba(185, 94, 73, 0.18);
+}
+
+.action-chip-outline {
+  background: #ffffff;
+  color: #B95E49;
+  border: 2rpx solid rgba(185, 94, 73, 0.35);
+}
+
+.action-chip-danger {
+  background: #FFF4F1;
+  color: #D65A31;
+  border: 2rpx solid rgba(214, 90, 49, 0.18);
 }
 
 .goods-chat-btn {

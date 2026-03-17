@@ -10,8 +10,7 @@ const USER_COLLECTION = 'userInfo';
 const WALLET_COLLECTION = 'wallets';
 const TRANSACTIONS_COLLECTION = 'wallet_transactions';
 const WITHDRAW_COLLECTION = 'wallet_withdraw_requests';
-const DEBUG_COLLECTION = 'function_debug_traces';
-const BUILD_TAG = 'walletWithdraw@2026-03-15.4';
+const BUILD_TAG = 'walletWithdraw@2026-03-16.2';
 const DEFAULT_AUTO_CASH_TYPE = 'D1';
 const ALLOWED_CASH_TYPES = ['DM', 'D1', 'T1'];
 const WITHDRAW_SUBMIT_LOCK_TTL_MS = Math.max(60 * 1000, Number(process.env.WITHDRAW_SUBMIT_LOCK_TTL_MS) || 2 * 60 * 1000);
@@ -395,22 +394,13 @@ async function ensureCashTypeOpenedForUser({
   tokenNo = '',
   boundCardInfo = null,
   currentCashTypes = [],
-  debugCallId = '',
 } = {}) {
   const targetCashType = pickStr(cashType, DEFAULT_AUTO_CASH_TYPE).toUpperCase();
   if (!ALLOWED_CASH_TYPES.includes(targetCashType)) {
-    return {
-      ok: false,
-      err: { code: 'UNSUPPORTED_CASH_TYPE', msg: '当前提现方式暂不支持' },
-      debug: { walletWithdrawBuildTag: BUILD_TAG, walletWithdrawCallId: debugCallId },
-    };
+    return { ok: false, err: { code: 'UNSUPPORTED_CASH_TYPE', msg: '当前提现方式暂不支持' } };
   }
   if (!pickStr(openid) || !pickStr(huifuId)) {
-    return {
-      ok: false,
-      err: { code: 'USER_NOT_READY', msg: '提现功能暂时不可用' },
-      debug: { walletWithdrawBuildTag: BUILD_TAG, walletWithdrawCallId: debugCallId },
-    };
+    return { ok: false, err: { code: 'USER_NOT_READY', msg: '提现功能暂时不可用' } };
   }
 
   const mergedCurrentCashTypes = mergeCashTypes(currentCashTypes, user && user.withdrawCard && user.withdrawCard.cashTypes);
@@ -421,17 +411,12 @@ async function ensureCashTypeOpenedForUser({
       cashType: targetCashType,
       alreadyOpen: true,
       msg: buildAutoOpenCashUserMsg('already_open', { cashType: targetCashType, alreadyOpen: true }),
-      debug: { walletWithdrawBuildTag: BUILD_TAG, walletWithdrawCallId: debugCallId },
     };
   }
 
   const cardInfo = buildCardInfoForModify(boundCardInfo || {}, normalizeUserCertInfo(user));
   if (!pickStr(tokenNo) || !cardInfo) {
-    return {
-      ok: false,
-      err: { code: 'CARD_NOT_BOUND', msg: '银行卡信息尚未准备好' },
-      debug: { walletWithdrawBuildTag: BUILD_TAG, walletWithdrawCallId: debugCallId },
-    };
+    return { ok: false, err: { code: 'CARD_NOT_BOUND', msg: '银行卡信息尚未准备好' } };
   }
 
   const openResult = await callHuifu('user_busi_open', {
@@ -440,16 +425,7 @@ async function ensureCashTypeOpenedForUser({
     cardInfo,
   });
   if (!openResult || !openResult.ok) {
-    return {
-      ok: false,
-      err: { code: 'USER_BUSI_OPEN_FAILED', msg: pickStr(openResult && openResult.err && openResult.err.msg, '提现功能开通失败') },
-      debug: {
-        walletWithdrawBuildTag: BUILD_TAG,
-        huifuMiniappPayBuildTag: pickStr(openResult && openResult.buildTag),
-        walletWithdrawCallId: debugCallId,
-        huifuMiniappPayCallId: pickStr(openResult && openResult.debugTraceId),
-      }
-    };
+    return { ok: false, err: { code: 'USER_BUSI_OPEN_FAILED', msg: pickStr(openResult && openResult.err && openResult.err.msg, '提现功能开通失败') } };
   }
   const openRespData = openResult.huifuResp || {};
   const openCodeDesc = getRespCodeDesc(openRespData);
@@ -461,12 +437,6 @@ async function ensureCashTypeOpenedForUser({
         msg: decorateCashTypeError(openCodeDesc.desc ? `${openCodeDesc.code}:${openCodeDesc.desc}` : (openCodeDesc.code || '提现功能开通失败')),
         respData: openRespData,
       },
-      debug: {
-        walletWithdrawBuildTag: BUILD_TAG,
-        huifuMiniappPayBuildTag: pickStr(openResult && openResult.buildTag),
-        walletWithdrawCallId: debugCallId,
-        huifuMiniappPayCallId: pickStr(openResult && openResult.debugTraceId),
-      }
     };
   }
   const openRespBusiness = ensureArray(parseJsonField(openRespData.resp_business));
@@ -487,12 +457,6 @@ async function ensureCashTypeOpenedForUser({
         ),
         respData: openRespData,
       },
-      debug: {
-        walletWithdrawBuildTag: BUILD_TAG,
-        huifuMiniappPayBuildTag: pickStr(openResult && openResult.buildTag),
-        walletWithdrawCallId: debugCallId,
-        huifuMiniappPayCallId: pickStr(openResult && openResult.debugTraceId),
-      }
     };
   }
 
@@ -509,16 +473,7 @@ async function ensureCashTypeOpenedForUser({
     cashConfig,
   });
   if (!result || !result.ok) {
-    return {
-      ok: false,
-      err: { code: 'OPEN_CASH_FAILED', msg: pickStr(result && result.err && result.err.msg, '提现功能开通失败') },
-      debug: {
-        walletWithdrawBuildTag: BUILD_TAG,
-        huifuMiniappPayBuildTag: pickStr(result && result.buildTag),
-        walletWithdrawCallId: debugCallId,
-        huifuMiniappPayCallId: pickStr(result && result.debugTraceId),
-      }
-    };
+    return { ok: false, err: { code: 'OPEN_CASH_FAILED', msg: pickStr(result && result.err && result.err.msg, '提现功能开通失败') } };
   }
 
   const respData = result.huifuResp || {};
@@ -538,12 +493,6 @@ async function ensureCashTypeOpenedForUser({
         msg: decorateCashTypeError(desc ? `${code}:${desc}` : (code || '提现功能开通失败')),
         respData,
       },
-      debug: {
-        walletWithdrawBuildTag: BUILD_TAG,
-        huifuMiniappPayBuildTag: pickStr(result && result.buildTag),
-        walletWithdrawCallId: debugCallId,
-        huifuMiniappPayCallId: pickStr(result && result.debugTraceId),
-      }
     };
   }
 
@@ -576,12 +525,6 @@ async function ensureCashTypeOpenedForUser({
         msg: decorateCashTypeError(pickStr(bizMsg, desc || '提现功能开通失败')),
         respData,
       },
-      debug: {
-        walletWithdrawBuildTag: BUILD_TAG,
-        huifuMiniappPayBuildTag: pickStr(result && result.buildTag),
-        walletWithdrawCallId: debugCallId,
-        huifuMiniappPayCallId: pickStr(result && result.debugTraceId),
-      }
     };
   }
 
@@ -592,12 +535,6 @@ async function ensureCashTypeOpenedForUser({
     reqDate: pickStr(result.reqDate),
     reqSeqId: pickStr(result.reqSeqId),
     msg: buildAutoOpenCashUserMsg(status, { cashType: targetCashType }),
-    debug: {
-      walletWithdrawBuildTag: BUILD_TAG,
-      huifuMiniappPayBuildTag: pickStr(result && result.buildTag),
-      walletWithdrawCallId: debugCallId,
-      huifuMiniappPayCallId: pickStr(result && result.debugTraceId),
-    }
   };
 }
 
@@ -608,27 +545,6 @@ async function ensureCollectionExists(name) {
     }
   } catch (e) {
     // ignore
-  }
-}
-
-async function recordDebugTrace({ functionName, buildTag, action, openid, event = {}, extra = {} }) {
-  try {
-    await ensureCollectionExists(DEBUG_COLLECTION);
-    const payload = {
-      functionName: pickStr(functionName),
-      buildTag: pickStr(buildTag),
-      action: pickStr(action),
-      openid: pickStr(openid),
-      eventKeys: Object.keys(event || {}).sort().slice(0, 30),
-      reqDate: pickStr(event && event.reqDate),
-      reqSeqId: pickStr(event && event.reqSeqId),
-      extra: extra && typeof extra === 'object' ? extra : {},
-      createdAt: new Date(),
-    };
-    const res = await db.collection(DEBUG_COLLECTION).add({ data: payload });
-    return pickStr(res && res._id);
-  } catch (e) {
-    return '';
   }
 }
 
@@ -1183,12 +1099,6 @@ async function loadHuifuProfile(user = {}, opts = {}) {
       enabledCashTypes,
       localBalance,
       activeWithdraw,
-      debug: {
-        huifuUserInfoBuildTag: pickStr(infoResult && infoResult.buildTag),
-        huifuBalanceBuildTag: pickStr(balanceResult && balanceResult.buildTag),
-        withdrawRefresh,
-        autoOpenCash,
-      }
     }
   };
 }
@@ -1223,9 +1133,6 @@ async function loadWalletSummary(user = {}) {
     data: {
       huifuId,
       availableBalance,
-      debug: {
-        huifuBalanceBuildTag: pickStr(balanceResult && balanceResult.buildTag),
-      }
     }
   };
 }
@@ -1239,33 +1146,28 @@ exports.main = async (event = {}) => {
   const { OPENID } = cloud.getWXContext();
   const systemCompensate = isSystemCompensateCall(event);
   if (systemCompensate && action !== 'sync_active_withdraw') {
-    return { ok: false, err: { code: 'SYSTEM_ACTION_NOT_ALLOWED', msg: '系统补偿仅支持同步提现状态' }, buildTag: BUILD_TAG, debugCallId: '' };
+    return { ok: false, err: { code: 'SYSTEM_ACTION_NOT_ALLOWED', msg: '系统补偿仅支持同步提现状态' }, buildTag: BUILD_TAG };
   }
   const effectiveOpenid = pickStr(systemCompensate ? event.targetOpenid : '', OPENID);
-  const debugCallId = (effectiveOpenid && action !== 'wallet_summary')
-    ? await recordDebugTrace({
-      functionName: 'walletWithdraw',
-      buildTag: BUILD_TAG,
-      action,
-      openid: effectiveOpenid,
-      event,
-      extra: {
-        systemCompensate,
-      },
-    })
-    : '';
+  console.log('[walletWithdraw] invoke', JSON.stringify({
+    action,
+    buildTag: BUILD_TAG,
+    openid: effectiveOpenid,
+    systemCompensate,
+    eventKeys: Object.keys(event || {}).sort().slice(0, 30),
+  }));
   if (!effectiveOpenid) {
-    return { ok: false, err: { code: 'NO_OPENID', msg: '获取用户身份失败' }, buildTag: BUILD_TAG, debugCallId };
+    return { ok: false, err: { code: 'NO_OPENID', msg: '获取用户身份失败' }, buildTag: BUILD_TAG };
   }
 
   const user = await getUserByOpenid(effectiveOpenid);
   if (!user || !user._id) {
-    return { ok: false, err: { code: 'USER_NOT_FOUND', msg: '未找到用户信息，请重新登录后重试' }, buildTag: BUILD_TAG, debugCallId };
+    return { ok: false, err: { code: 'USER_NOT_FOUND', msg: '未找到用户信息，请重新登录后重试' }, buildTag: BUILD_TAG };
   }
 
   if (action === 'profile') {
     const profile = await loadHuifuProfile(user);
-    if (!profile.ok) return { ...profile, buildTag: BUILD_TAG, debugCallId };
+    if (!profile.ok) return { ...profile, buildTag: BUILD_TAG };
 
     let data = profile.data || {};
     const cardInfo = data.cardInfo || {};
@@ -1332,25 +1234,18 @@ exports.main = async (event = {}) => {
           status: pickStr(activeWithdraw.status),
           statusText: pickStr(activeWithdraw.statusText, activeWithdraw.status),
         } : null,
-        debug: {
-          walletWithdrawBuildTag: BUILD_TAG,
-          huifuUserInfoBuildTag: pickStr(data.debug && data.debug.huifuUserInfoBuildTag),
-          huifuBalanceBuildTag: pickStr(data.debug && data.debug.huifuBalanceBuildTag),
-          debugCallId,
-        },
       },
       buildTag: BUILD_TAG,
-      debugCallId,
     };
   }
 
   if (action === 'sync_active_withdraw') {
     const huifuId = pickStr(user.huifu_id, user.huifuId, user.huifuUserId);
     if (!huifuId) {
-      return { ok: false, err: { code: 'MISSING_HUIFU_ID', msg: '暂时无法同步提现状态' }, buildTag: BUILD_TAG, debugCallId };
+      return { ok: false, err: { code: 'MISSING_HUIFU_ID', msg: '暂时无法同步提现状态' }, buildTag: BUILD_TAG };
     }
     if (pickStr(user.huifu_open_status) !== 'success' || pickStr(user.user_busi_status) !== 'success') {
-      return { ok: false, err: { code: 'USER_NOT_READY', msg: '暂时无法同步提现状态' }, buildTag: BUILD_TAG, debugCallId };
+      return { ok: false, err: { code: 'USER_NOT_READY', msg: '暂时无法同步提现状态' }, buildTag: BUILD_TAG };
     }
 
     const reqDate = pickStr(event.reqDate);
@@ -1371,7 +1266,6 @@ exports.main = async (event = {}) => {
           userMsg: '当前没有处理中提现吗'
         },
         buildTag: BUILD_TAG,
-        debugCallId,
       };
     }
 
@@ -1403,7 +1297,6 @@ exports.main = async (event = {}) => {
           msg: pickStr(refreshed && refreshed.msg, '同步提现状态失败')
         },
         buildTag: BUILD_TAG,
-        debugCallId,
       };
     }
 
@@ -1426,29 +1319,21 @@ exports.main = async (event = {}) => {
         userMsg: buildSyncWithdrawUserMsg(latestStatus, latestStatusText),
       },
       buildTag: BUILD_TAG,
-      debugCallId,
     };
   }
 
   if (action === 'wallet_summary') {
     const summary = await loadWalletSummary(user);
-    if (!summary.ok) return { ...summary, buildTag: BUILD_TAG, debugCallId };
+    if (!summary.ok) return { ...summary, buildTag: BUILD_TAG };
 
     const data = summary.data || {};
-    const activeWithdraw = data.activeWithdraw || null;
     return {
       ok: true,
       summary: {
         availableBalance: data.availableBalance,
         availableBalanceText: formatMoney(data.availableBalance),
-        debug: {
-          walletWithdrawBuildTag: BUILD_TAG,
-          huifuBalanceBuildTag: pickStr(data.debug && data.debug.huifuBalanceBuildTag),
-          debugCallId,
-        },
       },
       buildTag: BUILD_TAG,
-      debugCallId,
     };
   }
 
@@ -1533,17 +1418,7 @@ exports.main = async (event = {}) => {
       cardInfo,
     });
     if (!result || !result.ok) {
-      return {
-        ok: false,
-        err: { code: 'USER_BUSI_MODIFY_FAILED', msg: pickStr(result && result.err && result.err.msg, '绑定银行卡失败') },
-        buildTag: BUILD_TAG,
-        debug: {
-          walletWithdrawBuildTag: BUILD_TAG,
-          huifuMiniappPayBuildTag: pickStr(result && result.buildTag),
-          walletWithdrawCallId: debugCallId,
-          huifuMiniappPayCallId: pickStr(result && result.debugTraceId),
-        }
-      };
+      return { ok: false, err: { code: 'USER_BUSI_MODIFY_FAILED', msg: pickStr(result && result.err && result.err.msg, '绑定银行卡失败') }, buildTag: BUILD_TAG };
     }
 
     const respData = result.huifuResp || {};
@@ -1570,12 +1445,6 @@ exports.main = async (event = {}) => {
           respData
         },
         buildTag: BUILD_TAG,
-        debug: {
-          walletWithdrawBuildTag: BUILD_TAG,
-          huifuMiniappPayBuildTag: pickStr(result && result.buildTag),
-          walletWithdrawCallId: debugCallId,
-          huifuMiniappPayCallId: pickStr(result && result.debugTraceId),
-        }
       };
     }
 
@@ -1626,7 +1495,6 @@ exports.main = async (event = {}) => {
         tokenNo,
         boundCardInfo: cardInfo,
         currentCashTypes: mergeCashTypes(user && user.withdrawCard && user.withdrawCard.cashTypes),
-        debugCallId,
       });
     }
 
@@ -1661,18 +1529,6 @@ exports.main = async (event = {}) => {
       canWithdrawNow: status === 'success' && !!(autoOpen && autoOpen.ok && pickStr(autoOpen.status) !== 'pending'),
       msg: userMsg,
       buildTag: BUILD_TAG,
-      debug: {
-        walletWithdrawBuildTag: BUILD_TAG,
-        huifuMiniappPayBuildTag: pickStr(
-          autoOpen && autoOpen.debug && autoOpen.debug.huifuMiniappPayBuildTag,
-          result && result.buildTag
-        ),
-        walletWithdrawCallId: debugCallId,
-        huifuMiniappPayCallId: pickStr(
-          autoOpen && autoOpen.debug && autoOpen.debug.huifuMiniappPayCallId,
-          result && result.debugTraceId
-        ),
-      }
     };
   }
 
@@ -1705,17 +1561,7 @@ exports.main = async (event = {}) => {
       cardInfo,
     });
     if (!openResult || !openResult.ok) {
-      return {
-        ok: false,
-        err: { code: 'USER_BUSI_OPEN_FAILED', msg: pickStr(openResult && openResult.err && openResult.err.msg, '补开用户业务入驻失败') },
-        buildTag: BUILD_TAG,
-        debug: {
-          walletWithdrawBuildTag: BUILD_TAG,
-          huifuMiniappPayBuildTag: pickStr(openResult && openResult.buildTag),
-          walletWithdrawCallId: debugCallId,
-          huifuMiniappPayCallId: pickStr(openResult && openResult.debugTraceId),
-        }
-      };
+      return { ok: false, err: { code: 'USER_BUSI_OPEN_FAILED', msg: pickStr(openResult && openResult.err && openResult.err.msg, '补开用户业务入驻失败') }, buildTag: BUILD_TAG };
     }
     const openRespData = openResult.huifuResp || {};
     const openCodeDesc = getRespCodeDesc(openRespData);
@@ -1728,12 +1574,6 @@ exports.main = async (event = {}) => {
           respData: openRespData,
         },
         buildTag: BUILD_TAG,
-        debug: {
-          walletWithdrawBuildTag: BUILD_TAG,
-          huifuMiniappPayBuildTag: pickStr(openResult && openResult.buildTag),
-          walletWithdrawCallId: debugCallId,
-          huifuMiniappPayCallId: pickStr(openResult && openResult.debugTraceId),
-        }
       };
     }
     const openRespBusiness = ensureArray(parseJsonField(openRespData.resp_business));
@@ -1763,12 +1603,6 @@ exports.main = async (event = {}) => {
           respData: openRespData,
         },
         buildTag: BUILD_TAG,
-        debug: {
-          walletWithdrawBuildTag: BUILD_TAG,
-          huifuMiniappPayBuildTag: pickStr(openResult && openResult.buildTag),
-          walletWithdrawCallId: debugCallId,
-          huifuMiniappPayCallId: pickStr(openResult && openResult.debugTraceId),
-        }
       };
     }
 
@@ -1785,17 +1619,7 @@ exports.main = async (event = {}) => {
       cashConfig,
     });
     if (!result || !result.ok) {
-      return {
-        ok: false,
-        err: { code: 'OPEN_CASH_FAILED', msg: pickStr(result && result.err && result.err.msg, '开通到账方式失败') },
-        buildTag: BUILD_TAG,
-        debug: {
-          walletWithdrawBuildTag: BUILD_TAG,
-          huifuMiniappPayBuildTag: pickStr(result && result.buildTag),
-          walletWithdrawCallId: debugCallId,
-          huifuMiniappPayCallId: pickStr(result && result.debugTraceId),
-        }
-      };
+      return { ok: false, err: { code: 'OPEN_CASH_FAILED', msg: pickStr(result && result.err && result.err.msg, '开通到账方式失败') }, buildTag: BUILD_TAG };
     }
 
     const respData = result.huifuResp || {};
@@ -1816,12 +1640,6 @@ exports.main = async (event = {}) => {
           respData,
         },
         buildTag: BUILD_TAG,
-        debug: {
-          walletWithdrawBuildTag: BUILD_TAG,
-          huifuMiniappPayBuildTag: pickStr(result && result.buildTag),
-          walletWithdrawCallId: debugCallId,
-          huifuMiniappPayCallId: pickStr(result && result.debugTraceId),
-        }
       };
     }
 
@@ -1855,12 +1673,6 @@ exports.main = async (event = {}) => {
           respData,
         },
         buildTag: BUILD_TAG,
-        debug: {
-          walletWithdrawBuildTag: BUILD_TAG,
-          huifuMiniappPayBuildTag: pickStr(result && result.buildTag),
-          walletWithdrawCallId: debugCallId,
-          huifuMiniappPayCallId: pickStr(result && result.debugTraceId),
-        }
       };
     }
 
@@ -1874,12 +1686,6 @@ exports.main = async (event = {}) => {
         ? `到账方式 ${cashType} 已开通`
         : `到账方式 ${cashType} 开通申请已提交，请稍后刷新查看`,
       buildTag: BUILD_TAG,
-      debug: {
-        walletWithdrawBuildTag: BUILD_TAG,
-        huifuMiniappPayBuildTag: pickStr(result && result.buildTag),
-        walletWithdrawCallId: debugCallId,
-        huifuMiniappPayCallId: pickStr(result && result.debugTraceId),
-      }
     };
   }
 
@@ -1921,29 +1727,12 @@ exports.main = async (event = {}) => {
         tokenNo: pickStr(data.tokenNo),
         boundCardInfo: pickBoundCashCard(data.cashCardInfoList, data.tokenNo) || data.cardInfo,
         currentCashTypes: data.enabledCashTypes,
-        debugCallId,
       });
       if (!autoOpenResult || !autoOpenResult.ok) {
-        return {
-          ok: false,
-          err: {
-            code: 'CASH_TYPE_PREPARING',
-            msg: '提现功能准备中，请稍后再试',
-          },
-          buildTag: BUILD_TAG,
-          debug: autoOpenResult && autoOpenResult.debug ? autoOpenResult.debug : undefined,
-        };
+        return { ok: false, err: { code: 'CASH_TYPE_PREPARING', msg: '提现功能准备中，请稍后再试' }, buildTag: BUILD_TAG };
       }
       if (pickStr(autoOpenResult.status) === 'pending') {
-        return {
-          ok: false,
-          err: {
-            code: 'CASH_TYPE_PREPARING',
-            msg: '提现功能准备中，请稍后再试',
-          },
-          buildTag: BUILD_TAG,
-          debug: autoOpenResult.debug,
-        };
+        return { ok: false, err: { code: 'CASH_TYPE_PREPARING', msg: '提现功能准备中，请稍后再试' }, buildTag: BUILD_TAG };
       }
 
       await sleep(800);
@@ -1963,7 +1752,6 @@ exports.main = async (event = {}) => {
           ? submitLockResult.err
           : { code: 'WITHDRAW_SUBMIT_LOCKED', msg: '正在处理上一笔提现请求，请稍后再试' },
         buildTag: BUILD_TAG,
-        debugCallId,
       };
     }
 
@@ -2056,12 +1844,6 @@ exports.main = async (event = {}) => {
           ok: false,
           err: { code: 'WITHDRAW_CALL_FAILED', msg: pickStr(result && result.err && result.err.msg, '提现申请失败') },
           buildTag: BUILD_TAG,
-          debug: {
-            walletWithdrawBuildTag: BUILD_TAG,
-            huifuMiniappPayBuildTag: pickStr(result && result.buildTag),
-            walletWithdrawCallId: debugCallId,
-            huifuMiniappPayCallId: pickStr(result && result.debugTraceId),
-          }
         };
       }
 
@@ -2095,12 +1877,6 @@ exports.main = async (event = {}) => {
             respData,
           },
           buildTag: BUILD_TAG,
-          debug: {
-            walletWithdrawBuildTag: BUILD_TAG,
-            huifuMiniappPayBuildTag: pickStr(result && result.buildTag),
-            walletWithdrawCallId: debugCallId,
-            huifuMiniappPayCallId: pickStr(result && result.debugTraceId),
-          }
         };
       }
 
@@ -2175,12 +1951,6 @@ exports.main = async (event = {}) => {
         hfSeqId,
         msg: status === 'success' ? '提现成功' : '提现申请已提交，正在处理中',
         buildTag: BUILD_TAG,
-        debug: {
-          walletWithdrawBuildTag: BUILD_TAG,
-          huifuMiniappPayBuildTag: pickStr(result && result.buildTag),
-          walletWithdrawCallId: debugCallId,
-          huifuMiniappPayCallId: pickStr(result && result.debugTraceId),
-        }
       };
     } finally {
       await releaseWithdrawSubmitLock(user._id, submitLockId, { status: 'done' });

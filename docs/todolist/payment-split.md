@@ -1,1081 +1,980 @@
-# HYYC 支付 / 分账 / 提现开发交接手册
+# HYYC 项目开发交接手册
 
-更新时间：2026-03-15
+更新时间：2026-03-17
 
-这份文档是给下一位开发直接接手用的。目标不是讲概念，而是让人看完后立刻知道：
+这份文档的目标不是讲概念，而是让一个完全没接触过本项目的人在第一次打开仓库后，能尽量少踩坑地完成：
 
-- 项目现在做到哪里
-- 哪些链路已经通了，哪些还在联调
-- 关键代码在哪
-- 哪些云函数要部署
-- 哪些环境变量要配
-- 出问题时先去哪里查
-- 现在还有哪些风险点和待收尾项
-
----
-
-## 1. 当前项目真实状态
-
-### 1.1 已完成
-
-- 普通用户实名注册后，会自动完成：
-  - 个人用户基本信息开户 `/v2/user/basicdata/indv`
-  - 用户业务入驻 `/v2/user/busi/open`
-- 用户端页面已收敛：
-  - `我的-账户信息` 只保留昵称、楼栋、门牌号
-  - 不再单独提供“收款开通 / 收款状态”页面
-  - 收款异常统一让用户联系管理员
-- 商品支付已跑通：
-  - 汇付下单
-  - 小程序拉起微信支付
-  - 实时分账
-  - 钱包镜像账本写入
-- 商品侧用户体验已补齐：
-  - 卖家可在“我的商品”或商品详情里手动下架 / 重新上架
-  - 商品详情卖家信息已按发布者读取，不再错误显示当前登录用户
-  - 收藏按钮已持久化
-  - 浏览记录已持久化
-  - 个人页已新增“收藏”入口，内含“收藏 / 浏览记录”两个 tab
-  - 商品“聊一聊”已接入：
-    - 买家可从商品详情直接和卖家单聊
-    - 卖家可从商品详情或“我的商品”直接进入咨询会话列表
-    - 商品详情 / 我的商品都已显示商品咨询未读角标
-- 任务支付已跑通：
-  - 先付款
-  - 发布者确认完成后再做延时分账
-  - 钱包镜像账本写入
-  - 正式版确认完成只依赖任务文档里持久化的支付元数据
-  - 不再依赖 `huifu_api_debug_logs` 参与资金判断
-- 任务取消退款已接通：
-  - 未接单任务可由发布者直接取消并原路退款
-  - 已接单 / 已提交任务，必须由接单人在聊天页同意后才退款
-  - 退款成功后任务会改为 `cancelled`
-  - 聊天消息卡片状态会切为“任务已取消”
-  - 退款处理中时，聊天页 / 任务详情 / 我的任务会自动追状态，不需要手动退出重进
-- 已付款任务现在禁止直接删除：
-  - 必须先走取消 / 退款流程
-- 任务完成提交已加基础校验：
-  - 必须填写完成说明或上传至少 1 张凭证
-  - 发布者现在可以在任务详情里直接查看接单人提交的完成说明 / 凭证图片 / 提交时间
-- 我的任务体验已补齐：
-  - 正常完成的任务支持发布者单条删除记录
-  - 发起支付但实际未支付成功的 `pay_pending` 任务，取消支付后也允许删除
-  - 批量删除只允许勾选当前真正可删除的任务
-- 我的商品 / 商品广场体验已补齐：
-  - 我的商品里上下架后，当前 tab 列表会立即更新，不用切标签手动刷新
-  - 我的商品页已支持下拉刷新
-  - 商品广场已支持下拉刷新，不再只能依赖顶部“点我刷新”
-- 头像与 loading 体验已补齐：
-  - 我的页 / 聊天页 / 商品咨询页头像已加本地临时链接缓存，进入页面时不再每次都慢 1~2 秒才出现
-  - 全局 `ui-loading` 组件已修复 canvas 残影问题，不再在“我的”等页面留下人物动画残留
-- 钱包页已展示：
-  - 收入
-  - 支出
-  - 提现相关流水
-- 钱包主文档已做唯一化保护：
-  - 每个用户固定 1 个主钱包文档
-  - 历史重复钱包会在资金写入前自动归并为影子钱包，避免余额分叉
-- 提现页已接入：
-  - 绑定本人银行卡
-  - 已绑卡后可只修改开户地址，不改卡号时可留空并复用当前已绑卡
-  - 绑卡成功后自动开通默认提现方式 `D1`
-  - 查询汇付余额
-  - 发起提现
-  - 主动查询提现结果
-- 独立资金补偿任务已接入：
-  - `financeCompensate` 已支持钱包修复、过期商品锁释放、退款同步、提现同步、延时分账重试、账本补齐
-  - 管理员临时调试入口已挂到“我的-账户信息”页
-  - 支持先做 `dryRun` 预检查，再执行真实补偿
-- 汇付回调云函数已接入：
-  - 支付回调
-  - 任务退款回调
-  - 用户业务入驻回调
-  - 提现绑卡审核回调
-  - 提现结果回调
-
-### 1.2 当前联调结论
-
-- `DM`、`D1` 到账方式都已经能开通。
-- 用户侧流程已改为：
-  - 不再给用户选择到账方式
-  - 默认固定走 `D1`
-  - 绑卡成功后后端自动补开 `D1`
-- `DM` 提现经常会被汇付返回：
-  - `DM取现额度不足`
-- `D1` 提现可以成功受理：
-  - 返回 `resp_code=00000000`
-  - `resp_desc=受理成功`
-  - `trans_stat=P`
-- 提现短回调地址方案已经打通：
-  - `?t=` 短参数可以被 `huifuPayNotify` 识别
-  - 旧的 `?token=` 也仍兼容
-- 商品聊天云函数已补齐并已部署：
-  - `markGoodsMessagesRead` 已用于卖家 / 买家商品房间已读标记
-- 任务退款已做过真实链路验证：
-  - `scanpay_refund` 可成功发起原路退款
-  - 遇到云函数超时但退款实际成功时，前端和后端都有兜底
-  - `scanpay_refund_query` 已接入，当前走 `v3` 路径
-  - 查询参数要用退款请求号 / 退款全局流水号，不要再用原支付单号
-- 资金补偿任务已做过真实触发验证：
-  - `dryRun=true` 预检查可正常返回扫描结果
-  - `dryRun=false` 执行补偿可正常返回执行结果
-  - 当前线上扫描结果显示：未发现待修的商品锁 / 提现 / 退款 / 分账异常单
-  - `financeCompensateTimer` 已部署并开始定时执行
-  - 已确认在北京时间 `2026-03-16 09:30`、`2026-03-16 09:40` 写入新的 `finance_compensate_logs`
-- 任务确认完成金额口径已重新收敛：
-  - 先按订单原价计算接单人应得 `96%`
-  - 再按汇付返回的 `confirmable/unconfirm` 金额执行延时确认
-  - 支付手续费由平台承担，不从接单人应得里扣
-- 提现绑卡参数已按汇付官方文档复核：
-  - `prov_id` / `area_id` 为必填
-  - `mp` 在官方表里是非必填
-  - 当前项目已改成跟随官方口径：页面不再要求填写手机号，后端也允许不传 `mp`
-- 多人并发商品购买已做过真实验证：
-  - 同一商品双人同时购买时，只会有一人成功拿到购买资格
-- 企业进件逻辑已经全部删除，不要再往这个方向改。
-
-### 1.3 仍未完全确认
-
-- 提现最终到账成功后的完整回调闭环，还需要继续真机联调。
-- 提现手续费如果未来不是 `0.00`，需要重新核对钱包镜像账本。
-- 如果后续要支持“拒绝取消申请”或“平台介入”，还需要单独补业务流转。
-- 商品聊天现在已经可用，但仍然是基础版：
-  - 还没有全局消息中心
-  - 也没有订阅消息 / 小程序消息提醒
-- 手机号查看申请和任务取消申请目前都只有“同意”链路：
-  - 页面状态里虽然兼容了 `rejected`
-  - 但前后端都还没有真正的“拒绝”动作入口
-- 接单人提交完成后，目前只会写 `tasks.submit`：
-  - 发布者能在任务详情里看到
-  - 但聊天页 / 会话列表里还没有单独的“已提交完成”消息提醒
-- 商品详情里的“查看卖家主页”当前仍是占位按钮，尚未接成真实卖家主页
-
-### 1.4 当前上线建议
-
-- 以当前代码状态看，项目已经可以进入灰度上线 / 小范围上线：
-  - 注册
-  - 商品支付
-  - 任务支付
-  - 任务取消退款
-  - 提现基础流程
-  - 商品聊天
-  这些核心链路都已经接通。
-- 但不建议直接按“完全稳定版”放量上线，主要原因有：
-  - 提现最终到账回调闭环还没有完全真机验证完
-  - 还缺至少一轮双账号 / 多设备真机并发回归
-  - 商品聊天目前仍是基础版，没有全局消息中心和订阅提醒
-- 当前更准确的上线口径是：
-  - 已达到“可以提审 + 可以灰度发布”的状态
-  - 还没有达到“可以无观察直接全量放量”的状态
-- 如果准备正式放量，建议至少先补做这 3 类动作：
-  - 真机完整跑一次 `D1` 绑卡 -> 提现 -> 到账 -> 回调回写
-  - 真机完整跑一次商品链路和一次任务链路，确认支付 / 聊天 / 提交 / 确认 / 退款状态都能收口
-  - 至少再做一次双账号并发验证：同一商品双人抢购、同账号重复提现、任务确认完成连续点击
-
-### 1.5 当前待完成项
-
-- 这一轮资金安全主线暂未完全结束，后续修完其他 bug 后需要回到这里继续收尾。
-- 当前剩余的上线前动作：
-  - 再测：支付成功后直接退出小程序，确认回调 / 补偿能自动收口
-  - 再测：`D1` 提现完整链路，确认到账和状态回写闭环
-  - 再测：同一账号连续点击提现，只能受理一笔
-  - 再测：任务确认完成连续点击，不能重复分账
-  - 如果时间允许，再测：退款动作重复触发，不会重复退款
-  - 连续观察 `finance_compensate_logs` 至少 `1-3` 天，确认定时补偿稳定执行、没有长期卡单
-- 当前临时管理员补偿入口仅用于联调：
-  - 等上述验证完成并确认稳定后，建议移除页面入口或继续严格限制为管理员可见
-- 正式提审 / 发布前还要补的运维动作：
-  - 复核生产环境的汇付参数、`SYSTEM_COMPENSATE_TOKEN`、回调地址等环境变量，并留一份备份
-  - 复核云数据库权限规则，确认敏感写操作只走云函数
-  - 准备灰度发布，不要直接全量上线
+- 认识项目真实形态
+- 知道当前功能做到哪里
+- 找到核心页面、云函数、数据表
+- 理解商品 / 任务 / 资金三条主线的真实口径
+- 明确哪些函数必须部署、哪些环境变量必须配
+- 遇到问题时知道先查哪里
+- 立刻开始继续开发，而不是先花半天猜现状
 
 ---
 
-## 2. 当前业务口径
+## 1. 一句话认识这个项目
 
-### 2.1 普通用户收款
+`HYYC` 是一个面向合作小区住户的微信小程序，当前有两条主要业务线：
 
-- 用户实名后自动开通收款。
-- 用户端不再单独展示收款状态页。
-- 正常情况下用户无需手动处理。
-- 如果收款状态异常，统一联系管理员。
-- 接单前必须满足：
-  - `huifu_id` 存在
-  - `huifu_open_status=success`
-  - `user_busi_status=success`
+- 社区任务：发布任务、支付、接单、提交完成、确认完成、取消退款、申请查看手机号
+- 闲置商品：发布商品、图片审核、上架、收藏、浏览记录、聊天咨询、购买、已买到/已发布管理
 
-### 2.2 商品分账
+资金链路依赖：
 
-- 当前默认平台费率：`4%`
-- 用户分成：`96%`
-- 实际费率代码默认值在：
-  - `hyyc/cloudfunctions/huifuMiniappPay/index.js`
-  - `hyyc/cloudfunctions/goodsPurchase/index.js`
-- 若环境变量 `HUIFU_PLATFORM_FEE_RATE` 存在，会覆盖默认值。
+- 腾讯云云开发：数据库、云函数、文件存储
+- 汇付：开户、业务入驻、小程序支付、延时分账、原路退款、提现
+- COS 内容审核：商品图片审核
 
-### 2.3 任务分账
-
-- 任务发布时先付款。
-- 发布者确认完成后再做延时分账。
-- 当前默认分账比例同商品：
-  - 平台 `4%`
-  - 接单人 `96%`
-- 正式资金口径：
-  - 接单人按订单原价固定拿 `96%`
-  - 平台拿“可确认金额减去接单人应得金额”的剩余部分
-  - 如果支付手续费导致 `confirmable` 小于订单原价，差额由平台承担
-- 如果出现 `confirmable` 甚至小于接单人应得金额的异常单，后端直接失败并释放锁，不允许少给接单人
-- 正式实现依赖：
-  - `tasks.pay.orderAmtYuan`
-  - `tasks.pay.confirmableAmtYuan`
-  - `tasks.pay.unconfirmAmtYuan`
-  - `tasks.pay.feeAmtYuan`
-- `huifu_api_debug_logs` 现在只作为调试日志，不再参与任务确认金额推导。
-- 任务取消退款口径：
-  - 未接单：发布者可直接取消并原路退款
-  - 已接单 / 已提交：发布者先发起取消申请，接单人同意后原路退款
-- 退款不会回到小程序钱包余额：
-  - 走的是汇付原交易退款，再由微信支付原路退回支付账户
-
-### 2.4 提现
-
-- 用户页面不再展示到账方式选择。
-- 当前用户侧默认固定：
-  - `D1`
-- 绑卡成功后，后端会自动尝试开通默认提现方式。
-- 如果第三方侧当下还没完全同步：
-  - 提现页加载时会自动补开一次
-  - 用户直接点提现时也会再自动补开一次
-  - 仍未完成时，给用户提示“提现功能准备中，请稍后再试”
-- 后端代码仍保留 `DM / D1 / T1` 的兼容能力，但小程序不再暴露给用户选择。
-- 当前测试环境最低提现金额已改为 `1` 元。
-- 正常逻辑下，一次只允许 1 笔处理中提现，避免重复提现。
-- 按汇付 `用户业务入驻修改 /v2/user/busi/modify` 当前官方参数表：
-  - `card_info.prov_id` 必填
-  - `card_info.area_id` 必填
-  - `card_info.mp` 非必填
-- 当前项目实现已收敛到官方口径：
-  - 前端提现绑卡页不再展示手机号输入框
-  - 后端 `walletWithdraw action=bind_card` 允许不传 `bankMobile/mp`
-  - 当前页面实际要求只有：银行卡号 + 开户地址（省、市）
-  - 如果用户已经绑过卡，只改开户地址时可以不重新输入银行卡号
-
-### 2.5 用户端展示口径
-
-- `我的-账户信息` 页只展示并允许修改：
-  - 昵称
-  - 楼栋
-  - 门牌号
-- 页面保留“联系管理员”信息。
-- 不再保留单独的“收款开通 / 收款状态”页面。
-- 不要再把“去账户页手动开通收款”作为默认产品方案。
-- `我的-商品` 当前展示并支持管理的状态：
-  - `pending`
-  - `need_fix`
-  - `posted`
-  - `off_shelf`
-  - `sold`
-- 商品聊天卖家入口当前有两处：
-  - 商品详情底部“咨询会话”
-  - 我的商品列表里的“咨询会话”
-- 商品详情页顶部卖家信息展示口径：
-  - 优先读发布者公开资料
-  - 如果公开资料读取失败，回退到商品里保存的卖家快照字段
-- 收藏和浏览记录不单独新开集合：
-  - 统一写在当前用户自己的 `userInfo` 文档里
-- 老商品如果创建时还没带 `ownerAvatarFileID` 快照：
-  - 编辑并重新保存一次后会自动补齐
-  - 在补齐前，如果公开资料读取失败，可能只能回退昵称或默认头像
+当前代码状态已经达到“可以灰度上线 / 可以继续开发”的阶段，但还不是“完全稳定、无需观察即可全量放量”的状态。
 
 ---
 
-## 3. 不要误解的几个点
+## 2. 新人第一天先记住这 10 件事
 
-### 3.1 钱包页余额 = 汇付官方可用余额
+1. 微信开发者工具请直接打开 `hyyc/` 目录，不要打开仓库根目录。
+2. 小程序是“源码 + 云函数仓库”形态，不是有后端服务和自动部署流水线的工程。
+3. `hyyc/app.js` 里当前把云开发环境 ID 写死成了 `hyyc-1gi3f5sqc5becabf`，切环境时别只改控制台不改代码。
+4. `hyyc/cloudbaserc.json` 不是完整的云函数部署清单，很多当前实际在用的函数没有写进去。
+5. 云数据库权限规则不在仓库里，必须去云开发控制台确认；不要假设“前端能查就代表权限设计是对的”。
+6. 商品模块现在强依赖 `getGoodsProfile`，如果这个函数没部署，`我的商品 / 我买到的 / 收藏 / 浏览记录 / 已售后详情` 都会不完整。
+7. 买家或卖家跨角色读取商品/消息时，很多场景必须走云函数，不能偷懒直接前端查库，否则很容易报 `database permission denied`。
+8. 收藏和浏览记录没有单独新集合，仍然写在 `userInfo` 文档里，但展示时会叠加最新商品快照。
+9. 这个项目没有成体系的自动化测试，当前主要依赖真机联调、云函数日志和关键链路回归。
+10. 当前最容易误判的地方不是代码逻辑，而是“漏部署云函数 / 漏配环境变量 / 数据库规则没对齐”。
 
-- 钱包页顶部余额应展示汇付账户真实可用余额。
-- 用户通过 `wx.requestPayment` 完成的商品购买 / 任务付款，资金来自微信支付（微信零钱/银行卡），不应扣减这里的余额。
-- 本地 `wallet_transactions` 只作为“收支明细镜像”：
-  - 影响汇付余额的记录：收入、提现、提现手续费、提现退回
-  - 不影响汇付余额的记录：商品购买、任务付款、任务原路退款
-- 提现仍然以汇付余额为准。
+---
 
-### 3.2 注册阶段不会自动开通提现
+## 3. 仓库与工程形态
 
-- 注册阶段只做：
-  - 开户
+### 3.1 仓库目录
+
+- `docs/`
+  - 项目文档
+- `hyyc/`
+  - 小程序主工程
+  - 包含 `app.json`、`pages/`、`cloudfunctions/`
+- `project.config.json`
+  - 仓库根目录也有一个微信工程配置，但真正适合导入开发者工具的是 `hyyc/`
+- `pics/`
+  - 截图等临时素材
+
+### 3.2 小程序主工程目录
+
+- `hyyc/app.js`
+  - 小程序启动入口
+  - 当前写死 `wx.cloud.init({ env: 'hyyc-1gi3f5sqc5becabf' })`
+- `hyyc/app.json`
+  - 页面注册、分包、tabBar、隐私权限声明
+- `hyyc/pages/`
+  - 所有页面源码
+- `hyyc/cloudfunctions/`
+  - 所有云函数
+- `hyyc/config/`
+  - 前端访问控制与小区围栏配置
+- `hyyc/utils/`
+  - 公共工具
+- `hyyc/components/`
+  - UI 和聊天组件
+
+### 3.3 重要前端配置
+
+- `hyyc/config/access.js`
+  - 前端允许的小区名称
+  - 功能开关：
+    - `taskWorkflow`
+    - `goodsChat`
+  - 首页“特定人群使用说明”
+- `hyyc/config/community.js`
+  - 小区地理围栏配置
+  - 当前只有：
+    - `花语云萃`
+    - 半径 `220m`
+
+注意：
+
+- 前端 `access.js` 只是展示和入口限制，不是安全边界。
+- 真正的账号校验、小区校验、读写权限，仍然必须在云函数和数据库规则里兜住。
+
+### 3.4 工程化现状
+
+- 没有完整 CI/CD
+- 没有系统化单元测试 / E2E 测试
+- `miniprogram_npm/` 已经在仓库中
+- 如果本地 npm 依赖丢失，可在 `hyyc/` 下执行 `npm install`
+- 当前依赖很轻：
+  - `@babel/runtime`
+  - `lottie-miniprogram`
+
+---
+
+## 4. 当前产品范围与真实状态
+
+### 4.1 已经接通的核心能力
+
+- 注册实名
+  - 手机号换取
+  - 身份证 OCR / 实名资料
+  - 普通用户开户
   - 用户业务入驻
-- 不会自动开通取现。
-- 原因：
-  - 汇付对接已确认，开通结算/取现时需要 `card_info`
-  - 注册阶段没有银行卡资料
+- 商品
+  - 发布
+  - 编辑
+  - 图片审核
+  - 上下架
+  - 购买
+  - 收藏
+  - 浏览记录
+  - 商品聊天
+  - 我的商品
+  - 我买到的
+- 任务
+  - 发布并支付
+  - 接单
+  - 提交完成
+  - 发布者确认完成
+  - 取消退款
+  - 任务聊天
+  - 查看对方资料与手机号申请
+- 钱包 / 提现
+  - 钱包镜像账本
+  - 查询汇付余额
+  - 绑卡
+  - 默认 `D1` 提现
+  - 主动同步提现状态
+- 资金安全
+  - 商品支付锁
+  - 任务退款状态追踪
+  - 延时分账重试
+  - 钱包修复
+  - 管理员补偿入口
+  - 定时补偿任务
 
-### 3.3 当前只支持本人银行卡
+### 4.2 当前仍未完全收尾的点
 
-- 绑定银行卡时，要求：
-  - 银行卡姓名 = 实名用户姓名
-  - 开户地址（省 / 市）必须填写
-- 不支持绑配偶或其他人的银行卡。
-- 汇付官方文档当前口径：
-  - `prov_id / area_id` 必填
-  - `mp` 非必填
-- 现网测试现象：
-  - 即使填写的不是银行留存手机号，也可能绑卡 / 提现成功
-  - 这说明当前接口未必严格把 `mp` 校验为“银行预留手机号”
-  - 因此当前产品先不要求用户填写银行卡手机号，后续如业务需要再补回
+- 提现最终到账后的完整回调闭环，还需要继续真机验证
+- 商品“查看卖家主页”仍是占位按钮，未接成真实主页
+- 商品聊天和任务聊天都还没有全局消息中心
+- 商品聊天和任务聊天都还没有订阅消息 / 小程序消息提醒
+- 任务取消申请目前只有“同意”链路，没有“拒绝”入口
+- 手机号查看申请目前只有“同意”链路，没有“拒绝”入口
+- 还缺至少一轮双账号 / 多设备真机回归
 
----
+### 4.3 当前上线判断
 
-## 4. 官方接口文档
-
-- 个人用户基本信息开户
-  https://paas.huifu.com/open/doc/api/#/yhgl/api_yhgl_gryhjbxxzc
-
-- 用户业务入驻
-  https://paas.huifu.com/open/doc/api/#/yhgl/api_yhgl_ywrz
-
-- 用户业务入驻修改
-  https://paas.huifu.com/open/doc/api/#/yhgl/api_yhgl_ywrzxg
-
-- 用户信息查询
-  https://paas.huifu.com/open/doc/api/#/yhgl/api_yhgl_yhywcx
-
-- 账户余额信息查询
-  https://paas.huifu.com/open/doc/api/#/jyjs/api_jyjs_yuexxcx
-
-- 取现
-  https://paas.huifu.com/open/doc/api/#/jyjs/qx/api_qx
-
-- 提现结果查询
-  对照官方 SDK / `/v2/trade/settlement/query`
-
-- 聚合正扫 / 小程序支付
-  https://paas.huifu.com/open/doc/api/#/smzf/api_jhzs?id=appwx
-
----
-
-## 5. 核心代码入口
-
-### 5.1 前端页面
-
-- 实名页
-  `hyyc/pages/auth/realname/index.js`
-
-- 账户信息页
-  `hyyc/pages/profile/account/index.js`
-  `hyyc/pages/profile/account/index.wxml`
-  `hyyc/pages/profile/account/index.wxss`
-  说明：
-  - 当前已临时挂管理员“资金补偿调试”面板
-  - 支持 `预检查(dryRun)` 和 `执行补偿`
-
-- 钱包页
-  `hyyc/pages/profile/wallet/index.js`
-  `hyyc/pages/profile/wallet/index.wxml`
-
-- 提现页
-  `hyyc/pages/profile/withdraw/index.js`
-  `hyyc/pages/profile/withdraw/index.wxml`
-  说明：
-  - 绑卡区域当前只保留脱敏已绑卡信息、银行卡号输入、省市选择、保存按钮
-  - 不再展示额外的长段说明文案
-
-- 商品发布页
-  `hyyc/pages/publish/goods/index.js`
-
-- 商品详情 / 收藏 / 支付页
-  `hyyc/pages/goods/detail/index.js`
-
-- 商品咨询会话列表页
-  `hyyc/pages/chat/goods-sessions/index.js`
-  `hyyc/pages/chat/goods-sessions/index.wxml`
-
-- 商品咨询单聊页
-  `hyyc/pages/chat/goods-room/index.js`
-  `hyyc/pages/chat/goods-room/index.wxml`
-
-- 我的商品页
-  `hyyc/pages/profile/goods/index.js`
-  `hyyc/pages/profile/goods/index.wxml`
-
-- 我的收藏页
-  `hyyc/pages/profile/favorites/index.js`
-  `hyyc/pages/profile/favorites/index.wxml`
-
-- 我的页
-  `hyyc/pages/profile/index/index.js`
-  `hyyc/pages/profile/index/index.wxml`
-
-- 任务发布支付页
-  `hyyc/pages/publish/task/index.js`
-
-- 任务聊天页（取消申请 / 同意取消）
-  `hyyc/pages/chat/room/index.js`
-  `hyyc/pages/chat/room/index.wxml`
-
-- 任务详情页（提交按钮 / 退款状态同步）
-  `hyyc/pages/task/detail/index.js`
-  `hyyc/pages/task/detail/index.wxml`
-
-- 我发布的任务列表页（取消入口 / 删除限制提示）
-  `hyyc/pages/profile/tasks/index.js`
-  `hyyc/pages/profile/tasks/index.wxml`
-
-- 任务提交完成页
-  `hyyc/pages/task/submit/index.js`
-
-### 5.2 云函数
-
-- 注册实名主流程
-  `hyyc/cloudfunctions/registerUserByIdCard/index.js`
-
-- 收款开通补偿 / 手工重试（当前无前端入口）
-  `hyyc/cloudfunctions/huifuUserApplyForMe/index.js`
-
-- 汇付统一入口
-  `hyyc/cloudfunctions/huifuMiniappPay/index.js`
-
-- 资金补偿任务
-  `hyyc/cloudfunctions/financeCompensate/index.js`
-
-- 资金补偿定时 wrapper
-  `hyyc/cloudfunctions/financeCompensateTimer/index.js`
-  `hyyc/cloudfunctions/financeCompensateTimer/config.json`
-
-- 管理员代调资金补偿
-  `hyyc/cloudfunctions/adminFinanceCompensate/index.js`
-
-- 管理员登录
-  `hyyc/cloudfunctions/adminLogin/index.js`
-
-- 提现编排
-  `hyyc/cloudfunctions/walletWithdraw/index.js`
-
-- 汇付回调
-  `hyyc/cloudfunctions/huifuPayNotify/index.js`
-
-- 商品支付后落库
-  `hyyc/cloudfunctions/goodsPurchase/index.js`
-
-- 商品详情卖家公开资料读取
-  `hyyc/cloudfunctions/getUserPublicProfile/index.js`
-
-- 商品聊天已读标记
-  `hyyc/cloudfunctions/markGoodsMessagesRead/index.js`
-
-- 任务支付成功后落库
-  `hyyc/cloudfunctions/taskPaySuccess/index.js`
-
-- 任务创建
-  `hyyc/cloudfunctions/taskCreate/index.js`
-
-- 任务接单校验
-  `hyyc/cloudfunctions/taskAccept/index.js`
-
-- 任务提交完成
-  `hyyc/cloudfunctions/taskSubmit/index.js`
-
-- 任务取消 / 退款编排
-  `hyyc/cloudfunctions/taskCancelFlow/index.js`
-
-- 已付款任务删除保护
-  `hyyc/cloudfunctions/deleteTaskWithMessages/index.js`
-
-### 5.3 公共组件 / 工具
-
-- 全局 loading 组件
-  `hyyc/components/ui/loading/index.js`
-  `hyyc/components/ui/loading/index.wxml`
-
-- 头像临时链接缓存
-  `hyyc/utils/avatarCache.js`
+- 已达到：
+  - 可以提审
+  - 可以灰度发布
+  - 可以继续往真实用户场景联调
+- 尚未达到：
+  - 可以无观察直接全量放量
 
 ---
 
-## 6. 现在的完整链路
+## 5. 页面地图
 
-### 6.1 注册实名链路
+以下路径来自 `hyyc/app.json` 和当前分包配置。
 
-1. 前端实名页提交资料。
-2. `registerUserByIdCard` 做 OCR / 实名资料保存。
-3. 调 `huifuMiniappPay action=user_indv_open`
-4. 调 `huifuMiniappPay action=user_busi_open`
-5. 回写 `userInfo`：
-   - `huifu_id`
-   - `huifu_open_status`
-   - `user_busi_status`
-6. 用户端不再单独展示“收款开通”页面，默认按自动开通口径处理。
+### 5.1 主包页面
 
-### 6.2 商品支付链路
+- `pages/welcome/index`
+  - 欢迎页 / 登录入口 / 管理员隐藏入口
+- `pages/home/index/index`
+  - 任务广场
+- `pages/goods/index/index`
+  - 商品广场
+- `pages/goods/detail/index`
+  - 商品详情 / 收藏 / 购买 / 商品聊天入口
+- `pages/publish/index/index`
+  - 发布入口聚合
+- `pages/publish/task/index`
+  - 发布任务并支付
+- `pages/publish/goods/index`
+  - 发布 / 编辑商品
+- `pages/profile/index/index`
+  - 我的
+- `pages/profile/account/index`
+  - 账户信息 / 管理员补偿入口
+- `pages/profile/tasks/index`
+  - 我的任务
+- `pages/profile/goods/index`
+  - 我的商品 / 我买到的
+- `pages/profile/favorites/index`
+  - 我的收藏 / 浏览记录
+- `pages/profile/wallet/index`
+  - 钱包
+- `pages/profile/withdraw/index`
+  - 提现
 
-1. 商品页调用 `huifuMiniappPay` 下单。
-2. 汇付返回 `pay_info`
-3. 前端 `wx.requestPayment`
-4. 成功后 `goodsPurchase` 落库
-5. 钱包镜像账本写：
-   - 买家支出明细（仅记录“微信支付已完成”，不扣汇付余额）
-   - 卖家收入（计入汇付余额）
+### 5.2 分包页面
 
-### 6.2.1 商品聊天链路
-
-1. 买家在商品详情页点击“聊一聊”。
-2. 页面进入 `pages/chat/goods-room/index`：
-   - 按商品 `gid` + 卖家 / 买家身份初始化房间
-   - 文本消息和图片消息都写进 `messages`
-   - 当前消息记录会带：
-     - `bizType=goods`
-     - `gid`
-     - `sellerId / sellerOpenid`
-     - `peerUserId / peerOpenid`
-3. 卖家在以下任一入口查看咨询：
-   - 商品详情页底部“咨询会话”
-   - 我的商品卡片上的“咨询会话”
-4. 卖家进入 `pages/chat/goods-sessions/index` 后：
-   - 按商品聚合当前所有咨询用户会话
-   - 显示每个买家的最后一条消息与未读数
-5. 已读标记：
-   - 优先调用云函数 `markGoodsMessagesRead`
-   - 如果开发环境漏部署，前端房间页会临时兜底标记，避免未读一直不消
-
-### 6.3 任务支付链路
-
-1. 发布页先调用 `taskCreate` 建立待支付任务。
-2. 前端调用 `huifuMiniappPay` 下单。
-3. 前端 `wx.requestPayment`。
-4. 成功后 `taskPaySuccess` 把任务改为可展示。
-5. 接单人接单时调用 `taskAccept`：
-   - 云函数内部用事务锁任务，避免多人同时接单成功
-6. 接单人提交完成时调用 `taskSubmit`：
-   - 现在要求“完成说明”或“至少 1 张凭证”二选一
-   - 提交内容会写进 `tasks.submit`
-   - 发布者可在任务详情页直接查看
-7. 发布者确认完成后：
-   - `huifuMiniappPay action=delay_confirm_task` 做延时分账
-   - 只按任务文档中已保存的 `pay.confirmableAmtYuan / feeAmtYuan / orderAmtYuan` 等元数据执行
-   - 不再从调试日志反推金额
-8. 钱包镜像账本写：
-   - 发布者付款明细（仅记录“微信支付已完成”，不扣汇付余额）
-   - 接单人收入（计入汇付余额）
-
-### 6.3.1 钱包页 UI 约定
-
-- 明细列表要明确区分：
-  - `余额变动`：会影响顶部余额
-  - `消费记录`：只展示消费情况，不影响顶部余额
-- 明细很多时，优先用：
-  - 类型筛选（全部 / 余额变动 / 消费记录）
-  - 分页 / 加载更多
-
-### 6.3.2 任务取消 / 退款链路
-
-1. 未接单任务：
-   - 发布者可直接取消
-   - `taskCancelFlow action=cancel_direct`
-   - 内部调用 `huifuMiniappPay action=scanpay_refund`
-2. 已接单 / 已提交任务：
-   - 发布者在聊天页发起取消申请
-   - `taskCancelFlow action=request` 会写入 `tasks.cancelRequest`
-   - 同时写一条 `messages.type=task_cancel_request`
-3. 接单人在聊天页点“同意取消”：
-   - `taskCancelFlow action=approve`
-   - 内部调用 `huifuMiniappPay action=scanpay_refund`
-   - 任务会先立刻写成 `cancelled + refund_pending`
-   - 接单人任务详情页里的“提交完成”按钮要立刻禁用
-4. 退款成功后：
-   - 任务状态改为 `cancelled`
-   - `cancelRequest.status` 改为 `approved`
-   - `pay.status` 改为 `refunded`
-   - 聊天卡片文案会改成“任务已取消”
-5. 退款处理中时：
-   - `cancelRequest.status` / `pay.status` 会写成 `refund_pending`
-   - 聊天页会监听任务文档，并持续短轮询补查
-   - 任务详情页 / 我的任务页会持续短轮询补查
-6. 当前主动查询口径：
-   - `huifuMiniappPay action=scanpay_refund_query`
-   - 当前路径是 `/v3/trade/payment/scanpay/refundquery`
-   - 查询入参要用退款请求号 `RF...` / 退款全局流水号 `0031...`
-   - 不要再用原支付单号 `TK...` / 原支付全局流水号 `0029...`
-7. 当前特殊兜底：
-   - 如果汇付返回“申请退款金额大于可退款余额”，代码会按“这笔退款已经处理过”来兜底成功，防止重复点击后页面还停在待处理
-
-### 6.4 提现链路
-
-#### 步骤 1：绑定银行卡
-
-- 页面调用 `walletWithdraw action=bind_card`
-- 云函数内部调：
-  - `/v2/user/busi/modify`
-- 本次先传 `card_info`
-- 如果绑卡成功且已拿到可用 `token_no`：
-  - 后端会立刻自动补开默认 `D1`
-  - 内部先调 `/v2/user/busi/open`
-  - 再调 `/v2/user/busi/modify`
-  - `cash_type` 不能放顶层，必须写进 `cash_config`
-- 如果第三方当下还没同步完成，页面会提示“提现功能准备中”
-- 当前官方文档口径：
-  - `card_info.prov_id` / `card_info.area_id` 必填
-  - `card_info.mp` 非必填
-- 当前项目实现口径：
-  - 不再要求用户填写银行卡手机号
-  - 仍要求选择开户地址（省、市）
-  - 已绑卡后只改开户地址时，可不重新输入银行卡号
-  - 与当前官方参数表一致
-
-#### 步骤 2：发起提现
-
-- 页面调用 `walletWithdraw action=submit`
-- 云函数内部调：
-  - `/v2/trade/settlement/encashment`
-- 如果发现默认提现方式还没准备好：
-  - 提交前会自动再补开一次 `D1`
-  - 仍未完成则返回“提现功能准备中，请稍后再试”
-
-#### 步骤 3：查询提现结果
-
-- 正常依赖汇付回调
-- 如果老单没有回调：
-  - 提现页加载时会自动查一次
-  - 顶部“立即同步提现状态”按钮会调用 `walletWithdraw action=sync_active_withdraw`
-  - 后端内部主动调 `/v2/trade/settlement/query`
-
-### 6.5 资金补偿链路
-
-1. 管理员在“我的-账户信息”页打开临时调试面板。
-2. 页面调用 `adminFinanceCompensate`：
-   - 管理员账号密码校验通过后
-   - 由后端代调 `financeCompensate`
-3. `预检查` 对应：
-   - `action=run_all`
-   - `dryRun=true`
-   - 只扫描，不落库
-4. `执行补偿` 对应：
-   - `action=run_all`
-   - `dryRun=false`
-   - 真正执行修复
-5. 当前 `financeCompensate` 会做：
-   - `repairWalletDocs`
-   - `releaseExpiredGoodsLocks`
-   - `syncTaskRefunds`
-   - `syncWithdraws`
-   - `retryDelayConfirms`
-   - `repairMissingLedgers`
-6. 执行结果会同时输出到：
-   - 页面结果区
-   - 云函数日志
-   - 集合 `finance_compensate_logs`
-7. 正式定时任务实现：
-   - 使用 `financeCompensateTimer`
-   - 由定时触发器每 `10` 分钟后台调用一次 `financeCompensate run_all`
-   - 不对小程序前端开放
-8. 当前线上确认口径：
-   - 以集合 `finance_compensate_logs` 是否持续新增记录为准
-   - 不要只依赖云函数详情页里的日志展示
+- `pages/auth/realname/index`
+  - 实名注册
+- `pages/auth/legal/doc/index`
+  - 协议类页面
+- `pages/task/detail/index`
+  - 任务详情
+- `pages/task/submit/index`
+  - 任务提交完成
+- `pages/chat/room/index`
+  - 任务聊天
+- `pages/chat/sessions/index`
+  - 任务会话列表
+- `pages/chat/goods-room/index`
+  - 商品聊天房间
+- `pages/chat/goods-sessions/index`
+  - 商品咨询会话列表
+- `pages/user/profile/index`
+  - 任务场景下查看对方资料 / 申请查看手机号
 
 ---
 
-## 7. 当前实现细节
+## 6. 云函数地图
 
-### 7.1 提现状态主动查询
+这一节非常重要。新同学最容易踩的坑，就是把云函数当成“只要部署支付相关几个就够了”。
 
-- 如果本地库里存在 1 笔 `processing/pending` 的提现单：
-  - 提现页加载时会自动查一次
-  - 页面顶部也有“立即同步提现状态”按钮
-- “立即同步提现状态”不再只是整页重刷：
-  - 前端会调用 `walletWithdraw action=sync_active_withdraw`
-  - 后端如果第一次查询仍是 `P`，会等待约 `1.2` 秒再补查一次
-  - 同步后会明确给用户提示：已到账 / 仍在处理中 / 同步失败
-- 主动查询结果会回写：
-  - `wallet_withdraw_requests`
+### 6.1 前端直接调用的云函数
 
-### 7.2 提现并发保护
+- 基础能力
+  - `login`
+    - 获取当前用户 `openid`
+  - `exchangePhoneNumber`
+    - 微信手机号 code 换手机号
+- 注册 / 管理员
+  - `registerUserByIdCard`
+  - `adminLogin`
+  - `adminFinanceCompensate`
+- 商品主链路
+  - `getGoodsProfile`
+    - 收藏 / 浏览记录最新快照
+    - 我的商品 / 我买到的
+    - 商品详情权限兜底
+    - 删除我的商品记录 / 购买记录
+  - `getUserPublicProfile`
+    - 商品详情 / 商品聊天读取卖家公开资料
+  - `goodsPurchase`
+    - 商品支付成功后落库
+  - `markGoodsMessagesRead`
+    - 商品聊天服务端已读
+  - `imageAuditStart`
+    - 商品图片审核任务启动
+- 商品支付
+  - `huifuMiniappPay`
+    - 商品下单
+    - 商品支付查询 / 释放锁等资金动作
+- 任务主链路
+  - `taskCreate`
+  - `taskPaySuccess`
+  - `taskAccept`
+  - `taskSubmit`
+  - `taskCancelFlow`
+  - `deleteTaskWithMessages`
+  - `taskContactFlow`
+  - `markMessagesReadByOwner`
+  - `markMessagesReadByPeer`
+- 钱包 / 提现
+  - `walletWithdraw`
 
-- 提现测试绕过逻辑已经删除：
-  - `ignoreActiveWithdrawForTest`
-  - `TEST_BYPASS_PENDING`
-  - `onForceSubmitWithdraw`
-  - `forceTestBypass`
-- 现在前后端都统一要求：
-  - 同一用户只允许存在 1 笔处理中提现
-  - 发现 `activeWithdraw` 时，前端直接拦截，后端也会再次拦截
-- 这样做的目的：
-  - 避免联调残留逻辑进入生产
-  - 避免重复提现和后续对账混乱
+### 6.2 云函数之间互相调用的函数
 
-### 7.2.1 钱包唯一文档保护
+- `registerUserByIdCard`
+  - 内部调 `huifuMiniappPay`
+- `walletWithdraw`
+  - 内部调 `huifuMiniappPay`
+- `taskCancelFlow`
+  - 内部调 `huifuMiniappPay`
+- `financeCompensate`
+  - 内部调 `walletWithdraw` / `huifuMiniappPay`
+- `financeCompensateTimer`
+  - 内部调 `financeCompensate`
+- `huifuUserApplyForMe`
+  - 内部调 `huifuMiniappPay`
+- `huifuIndvOpenForMe`
+  - 内部调 `huifuMiniappPay`
 
-- 现在所有资金写入前，都会先检查当前用户钱包是否已存在：
-  - 主钱包文档
-  - 历史影子钱包文档
-- 处理口径：
-  - 主钱包只认固定 docId = 当前用户 `openid`
-  - 历史重复钱包会标记为 `legacy_shadow`
-  - 已经标记为影子钱包的文档，后续不会再重复计入主钱包余额
-- 这样做的目的：
-  - 避免“首次并发写入”或历史脏数据导致一个用户出现多份钱包余额
-  - 避免补偿任务或后续资金写入把影子钱包反复叠加
+### 6.3 回调 / 定时触发类函数
 
-### 7.3 当前已知提现行为
+- `huifuPayNotify`
+  - 汇付支付 / 提现 / 业务入驻等回调
+- `imageAuditCallback`
+  - COS 图片审核回调
+  - 这是云函数 URL，不是页面 `callFunction`
+- `financeCompensateTimer`
+  - 定时触发补偿
 
-- 用户侧默认只走 `D1`。
-- 绑卡成功后，后端会自动尝试开通 `D1`。
-- 首次绑卡后的短时间内，如果第三方侧状态还没同步好，页面可能短暂提示：
-  - `提现功能准备中，请稍后再试`
-- `DM`：
-  - 经常直接失败
-  - 常见原因：`DM取现额度不足`
-- `D1`：
-  - 能成功受理
-  - 常返回：
-    - `resp_code=00000000`
-    - `resp_desc=受理成功`
-    - `trans_stat=P`
-- `P` 不代表失败，只代表处理中。
+### 6.4 当前不是主链路，但建议保留的函数
 
-### 7.4 当前任务取消实现细节
+- `checkUserByIdNumber`
+  - 服务端按身份证号查重工具
+  - 当前页面里没有直接调用入口
+- `huifuIndvOpenForMe`
+  - 手工补开户
+- `huifuUserApplyForMe`
+  - 手工补业务入驻
 
-- 前端审批入口已经从聊天消息卡片里移到固定横幅：
-  - 避免 `scroll-view` 内点击事件不稳定
-- 接单人点击“同意取消”后：
-  - 按钮会立刻进入“处理中...”
-  - 同一请求会被前端锁住，防止重复点击
-  - 任务详情页重新显示时，会先刷新任务文档
-  - 如果任务已经进入 `cancelled / refund_pending / refunded`，接单人的“提交完成”按钮会立刻禁用
-- 如果退款实际成功，但前端调用因为超时没拿到结果：
-  - 前端会回读任务状态
-  - 如果已是 `cancelled + refunded/refund_pending`，页面直接按成功处理
-- 页面实时性说明：
-  - 聊天页会 `watch tasks.doc(tid)`，回调或主动查询改库后会立刻刷新卡片状态
-  - 聊天页在 `refund_pending` 时还会每 `3` 秒主动补查一次
-  - 我的任务页 / 任务详情页在 `refund_pending` 时会每 `3` 秒静默刷新一次
-- 如果重复点击导致汇付返回：
-  - `申请退款金额大于可退款余额`
-  现在前后端都按“退款已处理”兜底，不再把页面留在“等待接单人同意”
-- 退款镜像流水说明：
-  - 会写 `wallet_transactions`
-  - 但 `affectsBalance=false`
-  - 只是消费 / 退款明细镜像，不回到汇付余额，也不回到小程序钱包余额
+---
 
-### 7.5 当前商品详情 / 收藏实现细节
+## 7. 关键数据模型与状态口径
 
-- 商品发布 / 编辑时，前端会把这些卖家快照一起写进 `goods`：
+### 7.1 `userInfo`
+
+存：
+
+- 基础实名资料
+- 手机号
+- 楼栋 / 门牌号 / 小区
+- 汇付开户状态
+- 汇付业务入驻状态
+- 提现绑卡快照
+- 商品收藏 `goodsFavorites`
+- 商品浏览记录 `goodsBrowseHistory`
+
+### 7.2 `goods`
+
+这是商品主表，当前真实会用到这些字段：
+
+- 商品基本信息
+  - `title`
+  - `desc`
+  - `price`
+  - `originalPrice`
+  - `category`
+  - `condition`
+  - `tradeType`
+  - `images`
+  - `building`
+  - `community`
+- 发布者快照
+  - `ownerId`
+  - `_openid`
   - `ownerOpenid`
   - `ownerNickname`
   - `ownerAvatarFileID`
-- 商品详情读取卖家信息时：
-  - 先按 `goods._openid` 调 `getUserPublicProfile`
-  - 返回值里的 `_openid` 必须和商品发布者一致才会使用
-  - 如果云函数失败或返回不匹配，才回退到商品快照
-- 这样做的原因：
-  - 避免详情页错误显示“当前登录用户”的头像昵称
-  - 避免以后再次出现用户侧串号
-- 收藏和浏览记录当前存储方式：
-  - `userInfo.goodsFavorites`
-  - `userInfo.goodsBrowseHistory`
-- 浏览记录触发时机：
-  - 商品详情页成功加载后自动写入
-- 当前数量上限：
-  - 收藏最多保留 `60` 条
-  - 浏览记录最多保留 `100` 条
-- 去重规则：
-  - 都按 `goodsId` 去重
-  - 新一次访问 / 收藏会顶到最前面
-
-### 7.6 当前任务提交展示 / 删除实现细节
-
-- 接单人提交完成后，云函数只会更新：
-  - `tasks.status=submitted`
-  - `tasks.submit.note`
-  - `tasks.submit.images`
-  - `tasks.submit.submittedAt`
-- 发布者查看入口当前放在任务详情页：
-  - 页面会把 `submit.images` 里的 `cloud://` 文件转成临时链接后再展示
-  - 点击图片可直接预览
-- 已完成任务现在允许发布者删除“记录”：
-  - 前端入口在“我的任务”
-  - 云函数 `deleteTaskWithMessages` 也已放开 `status=completed`
-- 发起支付但未真正支付成功的 `pay_pending` 任务：
-  - 取消微信支付后允许删除
-  - 后端不会再把“仅发起过支付”误判成“已支付完成”
-- 批量删除限制：
-  - 只有“未真正支付成功的 `pay_pending`” / `completed` / `cancelled+refunded` 会被算作可删除
-  - 其它任务在批量模式下会显示但不可勾选
-
-### 7.7 当前商品列表 / 商品聊天 / 头像 / loading 实现细节
-
-- 我的商品上下架：
-  - 更新成功后会直接在当前列表本地改状态 / 移除条目
-  - 同时写入 `hyyc_goods_refresh_token`，通知商品广场下次进入时刷新
-- 商品聊天：
-  - 已新增 `pages/chat/goods-room` 和 `pages/chat/goods-sessions`
-  - 卖家未读会显示在：
-    - 商品详情页底部“咨询会话”按钮
-    - 我的商品列表里的“咨询会话”按钮
-  - 我的商品页按“每个商品”的未读数聚合
-  - 商品详情页按“当前商品总未读数”聚合
-  - 商品聊天头像会先读本地缓存，再后台补公开资料
-  - 房间页已读优先走云函数 `markGoodsMessagesRead`
-  - 如果开发环境没部署这个云函数，房间页会自动降级成前端兜底更新，避免开发时一直报 `FUNCTION_NOT_FOUND`
-- 商品广场刷新：
-  - 保留顶部“有新商品，点我刷新”
-  - 现在也支持原生下拉刷新第一页
-- 头像缓存：
-  - 新增 `avatarCache`，把 `cloud://` 头像换到的临时链接缓存到本地
-  - 我的页和聊天页会优先读缓存，减少重复 `getTempFileURL`
-- 全局 loading：
-  - 旧实现用 `hidden` 隐藏 canvas，真机 / 开发者工具偶发残影
-  - 现在改成显示时挂载、隐藏时销毁，避免“人物动画残留”问题
-
----
-
-## 8. 数据库集合
-
-### 8.1 业务数据
-
-- `userInfo`
-  - 用户实名信息
-  - 汇付开户状态
-  - 用户业务入驻状态
-  - 提现绑卡快照
-  - 商品收藏 `goodsFavorites`
-  - 商品浏览记录 `goodsBrowseHistory`
-
-- `wallets`
-  - 本地钱包镜像余额
-
-- `wallet_transactions`
-  - 本地钱包镜像流水
-
-- `tasks`
-  - 任务主表
-  - 含任务支付信息 `pay`
-  - 含取消申请信息 `cancelRequest`
-
-- `goods`
-  - 商品主表
-  - 含卖家快照字段：
-    - `ownerOpenid`
-    - `ownerNickname`
-    - `ownerAvatarFileID`
-  - 含商品展示状态：
+- 审核状态
+  - `status`
     - `pending`
     - `need_fix`
     - `posted`
     - `off_shelf`
     - `sold`
+  - `auditJobId`
+  - `auditNeedFixIdx`
+  - `auditError`
+- 购买状态
+  - `buyerId`
+  - `buyerOpenid`
+  - `soldAt`
+- 支付锁
+  - `paymentLock`
+- 软删除标记
+  - `sellerDeletedAt`
+  - `buyerDeletedAt`
 
-- `messages`
-  - 聊天消息
-  - 取消申请会写 `type=task_cancel_request`
+### 7.3 `tasks`
 
-### 8.2 调试 / 回调数据
+任务主表当前重点看：
 
+- 基础任务信息
+- `status`
+- 支付信息
+  - `pay.status`
+  - `pay.orderAmtYuan`
+  - `pay.confirmableAmtYuan`
+  - `pay.unconfirmAmtYuan`
+  - `pay.feeAmtYuan`
+- 提交完成信息
+  - `submit.note`
+  - `submit.images`
+  - `submit.submittedAt`
+- 取消申请
+  - `cancelRequest`
+- 联系方式权限
+  - `contactAccess`
+- 手机号申请
+  - `contactRequest`
+
+### 7.4 `messages`
+
+同一个集合同时承载任务聊天和商品聊天。
+
+- 商品聊天：
+  - `bizType=goods`
+  - `gid`
+  - `sellerId / sellerOpenid`
+  - `peerUserId / peerOpenid`
+  - `readBySeller`
+  - `readByBuyer`
+- 任务聊天：
+  - `tid`
+  - `ownerId`
+  - `peerUserId`
+  - `readByOwner`
+  - `readByPeer`
+  - `type=task_cancel_request`
+  - `type=contact_request`
+
+### 7.5 钱包与资金相关集合
+
+- `wallets`
+  - 主钱包与历史影子钱包
+- `wallet_transactions`
+  - 钱包镜像流水
 - `wallet_withdraw_requests`
-  - 每笔提现申请
-  - 请求报文
-  - 响应报文
-  - 当前状态
+  - 提现申请与主动查询结果
+
+### 7.6 审核 / 回调 / 补偿相关集合
+
+- `image_audit_jobs`
+  - 图片审核任务
+- `huifu_notify_logs`
+  - 汇付异常回调摘要
+- `finance_compensate_logs`
+  - 资金补偿执行摘要
+
+### 7.7 旧调试集合
 
 - `huifu_api_debug_logs`
-  - 所有实际发往汇付的请求/响应
-  - 仅用于联调排查
-  - 不参与正式资金判断
-
 - `function_debug_traces`
-  - 云函数命中轨迹
-  - 用于判断前端到底有没有调到指定云函数
 
-- `huifu_notify_logs`
-  - 汇付回调日志摘要
+当前口径：
 
-- `finance_compensate_logs`
-  - 每次资金补偿任务的执行摘要
-  - 用于追踪 `dryRun` / 真执行结果
-
-- `tasks`
-  - 重点看 `status`
-  - `pay.status`
-  - `pay.refund.reqDate / reqSeqId / hfSeqId`
-  - `cancelRequest.status`
+- 已不再作为正式业务逻辑依赖
+- 重新部署最新云函数后，可以手工清理
 
 ---
 
-## 9. 最重要的调试方法
+## 8. 商品模块的当前真实实现
 
-### 9.1 先看哪个集合
+这一节是本轮最重要的补充。因为商品侧最近改动最大，旧文档已经不够用了。
 
-1. 先按场景看业务主表：
-   - 任务看 `tasks`
-   - 提现看 `wallet_withdraw_requests`
-2. 再看 `huifu_notify_logs`
-3. 再看 `huifu_api_debug_logs`
-4. 再看 `function_debug_traces`
+### 8.1 商品发布 / 编辑 / 审核链路
 
-### 9.2 看什么字段
+1. 商品发布或编辑时，前端先写 `goods`
+2. 商品会先保存为 `status=pending`
+3. 然后调用 `imageAuditStart`
+4. `imageAuditStart` 创建 `image_audit_jobs`
+5. COS 审核完成后回调 `imageAuditCallback`
+6. 回调收口：
+   - 全部通过 -> `status=posted`
+   - 有问题 -> `status=need_fix`
+   - 同时回写 `auditNeedFixIdx / auditError`
 
-- `huifu_api_debug_logs`
-  - `action`
-  - `apiPath`
-  - `copyableRequestJson`
-  - `copyableResponseJson`
-  - `reqDate`
-  - `reqSeqId`
-  - 说明：这里只用于排查“实际发了什么 / 汇付回了什么”，不是正式业务状态来源
+当前实际行为：
 
-- `wallet_withdraw_requests`
-  - `status`
-  - `statusText`
-  - `reqDate`
-  - `reqSeqId`
-  - `hfSeqId`
-  - `copyableRequestJson`
-  - `copyableResponseJson`
+- 商品发布后不是立刻公开，而是先审核
+- 编辑商品后会重新进入审核链路
+- `need_fix` 的商品可以编辑后重新提交审核
 
-- `function_debug_traces`
-  - `functionName`
-  - `action`
-  - `buildTag`
+### 8.2 商品状态与用户侧可见性
 
-- `tasks`
-  - `status`
-  - `pay.status`
-  - `pay.refund.reqDate`
-  - `pay.refund.reqSeqId`
-  - `pay.refund.hfSeqId`
-  - `cancelRequest.status`
+- `pending`
+  - 仅本人可见
+  - 商品广场不可见
+- `need_fix`
+  - 仅本人可见
+  - 详情页会显示需要修改说明
+- `posted`
+  - 同小区公开可见
+  - 可购买
+- `off_shelf`
+  - 默认仅本人可见
+  - 可重新上架
+- `sold`
+  - 卖家可见
+  - 买家可见
+  - 其他人不可购买
 
-### 9.3 常见判断
+### 8.3 `getGoodsProfile` 是当前商品模块的权限兜底中心
 
-- 页面说失败，但 `withdraw_apply` 返回：
-  - `resp_code=00000000`
-  - `trans_stat=P`
-  那就是已受理，不是失败。
+当前这个云函数有 4 个 action：
 
-- `DM` 失败但 `D1` 成功，通常不是代码错，是汇付业务规则不同。
+- `get_goods_snapshots`
+  - 给收藏 / 浏览记录刷新最新商品状态
+- `list_my_goods`
+  - 返回：
+    - 我发布的
+    - 我买到的
+- `delete_my_goods_record`
+  - 删除“我的商品记录”或“我买到的记录”
+  - 实际是软删除
+- `get_goods_detail`
+  - 详情页和商品聊天页的权限兜底读取
 
-- 如果页面显示“处理中”，先看：
-  - `/v2/trade/settlement/query`
-  是否已经返回 `S/F/P`
+它解决的问题：
 
-- 如果任务退款还停在“退款中”，先看：
-  - `scanpay_refund_query` 的 `apiPath` 是否是 `/v3/trade/payment/scanpay/refundquery`
-  - `copyableRequestJson` 里是否传了退款请求号 `RF...` 或退款全局流水号 `0031...`
-  - 不要再把原支付单号 `TK...` / 原支付全局流水号 `0029...` 传给退款查询
+- 买家读取已成交商品详情时的数据库权限限制
+- 收藏 / 浏览记录的状态同步
+- 我的商品 / 我买到的统一读取
+- 删除记录时的角色校验
 
-- 如果任务退款同步返回：
-  - `resp_code=00000100`
-  - `trans_stat=P`
-  那是“已受理，退款处理中”，不是失败。
+### 8.4 我的商品页当前口径
 
-- 如果回调没回写，但主动查询有结果：
-  - 以主动查询结果为准
+页面路径：
 
-- 如果任务取消页提示失败，但你怀疑退款已经成功：
-  - 先看 `huifu_api_debug_logs`
-  - 筛 `action=scanpay_refund`
-  - 再看 `tasks.pay.status` / `tasks.cancelRequest.status`
+- `hyyc/pages/profile/goods/index.js`
+- `hyyc/pages/profile/goods/index.wxml`
 
+当前 UI 和业务口径：
+
+- 顶部是两个视图：
+  - `我发布的`
+  - `我买到的`
+- `我发布的` 下方筛选只保留：
+  - `全部`
+  - `已上架`
+  - `已下架`
+  - `已售出`
+- `审核中 / 需修改` 不再做顶部 tab
+  - 这两个状态直接显示在卡片右上角
+- 卡片按钮当前支持：
+  - `查看`
+  - 卖家视角：`咨询会话`
+  - 买家视角：`联系卖家`
+  - `删除记录`
+
+### 8.5 “我买到的”当前口径
+
+这是新功能，旧文档没有写全。
+
+当前行为：
+
+- 买到的商品单独显示在“我买到的”
+- 点击 `查看` 可以继续进商品详情
+- 只要卖家没有删除商品记录，买家就能继续看已成交商品详情
+- 如果卖家删除了商品记录，买家点进去会直接看到空态：
+  - `商品不存在或已下架`
+  - 不再额外弹“加载失败，请稍后重试”
+
+### 8.6 商品记录删除的真实口径
+
+当前不是硬删除，而是软删除。
+
+- 卖家删除自己发布的商品记录：
+  - 写 `sellerDeletedAt`
+  - 如果商品还在上架，会先自动改成 `off_shelf`
+  - 不会直接抹掉买家的购买记录
+- 买家删除自己的购买记录：
+  - 写 `buyerDeletedAt`
+  - 不会影响卖家的商品主记录
+
+### 8.7 收藏 / 浏览记录的当前口径
+
+存储位置不变：
+
+- `userInfo.goodsFavorites`
+- `userInfo.goodsBrowseHistory`
+
+但展示逻辑已经升级：
+
+- 页面加载时会通过 `getGoodsProfile action=get_goods_snapshots` 获取最新商品快照
+- 这样别人商品卖掉、下架、软删除后：
+  - 收藏页会同步显示 `已售出 / 已下架`
+  - 浏览记录也会同步
+- 浏览记录仍然是：
+  - 商品详情成功加载后自动写入
+- 上限仍然是：
+  - 收藏最多 `60`
+  - 浏览记录最多 `100`
+
+### 8.8 商品详情页当前口径
+
+页面路径：
+
+- `hyyc/pages/goods/detail/index.js`
+- `hyyc/pages/goods/detail/index.wxml`
+
+当前真实行为：
+
+- 详情页读取顺序是：
+  1. 先尝试按“本人”直查
+  2. 再尝试按“公开 posted 商品”直查
+  3. 最后走 `getGoodsProfile action=get_goods_detail`
+- 这是为了兼容数据库权限规则
+
+卖家打开自己商品时：
+
+- `pending / need_fix / posted / off_shelf` 都可以看到详情
+- `pending / need_fix / posted / off_shelf` 都可以进入编辑
+- `posted / off_shelf` 可以直接上下架
+- 如果有活跃 `paymentLock`，会禁止修改和上下架
+
+买家打开自己买到的商品时：
+
+- 若卖家未删除记录，可以查看 `sold` 商品详情
+- 若卖家已删除记录，会看到空态
+
+当前还没做完的点：
+
+- 点击顶部卖家信息时，仍然只是 toast：
+  - `查看卖家主页`
+
+### 8.9 商品聊天当前口径
+
+链路：
+
+1. 买家从商品详情点 `聊一聊`
+2. 进入 `pages/chat/goods-room/index`
+3. 卖家从：
+   - 商品详情底部 `咨询会话`
+   - 我的商品卡片 `咨询会话`
+   进入 `pages/chat/goods-sessions/index`
+
+已读逻辑：
+
+- 优先调用 `markGoodsMessagesRead`
+- 如果开发环境没部署，前端会做临时兜底
+
+未读角标：
+
+- 商品详情页按“当前商品总未读数”聚合
+- 我的商品页按“每个商品的未读数”聚合
+
+### 8.10 商品模块的权限原则
+
+请牢牢记住这一条：
+
+- 前端直接查库，只适合：
+  - 查本人自己的商品
+  - 查公开 `posted` 商品
+- 买家读取已成交商品
+- 卖家/买家读取跨角色聊天资料
+- 收藏/浏览记录刷新最新状态
+
+这些场景都应该优先走云函数兜底，而不是继续在前端直接 `where({ buyerOpenid })` 查库。
+
+否则常见现象就是：
+
+- 开发者工具日志出现：
+  - `database permission denied`
+
+这不是业务权限错，而是数据库规则拦住了错误的读取方式。
+
+---
+
+## 9. 任务模块的当前真实实现
+
+### 9.1 任务支付主链路
+
+1. `taskCreate`
+2. `huifuMiniappPay` 下单
+3. 前端 `wx.requestPayment`
+4. `taskPaySuccess`
+5. `taskAccept`
+6. `taskSubmit`
+7. 发布者确认完成时，`huifuMiniappPay action=delay_confirm_task`
+
+### 9.2 任务完成提交
+
+当前要求：
+
+- 必须填写完成说明
+  或
+- 至少上传 1 张凭证
+
+提交后：
+
+- 写入 `tasks.submit`
+- 发布者可在任务详情里查看说明 / 图片 / 提交时间
+
+### 9.3 任务取消 / 退款
+
+未接单：
+
+- 发布者可直接取消并原路退款
+- 入口：
+  - 任务详情页
+
+已接单 / 已提交：
+
+- 发布者在聊天页发起取消申请
+- 接单人只能在聊天页点“同意取消”
+- 同意后立即进入：
+  - `cancelled + refund_pending`
+
+当前特殊兜底：
+
+- 如果退款实际成功，但前端超时没拿到结果：
+  - 页面会回读任务状态
+  - 如果状态已收口，就按成功处理
 - 如果汇付返回：
   - `申请退款金额大于可退款余额`
-  通常不是“新的退款失败”，而是“原单已经退过了”
+  - 当前代码按“这笔退款已经处理过”兜底
+
+### 9.4 联系方式查看申请
+
+页面路径：
+
+- `pages/user/profile/index`
+
+云函数：
+
+- `taskContactFlow`
+
+当前已有动作：
+
+- `get_profile`
+- `request_phone`
+- `approve_phone`
+
+当前没有动作：
+
+- `reject_phone`
+
+所以现在只支持“申请 -> 同意”，不支持“拒绝”。
+
+### 9.5 任务聊天已读
+
+云函数：
+
+- `markMessagesReadByOwner`
+- `markMessagesReadByPeer`
+
+存在原因：
+
+- 任务消息的已读写回也会受到数据库权限影响
+- 所以最终要通过服务端改 `readByOwner / readByPeer`
 
 ---
 
-## 10. 回调地址规则
+## 10. 支付 / 分账 / 钱包 / 提现的当前口径
 
-### 10.1 当前回调接收函数
+### 10.1 注册与收款开通
 
-- `huifuPayNotify`
+普通用户实名注册后，会自动做：
 
-### 10.2 当前支持的 token 参数
+- 个人用户基本信息开户 `/v2/user/basicdata/indv`
+- 用户业务入驻 `/v2/user/busi/open`
 
-- `?token=xxx`
-- `?t=xxx`
+用户端不再单独展示：
 
-代码位置：
-- `hyyc/cloudfunctions/huifuPayNotify/index.js`
+- 收款开通页面
+- 收款状态页面
 
-### 10.3 长度限制
+### 10.2 商品分账
 
-- 汇付不同接口对 `notify_url` / `async_return_url` 的长度限制不完全一样
-- 任务退款 `scanpay_refund` 当前文档是 `512`
-- 但用户业务入驻 / 提现等老接口仍然要按各自文档约束处理
-- 当前 CloudBase 域名很长，所以 token 必须尽量短
+当前默认平台费率：
 
-### 10.4 当前建议
+- 平台 `4%`
+- 卖家 `96%`
 
-- 建议 token 长度：
-  - `16` 位
-  - 或 `20` 位
-- 不要再用很长的 token
+代码读取顺序：
 
-当前固定前缀长度约为：
-- `92`
+- 环境变量 `HUIFU_PLATFORM_FEE_RATE`
+- 若无，则默认 `4%`
 
-所以：
-- token `16` 位，总长约 `108`
-- token `20` 位，总长约 `112`
+### 10.3 任务分账
 
-这是安全区，不要再贴着旧接口的长度边界走。
+当前正式口径：
+
+- 接单人按订单原价拿 `96%`
+- 平台拿剩余部分
+- 若支付手续费导致 `confirmable` 小于订单原价，差额由平台承担
+- 若 `confirmable` 甚至小于接单人应得，后端直接失败并释放锁
+
+### 10.4 钱包页口径
+
+钱包页顶部余额 = 汇付官方可用余额，不是微信支付余额。
+
+`wallet_transactions` 只是镜像账本：
+
+- 影响汇付余额的：
+  - 收入
+  - 提现
+  - 提现手续费
+  - 提现退回
+- 不影响汇付余额的：
+  - 商品购买
+  - 任务付款
+  - 原路退款
+
+### 10.5 提现当前口径
+
+当前用户侧固定：
+
+- 默认 `D1`
+
+当前页面行为：
+
+- 已绑卡时默认折叠表单
+- 不再要求填写银行卡手机号
+- 仍要求开户地址（省、市）
+- 只允许存在 1 笔处理中提现
+
+已确认的第三方现象：
+
+- `DM` 经常失败：
+  - `DM取现额度不足`
+- `D1` 可以成功受理：
+  - `resp_code=00000000`
+  - `trans_stat=P`
+
+### 10.6 资金补偿任务
+
+当前 `financeCompensate` 支持：
+
+- `repairWalletDocs`
+- `releaseExpiredGoodsLocks`
+- `syncTaskRefunds`
+- `syncWithdraws`
+- `retryDelayConfirms`
+- `repairMissingLedgers`
+- `cleanupLogCollections`
+
+定时任务：
+
+- `financeCompensateTimer`
+- 每 `10` 分钟触发一次
 
 ---
 
-## 11. 环境变量
+## 11. 图片审核链路
 
-### 11.1 `registerUserByIdCard`
+当前主要服务于商品。
 
-- `TENCENT_SECRET_ID`
-- `TENCENT_SECRET_KEY`
-- `TENCENT_REGION`
-- `ALLOWED_COMMUNITIES`
-- `HUIFU_UPPER_HUIFU_ID`
+### 11.1 启动审核
 
-### 11.2 `huifuUserApplyForMe`
+- 前端工具函数：
+  - `hyyc/utils/imageAudit.js`
+- 调用云函数：
+  - `imageAuditStart`
 
-- `HUIFU_UPPER_HUIFU_ID`
+### 11.2 审核回调
 
-### 11.3 `huifuMiniappPay`
+- 回调函数：
+  - `imageAuditCallback`
+- 回调体会更新：
+  - `image_audit_jobs`
+  - `goods.status`
+  - `goods.auditNeedFixIdx`
+  - `goods.auditError`
+
+### 11.3 当前注意点
+
+- `imageAuditCallback` 不是 `callFunction`，而是 HTTP 回调入口
+- `COS_AUDIT_CALLBACK_URL` 必须指向这个函数 URL
+- 建议一定配置 `COS_AUDIT_CALLBACK_TOKEN`
+- 当前 `imageAuditStart` 代码里虽然兼容 `tasks`，但真实在跑的是商品图片审核
+
+---
+
+## 12. 权限与调试原则
+
+### 12.1 数据库规则不在仓库里
+
+这个项目当前没有把云数据库 rules 文件放在仓库里。
+
+所以新同学接手时必须做两件事：
+
+- 去云开发控制台看数据库权限规则
+- 不要凭“本地查得到 / 查不到”来猜业务对错
+
+### 12.2 前端直查与云函数兜底的边界
+
+原则：
+
+- 本人数据：
+  - 前端可按 `_openid` 精确查询
+- 公开商品：
+  - 前端可按 `status=posted + community` 查询
+- 跨角色数据：
+  - 优先走云函数
+
+典型必须走云函数的地方：
+
+- 买家看已成交商品详情
+- 收藏 / 浏览记录同步最新商品状态
+- 我的商品里拉我买到的商品
+- 任务聊天和商品聊天的已读回写
+- 查看对方资料 / 完整手机号
+
+### 12.3 不要再把旧调试集合当业务来源
+
+不要依赖：
+
+- `huifu_api_debug_logs`
+- `function_debug_traces`
+
+当前正式口径：
+
+- 看主业务表
+- 看云函数日志
+- 看回调异常摘要
+
+### 12.4 排错优先级
+
+1. 先看业务主表
+2. 再看相关云函数日志
+3. 再看 `huifu_notify_logs`
+4. 最后再怀疑第三方或数据库权限
+
+### 12.5 常见现象对应判断
+
+- 日志里出现 `database permission denied`
+  - 先怀疑是不是错误地在前端直接查了跨角色数据
+- 页面显示“处理中”
+  - 先看业务表状态是否其实已经回写
+- 前端超时但资金状态像是成功
+  - 先看 `huifuMiniappPay` / `walletWithdraw` / `taskCancelFlow` 日志
+- 收藏或浏览记录状态不更新
+  - 先看 `getGoodsProfile` 是否已部署
+
+---
+
+## 13. 环境变量总表
+
+下面按函数分组列。带“必配”的建议视为必须配齐。
+
+### 13.1 `registerUserByIdCard`
+
+- 必配：
+  - `TENCENT_SECRET_ID`
+  - `TENCENT_SECRET_KEY`
+  - `ALLOWED_COMMUNITIES`
+- 可选：
+  - `TENCENT_REGION`
+    - 默认 `ap-beijing`
+  - `HUIFU_UPPER_HUIFU_ID`
+
+### 13.2 `huifuMiniappPay`
 
 - 必配：
   - `HUIFU_SYS_ID`
   - `HUIFU_PRODUCT_ID`
   - `HUIFU_HUIFU_ID`
   - `HUIFU_PRIVATE_KEY` 或 `HUIFU_PRIVATE_KEY_PATH`
-- 普通用户业务入驻必配：
+- 普通用户开户 / 业务入驻建议配：
   - `HUIFU_UPPER_HUIFU_ID`
 - 小程序支付必配：
   - `HUIFU_SUB_APPID`
   - `HUIFU_NOTIFY_URL`
-- 提现 / 绑卡建议配置：
+- 业务入驻回调建议配：
   - `HUIFU_USER_BUSI_NOTIFY_URL`
+- 提现回调建议配：
   - `HUIFU_WITHDRAW_NOTIFY_URL`
-- 平台分账费率可选：
+- 平台费率可选：
   - `HUIFU_PLATFORM_FEE_RATE`
+- 进阶可选：
+  - `HUIFU_API_HOST`
+  - `GOODS_PAYMENT_LOCK_TTL_MS`
+  - `TASK_DELAY_CONFIRM_LOCK_TTL_MS`
+  - `SYSTEM_COMPENSATE_TOKEN`
 
-说明：
-- `HUIFU_USER_BUSI_NOTIFY_URL` 不配时回退到 `HUIFU_NOTIFY_URL`
-- `HUIFU_WITHDRAW_NOTIFY_URL` 不配时回退到 `HUIFU_NOTIFY_URL`
-- 当前代码如果发现 URL 超长，会直接不上传，避免被汇付参数校验拦住
-- 如果没有配置 `HUIFU_PLATFORM_FEE_RATE`：
-  - 代码默认按 `4%` 平台费率执行
-
-### 11.4 `goodsPurchase`
+### 13.3 `goodsPurchase`
 
 - 无新增必配环境变量
-- 也会读取：
+- 会读取：
   - `HUIFU_PLATFORM_FEE_RATE`
-- 如果该变量未配置：
-  - 默认按 `4%` 平台费率镜像商品侧分账结果
 
-### 11.5 `walletWithdraw`
+### 13.4 `walletWithdraw`
 
 - 无新增必配环境变量
-- 依赖：
-  - 当前用户已实名
-  - 当前用户已开户
-  - 当前用户已业务入驻
-  - `huifuMiniappPay` 环境变量完整
+- 依赖 `huifuMiniappPay` 相关环境变量完整
+- 可选：
+  - `WITHDRAW_SUBMIT_LOCK_TTL_MS`
+  - `SYSTEM_COMPENSATE_TOKEN`
 
-### 11.6 `huifuPayNotify`
+### 13.5 `huifuPayNotify`
 
 - 必配：
   - `HUIFU_NOTIFY_TOKEN`
@@ -1084,160 +983,389 @@
   - `HUIFU_SYS_ID`
   - `HUIFU_PRODUCT_ID`
   - `HUIFU_HUIFU_ID`
+  - `HUIFU_PLATFORM_FEE_RATE`
 
-### 11.7 资金补偿 / 管理员调试
+### 13.6 `financeCompensate`
 
-- `financeCompensate` 必配：
+- 必配：
   - `SYSTEM_COMPENSATE_TOKEN`
-- `adminFinanceCompensate` 必配：
+- 可选：
+  - `FINANCE_LOG_RETENTION_DAYS`
+  - `HUIFU_PLATFORM_FEE_RATE`
+
+### 13.7 `financeCompensateTimer`
+
+- 必配：
   - `SYSTEM_COMPENSATE_TOKEN`
-- `financeCompensateTimer` 必配：
-  - `SYSTEM_COMPENSATE_TOKEN`
-  - 可选：`FINANCE_COMPENSATE_TIMER_LIMIT`
-- 以下函数必须配置同一串 `SYSTEM_COMPENSATE_TOKEN`，否则补偿代调会失败：
-  - `financeCompensate`
-  - `financeCompensateTimer`
-  - `huifuMiniappPay`
-  - `taskCancelFlow`
-  - `walletWithdraw`
-  - `adminFinanceCompensate`
-- 管理员账号密码可选环境变量：
+- 可选：
+  - `FINANCE_COMPENSATE_TIMER_LIMIT`
+
+### 13.8 `adminFinanceCompensate` / `adminLogin`
+
+- 可选但建议配置：
   - `ADMIN_USERNAME`
   - `ADMIN_PASSWORD`
-- 如果配置了管理员账号密码环境变量：
-  - `adminLogin`
-  - `adminFinanceCompensate`
-  这两个函数必须保持一致
-- 如果未配置：
-  - 当前代码仍会回退到默认管理员账号密码
+- `adminFinanceCompensate` 还必配：
+  - `SYSTEM_COMPENSATE_TOKEN`
+
+如果不配置管理员账号密码：
+
+- 代码会回退到默认账号密码
+- 生产环境不建议这么做
+
+### 13.9 `imageAuditStart`
+
+- 必配：
+  - `COS_SECRET_ID`
+  - `COS_SECRET_KEY`
+  - `COS_AUDIT_BUCKET`
+  - `COS_AUDIT_REGION`
+  - `COS_AUDIT_CALLBACK_URL`
+- 强烈建议配置：
+  - `COS_AUDIT_CALLBACK_TOKEN`
+- 可选：
+  - `COS_AUDIT_BIZ_TYPE`
+
+### 13.10 `imageAuditCallback`
+
+- 强烈建议配置：
+  - `COS_AUDIT_CALLBACK_TOKEN`
+
+### 13.11 `exchangePhoneNumber`
+
+- 无环境变量要求
+- 但微信公众平台必须开通“获取手机号”能力
+
+### 13.12 前端配置同步要求
+
+这不是环境变量，但每次新环境接手都要对齐：
+
+- `hyyc/app.js`
+  - 云开发 envId
+- `hyyc/config/access.js`
+  - `allowedCommunities`
+  - `features`
+- `hyyc/config/community.js`
+  - 小区围栏
+- `registerUserByIdCard` 的 `ALLOWED_COMMUNITIES`
+  - 必须和前端开放小区口径一致
 
 ---
 
-## 12. 云函数部署要求
+## 14. 云函数部署要求
 
-### 12.1 必须重新部署的函数
+### 14.1 当前必须部署的函数
+
+这是按“当前真实页面会用到”整理的完整清单。
+
+- 基础：
+  - `login`
+  - `exchangePhoneNumber`
+- 注册 / 管理：
+  - `registerUserByIdCard`
+  - `adminLogin`
+  - `adminFinanceCompensate`
+- 商品：
+  - `getGoodsProfile`
+  - `getUserPublicProfile`
+  - `goodsPurchase`
+  - `markGoodsMessagesRead`
+  - `imageAuditStart`
+  - `imageAuditCallback`
+- 任务：
+  - `taskCreate`
+  - `taskPaySuccess`
+  - `taskAccept`
+  - `taskSubmit`
+  - `taskCancelFlow`
+  - `deleteTaskWithMessages`
+  - `taskContactFlow`
+  - `markMessagesReadByOwner`
+  - `markMessagesReadByPeer`
+- 资金：
+  - `huifuMiniappPay`
+  - `walletWithdraw`
+  - `huifuPayNotify`
+  - `financeCompensate`
+  - `financeCompensateTimer`
+
+### 14.2 建议也部署的函数
+
+- `huifuUserApplyForMe`
+- `huifuIndvOpenForMe`
+- `checkUserByIdNumber`
+
+原因：
+
+- 它们不一定在当前用户页面直接出现
+- 但排查历史数据或手工修复时会用到
+
+### 14.3 `cloudbaserc.json` 当前不完整
+
+当前 `hyyc/cloudbaserc.json` 只列了一部分核心函数，例如：
 
 - `registerUserByIdCard`
-- `huifuUserApplyForMe`
 - `huifuMiniappPay`
 - `taskCreate`
 - `taskPaySuccess`
-- `walletWithdraw`
-- `huifuPayNotify`
-- `goodsPurchase`
 - `taskAccept`
 - `taskSubmit`
 - `taskCancelFlow`
-- `deleteTaskWithMessages`
+- `goodsPurchase`
+- `walletWithdraw`
+- `huifuPayNotify`
+
+但没有列出很多现在真实在用的函数，例如：
+
+- `login`
+- `exchangePhoneNumber`
+- `getGoodsProfile`
 - `getUserPublicProfile`
+- `markGoodsMessagesRead`
+- `taskContactFlow`
+- `markMessagesReadByOwner`
+- `markMessagesReadByPeer`
+- `imageAuditStart`
+- `imageAuditCallback`
 - `financeCompensate`
 - `financeCompensateTimer`
-- `adminFinanceCompensate`
 - `adminLogin`
+- `adminFinanceCompensate`
 
-### 12.2 超时建议
+所以：
 
-- `huifuMiniappPay`：`60 秒`
-- `taskCancelFlow`：`60 秒`
-- `walletWithdraw`：`60 秒`
-- `huifuPayNotify`：`60 秒`
+- 不要把 `cloudbaserc.json` 当成完整部署清单
+- 手动部署或补全脚本都可以
+- 但最终必须按本节清单核对
 
-仓库中已有：
-- `hyyc/cloudbaserc.json`
+### 14.4 超时建议
 
-但如果开发是手动在云开发控制台上传，仍然要以线上配置为准检查一遍。
+- `huifuMiniappPay`
+  - `60 秒`
+- `taskCancelFlow`
+  - `60 秒`
+- `walletWithdraw`
+  - `60 秒`
+- `huifuPayNotify`
+  - `60 秒`
 
-注意：
-- `taskCancelFlow` 如果线上还是 `3 秒`，接单人点“同意取消”时很容易前端先报超时
-- `huifuMiniappPay` 如果线上超时太短，也会导致退款实际已受理、前端却先失败
+### 14.5 回调 / 定时额外要求
 
----
-
-## 13. 当前 BuildTag 快照
-
-以代码当前状态为准：
-
-- `registerUserByIdCard@2026-03-13.3`
-- `huifuUserApplyForMe@2026-03-13.3`
-- `huifuMiniappPay@2026-03-15.4`
-- `walletWithdraw@2026-03-15.4`
-- `financeCompensate@2026-03-15.1`
-- `financeCompensateTimer@2026-03-15.1`
-- `adminFinanceCompensate@2026-03-15.1`
-
-调试时：
-- 用户页面不再展示 `buildTag`
-- 云函数返回值和数据库 `function_debug_traces` 里仍会落 `buildTag`
+- `huifuPayNotify`
+  - 必须有可访问的云函数 URL
+- `imageAuditCallback`
+  - 必须有可访问的云函数 URL
+  - URL 要回填给 `COS_AUDIT_CALLBACK_URL`
+- `financeCompensateTimer`
+  - 需要在云开发控制台配置定时触发
 
 ---
 
-## 14. 下一位开发上手顺序
+## 15. 新同学第一天上手顺序
 
-建议严格按这个顺序来，不要直接跳进去改代码。
+建议严格按这个顺序来。
 
-1. 先看这份文档。
-2. 先读这 6 个文件：
-   - `hyyc/cloudfunctions/huifuMiniappPay/index.js`
-   - `hyyc/cloudfunctions/taskCancelFlow/index.js`
-   - `hyyc/cloudfunctions/walletWithdraw/index.js`
-   - `hyyc/cloudfunctions/huifuPayNotify/index.js`
-   - `hyyc/pages/chat/room/index.js`
-   - `hyyc/pages/profile/withdraw/index.js`
-3. 去云开发确认环境变量。
-4. 去数据库看这 4 个集合是否存在：
+1. 微信开发者工具打开 `hyyc/`
+2. 确认：
+   - `appid`
+   - `app.js` 里的云环境 ID
+3. 在云开发控制台确认：
+   - 数据库权限规则
+   - 存储权限
+   - 云函数环境变量
+4. 按本文件第 14 节把云函数部署齐
+5. 确认回调地址：
+   - `huifuPayNotify`
+   - `imageAuditCallback`
+6. 确认以下集合至少存在或可被自动创建：
+   - `userInfo`
+   - `goods`
+   - `tasks`
+   - `messages`
+   - `wallets`
+   - `wallet_transactions`
    - `wallet_withdraw_requests`
-   - `huifu_api_debug_logs`
-   - `function_debug_traces`
+   - `image_audit_jobs`
    - `huifu_notify_logs`
-5. 真机跑一次：
-   - 注册
-   - 支付
-   - 分账
+   - `finance_compensate_logs`
+7. 真机至少跑一次：
+   - 登录
+   - 注册实名
+   - 商品发布
+   - 商品审核
+   - 商品购买
+   - 任务发布支付
+   - 任务接单 / 提交 / 确认
    - 提现
-6. 如果提现异常：
-   - 先查 `huifu_api_debug_logs`
-   - 不要先猜
-7. 明确一条正式口径：
-   - `huifu_api_debug_logs` 只用于排查，不允许作为正式资金逻辑依赖
+8. 如果先改商品模块：
+   - 先读
+     - `hyyc/pages/profile/goods/index.js`
+     - `hyyc/pages/goods/detail/index.js`
+     - `hyyc/utils/userGoodsStore.js`
+     - `hyyc/cloudfunctions/getGoodsProfile/index.js`
+9. 如果先改任务模块：
+   - 先读
+     - `hyyc/pages/chat/room/index.js`
+     - `hyyc/pages/task/detail/index.js`
+     - `hyyc/cloudfunctions/taskCancelFlow/index.js`
+     - `hyyc/cloudfunctions/taskContactFlow/index.js`
+10. 如果先改资金模块：
+   - 先读
+     - `hyyc/cloudfunctions/huifuMiniappPay/index.js`
+     - `hyyc/cloudfunctions/walletWithdraw/index.js`
+     - `hyyc/cloudfunctions/huifuPayNotify/index.js`
+     - `hyyc/cloudfunctions/financeCompensate/index.js`
 
 ---
 
-## 15. 现在最该继续做的事
+## 16. 首轮联调 checklist
 
-按优先级：
+### 16.1 商品链路
 
-1. 用 `D1` 再做一次新提现，完整验证：绑卡 -> 提现 -> 到账 -> 回调回写。
-2. 再做一次“支付成功后立刻退出小程序”的真实验证，确认任务 / 商品都能靠回调或补偿自动收口。
-3. 做一次同账号重复提现测试，确认连续点击只能受理一笔。
-4. 做一次任务“确认完成”连续点击测试，确认不会重复分账。
-5. 如果时间允许，再做一次退款重复触发测试，确认不会重复退款。
-6. 连续观察 `finance_compensate_logs` 至少 `1-3` 天：
-   - 确认每 `10` 分钟都有新记录
-   - 没有长期卡在 `refund_pending / confirming / processing / pay_pending` 的订单
-7. 真机继续验证商品聊天：
-   - 买家发送后，卖家“咨询会话”是否稳定显示未读
-   - 进入房间后，已读状态是否及时回写
-   - 买卖双方头像是否都能稳定加载
-8. 正式提审前复核微信公众平台侧配置：
-   - 隐私保护指引与实际调用的隐私接口保持一致
-   - 类目、服务范围、资质材料和真实业务一致
-   - 用户协议、隐私政策、客服联系方式可以正常访问
-9. 发布策略固定为：
-   - 先提审
-   - 审核通过后先灰度发布
-   - 灰度稳定后再全量发布
-10. 如果产品要继续完善任务协商：
-   - 增加“拒绝取消申请”
-   - 增加“平台介入 / 客服介入”
-11. 如果商品侧要继续补完整：
-   - 增加全局消息中心
-   - 增加订阅消息 / 小程序消息提醒
-   - 接通真实卖家主页
+- 发布商品
+- 图片审核通过后出现在商品广场
+- `need_fix` 时能看到修图提示
+- 卖家能编辑并重新提交
+- 卖家能上下架
+- 买家能购买
+- 买家购买后：
+  - 卖家看到 `已售出`
+  - 买家在“我买到的”里能看到
+- 卖家删除商品记录后：
+  - 买家点已购商品看到空态
+- 收藏 / 浏览记录能同步最新状态
+- 商品聊天未读能正常变化
+
+### 16.2 任务链路
+
+- 发布任务并支付
+- 接单
+- 提交完成
+- 发布者查看提交内容
+- 发布者确认完成
+- 未接单任务可直接退款
+- 已接单任务可申请取消并由对方同意
+- 聊天里能发起查看手机号申请
+- 对方同意后能看到完整手机号
+
+### 16.3 钱包 / 提现链路
+
+- 钱包页能查到汇付余额
+- 已绑卡用户再次进入页面时表单折叠
+- 可发起 `D1` 提现
+- 提现处理中时可主动同步状态
+- 同一账号连续点击提现，只会受理一笔
+
+### 16.4 补偿与回调
+
+- `financeCompensateTimer` 周期性写入 `finance_compensate_logs`
+- `huifuPayNotify` 能收到并处理真实回调
+- `imageAuditCallback` 能把商品状态从 `pending` 收口到 `posted / need_fix`
 
 ---
 
-## 16. 明确不做
+## 17. 最重要的调试方法
 
-- 不再恢复企业进件。
-- 不再新增企业商户相关页面、云函数、回调。
-- 不再恢复独立的“收款开通 / 收款状态”用户页面。
+### 17.1 先看哪个数据源
+
+1. 先看业务主表
+   - 商品看 `goods`
+   - 任务看 `tasks`
+   - 提现看 `wallet_withdraw_requests`
+2. 再看对应云函数日志
+3. 再看：
+   - `huifu_notify_logs`
+   - `finance_compensate_logs`
+
+### 17.2 商品问题先查什么
+
+- 我的商品 / 我买到的加载异常
+  - 先看 `getGoodsProfile` 是否部署
+- 已购商品详情打开失败
+  - 先看 `getGoodsProfile action=get_goods_detail`
+- 收藏 / 浏览记录状态不更新
+  - 先看 `getGoodsProfile action=get_goods_snapshots`
+- 商品聊天未读不消
+  - 先看 `markGoodsMessagesRead`
+
+### 17.3 任务问题先查什么
+
+- 取消退款状态不对
+  - 先看 `tasks.cancelRequest`
+  - 再看 `taskCancelFlow`
+  - 再看 `huifuMiniappPay`
+- 手机号申请不对
+  - 先看 `tasks.contactRequest / contactAccess`
+  - 再看 `taskContactFlow`
+- 聊天已读异常
+  - 先看 `markMessagesReadByOwner / markMessagesReadByPeer`
+
+### 17.4 提现问题先查什么
+
+- 页面说失败，但返回 `resp_code=00000000` 且 `trans_stat=P`
+  - 这不是失败，是已受理处理中
+- 如果状态迟迟不回写
+  - 先看 `walletWithdraw action=sync_active_withdraw`
+  - 再看 `huifuPayNotify`
+
+### 17.5 商品 / 任务权限问题的判断方法
+
+如果开发者工具日志里出现：
+
+- `database permission denied`
+
+先不要立即改数据库规则，先判断是不是：
+
+- 前端错误地直接查了跨角色数据
+- 云函数没部署，导致代码回退到了本地直查
+
+---
+
+## 18. 当前已知风险与下一步优先级
+
+### 18.1 已知风险
+
+- 提现最终到账回调闭环还没完全真机验证完
+- 商品卖家主页仍是占位
+- 商品聊天 / 任务聊天都没有全局消息中心
+- 手机号申请和任务取消申请都没有“拒绝”动作
+- 还缺一轮完整双账号并发回归
+
+### 18.2 下一步最该继续做的事
+
+1. 再跑一次完整 `D1` 提现：
+   - 绑卡 -> 提现 -> 到账 -> 回调回写
+2. 再跑一次“支付成功后立刻退出小程序”的真实链路
+3. 再做一次双账号并发回归：
+   - 同一商品双人抢购
+   - 同账号重复提现
+   - 任务确认完成连续点击
+4. 如果继续补商品侧：
+   - 接真实卖家主页
+   - 做全局消息中心
+   - 做订阅消息
+5. 如果继续补任务协商：
+   - 增加拒绝手机号申请
+   - 增加拒绝取消申请
+   - 增加平台介入
+
+---
+
+## 19. 明确不做
+
+- 不再恢复企业进件
+- 不再新增企业商户相关页面和回调
+- 不再恢复独立的“收款开通 / 收款状态”用户页面
+- 不再把旧调试集合重新拉回业务主链路
+
+---
+
+## 20. 给下一位开发的最后一句提醒
+
+这个项目最难的不是页面本身，而是“三层口径要同时一致”：
+
+- 前端入口口径
+- 云函数业务口径
+- 数据库权限 / 环境变量 / 回调配置口径
+
+如果你改了页面，却没同步云函数和部署配置，最后看到的通常不是“明显报错”，而是“某个链路只有一半能用”。先核对部署和配置，再判断是不是代码逻辑问题。

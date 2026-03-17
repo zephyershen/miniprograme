@@ -1,0 +1,9 @@
+{
+  "name": "getGoodsProfile",
+  "version": "1.0.0",
+  "description": "Query latest goods snapshots and my published/purchased goods lists",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

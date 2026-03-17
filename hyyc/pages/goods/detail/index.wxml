@@ -12,6 +12,14 @@
     </view>
   </view>
 
+  <view wx:if="{{goods.statusText || goods.statusNote}}" class="{{'status-section status-section-' + (goods.statusTone || 'muted')}}">
+    <view class="status-row">
+      <text class="status-badge">{{goods.statusText}}</text>
+      <text wx:if="{{goods.statusNote}}" class="status-note">{{goods.statusNote}}</text>
+    </view>
+    <text wx:if="{{goods.auditError && goods.status==='need_fix'}}" class="status-extra">{{goods.auditError}}</text>
+  </view>
+
   <!-- 价格区域 -->
   <view class="price-section">
     <view class="price-row">
@@ -82,9 +90,10 @@
     </view>
   </view>
   <view class="footer-right">
+    <view wx:if="{{isOwner && canEditGoods}}" class="btn-secondary" bindtap="onEditTap">编辑商品</view>
     <view wx:if="{{isOwner && canOwnerManage}}" class="btn-buy" bindtap="onOwnerActionTap">{{ownerActionText}}</view>
-    <view wx:elif="{{canBuy}}" class="btn-buy" bindtap="onBuyTap">{{buyButtonText || '立即购买'}}</view>
-    <view wx:else class="btn-buy btn-buy-disabled">{{buyButtonText || (isOwner ? '我的商品' : '不可购买')}}</view>
+    <view wx:elif="{{!isOwner && canBuy}}" class="btn-buy" bindtap="onBuyTap">{{buyButtonText || '立即购买'}}</view>
+    <view wx:elif="{{!isOwner}}" class="btn-buy btn-buy-disabled">{{buyButtonText || '不可购买'}}</view>
     <view wx:if="{{goodsChatEnabled}}" class="btn-chat" bindtap="onChatTap">
       <image class="chat-icon" src="/assets/pages/goods/detail/icon-chat.svg" mode="aspectFit" />
       <text>{{isOwner ? '咨询会话' : '聊一聊'}}</text>

@@ -28,6 +28,7 @@ function toDateMs(v) {
   if (!v) return 0;
   if (typeof v.getTime === 'function') return v.getTime();
   if (typeof v === 'number' && Number.isFinite(v)) return v;
+  if (v && typeof v === 'object' && Number.isFinite(v.$date)) return v.$date;
   const t = Date.parse(v);
   return Number.isNaN(t) ? 0 : t;
 }
@@ -53,10 +54,39 @@ function statusText(s, paymentLockActive = false) {
   return { text: '未知', badge: 'badge-outline' };
 }
 
+function sortByTimeDesc(list = [], fields = []) {
+  const keys = Array.isArray(fields) ? fields : [];
+  return (Array.isArray(list) ? list.slice() : []).sort((a, b) => {
+    const aTs = keys.reduce((acc, key) => acc || toDateMs(a && a[key]), 0);
+    const bTs = keys.reduce((acc, key) => acc || toDateMs(b && b[key]), 0);
+    return bTs - aTs;
+  });
+}
+
+function isFunctionNotFoundError(err = {}) {
+  const text = pickStr(
+    err && err.errMsg,
+    err && err.message,
+    err
+  );
+  return text.includes('FunctionName parameter could not be found')
+    || text.includes('FUNCTION_NOT_FOUND')
+    || text.includes('-501000');
+}
+
+function normalizePublishedTab(tab = '') {
+  const value = pickStr(tab, 'all');
+  if (['all', 'posted', 'off_shelf', 'sold'].includes(value)) return value;
+  return 'all';
+}
+
 Page({
   data: {
+    viewMode: 'published',
     tab: 'all',
     list: [],
+    publishedList: [],
+    purchasedList: [],
     isLoading: true,
     goodsChatEnabled: !!(access && access.features && access.features.goodsChat)
   },
@@ -75,8 +105,6 @@ Page({
     });
   },
   async _ensureOpenid() {
-    // 安全规则里我们用的是 doc._openid == auth.openid（这才是可信身份），
-    // 所以“我的商品”列表也必须按 _openid 查询，否则可能被规则拒绝。
     const u = wx.getStorageSync('hyyc_user') || {};
     let openid = pickStr(u._openid || u.openid || u.openId);
     if (openid) return openid;
@@ -97,9 +125,30 @@ Page({
     }
     return '';
   },
+  setViewMode(e) {
+    const mode = pickStr(e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.mode, 'published');
+    if (mode === this.data.viewMode) return;
+    this.setData({ viewMode: mode }, () => this.syncList());
+  },
   setTab(e) {
-    const k = (e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.k) || 'all';
-    this.setData({ tab: k }, () => this.load());
+    if (this.data.viewMode !== 'published') return;
+    const k = normalizePublishedTab(e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.k);
+    this.setData({ tab: k }, () => this.syncList());
+  },
+  syncList() {
+    const viewMode = pickStr(this.data.viewMode, 'published');
+    let source = viewMode === 'purchased'
+      ? (Array.isArray(this.data.purchasedList) ? this.data.purchasedList : [])
+      : (Array.isArray(this.data.publishedList) ? this.data.publishedList : []);
+
+    if (viewMode === 'published') {
+      const tab = normalizePublishedTab(this.data.tab);
+      if (tab && tab !== 'all') {
+        source = source.filter((item) => pickStr(item && item.status) === tab);
+      }
+    }
+
+    this.setData({ list: source });
   },
   _buildGoodsChatWhere(openid = '', userId = '') {
     const sellerOpenid = pickStr(openid);
@@ -134,12 +183,13 @@ Page({
   },
   _applyGoodsUnreadMap(unreadMap = {}) {
     this._goodsUnreadMap = unreadMap && typeof unreadMap === 'object' ? unreadMap : {};
-    const list = Array.isArray(this.data.list) ? this.data.list : [];
-    const nextList = list.map((item) => ({
+    const publishedList = (Array.isArray(this.data.publishedList) ? this.data.publishedList : []).map((item) => ({
       ...item,
       goodsChatUnreadCount: Number(this._goodsUnreadMap[pickStr(item && item.id)]) || 0,
     }));
-    this.setData({ list: nextList });
+    this.setData({ publishedList }, () => {
+      if (this.data.viewMode === 'published') this.syncList();
+    });
   },
   loadGoodsUnreadSummary(openid = '', userId = '') {
     const where = this._buildGoodsChatWhere(openid, userId);
@@ -187,6 +237,104 @@ Page({
     }
     this._goodsChatWatcher = null;
   },
+  _mapPublishedGoods(doc = {}) {
+    const paymentLockActive = hasActivePaymentLock(doc);
+    const st = statusText(doc.status, paymentLockActive);
+    const needFixIdx = Array.isArray(doc.auditNeedFixIdx) ? doc.auditNeedFixIdx : [];
+    const needFixText = (doc.status === 'need_fix' && needFixIdx.length)
+      ? `请替换第 ${needFixIdx.map((i) => Number(i) + 1).join('、')} 张图片`
+      : '';
+    return {
+      ...doc,
+      id: pickStr(doc._id, doc.id),
+      status: pickStr(doc.status),
+      statusText: st.text,
+      statusBadge: st.badge,
+      priceText: formatMoney(doc.price),
+      createdAtText: formatCreatedAt(doc.createdAt || doc._createTime),
+      needFixText,
+      auditError: pickStr(doc.auditError),
+      paymentLockActive,
+      goodsChatUnreadCount: Number((this._goodsUnreadMap || {})[pickStr(doc._id, doc.id)]) || 0
+    };
+  },
+  _mapPurchasedGoods(doc = {}) {
+    const sellerParts = [];
+    const sellerName = pickStr(doc.ownerNickname, doc.ownerName);
+    if (sellerName) sellerParts.push(sellerName);
+    if (doc.community) sellerParts.push(doc.community);
+    if (doc.building) sellerParts.push(doc.building);
+
+    return {
+      ...doc,
+      id: pickStr(doc._id, doc.id),
+      status: 'sold',
+      statusText: '已买到',
+      statusBadge: 'badge-primary',
+      priceText: formatMoney(doc.price),
+      createdAtText: formatCreatedAt(doc.soldAt || doc.updatedAt || doc.createdAt || doc._createTime),
+      sellerText: sellerParts.join(' · '),
+      paymentLockActive: false,
+      goodsChatUnreadCount: 0,
+      isPurchased: true
+    };
+  },
+  async _loadMyGoodsViaCloudFunction() {
+    const res = await wx.cloud.callFunction({
+      name: 'getGoodsProfile',
+      data: {
+        action: 'list_my_goods',
+        limit: 100
+      }
+    });
+    const result = (res && res.result) || {};
+    if (!result.ok) {
+      throw new Error(pickStr(result.message, result.code, '加载商品失败'));
+    }
+    return {
+      published: Array.isArray(result.published) ? result.published : [],
+      purchased: Array.isArray(result.purchased) ? result.purchased : []
+    };
+  },
+  async _loadMyGoodsDirect(openid = '') {
+    const publishedPromise = db.collection(GOODS_COLLECTION)
+      .where({ _openid: openid })
+      .orderBy('createdAt', 'desc')
+      .limit(100)
+      .get();
+
+    const purchasedPromise = db.collection(GOODS_COLLECTION)
+      .where({ buyerOpenid: openid, status: 'sold' })
+      .orderBy('soldAt', 'desc')
+      .limit(100)
+      .get()
+      .catch((err) => {
+        console.warn('直接查询我买到的商品失败', err);
+        return { data: [] };
+      });
+
+    const [publishedRes, purchasedRes] = await Promise.all([publishedPromise, purchasedPromise]);
+    return {
+      published: sortByTimeDesc(
+        ((publishedRes && publishedRes.data) || []).filter((doc) => !doc.sellerDeletedAt),
+        ['createdAt', 'updatedAt', '_createTime']
+      ),
+      purchased: sortByTimeDesc(
+        ((purchasedRes && purchasedRes.data) || []).filter((doc) => !doc.buyerDeletedAt),
+        ['soldAt', 'updatedAt', 'createdAt', '_createTime']
+      )
+    };
+  },
+  async _loadMyGoodsData(openid = '') {
+    try {
+      return await this._loadMyGoodsViaCloudFunction();
+    } catch (err) {
+      if (!isFunctionNotFoundError(err)) {
+        console.warn('云函数加载我的商品失败，回退直接查询', err);
+      }
+      return this._loadMyGoodsDirect(openid);
+    }
+  },
   async load() {
     const u = wx.getStorageSync('hyyc_user') || {};
     if (!u || !u.realname) {
@@ -203,80 +351,137 @@ Page({
     this.setData({ isLoading: true });
 
     try {
-      // 关键：按 _openid 查询，才能稳定通过数据库安全规则
-      const where = { _openid: openid };
-      const tab = this.data.tab;
-      if (tab && tab !== 'all') where.status = tab;
+      const goodsData = await this._loadMyGoodsData(openid);
+      const tab = normalizePublishedTab(this.data.tab);
+      const publishedList = (Array.isArray(goodsData.published) ? goodsData.published : []).map((doc) => this._mapPublishedGoods(doc));
+      const purchasedList = (Array.isArray(goodsData.purchased) ? goodsData.purchased : []).map((doc) => this._mapPurchasedGoods(doc));
 
-      const res = await db.collection(GOODS_COLLECTION)
-        .where(where)
-        .orderBy('createdAt', 'desc')
-        .limit(100)
-        .get();
+      this.setData({
+        tab,
+        publishedList,
+        purchasedList,
+        isLoading: false
+      }, () => this.syncList());
 
-      const docs = (res && res.data) ? res.data : [];
-      const list = docs.map((doc) => {
-        const paymentLockActive = hasActivePaymentLock(doc);
-        const st = statusText(doc.status, paymentLockActive);
-        const needFixIdx = Array.isArray(doc.auditNeedFixIdx) ? doc.auditNeedFixIdx : [];
-        const needFixText = (doc.status === 'need_fix' && needFixIdx.length)
-          ? `请替换第 ${needFixIdx.map((i) => Number(i) + 1).join('、')} 张图片`
-          : '';
-        return {
-          ...doc,
-          id: doc._id,
-          status: pickStr(doc.status),
-          statusText: st.text,
-          statusBadge: st.badge,
-          priceText: formatMoney(doc.price),
-          createdAtText: formatCreatedAt(doc.createdAt || doc._createTime),
-          needFixText,
-          auditError: pickStr(doc.auditError),
-          paymentLockActive,
-          goodsChatUnreadCount: Number((this._goodsUnreadMap || {})[pickStr(doc._id)]) || 0
-        };
-      });
-
-      this.setData({ list, isLoading: false });
       this.loadGoodsUnreadSummary(openid, pickStr(u.id));
       this.openGoodsChatWatch(openid, pickStr(u.id));
     } catch (err) {
       console.error('加载我的商品失败', err);
-      this.setData({ list: [], isLoading: false });
+      this.setData({ list: [], publishedList: [], purchasedList: [], isLoading: false });
       this.clearGoodsChatWatch();
       toast('加载失败，请稍后重试');
     }
   },
   _applyLocalShelfChange(id = '', nextStatus = '') {
-    const currentTab = pickStr(this.data.tab, 'all');
-    const list = Array.isArray(this.data.list) ? this.data.list.slice() : [];
-    const idx = list.findIndex((item) => item && (item.id === id || item._id === id));
+    const publishedList = Array.isArray(this.data.publishedList) ? this.data.publishedList.slice() : [];
+    const idx = publishedList.findIndex((item) => item && (item.id === id || item._id === id));
     if (idx < 0) {
       this.setData({ isLoading: false });
       return;
     }
 
-    if (currentTab === 'all') {
-      const nextState = statusText(nextStatus);
-      list[idx] = {
-        ...list[idx],
-        status: nextStatus,
-        statusText: nextState.text,
-        statusBadge: nextState.badge
-      };
-    } else {
-      list.splice(idx, 1);
-    }
+    const nextState = statusText(nextStatus);
+    publishedList[idx] = {
+      ...publishedList[idx],
+      status: nextStatus,
+      statusText: nextState.text,
+      statusBadge: nextState.badge,
+      paymentLockActive: false
+    };
 
     this.setData({
-      list,
+      publishedList,
       isLoading: false
-    });
+    }, () => this.syncList());
   },
   onView(e) {
-    const id = (e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id) || '';
+    const id = pickStr(e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id);
     if (!id) return;
     wx.navigateTo({ url: `/pages/goods/detail/index?id=${id}` });
+  },
+  async _deletePublishedRecordDirect(item = {}) {
+    const goodsId = pickStr(item.id, item._id);
+    const openid = await this._ensureOpenid();
+    if (!goodsId || !openid) {
+      throw new Error('获取用户身份失败，请重新登录');
+    }
+
+    const updateData = {
+      sellerDeletedAt: db.serverDate(),
+      updatedAt: db.serverDate()
+    };
+    if (pickStr(item.status) === 'posted') {
+      updateData.status = 'off_shelf';
+      updateData.offShelfAt = db.serverDate();
+    }
+
+    const res = await db.collection(GOODS_COLLECTION)
+      .where({ _id: goodsId, _openid: openid })
+      .update({ data: updateData });
+    const updated = Number(res && res.stats && res.stats.updated) || 0;
+    if (!updated) {
+      throw new Error('删除失败，请刷新后重试');
+    }
+  },
+  async onDeleteRecord(e) {
+    const id = pickStr(e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id);
+    if (!id) return;
+
+    const sourceList = this.data.viewMode === 'purchased'
+      ? (this.data.purchasedList || [])
+      : (this.data.publishedList || []);
+    const item = sourceList.find((entry) => entry && pickStr(entry.id, entry._id) === id);
+    if (!item) return;
+
+    const isPurchased = !!item.isPurchased;
+    const confirmText = isPurchased
+      ? '这只会从“我买到的”里移除，不会影响卖家记录。'
+      : (pickStr(item.status) === 'posted'
+        ? '删除后会从“我的商品”里移除；如果商品仍在上架中，会自动先下架。'
+        : '删除后会从“我的商品”里移除，不会影响买家记录。');
+    const ok = await new Promise((resolve) => {
+      wx.showModal({
+        title: isPurchased ? '删除购买记录' : '删除商品记录',
+        content: confirmText,
+        confirmText: '删除',
+        confirmColor: '#D65A31',
+        success: (res) => resolve(!!res.confirm),
+        fail: () => resolve(false)
+      });
+    });
+    if (!ok) return;
+
+    this.setData({ isLoading: true });
+    try {
+      const role = isPurchased ? 'purchased' : 'published';
+      try {
+        const res = await wx.cloud.callFunction({
+          name: 'getGoodsProfile',
+          data: {
+            action: 'delete_my_goods_record',
+            goodsId: id,
+            role
+          }
+        });
+        const result = (res && res.result) || {};
+        if (!result.ok) {
+          throw new Error(pickStr(result.message, result.code, '删除失败'));
+        }
+      } catch (err) {
+        if (isFunctionNotFoundError(err) && !isPurchased) {
+          await this._deletePublishedRecordDirect(item);
+        } else {
+          throw err;
+        }
+      }
+
+      toast('已删除');
+      await this.load();
+    } catch (err) {
+      console.error('删除商品记录失败', err);
+      this.setData({ isLoading: false });
+      toast(pickStr(err && err.message, '删除失败，请稍后重试'));
+    }
   },
   onConsultSessions(e) {
     if (!this.data.goodsChatEnabled) return;
@@ -290,13 +495,21 @@ Page({
       url: `/pages/chat/goods-sessions/index?gid=${id}&ownerId=${encodeURIComponent(ownerId)}&ownerOpenid=${encodeURIComponent(ownerOpenid)}&title=${encodeURIComponent(title)}`
     });
   },
+  onContactSeller(e) {
+    if (!this.data.goodsChatEnabled) return;
+    const id = pickStr(e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id);
+    if (!id) return;
+    wx.navigateTo({
+      url: `/pages/chat/goods-room/index?gid=${id}`
+    });
+  },
   onEdit(e) {
-    const id = (e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id) || '';
+    const id = pickStr(e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id);
     if (!id) return;
     wx.navigateTo({ url: `/pages/publish/goods/index?id=${id}` });
   },
   async onToggleShelf(e) {
-    const id = (e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id) || '';
+    const id = pickStr(e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id);
     const status = pickStr(e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.status);
     const paymentLockActive = !!(e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.paymentLockActive);
     if (!id || (status !== 'posted' && status !== 'off_shelf')) return;
@@ -365,10 +578,10 @@ Page({
     }
   },
   async onRetryAudit(e) {
-    const id = (e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id) || '';
+    const id = pickStr(e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id);
     if (!id) return;
 
-    const item = (this.data.list || []).find((x) => x && (x.id === id || x._id === id));
+    const item = (this.data.publishedList || []).find((x) => x && (x.id === id || x._id === id));
     if (!item || !Array.isArray(item.images) || !item.images.length) {
       toast('找不到图片');
       return;

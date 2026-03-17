@@ -140,7 +140,7 @@ Page({
             if (statusRaw === 'pay_pending') {
               ownerActionText = '删除';
             } else if (statusRaw === 'posted') {
-              ownerActionText = '取消退款';
+              ownerActionText = '删除';
             } else if (statusRaw === 'accepted' || statusRaw === 'submitted') {
               ownerActionText = '申请取消';
             } else if (statusRaw === 'completed') {
@@ -158,7 +158,7 @@ Page({
               canPay: statusRaw === 'pay_pending',
               canEdit: statusRaw === 'posted',
               ownerActionText,
-              canCancelDirect: statusRaw === 'posted',
+              canRefundDirect: statusRaw === 'posted',
               needsCancelRequest: statusRaw === 'accepted' || statusRaw === 'submitted',
               canDeleteRecord: statusRaw === 'pay_pending' || statusRaw === 'completed' || (statusRaw === 'cancelled' && payStatus === 'refunded'),
               // 未设置截止时间时，展示默认过期时间
@@ -301,32 +301,15 @@ Page({
       return;
     }
 
-    if (item.canCancelDirect) {
-      const okCancel = await confirm('该任务已付款。取消后会按原支付路径退款，是否继续？', '取消退款');
-      if (!okCancel) return;
+    if (item.canRefundDirect) {
+      const goRefund = await confirm('该任务已付款，请先发起退款，退款完成后再删除记录。现在去任务详情发起退款？', '先退款');
+      if (!goRefund) return;
+      wx.navigateTo({ url: `/pages/task/detail/index?id=${id}` });
+      return;
+    }
 
-      this.setData({ isLoading: true });
-      try {
-        const res = await wx.cloud.callFunction({
-          name: 'taskCancelFlow',
-          data: {
-            action: 'cancel_direct',
-            taskId: id,
-          }
-        });
-        const ret = (res && res.result) || {};
-        if (!ret || ret.ok !== true) {
-          this.setData({ isLoading: false });
-          toast((ret && ret.msg) || '取消退款失败');
-          return;
-        }
-        toast(ret.msg || '已取消，退款处理中');
-        this.load();
-      } catch (err) {
-        console.error('直接取消退款失败', err);
-        this.setData({ isLoading: false });
-        toast('取消退款失败，请稍后重试');
-      }
+    if (!item.canDeleteRecord) {
+      toast('当前任务请先处理退款或取消，再删除记录');
       return;
     }
 

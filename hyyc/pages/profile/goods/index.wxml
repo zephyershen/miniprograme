@@ -1,17 +1,20 @@
 <ui-loading show="{{isLoading}}" />
 
 <view class="px-24 py-16">
-  <view class="tabs">
+  <view class="tabs mode-tabs">
+    <view class="tab {{viewMode==='published' ? 'tab-active' : ''}}" data-mode="published" bindtap="setViewMode">我发布的</view>
+    <view class="tab {{viewMode==='purchased' ? 'tab-active' : ''}}" data-mode="purchased" bindtap="setViewMode">我买到的</view>
+  </view>
+
+  <view wx:if="{{viewMode==='published'}}" class="tabs">
     <view class="tab {{tab==='all' ? 'tab-active' : ''}}" data-k="all" bindtap="setTab">全部</view>
-    <view class="tab {{tab==='pending' ? 'tab-active' : ''}}" data-k="pending" bindtap="setTab">审核中</view>
-    <view class="tab {{tab==='need_fix' ? 'tab-active' : ''}}" data-k="need_fix" bindtap="setTab">需修改</view>
     <view class="tab {{tab==='posted' ? 'tab-active' : ''}}" data-k="posted" bindtap="setTab">已上架</view>
     <view class="tab {{tab==='off_shelf' ? 'tab-active' : ''}}" data-k="off_shelf" bindtap="setTab">已下架</view>
     <view class="tab {{tab==='sold' ? 'tab-active' : ''}}" data-k="sold" bindtap="setTab">已售出</view>
   </view>
 
   <view wx:if="{{!isLoading && (!list || list.length===0)}}" class="empty center">
-    <text class="c-muted">暂无商品</text>
+    <text class="c-muted">{{viewMode==='published' ? '暂无商品' : '暂无已购买商品'}}</text>
   </view>
 
   <view class="gap-12" wx:if="{{list && list.length>0}}">
@@ -28,6 +31,10 @@
           <text>{{item.createdAtText}}</text>
         </view>
 
+        <view wx:if="{{item.sellerText}}" class="goods-sub mt-8">
+          <text>{{item.sellerText}}</text>
+        </view>
+
         <view wx:if="{{item.needFixText}}" class="need-fix mt-8">
           {{item.needFixText}}
         </view>
@@ -35,34 +42,17 @@
           {{item.auditError}}
         </view>
 
-        <view class="row row-gap-8 mt-12">
+        <view class="goods-actions mt-12">
           <view
-            wx:if="{{item.status==='need_fix'}}"
-            class="btn btn-outline row-gap-item"
-            data-id="{{item.id}}"
-            bindtap="onEdit"
-          >
-            去修改
-          </view>
-          <view
-            wx:if="{{item.status==='need_fix' || item.status==='pending'}}"
-            class="btn btn-outline row-gap-item"
-            data-id="{{item.id}}"
-            bindtap="onRetryAudit"
-          >
-            重新审核
-          </view>
-          <view
-            wx:if="{{item.status==='posted' || item.status==='off_shelf' || item.status==='sold'}}"
-            class="btn btn-primary row-gap-item"
+            class="action-chip action-chip-primary"
             data-id="{{item.id}}"
             bindtap="onView"
           >
             查看
           </view>
           <view
-            wx:if="{{goodsChatEnabled && (item.status==='posted' || item.status==='off_shelf' || item.status==='sold')}}"
-            class="btn btn-outline row-gap-item goods-chat-btn"
+            wx:if="{{!item.isPurchased && goodsChatEnabled && (item.status==='posted' || item.status==='off_shelf' || item.status==='sold')}}"
+            class="action-chip action-chip-outline goods-chat-btn"
             data-id="{{item.id}}"
             data-owner-id="{{item.ownerId}}"
             data-owner-openid="{{item._openid}}"
@@ -78,14 +68,19 @@
             </view>
           </view>
           <view
-            wx:if="{{item.status==='posted' || item.status==='off_shelf'}}"
-            class="btn btn-outline row-gap-item"
+            wx:if="{{item.isPurchased && goodsChatEnabled}}"
+            class="action-chip action-chip-outline"
             data-id="{{item.id}}"
-            data-status="{{item.status}}"
-            data-payment-lock-active="{{item.paymentLockActive}}"
-            bindtap="onToggleShelf"
+            bindtap="onContactSeller"
           >
-            {{item.status==='posted' ? '下架' : '重新上架'}}
+            联系卖家
+          </view>
+          <view
+            class="action-chip action-chip-danger"
+            data-id="{{item.id}}"
+            bindtap="onDeleteRecord"
+          >
+            删除记录
           </view>
         </view>
       </view>

@@ -215,6 +215,7 @@ Page({
     const canAccept = !isOwner && !isExpired && (statusRaw === '' || statusRaw === 'posted');
     const canSubmit = !isOwner && isWorker && statusRaw === 'accepted';
     const canApprove = isOwner && statusRaw === 'submitted';
+    const canRefundDirect = isOwner && statusRaw === 'posted';
     const accepted = isWorker && (statusRaw === 'accepted' || statusRaw === 'submitted');
 
     this.setData({
@@ -225,6 +226,7 @@ Page({
       canAccept,
       canSubmit,
       canApprove,
+      canRefundDirect,
       isLoading: false
     });
     this._hydrateTaskMedia(id, task);
@@ -545,6 +547,46 @@ Page({
       return;
     }
     wx.navigateTo({ url: '/pages/task/submit/index?tid=' + this.data.task.id });
+  },
+  async onRefundTask() {
+    if (!this.data.isOwner) {
+      toast('只有发布者可以发起退款');
+      return;
+    }
+    if (!this.data.canRefundDirect) {
+      toast('当前任务状态不支持直接退款');
+      return;
+    }
+    const task = this.data.task || {};
+    if (!task.id) {
+      toast('缺少任务 ID');
+      return;
+    }
+    const okCancel = await confirm('该任务已付款。发起退款后会按原支付路径退回，退款完成后才能删除记录。是否继续？', '发起退款');
+    if (!okCancel) return;
+
+    wx.showLoading({ title: '退款中', mask: true });
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'taskCancelFlow',
+        data: {
+          action: 'cancel_direct',
+          taskId: task.id,
+        }
+      });
+      const ret = (res && res.result) || {};
+      wx.hideLoading();
+      if (!ret || ret.ok !== true) {
+        toast((ret && ret.msg) || '退款失败');
+        return;
+      }
+      toast(ret.msg || '已取消，退款处理中');
+      this._loadTaskDetail(task.id, { silent: true });
+    } catch (err) {
+      console.error('直接退款失败', err);
+      wx.hideLoading();
+      toast('退款失败，请稍后重试');
+    }
   },
   async approve(){
     if (!this.data.workflowEnabled) {

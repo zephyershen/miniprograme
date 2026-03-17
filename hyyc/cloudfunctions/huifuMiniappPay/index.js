@@ -33,9 +33,7 @@ const GOODS_COLLECTION = 'goods';
 const TASK_COLLECTION = 'tasks';
 const WALLET_COLLECTION = 'wallets';
 const TRANSACTIONS_COLLECTION = 'wallet_transactions';
-const DEBUG_COLLECTION = 'function_debug_traces';
-const HUIFU_API_DEBUG_COLLECTION = 'huifu_api_debug_logs';
-const BUILD_TAG = 'huifuMiniappPay@2026-03-15.4';
+const BUILD_TAG = 'huifuMiniappPay@2026-03-16.1';
 const GOODS_PAYMENT_LOCK_TTL_MS = Math.max(60 * 1000, Number(process.env.GOODS_PAYMENT_LOCK_TTL_MS) || 15 * 60 * 1000);
 const TASK_DELAY_CONFIRM_LOCK_TTL_MS = Math.max(60 * 1000, Number(process.env.TASK_DELAY_CONFIRM_LOCK_TTL_MS) || 10 * 60 * 1000);
 
@@ -57,93 +55,6 @@ function isSystemCompensateCall(event = {}) {
     && token
     && pickStr(event.compensateToken) === token
   );
-}
-
-async function ensureCollectionExists(name) {
-  try {
-    if (db && typeof db.createCollection === 'function') {
-      await db.createCollection(String(name || '').trim());
-    }
-  } catch (e) {
-    // ignore
-  }
-}
-
-async function recordDebugTrace({ functionName, buildTag, action, openid, event = {}, extra = {} }) {
-  try {
-    await ensureCollectionExists(DEBUG_COLLECTION);
-    const payload = {
-      functionName: pickStr(functionName),
-      buildTag: pickStr(buildTag),
-      action: pickStr(action),
-      openid: pickStr(openid),
-      eventKeys: Object.keys(event || {}).sort().slice(0, 30),
-      reqDate: pickStr(event && event.reqDate),
-      reqSeqId: pickStr(event && event.reqSeqId),
-      extra: extra && typeof extra === 'object' ? extra : {},
-      createdAt: new Date(),
-    };
-    const res = await db.collection(DEBUG_COLLECTION).add({ data: payload });
-    return pickStr(res && res._id);
-  } catch (e) {
-    return '';
-  }
-}
-
-function truncateString(s, maxLen = 16000) {
-  const text = String(s == null ? '' : s);
-  return text.length > maxLen ? text.slice(0, maxLen) : text;
-}
-
-function safeStringifyForDebug(v, maxLen = 16000) {
-  try {
-    return truncateString(JSON.stringify(v), maxLen);
-  } catch (e) {
-    return truncateString(String(v), maxLen);
-  }
-}
-
-async function recordHuifuApiDebug({
-  action,
-  buildTag,
-  openid,
-  hostName,
-  pathName,
-  reqDate = '',
-  reqSeqId = '',
-  body = null,
-  response = null,
-  error = null,
-}) {
-  try {
-    await ensureCollectionExists(HUIFU_API_DEBUG_COLLECTION);
-    const requestJson = safeStringifyForDebug({
-      host: hostName,
-      path: pathName,
-      body,
-    });
-    const responseJson = response == null ? '' : safeStringifyForDebug(response);
-    const errorText = error == null ? '' : truncateString(error && error.stack ? error.stack : String(error), 4000);
-    const res = await db.collection(HUIFU_API_DEBUG_COLLECTION).add({
-      data: {
-        functionName: 'huifuMiniappPay',
-        action: pickStr(action),
-        buildTag: pickStr(buildTag),
-        openid: pickStr(openid),
-        host: pickStr(hostName),
-        apiPath: pickStr(pathName),
-        reqDate: pickStr(reqDate, body && body.data && body.data.req_date),
-        reqSeqId: pickStr(reqSeqId, body && body.data && body.data.req_seq_id),
-        copyableRequestJson: requestJson,
-        copyableResponseJson: responseJson,
-        errorText,
-        createdAt: new Date(),
-      }
-    });
-    return pickStr(res && res._id);
-  } catch (e) {
-    return '';
-  }
 }
 
 function pickObj(...vals) {
@@ -1082,6 +993,15 @@ async function huifuCallSignedJson({ hostName, pathName, cfg, data, copyLogLabel
       body,
     })}`);
   }
+  console.log('[huifuMiniappPay] request', JSON.stringify({
+    action: pickStr(debugMeta && debugMeta.action),
+    buildTag: pickStr(debugMeta && debugMeta.buildTag, BUILD_TAG),
+    openid: pickStr(debugMeta && debugMeta.openid),
+    host: hostName,
+    path: pathName,
+    reqDate: pickStr(debugMeta && debugMeta.reqDate, data && data.req_date),
+    reqSeqId: pickStr(debugMeta && debugMeta.reqSeqId, data && data.req_seq_id),
+  }));
   try {
     const resp = await huifuRequest({ hostName, pathName, body });
     resp.requestMeta = {
@@ -1089,20 +1009,17 @@ async function huifuCallSignedJson({ hostName, pathName, cfg, data, copyLogLabel
       path: pathName,
       body,
     };
-    resp.huifuDebugLogId = await recordHuifuApiDebug({
+    console.log('[huifuMiniappPay] response', JSON.stringify({
       action: pickStr(debugMeta && debugMeta.action),
-      buildTag: pickStr(debugMeta && debugMeta.buildTag),
+      buildTag: pickStr(debugMeta && debugMeta.buildTag, BUILD_TAG),
       openid: pickStr(debugMeta && debugMeta.openid),
-      hostName,
-      pathName,
+      host: hostName,
+      path: pathName,
       reqDate: pickStr(debugMeta && debugMeta.reqDate, data && data.req_date),
       reqSeqId: pickStr(debugMeta && debugMeta.reqSeqId, data && data.req_seq_id),
-      body,
-      response: {
-        statusCode: resp && resp.statusCode,
-        body: resp && resp.json ? resp.json : (resp && resp.raw),
-      },
-    });
+      statusCode: resp && resp.statusCode,
+      body: resp && resp.json ? resp.json : (resp && resp.raw),
+    }));
     if (copyLogLabel) {
       console.log(`[copyable:${copyLogLabel}:response] ${JSON.stringify({
         statusCode: resp && resp.statusCode,
@@ -1111,17 +1028,16 @@ async function huifuCallSignedJson({ hostName, pathName, cfg, data, copyLogLabel
     }
     return resp;
   } catch (err) {
-    await recordHuifuApiDebug({
+    console.error('[huifuMiniappPay] request failed', JSON.stringify({
       action: pickStr(debugMeta && debugMeta.action),
-      buildTag: pickStr(debugMeta && debugMeta.buildTag),
+      buildTag: pickStr(debugMeta && debugMeta.buildTag, BUILD_TAG),
       openid: pickStr(debugMeta && debugMeta.openid),
-      hostName,
-      pathName,
+      host: hostName,
+      path: pathName,
       reqDate: pickStr(debugMeta && debugMeta.reqDate, data && data.req_date),
       reqSeqId: pickStr(debugMeta && debugMeta.reqSeqId, data && data.req_seq_id),
-      body,
-      error: err,
-    });
+      error: err && err.message ? err.message : String(err),
+    }));
     throw err;
   }
 }
@@ -1147,19 +1063,16 @@ exports.main = async (event = {}) => {
   }
   const debugOpenid = pickStr(OPENID, systemCompensate ? event.ownerOpenid : '', systemCompensate ? event.targetOpenid : '');
   const cfg = resolveHuifuConfig(event);
-  const debugTraceId = await recordDebugTrace({
-    functionName: 'huifuMiniappPay',
-    buildTag: BUILD_TAG,
+  console.log('[huifuMiniappPay] invoke', JSON.stringify({
     action,
+    buildTag: BUILD_TAG,
     openid: debugOpenid,
-    event,
-    extra: {
-      systemCompensate,
-    },
-  });
+    systemCompensate,
+    eventKeys: Object.keys(event || {}).sort().slice(0, 30),
+  }));
 
   if (cfg.privateKeyFormatError) {
-    return { ok: false, err: cfg.privateKeyFormatError, buildTag: BUILD_TAG, debugTraceId };
+    return { ok: false, err: cfg.privateKeyFormatError, buildTag: BUILD_TAG };
   }
   if (!cfg.sysId || !cfg.productId || !cfg.huifuId) {
     return {
@@ -1170,8 +1083,7 @@ exports.main = async (event = {}) => {
         got: { sysId: cfg.sysId, productId: cfg.productId, huifuId: cfg.huifuId },
       }
       ,
-      buildTag: BUILD_TAG,
-      debugTraceId
+      buildTag: BUILD_TAG
     };
   }
 
@@ -1930,7 +1842,7 @@ exports.main = async (event = {}) => {
     const pathName = pickStr(event.apiPath, DEFAULT_HUIFU_USER_BUSI_MODIFY_PATH);
     const resp = await callSigned({ pathName, data });
     const { okHttp, respData } = unwrapHuifuResp(resp);
-    if (!okHttp) return { ok: false, err: { code: 'HTTP_ERROR', statusCode: resp.statusCode, raw: resp.raw }, buildTag: BUILD_TAG, debugTraceId };
+    if (!okHttp) return { ok: false, err: { code: 'HTTP_ERROR', statusCode: resp.statusCode, raw: resp.raw }, buildTag: BUILD_TAG };
     return {
       ok: true,
       apiPath: pathName,
@@ -1943,8 +1855,7 @@ exports.main = async (event = {}) => {
           msg: 'HUIFU_USER_BUSI_NOTIFY_URL/HUIFU_NOTIFY_URL 超过 128 字符，本次未上传 async_return_url',
         }
         : null,
-      buildTag: BUILD_TAG,
-      debugTraceId
+      buildTag: BUILD_TAG
     };
   }
 
@@ -1959,8 +1870,8 @@ exports.main = async (event = {}) => {
     const pathName = pickStr(event.apiPath, DEFAULT_HUIFU_USER_INFO_QUERY_PATH);
     const resp = await callSigned({ pathName, data });
     const { okHttp, respData } = unwrapHuifuResp(resp);
-    if (!okHttp) return { ok: false, err: { code: 'HTTP_ERROR', statusCode: resp.statusCode, raw: resp.raw }, buildTag: BUILD_TAG, debugTraceId };
-    return { ok: true, apiPath: pathName, reqSeqId: data.req_seq_id, reqDate: data.req_date, huifuResp: respData, buildTag: BUILD_TAG, debugTraceId };
+    if (!okHttp) return { ok: false, err: { code: 'HTTP_ERROR', statusCode: resp.statusCode, raw: resp.raw }, buildTag: BUILD_TAG };
+    return { ok: true, apiPath: pathName, reqSeqId: data.req_seq_id, reqDate: data.req_date, huifuResp: respData, buildTag: BUILD_TAG };
   }
 
   if (action === 'acct_balance_query') {
@@ -1976,8 +1887,8 @@ exports.main = async (event = {}) => {
     const pathName = pickStr(event.apiPath, DEFAULT_HUIFU_ACCT_BALANCE_QUERY_PATH);
     const resp = await callSigned({ pathName, data });
     const { okHttp, respData } = unwrapHuifuResp(resp);
-    if (!okHttp) return { ok: false, err: { code: 'HTTP_ERROR', statusCode: resp.statusCode, raw: resp.raw }, buildTag: BUILD_TAG, debugTraceId };
-    return { ok: true, apiPath: pathName, reqSeqId: data.req_seq_id, reqDate: data.req_date, huifuResp: respData, buildTag: BUILD_TAG, debugTraceId };
+    if (!okHttp) return { ok: false, err: { code: 'HTTP_ERROR', statusCode: resp.statusCode, raw: resp.raw }, buildTag: BUILD_TAG };
+    return { ok: true, apiPath: pathName, reqSeqId: data.req_seq_id, reqDate: data.req_date, huifuResp: respData, buildTag: BUILD_TAG };
   }
 
   if (action === 'withdraw_apply') {
@@ -2038,8 +1949,7 @@ exports.main = async (event = {}) => {
         reqDate: data.req_date,
         copyableRequest,
         copyableResponse,
-        buildTag: BUILD_TAG,
-        debugTraceId
+        buildTag: BUILD_TAG
       };
     }
     return {
@@ -2056,8 +1966,7 @@ exports.main = async (event = {}) => {
           msg: 'HUIFU_WITHDRAW_NOTIFY_URL/HUIFU_NOTIFY_URL 超过 128 字符，本次未上传 notify_url',
         }
         : null,
-      buildTag: BUILD_TAG,
-      debugTraceId
+      buildTag: BUILD_TAG
     };
   }
 
@@ -2108,8 +2017,7 @@ exports.main = async (event = {}) => {
         reqDate: data.req_date,
         copyableRequest,
         copyableResponse,
-        buildTag: BUILD_TAG,
-        debugTraceId
+        buildTag: BUILD_TAG
       };
     }
     return {
@@ -2120,8 +2028,7 @@ exports.main = async (event = {}) => {
       huifuResp: respData,
       copyableRequest,
       copyableResponse,
-      buildTag: BUILD_TAG,
-      debugTraceId
+      buildTag: BUILD_TAG
     };
   }
 

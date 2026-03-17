@@ -75,6 +75,7 @@
             {{ unreadCount > 99 ? '99+' : unreadCount }}
           </view>
         </view>
+        <view wx:if="{{canRefundDirect}}" class="btn btn-outline" bindtap="onRefundTask">发起退款</view>
       </view>
     </view>
 
@@ -136,6 +137,7 @@
             {{ unreadCount > 99 ? '99+' : unreadCount }}
           </view>
         </view>
+        <view wx:if="{{canRefundDirect}}" class="btn btn-primary" bindtap="onRefundTask">发起退款</view>
         <view wx:if="{{canApprove}}" class="btn btn-primary" bindtap="approve">确认完成</view>
       </view>
     </view>

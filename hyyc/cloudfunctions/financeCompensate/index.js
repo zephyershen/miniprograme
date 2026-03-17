@@ -11,7 +11,9 @@ const WALLET_COLLECTION = 'wallets';
 const TRANSACTIONS_COLLECTION = 'wallet_transactions';
 const WITHDRAW_COLLECTION = 'wallet_withdraw_requests';
 const LOG_COLLECTION = 'finance_compensate_logs';
-const BUILD_TAG = 'financeCompensate@2026-03-15.1';
+const NOTIFY_LOG_COLLECTION = 'huifu_notify_logs';
+const BUILD_TAG = 'financeCompensate@2026-03-16.2';
+const DEFAULT_LOG_RETENTION_DAYS = clampInt(process.env.FINANCE_LOG_RETENTION_DAYS, 7, 1, 365);
 
 function pickStr(...vals) {
   for (const v of vals) {
@@ -74,6 +76,86 @@ async function writeRunLog(payload = {}) {
   } catch (e) {
     console.error('[financeCompensate] write log failed', e);
   }
+}
+
+async function cleanupCollectionOlderThan({ collectionName = '', cutoffDate, dryRun = false }) {
+  const name = pickStr(collectionName);
+  if (!name || !(cutoffDate instanceof Date)) {
+    return { ok: false, code: 'INVALID_LOG_CLEANUP_INPUT', msg: '缺少日志清理参数' };
+  }
+  try {
+    const query = db.collection(name).where({ createdAt: _.lt(cutoffDate) });
+    const countRes = await query.count();
+    const matchedCount = Number(countRes && countRes.total) || 0;
+    if (dryRun || matchedCount <= 0) {
+      return {
+        ok: true,
+        collection: name,
+        matchedCount,
+        removedCount: 0,
+        dryRun,
+      };
+    }
+    const removeRes = await query.remove();
+    const removedCount = Number(
+      removeRes && removeRes.stats && (
+        removeRes.stats.removed
+        || removeRes.stats.deleted
+        || removeRes.stats.count
+      )
+    ) || matchedCount;
+    return {
+      ok: true,
+      collection: name,
+      matchedCount,
+      removedCount,
+      dryRun,
+    };
+  } catch (err) {
+    const msg = pickStr(err && err.message, err);
+    if (/collection.*not exists/i.test(msg) || /does not exist/i.test(msg)) {
+      return {
+        ok: true,
+        collection: name,
+        matchedCount: 0,
+        removedCount: 0,
+        missing: true,
+        dryRun,
+      };
+    }
+    return {
+      ok: false,
+      collection: name,
+      code: 'LOG_CLEANUP_FAILED',
+      msg,
+      dryRun,
+    };
+  }
+}
+
+async function cleanupLogCollections({ retentionDays = DEFAULT_LOG_RETENTION_DAYS, dryRun = false }) {
+  const days = clampInt(retentionDays, DEFAULT_LOG_RETENTION_DAYS, 1, 365);
+  const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const financeLogs = await cleanupCollectionOlderThan({
+    collectionName: LOG_COLLECTION,
+    cutoffDate,
+    dryRun,
+  });
+  const notifyLogs = await cleanupCollectionOlderThan({
+    collectionName: NOTIFY_LOG_COLLECTION,
+    cutoffDate,
+    dryRun,
+  });
+  return {
+    ok: [financeLogs, notifyLogs].every((item) => item && item.ok !== false),
+    retentionDays: days,
+    cutoffDate,
+    dryRun,
+    results: {
+      financeCompensateLogs: financeLogs,
+      huifuNotifyLogs: notifyLogs,
+    },
+  };
 }
 
 function toWalletDateMs(v) {
@@ -758,7 +840,7 @@ async function runSafeStep(step, handler) {
   }
 }
 
-async function runAll({ limit = 50, dryRun = false }) {
+async function runAll({ limit = 50, dryRun = false, retentionDays = DEFAULT_LOG_RETENTION_DAYS }) {
   const results = {};
   results.repairWalletDocs = await runSafeStep('repair_wallet_docs', () => repairWalletDocs({ limit: Math.max(limit * 2, 100), dryRun }));
   results.releaseExpiredGoodsLocks = await runSafeStep('release_expired_goods_locks', () => releaseExpiredGoodsLocks({ limit, dryRun }));
@@ -766,6 +848,7 @@ async function runAll({ limit = 50, dryRun = false }) {
   results.syncWithdraws = await runSafeStep('sync_withdraws', () => syncWithdraws({ limit: Math.max(10, Math.floor(limit / 2)), dryRun }));
   results.retryDelayConfirms = await runSafeStep('retry_delay_confirms', () => retryDelayConfirms({ limit: Math.max(10, Math.floor(limit / 2)), dryRun }));
   results.repairMissingLedgers = await runSafeStep('repair_missing_ledgers', () => repairMissingLedgers({ limit, dryRun }));
+  results.cleanupLogCollections = await runSafeStep('cleanup_log_collections', () => cleanupLogCollections({ retentionDays, dryRun }));
   return {
     ok: Object.values(results).every((item) => !item || item.ok !== false),
     results,
@@ -777,11 +860,13 @@ exports.main = async (event = {}) => {
   const action = pickStr(event.action, 'run_all');
   const limit = clampInt(event.limit, 50, 1, 200);
   const dryRun = event.dryRun === true;
+  const retentionDays = clampInt(event.retentionDays, DEFAULT_LOG_RETENTION_DAYS, 1, 365);
 
   console.log('[financeCompensate] start', JSON.stringify({
     action,
     dryRun,
     limit,
+    retentionDays,
     buildTag: BUILD_TAG,
   }));
 
@@ -812,8 +897,10 @@ exports.main = async (event = {}) => {
       result = await retryDelayConfirms({ limit, dryRun });
     } else if (action === 'repair_missing_ledgers') {
       result = await repairMissingLedgers({ limit, dryRun });
+    } else if (action === 'cleanup_logs') {
+      result = await cleanupLogCollections({ retentionDays, dryRun });
     } else if (action === 'run_all') {
-      result = await runAll({ limit, dryRun });
+      result = await runAll({ limit, dryRun, retentionDays });
     } else {
       return {
         ok: false,
@@ -827,6 +914,7 @@ exports.main = async (event = {}) => {
       action,
       dryRun,
       limit,
+      retentionDays,
       ok: !!(result && result.ok),
       resultBrief: result,
     });
@@ -835,6 +923,7 @@ exports.main = async (event = {}) => {
       action,
       dryRun,
       limit,
+      retentionDays,
       ok: !!(result && result.ok),
       buildTag: BUILD_TAG,
       result,
@@ -845,6 +934,7 @@ exports.main = async (event = {}) => {
       action,
       dryRun,
       limit,
+      retentionDays,
       buildTag: BUILD_TAG,
       result,
     };
@@ -854,6 +944,7 @@ exports.main = async (event = {}) => {
       action,
       dryRun,
       limit,
+      retentionDays,
       ok: false,
       error: pickStr(err && err.message, err),
     });
@@ -862,6 +953,7 @@ exports.main = async (event = {}) => {
       action,
       dryRun,
       limit,
+      retentionDays,
       buildTag: BUILD_TAG,
       code: 'FINANCE_COMPENSATE_FAILED',
       msg: err && err.message ? err.message : '补偿任务执行失败',

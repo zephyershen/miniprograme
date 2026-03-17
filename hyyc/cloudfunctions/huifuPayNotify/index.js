@@ -364,6 +364,14 @@ async function writeNotifyLog({ ok, code, msg, rawEvent, bodyObj }) {
   }
 }
 
+function shouldPersistNotifyLog({ success = null, handled = {}, mismatch = [] } = {}) {
+  const code = pickStr(handled && handled.code).toUpperCase();
+  if (!handled || handled.ok !== true) return true;
+  if (Array.isArray(mismatch) && mismatch.length) return true;
+  if (success !== true) return true;
+  return !code || code === 'ACK';
+}
+
 function guessBizSuccess(data = {}) {
   const d = data && typeof data === 'object' ? data : {};
   const respCode = pickStr(d.sub_resp_code, d.resp_code, d.return_code, d.code, d.respCode);
@@ -1236,13 +1244,25 @@ exports.main = async (event = {}) => {
     }
   }
 
-  await writeNotifyLog({
+  console.log('[huifuPayNotify] handled', JSON.stringify({
     ok: handled.ok,
     code: handled.code,
-    msg: `${handled.msg || ''}${mismatch.length ? ` (mismatch:${mismatch.join(',')})` : ''}`,
-    rawEvent: event,
-    bodyObj
-  });
+    msg: handled.msg,
+    success,
+    mismatch,
+    reqDate,
+    reqSeqId,
+  }));
+
+  if (shouldPersistNotifyLog({ success, handled, mismatch })) {
+    await writeNotifyLog({
+      ok: handled.ok,
+      code: handled.code,
+      msg: `${handled.msg || ''}${mismatch.length ? ` (mismatch:${mismatch.join(',')})` : ''}`,
+      rawEvent: event,
+      bodyObj
+    });
+  }
 
   // 重要：大多数支付回调是“返回 200 即表示我们收到了”，否则会反复重试。
   return httpResp(200, { ok: true, code: handled.code, msg: handled.msg });

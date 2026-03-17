@@ -23,23 +23,6 @@ function formatMoney(v) {
   return (Math.round(n * 100) / 100).toFixed(2);
 }
 
-function buildDebugText({ walletBuildTag = '', walletCallId = '', huifuBuildTag = '', huifuCallId = '', extra = '' } = {}) {
-  const lines = [];
-  if (walletBuildTag) lines.push(`walletWithdraw: ${walletBuildTag}`);
-  if (walletCallId) lines.push(`walletCallId: ${walletCallId}`);
-  if (huifuBuildTag) lines.push(`huifuMiniappPay: ${huifuBuildTag}`);
-  if (huifuCallId) lines.push(`huifuCallId: ${huifuCallId}`);
-  if (extra) lines.push(extra);
-  return lines.join('\n');
-}
-
-function buildWithdrawRefreshText(refresh = null) {
-  if (!refresh || !refresh.queried) return '';
-  return refresh.ok
-    ? `query: ${pickStr(refresh.msg, '主动查询成功')}`
-    : `query: ${pickStr(refresh.msg, '主动查询失败')}`;
-}
-
 function buildCashTypeViewState({
   enabledCashTypes = [],
 } = {}) {
@@ -114,6 +97,7 @@ Page({
     userPhone: '',
     idNumberLast4: '',
     hasBoundCard: false,
+    isCardFormExpanded: true,
     cardStatus: 'unbound',
     cardStatusText: '未绑定',
     boundCardNoMask: '',
@@ -123,7 +107,6 @@ Page({
     selectedCashTypeLabel: DEFAULT_CASH_TYPE_LABEL,
     isSelectedCashTypeOpened: false,
     activeWithdraw: null,
-    debugInfoText: '',
     provinceNames: [],
     cityNames: [],
     provinceIndex: 0,
@@ -158,6 +141,7 @@ Page({
   },
 
   onShow() {
+    this._resetCardFormExpandOnNextProfile = true;
     this.loadProfile();
   },
 
@@ -179,12 +163,6 @@ Page({
       const ret = res && res.result ? res.result : null;
       if (!ret || !ret.ok || !ret.profile) {
         this.setData({ isLoading: false });
-        this.setData({
-          debugInfoText: buildDebugText({
-            walletBuildTag: pickStr(ret && ret.buildTag),
-            walletCallId: pickStr(ret && ret.debugCallId),
-          })
-        });
         toast((ret && ret.err && ret.err.msg) || '加载提现信息失败');
         return;
       }
@@ -194,6 +172,8 @@ Page({
       const cashTypeState = buildCashTypeViewState({
         enabledCashTypes,
       });
+      const shouldResetCardFormExpand = !!this._resetCardFormExpandOnNextProfile;
+      this._resetCardFormExpandOnNextProfile = false;
 
       const cardInfo = profile.cardInfo || {};
       const areaMatch = findAreaByIds(cardInfo.provId, cardInfo.areaId);
@@ -207,6 +187,9 @@ Page({
         availableBalanceText: formatMoney(profile.availableBalance || 0),
         localBalanceText: formatMoney(profile.localBalance || 0),
         hasBoundCard: !!profile.hasBoundCard,
+        isCardFormExpanded: profile.hasBoundCard
+          ? (shouldResetCardFormExpand ? false : !!this.data.isCardFormExpanded)
+          : true,
         cardStatus: pickStr(profile.cardStatus, profile.hasBoundCard ? 'success' : 'unbound'),
         cardStatusText: pickStr(profile.cardStatusText, profile.hasBoundCard ? '已绑定' : '未绑定'),
         boundCardNoMask: pickStr(cardInfo.cardNoMask),
@@ -216,12 +199,6 @@ Page({
         selectedCashTypeLabel: cashTypeState.selectedCashTypeLabel,
         isSelectedCashTypeOpened: cashTypeState.isSelectedCashTypeOpened,
         activeWithdraw: profile.activeWithdraw || null,
-        debugInfoText: buildDebugText({
-          walletBuildTag: pickStr(profile.debug && profile.debug.walletWithdrawBuildTag, ret.buildTag),
-          walletCallId: pickStr(profile.debug && profile.debug.debugCallId, ret.debugCallId),
-          huifuBuildTag: pickStr(profile.debug && (profile.debug.huifuUserInfoBuildTag || profile.debug.huifuBalanceBuildTag)),
-          extra: buildWithdrawRefreshText(profile.debug && profile.debug.withdrawRefresh),
-        }),
         form: {
           ...this.data.form,
           provId: pickStr(cardInfo.provId, this.data.form.provId),
@@ -320,41 +297,38 @@ Page({
     this.setData({ 'form.amount': this.data.availableBalanceText });
   },
 
+  onToggleCardForm() {
+    if (!this.data.hasBoundCard) return;
+    this.setData({ isCardFormExpanded: !this.data.isCardFormExpanded });
+  },
+
   async submitWithdraw() {
     if (this.data.isSubmitting) return;
     if (!this.data.hasBoundCard) {
-      this.setData({ debugInfoText: buildDebugText({ extra: 'local: submit blocked - hasBoundCard=false' }) });
       toast('请先绑定提现银行卡');
       return;
     }
     if (this.data.activeWithdraw) {
-      this.setData({ debugInfoText: buildDebugText({ extra: 'local: submit blocked - activeWithdraw exists' }) });
       toast('当前已有一笔提现处理中，请稍后再试');
       return;
     }
 
     const amount = Number(this.data.form.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
-      this.setData({ debugInfoText: buildDebugText({ extra: 'local: submit blocked - invalid amount' }) });
       toast('请输入正确的提现金额');
       return;
     }
     if (amount < WITHDRAW_MIN) {
-      this.setData({ debugInfoText: buildDebugText({ extra: `local: submit blocked - amount < ${WITHDRAW_MIN}` }) });
       toast(`提现金额不能低于${WITHDRAW_MIN}元`);
       return;
     }
     if (amount > Number(this.data.availableBalance || 0)) {
-      this.setData({ debugInfoText: buildDebugText({ extra: 'local: submit blocked - amount > availableBalance' }) });
       toast(`提现金额不能超过 ¥${this.data.availableBalanceText}`);
       return;
     }
 
     const confirmed = await confirm(`确认提现 ¥${formatMoney(amount)} 到 ${this.data.boundCardNoMask || '银行卡'}？`);
-    if (!confirmed) {
-      this.setData({ debugInfoText: buildDebugText({ extra: 'local: submit cancelled by user' }) });
-      return;
-    }
+    if (!confirmed) return;
 
     this.setData({ isSubmitting: true, isLoading: true });
     try {
@@ -369,32 +343,9 @@ Page({
       const ret = res && res.result ? res.result : null;
       if (!ret || !ret.ok) {
         this.setData({ isSubmitting: false, isLoading: false });
-        this.setData({
-          debugInfoText: buildDebugText({
-            walletBuildTag: pickStr(ret && ret.debug && ret.debug.walletWithdrawBuildTag, ret && ret.buildTag),
-            walletCallId: pickStr(ret && ret.debug && ret.debug.walletWithdrawCallId, ret && ret.debugCallId),
-            huifuBuildTag: pickStr(ret && ret.debug && ret.debug.huifuMiniappPayBuildTag),
-            huifuCallId: pickStr(ret && ret.debug && ret.debug.huifuMiniappPayCallId),
-            extra: pickStr(ret && ret.err && ret.err.msg),
-          })
-        });
         toast((ret && ret.err && ret.err.msg) || '提现申请失败');
         return;
       }
-
-      this.setData({
-        debugInfoText: buildDebugText({
-          walletBuildTag: pickStr(ret && ret.debug && ret.debug.walletWithdrawBuildTag, ret && ret.buildTag),
-          walletCallId: pickStr(ret && ret.debug && ret.debug.walletWithdrawCallId, ret && ret.debugCallId),
-          huifuBuildTag: pickStr(ret && ret.debug && ret.debug.huifuMiniappPayBuildTag),
-          huifuCallId: pickStr(ret && ret.debug && ret.debug.huifuMiniappPayCallId),
-          extra: [
-            pickStr(ret && ret.reqDate) && pickStr(ret && ret.reqSeqId)
-              ? `req: ${pickStr(ret.reqDate)} / ${pickStr(ret.reqSeqId)}`
-              : '',
-          ].filter(Boolean).join('\n'),
-        })
-      });
       toast(ret.msg || '提现申请已提交');
       this.setData({
         isSubmitting: false,
@@ -404,21 +355,7 @@ Page({
         await this.loadProfile();
       } catch (refreshErr) {
         console.error('提现申请成功，但刷新状态失败', refreshErr);
-        this.setData({
-          isLoading: false,
-          debugInfoText: buildDebugText({
-            walletBuildTag: pickStr(ret && ret.debug && ret.debug.walletWithdrawBuildTag, ret && ret.buildTag),
-            walletCallId: pickStr(ret && ret.debug && ret.debug.walletWithdrawCallId, ret && ret.debugCallId),
-            huifuBuildTag: pickStr(ret && ret.debug && ret.debug.huifuMiniappPayBuildTag),
-            huifuCallId: pickStr(ret && ret.debug && ret.debug.huifuMiniappPayCallId),
-            extra: [
-              pickStr(ret && ret.reqDate) && pickStr(ret && ret.reqSeqId)
-                ? `req: ${pickStr(ret.reqDate)} / ${pickStr(ret.reqSeqId)}`
-                : '',
-              'refresh: profile reload failed after successful submit',
-            ].filter(Boolean).join('\n'),
-          })
-        });
+        this.setData({ isLoading: false });
         toast('提现已提交，状态刷新失败，请点“立即同步提现状态”');
       }
     } catch (err) {
@@ -434,12 +371,10 @@ Page({
     const f = this.data.form;
     const cardNo = digitsOnly(f.cardNo);
     if (!cardNo && !this.data.hasBoundCard) {
-      this.setData({ debugInfoText: buildDebugText({ extra: 'local: bind_card blocked - missing cardNo' }) });
       toast('请输入银行卡号');
       return;
     }
     if (!/^\d{6}$/.test(pickStr(f.provId)) || !/^\d{6}$/.test(pickStr(f.areaId))) {
-      this.setData({ debugInfoText: buildDebugText({ extra: 'local: bind_card blocked - invalid area' }) });
       toast('请选择银行卡开户地址');
       return;
     }
@@ -458,34 +393,13 @@ Page({
       const ret = res && res.result ? res.result : null;
       if (!ret || !ret.ok) {
         this.setData({ isSubmitting: false, isLoading: false });
-        this.setData({
-          debugInfoText: buildDebugText({
-            walletBuildTag: pickStr(ret && ret.debug && ret.debug.walletWithdrawBuildTag, ret && ret.buildTag),
-            walletCallId: pickStr(ret && ret.debug && ret.debug.walletWithdrawCallId, ret && ret.debugCallId),
-            huifuBuildTag: pickStr(ret && ret.debug && ret.debug.huifuMiniappPayBuildTag),
-            huifuCallId: pickStr(ret && ret.debug && ret.debug.huifuMiniappPayCallId),
-          })
-        });
         toast((ret && ret.err && ret.err.msg) || '绑定银行卡失败');
         return;
       }
-
-      this.setData({
-        debugInfoText: buildDebugText({
-          walletBuildTag: pickStr(ret && ret.debug && ret.debug.walletWithdrawBuildTag, ret && ret.buildTag),
-          walletCallId: pickStr(ret && ret.debug && ret.debug.walletWithdrawCallId, ret && ret.debugCallId),
-          huifuBuildTag: pickStr(ret && ret.debug && ret.debug.huifuMiniappPayBuildTag),
-          huifuCallId: pickStr(ret && ret.debug && ret.debug.huifuMiniappPayCallId),
-          extra: pickStr(
-            ret && ret.msg,
-            ret && ret.autoOpen && ret.autoOpen.msg,
-            ret && ret.err && ret.err.msg
-          ),
-        })
-      });
       toast(ret.msg || '银行卡已保存');
       this.setData({
         isSubmitting: false,
+        isCardFormExpanded: false,
         'form.cardNo': '',
       });
       await this.loadProfile();

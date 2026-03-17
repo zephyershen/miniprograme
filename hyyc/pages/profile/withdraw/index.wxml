@@ -14,36 +14,41 @@
   <view class="section-card">
     <view class="section-head">
       <text class="section-title">步骤1：绑定提现银行卡</text>
-      <text class="status-tag status-{{cardStatus}}">{{cardStatusText}}</text>
+      <view class="section-head-actions">
+        <text class="section-toggle" wx:if="{{hasBoundCard}}" bindtap="onToggleCardForm">{{isCardFormExpanded ? '收起' : '修改'}}</text>
+        <text class="status-tag status-{{cardStatus}}">{{cardStatusText}}</text>
+      </view>
     </view>
 
     <view class="info-row" wx:if="{{hasBoundCard && boundCardNoMask}}">
       <text class="info-label">当前已绑卡</text>
       <text class="info-value">{{boundCardNoMask}}</text>
     </view>
-    <view class="field-row">
-      <text class="field-label">银行卡号</text>
-      <input class="field-input" value="{{form.cardNo}}" bindinput="onInput" data-key="cardNo" type="number" placeholder="{{hasBoundCard ? '不改卡号可留空；换卡请重新输入' : '输入要绑定的银行卡号'}}" />
-    </view>
-    <view class="field-row">
-      <text class="field-label">开户地址(省)</text>
-      <picker mode="selector" range="{{provinceNames}}" value="{{provinceIndex}}" bindchange="onProvinceChange">
-        <view class="field-select">
-          <text>{{form.provName || '请选择省份'}}</text>
-          <text class="select-arrow">›</text>
-        </view>
-      </picker>
-    </view>
-    <view class="field-row">
-      <text class="field-label">开户地址(市)</text>
-      <picker mode="selector" range="{{cityNames}}" value="{{cityIndex}}" bindchange="onCityChange">
-        <view class="field-select">
-          <text>{{form.areaName || '请选择城市'}}</text>
-          <text class="select-arrow">›</text>
-        </view>
-      </picker>
-    </view>
-    <view class="btn-primary" bindtap="onBindCard">{{hasBoundCard ? '保存并更新银行卡' : '绑定银行卡'}}</view>
+    <block wx:if="{{!hasBoundCard || isCardFormExpanded}}">
+      <view class="field-row">
+        <text class="field-label">银行卡号</text>
+        <input class="field-input" value="{{form.cardNo}}" bindinput="onInput" data-key="cardNo" type="number" placeholder="{{hasBoundCard ? '不改卡号可留空；换卡请重新输入' : '输入要绑定的银行卡号'}}" />
+      </view>
+      <view class="field-row">
+        <text class="field-label">开户地址(省)</text>
+        <picker mode="selector" range="{{provinceNames}}" value="{{provinceIndex}}" bindchange="onProvinceChange">
+          <view class="field-select">
+            <text>{{form.provName || '请选择省份'}}</text>
+            <text class="select-arrow">›</text>
+          </view>
+        </picker>
+      </view>
+      <view class="field-row">
+        <text class="field-label">开户地址(市)</text>
+        <picker mode="selector" range="{{cityNames}}" value="{{cityIndex}}" bindchange="onCityChange">
+          <view class="field-select">
+            <text>{{form.areaName || '请选择城市'}}</text>
+            <text class="select-arrow">›</text>
+          </view>
+        </picker>
+      </view>
+      <view class="btn-primary" bindtap="onBindCard">{{hasBoundCard ? '保存银行卡设置' : '绑定银行卡'}}</view>
+    </block>
   </view>
 
   <view class="section-card">
