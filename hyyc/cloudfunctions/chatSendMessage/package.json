@@ -1,0 +1,9 @@
+{
+  "name": "chatSendMessage",
+  "version": "1.0.0",
+  "description": "统一发送任务/商品聊天消息，并尝试推送订阅提醒",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

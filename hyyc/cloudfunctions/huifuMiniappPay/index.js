@@ -36,6 +36,8 @@ const TRANSACTIONS_COLLECTION = 'wallet_transactions';
 const BUILD_TAG = 'huifuMiniappPay@2026-03-16.1';
 const GOODS_PAYMENT_LOCK_TTL_MS = Math.max(60 * 1000, Number(process.env.GOODS_PAYMENT_LOCK_TTL_MS) || 15 * 60 * 1000);
 const TASK_DELAY_CONFIRM_LOCK_TTL_MS = Math.max(60 * 1000, Number(process.env.TASK_DELAY_CONFIRM_LOCK_TTL_MS) || 10 * 60 * 1000);
+const MIN_PUBLISH_AMOUNT_YUAN = 0.5;
+const MIN_PUBLISH_AMOUNT_CENTS = 50;
 
 const db = cloud.database();
 
@@ -154,6 +156,7 @@ function formatYuan2(v) {
 function yuanToCents(v) {
   const n = Number(v);
   if (!Number.isFinite(n) || n <= 0) return null;
+  if (Math.abs(n * 100 - Math.round(n * 100)) >= 1e-8) return null;
   return Math.round(n * 100);
 }
 
@@ -1246,6 +1249,16 @@ exports.main = async (event = {}) => {
         });
         return { ok: false, err: { code: 'INVALID_PRICE', msg: '商品价格不合法' } };
       }
+      if (totalCents < MIN_PUBLISH_AMOUNT_CENTS) {
+        await releaseGoodsPaymentLock({
+          goodsId,
+          buyerOpenid: OPENID,
+          reqDate: lockRes.reqDate,
+          reqSeqId: lockRes.reqSeqId,
+          reason: 'price_below_minimum',
+        });
+        return { ok: false, err: { code: 'PRICE_TOO_LOW', msg: `商品价格不能低于 ${MIN_PUBLISH_AMOUNT_YUAN} 元` } };
+      }
 
       const sellerOpenid = pickStr(goods._openid);
       const sellerUser = await getUserInfoByOpenid(sellerOpenid);
@@ -1361,6 +1374,9 @@ exports.main = async (event = {}) => {
 
     const totalCents = yuanToCents(goods.price);
     if (!totalCents) return { ok: false, err: { code: 'INVALID_PRICE', msg: '商品价格不合法' } };
+    if (totalCents < MIN_PUBLISH_AMOUNT_CENTS) {
+      return { ok: false, err: { code: 'PRICE_TOO_LOW', msg: `商品价格不能低于 ${MIN_PUBLISH_AMOUNT_YUAN} 元` } };
+    }
 
     const sellerUser = await getUserInfoByOpenid(sellerOpenid);
     const sellerHuifuUserId = getReceiverHuifuIdFromUserDoc(sellerUser || {});
@@ -1430,6 +1446,9 @@ exports.main = async (event = {}) => {
 
     const totalCents = yuanToCents(task.amount);
     if (!totalCents) return { ok: false, err: { code: 'INVALID_AMOUNT', msg: '任务佣金不合法' }, buildTag: BUILD_TAG };
+    if (totalCents < MIN_PUBLISH_AMOUNT_CENTS) {
+      return { ok: false, err: { code: 'AMOUNT_TOO_LOW', msg: `任务佣金不能低于 ${MIN_PUBLISH_AMOUNT_YUAN} 元` }, buildTag: BUILD_TAG };
+    }
 
     const existingPay = (task.pay && typeof task.pay === 'object') ? task.pay : {};
     const reqDate = (/^\d{8}$/.test(pickStr(existingPay.reqDate)) ? pickStr(existingPay.reqDate) : yyyymmdd(new Date()));

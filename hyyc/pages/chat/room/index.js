@@ -1055,6 +1055,33 @@ Page({
     });
   },
 
+  _sendTaskMessage(type = 'text', payload = {}) {
+    const tid = this.data.tid;
+    const ownerId = this.data.ownerId || '';
+    const peerUserId = this.data.peerUserId || '';
+    if (!tid || !ownerId || !peerUserId) {
+      wx.showToast({ title: '聊天对象信息缺失', icon: 'none' });
+      return Promise.reject(new Error('missing_room_info'));
+    }
+    return wx.cloud.callFunction({
+      name: 'chatSendMessage',
+      data: {
+        bizType: 'task',
+        tid,
+        ownerId,
+        peerUserId,
+        type,
+        ...payload,
+      }
+    }).then((res) => {
+      const ret = (res && res.result) || {};
+      if (!ret || ret.ok !== true) {
+        throw new Error(pickStr(ret && ret.msg, '发送失败'));
+      }
+      return ret;
+    });
+  },
+
   // 发送文本消息：写入云数据库 messages 集合
   send() {
     const text = (this.data.text || '').trim();
@@ -1081,31 +1108,11 @@ Page({
     }
 
     this.setData({ text: '' });
-
-    const isOwnerSender = userId === ownerId;
-    const isPeerSender = userId === peerUserId;
-
-    db.collection(MSG_COLLECTION)
-      .add({
-        data: {
-          tid,
-          ownerId,
-          peerUserId,
-          fromUserId: userId,
-          fromNickname: me.nickname || me.name || '',
-          type: 'text',
-          text,
-          createTime: db.serverDate(),
-          // 任务发布者自己发出的消息视为已读，住户发给发布者的消息默认未读
-          readByOwner: isOwnerSender ? true : false,
-          // 住户自己发出的消息视为已读，业主发给住户的消息默认未读
-          readByPeer: isPeerSender ? true : false
-        }
-      })
-      .catch(err => {
-        console.error('send message error', err);
-        wx.showToast({ title: '发送失败', icon: 'none' });
-      });
+    this._sendTaskMessage('text', { text }).catch(err => {
+      console.error('send message error', err);
+      this.setData({ text });
+      wx.showToast({ title: pickStr(err && err.message, '发送失败'), icon: 'none' });
+    });
   },
 
   // 选择并发送图片消息：先上传到云存储，再写入 messages 集合
@@ -1156,27 +1163,10 @@ Page({
           success(upRes) {
             const fileID = upRes.fileID || '';
             if (!fileID) return;
-            const isOwnerSender = userId === ownerId;
-            const isPeerSender = userId === peerUserId;
-            db.collection(MSG_COLLECTION)
-              .add({
-                data: {
-                  tid,
-                  ownerId,
-                  peerUserId,
-                  fromUserId: userId,
-                  fromNickname: me.nickname || me.name || '',
-                  type: 'image',
-                  imageUrl: fileID,
-                  createTime: db.serverDate(),
-                  readByOwner: isOwnerSender ? true : false,
-                  readByPeer: isPeerSender ? true : false
-                }
-              })
-              .catch(err => {
-                console.error('send image message error', err);
-                wx.showToast({ title: '发送图片失败', icon: 'none' });
-              });
+            self._sendTaskMessage('image', { imageUrl: fileID }).catch(err => {
+              console.error('send image message error', err);
+              wx.showToast({ title: pickStr(err && err.message, '发送图片失败'), icon: 'none' });
+            });
           },
           fail(err) {
             console.error('upload image error', err);

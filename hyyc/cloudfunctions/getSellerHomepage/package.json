@@ -1,0 +1,9 @@
+{
+  "name": "getSellerHomepage",
+  "version": "1.0.0",
+  "description": "读取卖家公开主页和在售商品",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

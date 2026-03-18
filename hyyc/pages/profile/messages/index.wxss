@@ -1,0 +1,203 @@
+@import "../../../styles/shadcn.wxss";
+
+.message-page {
+  min-height: 100vh;
+  padding: 24rpx;
+  box-sizing: border-box;
+}
+
+.hero,
+.subscribe,
+.session-card,
+.empty {
+  padding: 24rpx;
+}
+
+.hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.hero-title {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #111827;
+}
+
+.hero-sub {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  color: #6b7280;
+}
+
+.hero-right {
+  text-align: right;
+}
+
+.hero-unread {
+  display: block;
+  font-size: 44rpx;
+  font-weight: 800;
+  color: #b95e49;
+}
+
+.hero-unread-label {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #9ca3af;
+}
+
+.subscribe {
+  margin-top: 18rpx;
+  display: flex;
+  gap: 16rpx;
+  align-items: center;
+}
+
+.subscribe-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.subscribe-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #111827;
+}
+
+.subscribe-sub {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+.subscribe-btn {
+  margin: 0;
+  padding: 0 24rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  border-radius: 999rpx;
+  background: #111827;
+  color: #ffffff;
+  font-size: 24rpx;
+}
+
+.subscribe-btn[disabled] {
+  opacity: 0.45;
+}
+
+.filter-row {
+  display: flex;
+  gap: 12rpx;
+  margin: 22rpx 0 16rpx;
+}
+
+.filter-chip {
+  padding: 12rpx 22rpx;
+  border-radius: 999rpx;
+  background: rgba(107, 114, 128, 0.08);
+  color: #4b5563;
+  font-size: 24rpx;
+}
+
+.filter-chip-active {
+  background: rgba(185, 94, 73, 0.12);
+  color: #b95e49;
+  font-weight: 700;
+}
+
+.session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.session-head,
+.session-sub {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.session-left {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  gap: 12rpx;
+  align-items: center;
+}
+
+.session-kind {
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+  font-size: 20rpx;
+  font-weight: 700;
+}
+
+.session-kind-task {
+  background: rgba(14, 165, 233, 0.12);
+  color: #0369a1;
+}
+
+.session-kind-goods {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+}
+
+.session-title {
+  min-width: 0;
+  flex: 1;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #111827;
+}
+
+.session-time {
+  margin-left: 12rpx;
+  font-size: 22rpx;
+  color: #9ca3af;
+}
+
+.session-sub {
+  margin-top: 12rpx;
+}
+
+.session-peer {
+  font-size: 24rpx;
+  color: #4b5563;
+}
+
+.session-unread {
+  min-width: 36rpx;
+  padding: 0 10rpx;
+  height: 36rpx;
+  line-height: 36rpx;
+  border-radius: 999rpx;
+  text-align: center;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 20rpx;
+  font-weight: 700;
+}
+
+.session-preview {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+.empty {
+  margin-top: 12rpx;
+  text-align: center;
+  color: #6b7280;
+  font-size: 26rpx;
+}

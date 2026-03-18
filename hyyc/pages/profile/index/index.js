@@ -4,6 +4,7 @@ Page({
   data: {
     user: {},
     isLoading: false,
+    messageCenterUnread: 0,
   },
   onShow(){
     const rawUser = wx.getStorageSync('hyyc_user') || {};
@@ -16,6 +17,23 @@ Page({
       isLoading: false,
     });
     this._hydrateAvatar(rawUser);
+    this._loadMessageCenterSummary();
+  },
+  async _loadMessageCenterSummary() {
+    const me = wx.getStorageSync('hyyc_user') || {};
+    if (!me || !Object.keys(me).length) {
+      this.setData({ messageCenterUnread: 0 });
+      return;
+    }
+    try {
+      const res = await wx.cloud.callFunction({ name: 'getMessageCenter' });
+      const ret = (res && res.result) || {};
+      if (!ret || ret.ok !== true) return;
+      const totalUnread = Number(ret && ret.summary && ret.summary.totalUnread) || 0;
+      this.setData({ messageCenterUnread: totalUnread });
+    } catch (err) {
+      console.warn('加载消息中心摘要失败', err);
+    }
   },
   async _hydrateAvatar(user = {}) {
     const avatarFileID = String(user && user.avatarFileID || '').trim();
@@ -47,6 +65,7 @@ Page({
   gotoMyTasks(){ wx.navigateTo({ url: '/pages/profile/tasks/index' }); },
   gotoMyGoods(){ wx.navigateTo({ url: '/pages/profile/goods/index' }); },
   gotoFavorites(){ wx.navigateTo({ url: '/pages/profile/favorites/index' }); },
+  gotoMessages(){ wx.navigateTo({ url: '/pages/profile/messages/index' }); },
   gotoWallet(){ wx.navigateTo({ url: '/pages/profile/wallet/index' }); },
 
   // 退出登录：清掉本地缓存的用户信息，并回到欢迎页

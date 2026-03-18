@@ -1,0 +1,46 @@
+<ui-loading show="{{isLoading}}" />
+
+<view class="seller-page" wx:if="{{seller}}">
+  <view class="seller-hero card">
+    <image wx:if="{{seller.avatarUrl}}" class="seller-avatar" src="{{seller.avatarUrl}}" mode="aspectFill"></image>
+    <view wx:else class="avatar seller-avatar"></view>
+    <view class="seller-meta">
+      <view class="seller-name-row">
+        <text class="seller-name">{{seller.displayName || '卖家'}}</text>
+        <text wx:if="{{seller.realname}}" class="seller-badge">已实名</text>
+      </view>
+      <text class="seller-sub">{{seller.community || '同小区卖家'}}</text>
+      <text class="seller-sub" wx:if="{{seller.building}}">{{seller.building}}</text>
+    </view>
+  </view>
+
+  <view class="stats-grid">
+    <view class="stats-card card">
+      <text class="stats-value">{{seller.onSaleCount || 0}}</text>
+      <text class="stats-label">在售</text>
+    </view>
+    <view class="stats-card card">
+      <text class="stats-value">{{seller.soldCount || 0}}</text>
+      <text class="stats-label">已售</text>
+    </view>
+    <view class="stats-card card">
+      <text class="stats-value">{{seller.totalGoodsCount || 0}}</text>
+      <text class="stats-label">累计发布</text>
+    </view>
+  </view>
+
+  <view class="section-title">在售商品</view>
+  <view wx:if="{{goodsList.length}}" class="goods-list">
+    <view wx:for="{{goodsList}}" wx:key="id" class="goods-card card" data-id="{{item.id}}" bindtap="openGoodsDetail">
+      <image wx:if="{{item.coverUrl}}" class="goods-cover" src="{{item.coverUrl}}" mode="aspectFill"></image>
+      <view wx:else class="goods-cover goods-cover-empty">暂无图片</view>
+      <view class="goods-body">
+        <text class="goods-title">{{item.title}}</text>
+        <text class="goods-meta">{{item.community || seller.community || '同小区'}}</text>
+        <text class="goods-price">¥{{item.priceText}}</text>
+        <text class="goods-time">{{item.createdAtText}}</text>
+      </view>
+    </view>
+  </view>
+  <view wx:else class="empty card">这个卖家当前没有在售商品</view>
+</view>

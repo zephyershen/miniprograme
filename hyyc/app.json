@@ -12,6 +12,7 @@
     "pages/profile/tasks/index",
     "pages/profile/goods/index",
     "pages/profile/favorites/index",
+    "pages/profile/messages/index",
     "pages/profile/wallet/index",
     "pages/profile/withdraw/index"
   ],
@@ -42,7 +43,8 @@
     {
       "root": "pages/user",
       "pages": [
-        "profile/index"
+        "profile/index",
+        "seller/index"
       ]
     }
   ],

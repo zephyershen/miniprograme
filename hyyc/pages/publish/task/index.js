@@ -4,6 +4,13 @@ const { toast } = require('../../../utils/ui');
 // 使用云开发数据库 tasks 集合存储任务
 const db = wx.cloud.database();
 const TASK_COLLECTION = 'tasks';
+const MIN_TASK_AMOUNT_YUAN = 0.5;
+
+function isMoneyWithMaxTwoDecimals(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) return false;
+  return Math.abs(n * 100 - Math.round(n * 100)) < 1e-8;
+}
 
 Page({
   data: {
@@ -281,7 +288,16 @@ Page({
     const f = this.data.form;
     const errors = {};
     errors.title = required(f.title, '请填写标题');
-    errors.amount = required(f.amount, '请填写佣金');
+    let amountErr = required(f.amount, '请填写佣金');
+    if (!amountErr) {
+      const amountYuan = Number(f.amount);
+      if (!isMoneyWithMaxTwoDecimals(amountYuan)) {
+        amountErr = '佣金最多支持两位小数';
+      } else if (amountYuan < MIN_TASK_AMOUNT_YUAN) {
+        amountErr = `佣金不能低于 ${MIN_TASK_AMOUNT_YUAN} 元`;
+      }
+    }
+    errors.amount = amountErr;
     errors.building = required(f.building, '请选择发布楼栋');
     errors.door = required(f.door, '请选择门牌号');
     Object.keys(errors).forEach(k => { if (!errors[k]) delete errors[k]; });
@@ -361,8 +377,12 @@ Page({
 
     // 新建任务：先确认“需要先付款”
     if (!editId) {
-      if (!Number.isFinite(amountYuan) || amountYuan <= 0) {
+      if (!isMoneyWithMaxTwoDecimals(amountYuan)) {
         toast('佣金不合法');
+        return;
+      }
+      if (amountYuan < MIN_TASK_AMOUNT_YUAN) {
+        toast(`佣金不能低于 ${MIN_TASK_AMOUNT_YUAN} 元`);
         return;
       }
 

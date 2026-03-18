@@ -41,6 +41,13 @@
           </view>
           <text class="quick-label">收藏</text>
         </view>
+        <view class="quick-item quick-item-message" bindtap="gotoMessages">
+          <view class="quick-icon quick-icon-message">
+            <text class="quick-icon-text">信</text>
+            <text wx:if="{{messageCenterUnread}}" class="quick-badge">{{messageCenterUnread > 99 ? '99+' : messageCenterUnread}}</text>
+          </view>
+          <text class="quick-label">消息</text>
+        </view>
         <view class="quick-item" bindtap="gotoWallet">
           <view class="quick-icon quick-icon-wallet">
             <image class="quick-icon-svg" src="/assets/pages/profile/wallet.svg" mode="aspectFit"></image>

@@ -11,6 +11,7 @@ const db = cloud.database();
 
 const USER_COLLECTION = 'userInfo';
 const TASK_COLLECTION = 'tasks';
+const MIN_TASK_AMOUNT_YUAN = 0.5;
 
 function pickStr(v) {
   return String(v == null ? '' : v).trim();
@@ -19,6 +20,12 @@ function pickStr(v) {
 function safeNumber(v) {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+function isMoneyWithMaxTwoDecimals(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) return false;
+  return Math.abs(n * 100 - Math.round(n * 100)) < 1e-8;
 }
 
 async function getUserByOpenid(openid) {
@@ -47,7 +54,12 @@ exports.main = async (event = {}) => {
   const images = Array.isArray(event.images) ? event.images.filter(Boolean) : [];
 
   if (!title) return { ok: false, code: 'MISSING_TITLE', msg: '请填写标题' };
-  if (amount == null || amount <= 0) return { ok: false, code: 'INVALID_AMOUNT', msg: '佣金不合法' };
+  if (!isMoneyWithMaxTwoDecimals(amount)) {
+    return { ok: false, code: 'INVALID_AMOUNT', msg: '佣金最多支持两位小数' };
+  }
+  if (amount < MIN_TASK_AMOUNT_YUAN) {
+    return { ok: false, code: 'INVALID_AMOUNT', msg: `佣金不能低于 ${MIN_TASK_AMOUNT_YUAN} 元` };
+  }
   if (!building) return { ok: false, code: 'MISSING_BUILDING', msg: '请选择发布楼栋' };
   if (!door) return { ok: false, code: 'MISSING_DOOR', msg: '请选择门牌号' };
 

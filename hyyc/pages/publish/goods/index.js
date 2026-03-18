@@ -5,9 +5,32 @@ const { startImageAudit } = require('../../../utils/imageAudit');
 // 使用云开发数据库 goods 集合存储商品
 const db = wx.cloud.database();
 const GOODS_COLLECTION = 'goods';
+const CATEGORY_PLACEHOLDER = '请选择分类';
+const CATEGORY_OPTIONS = [
+  { key: 'digital', label: '电子数码' },
+  { key: 'appliance', label: '家用电器' },
+  { key: 'furniture', label: '家具家居' },
+  { key: 'clothing', label: '服饰箱包' },
+  { key: 'books', label: '图书文具' },
+  { key: 'baby', label: '母婴玩具' },
+  { key: 'sports', label: '运动户外' },
+  { key: 'beauty', label: '美妆个护' },
+  { key: 'other', label: '其他' }
+];
+const CATEGORY_LABEL_MAP = CATEGORY_OPTIONS.reduce((acc, item) => {
+  acc[item.key] = item.label;
+  return acc;
+}, {});
+const MIN_GOODS_PRICE_YUAN = 0.5;
 
 function pickStr(v) {
   return String(v == null ? '' : v).trim();
+}
+
+function isMoneyWithMaxTwoDecimals(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) return false;
+  return Math.abs(n * 100 - Math.round(n * 100)) < 1e-8;
 }
 
 Page({
@@ -30,19 +53,11 @@ Page({
     MAX_IMAGES: 9,
     // 编辑模式：从“我的商品”进入时会带上这个 id
     editGoodsId: '',
+    categorySheetVisible: false,
+    categoryDisplayLabel: CATEGORY_PLACEHOLDER,
     // 需要用户替换的图片下标（用于红框提示）
     needFixIdxMap: {},
-    categoryOptions: [
-      { key: 'digital', label: '电子数码' },
-      { key: 'appliance', label: '家用电器' },
-      { key: 'furniture', label: '家具家居' },
-      { key: 'clothing', label: '服饰箱包' },
-      { key: 'books', label: '图书文具' },
-      { key: 'baby', label: '母婴玩具' },
-      { key: 'sports', label: '运动户外' },
-      { key: 'beauty', label: '美妆个护' },
-      { key: 'other', label: '其他' }
-    ],
+    categoryOptions: CATEGORY_OPTIONS,
     conditionOptions: [
       { key: 'new', label: '全新' },
       { key: '99', label: '99新' },
@@ -82,6 +97,16 @@ Page({
       this.setData({ editGoodsId: String(id) });
     }
   },
+  onHide() {
+    if (this.data.categorySheetVisible) {
+      this.setData({ categorySheetVisible: false });
+    }
+  },
+  onUnload() {
+    if (this.data.categorySheetVisible) {
+      this.setData({ categorySheetVisible: false });
+    }
+  },
   onShow() {
     const u = wx.getStorageSync('hyyc_user');
     if (!u || !u.realname) {
@@ -109,6 +134,7 @@ Page({
         building: prevForm.building || buildings[idx] || ''
       }
     }, () => {
+      this._syncCategoryLabel(this.data.form.category);
       // 编辑模式：回填商品数据（只加载一次）
       const editId = this.data.editGoodsId;
       if (editId && !this._editLoaded) {
@@ -181,6 +207,7 @@ Page({
         },
         needFixIdxMap,
         errors: {},
+        categoryDisplayLabel: this._getCategoryLabel(doc.category || ''),
         isLoading: false
       });
     } catch (err) {
@@ -189,15 +216,33 @@ Page({
       toast('加载失败，请稍后重试');
     }
   },
+  _getCategoryLabel(key = '') {
+    const k = pickStr(key);
+    return CATEGORY_LABEL_MAP[k] || CATEGORY_PLACEHOLDER;
+  },
+  _syncCategoryLabel(key = '') {
+    this.setData({ categoryDisplayLabel: this._getCategoryLabel(key) });
+  },
+  openCategorySheet() {
+    this.setData({ categorySheetVisible: true });
+  },
+  closeCategorySheet() {
+    if (!this.data.categorySheetVisible) return;
+    this.setData({ categorySheetVisible: false });
+  },
+  noop() {},
   onInput(e) {
     const k = e.currentTarget.dataset.k;
     this.setData({ [`form.${k}`]: e.detail.value });
   },
   onCategoryTap(e) {
     const v = e.currentTarget.dataset.v || '';
+    const nextLabel = this._getCategoryLabel(v);
     this.setData({
       'form.category': v,
-      'errors.category': ''
+      'errors.category': '',
+      categoryDisplayLabel: nextLabel,
+      categorySheetVisible: false
     });
   },
   onConditionTap(e) {
@@ -263,7 +308,9 @@ Page({
         desc: '',
         images: []
       },
-      errors: {}
+      errors: {},
+      categorySheetVisible: false,
+      categoryDisplayLabel: CATEGORY_PLACEHOLDER
     });
   },
   async submit() {
@@ -279,19 +326,23 @@ Page({
     errors.title = required(f.title, '请填写标题');
     errors.category = required(f.category, '请选择分类');
 
-    // 价格：必填且要大于 0
+    // 价格：必填，最多两位小数，且不能低于最低支付金额
     let priceErr = required(f.price, '请填写价格');
     if (!priceErr) {
       const n = Number(f.price);
-      if (!Number.isFinite(n) || n <= 0) priceErr = '价格要大于 0';
+      if (!isMoneyWithMaxTwoDecimals(n)) {
+        priceErr = '价格最多支持两位小数';
+      } else if (n < MIN_GOODS_PRICE_YUAN) {
+        priceErr = `价格不能低于 ${MIN_GOODS_PRICE_YUAN} 元`;
+      }
     }
     errors.price = priceErr;
 
     // 原价：可选，但填了就要是正常数字
     if (String(f.originalPrice || '').trim()) {
       const op = Number(f.originalPrice);
-      if (!Number.isFinite(op) || op <= 0) {
-        errors.originalPrice = '原价格式不正确';
+      if (!isMoneyWithMaxTwoDecimals(op)) {
+        errors.originalPrice = '原价最多支持两位小数';
       }
     }
 

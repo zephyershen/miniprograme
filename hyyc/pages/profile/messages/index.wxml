@@ -1,0 +1,62 @@
+<ui-loading show="{{isLoading}}" />
+
+<view class="message-page">
+  <view class="hero card">
+    <view>
+      <text class="hero-title">统一消息入口</text>
+      <text class="hero-sub">不用先点任务或商品，直接看所有会话和未读</text>
+    </view>
+    <view class="hero-right">
+      <text class="hero-unread">{{summary.totalUnread || 0}}</text>
+      <text class="hero-unread-label">未读</text>
+    </view>
+  </view>
+
+  <view class="subscribe card">
+    <view class="subscribe-copy">
+      <text class="subscribe-title">微信外部提醒</text>
+      <text class="subscribe-sub">
+        {{subscribeEnabled ? '开启后，别人给你发新消息时，微信可直接提醒你。' : '当前还没配置订阅模板，先补环境变量再开启。'}}
+      </text>
+    </view>
+    <button class="subscribe-btn" bindtap="onEnableSubscribe" disabled="{{!subscribeEnabled || subscribeLoading}}">
+      {{subscribeLoading ? '请求中...' : '开启聊天提醒'}}
+    </button>
+  </view>
+
+  <view class="filter-row">
+    <view class="filter-chip {{filter === 'all' ? 'filter-chip-active' : ''}}" data-filter="all" bindtap="onFilterTap">
+      全部
+    </view>
+    <view class="filter-chip {{filter === 'task' ? 'filter-chip-active' : ''}}" data-filter="task" bindtap="onFilterTap">
+      任务 {{summary.taskUnread ? '(' + summary.taskUnread + ')' : ''}}
+    </view>
+    <view class="filter-chip {{filter === 'goods' ? 'filter-chip-active' : ''}}" data-filter="goods" bindtap="onFilterTap">
+      商品 {{summary.goodsUnread ? '(' + summary.goodsUnread + ')' : ''}}
+    </view>
+  </view>
+
+  <view wx:if="{{displayList.length}}" class="session-list">
+    <view
+      wx:for="{{displayList}}"
+      wx:key="key"
+      class="session-card card"
+      data-url="{{item.jumpUrl}}"
+      bindtap="onSessionTap"
+    >
+      <view class="session-head">
+        <view class="session-left">
+          <text class="session-kind session-kind-{{item.kind}}">{{item.sceneText}}</text>
+          <text class="session-title">{{item.title}}</text>
+        </view>
+        <text class="session-time">{{item.lastTimeText}}</text>
+      </view>
+      <view class="session-sub">
+        <text class="session-peer">{{item.peerName || '对方'}}</text>
+        <text wx:if="{{item.unreadCount}}" class="session-unread">{{item.unreadCount}}</text>
+      </view>
+      <text class="session-preview">{{item.lastText || '[消息]'}}</text>
+    </view>
+  </view>
+  <view wx:else class="empty card">还没有消息，等真实用户开始聊天后这里会自动聚合。</view>
+</view>

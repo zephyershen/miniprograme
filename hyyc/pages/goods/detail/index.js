@@ -648,8 +648,16 @@ Page({
     }
   },
   onSellerTap() {
-    // 跳转卖家主页（后续功能）
-    wx.showToast({ title: '查看卖家主页', icon: 'none' });
+    const goods = this.data.goods || {};
+    const sellerOpenid = pickStr(goods._openid);
+    const sellerUserId = pickStr(goods.ownerId);
+    if (!sellerOpenid && !sellerUserId) {
+      wx.showToast({ title: '卖家主页暂不可用', icon: 'none' });
+      return;
+    }
+    wx.navigateTo({
+      url: `/pages/user/seller/index?openid=${encodeURIComponent(sellerOpenid)}&userId=${encodeURIComponent(sellerUserId)}`
+    });
   },
   onFavoriteTap() {
     this.toggleFavorite();

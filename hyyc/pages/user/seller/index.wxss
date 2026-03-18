@@ -1,0 +1,150 @@
+@import "../../../styles/shadcn.wxss";
+
+.seller-page {
+  min-height: 100vh;
+  padding: 24rpx;
+  box-sizing: border-box;
+}
+
+.seller-hero {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 24rpx;
+}
+
+.seller-avatar {
+  width: 112rpx;
+  height: 112rpx;
+  border-radius: 999rpx;
+  flex-shrink: 0;
+}
+
+.seller-meta {
+  min-width: 0;
+  flex: 1;
+}
+
+.seller-name-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.seller-name {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #111827;
+}
+
+.seller-badge {
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
+  font-size: 22rpx;
+  font-weight: 600;
+}
+
+.seller-sub {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #6b7280;
+}
+
+.stats-grid {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 20rpx;
+}
+
+.stats-card {
+  flex: 1;
+  padding: 24rpx 16rpx;
+  text-align: center;
+}
+
+.stats-value {
+  display: block;
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #111827;
+}
+
+.stats-label {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: #6b7280;
+}
+
+.section-title {
+  margin: 28rpx 4rpx 16rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #111827;
+}
+
+.goods-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.goods-card {
+  display: flex;
+  gap: 16rpx;
+  padding: 18rpx;
+}
+
+.goods-cover {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 18rpx;
+  background: #e5e7eb;
+  flex-shrink: 0;
+}
+
+.goods-cover-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  font-size: 22rpx;
+}
+
+.goods-body {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.goods-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.4;
+}
+
+.goods-meta,
+.goods-time {
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  color: #6b7280;
+}
+
+.goods-price {
+  margin-top: auto;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #b95e49;
+}
+
+.empty {
+  padding: 36rpx 24rpx;
+  text-align: center;
+  color: #6b7280;
+  font-size: 26rpx;
+}

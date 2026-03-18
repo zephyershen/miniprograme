@@ -736,6 +736,31 @@ Page({
     });
   },
 
+  _sendGoodsMessage(type = 'text', payload = {}) {
+    if (!pickStr(this.data.gid) || !pickStr(this.data.sellerId) || !pickStr(this.data.peerUserId)) {
+      wx.showToast({ title: '聊天对象信息缺失', icon: 'none' });
+      return Promise.reject(new Error('missing_room_info'));
+    }
+    return wx.cloud.callFunction({
+      name: 'chatSendMessage',
+      data: {
+        bizType: 'goods',
+        gid: pickStr(this.data.gid),
+        sellerId: pickStr(this.data.sellerId),
+        sellerOpenid: pickStr(this.data.sellerOpenid),
+        peerUserId: pickStr(this.data.peerUserId),
+        type,
+        ...payload,
+      }
+    }).then((res) => {
+      const ret = (res && res.result) || {};
+      if (!ret || ret.ok !== true) {
+        throw new Error(pickStr(ret && ret.msg, '发送失败'));
+      }
+      return ret;
+    });
+  },
+
   send() {
     const text = pickStr(this.data.text);
     if (!text) return;
@@ -745,14 +770,11 @@ Page({
     }
 
     this.setData({ text: '' });
-    db.collection(MSG_COLLECTION)
-      .add({
-        data: this._buildMessagePayload('text', { text }),
-      })
-      .catch((err) => {
-        console.error('发送商品聊天文本失败', err);
-        wx.showToast({ title: '发送失败', icon: 'none' });
-      });
+    this._sendGoodsMessage('text', { text }).catch((err) => {
+      console.error('发送商品聊天文本失败', err);
+      this.setData({ text });
+      wx.showToast({ title: pickStr(err && err.message, '发送失败'), icon: 'none' });
+    });
   },
 
   chooseImage(sourceType) {
@@ -785,14 +807,10 @@ Page({
           success: (uploadRes) => {
             const fileID = pickStr(uploadRes && uploadRes.fileID);
             if (!fileID) return;
-            db.collection(MSG_COLLECTION)
-              .add({
-                data: this._buildMessagePayload('image', { imageUrl: fileID }),
-              })
-              .catch((err) => {
-                console.error('发送商品聊天图片失败', err);
-                wx.showToast({ title: '发送图片失败', icon: 'none' });
-              });
+            this._sendGoodsMessage('image', { imageUrl: fileID }).catch((err) => {
+              console.error('发送商品聊天图片失败', err);
+              wx.showToast({ title: pickStr(err && err.message, '发送图片失败'), icon: 'none' });
+            });
           },
           fail: (err) => {
             console.error('上传商品聊天图片失败', err);

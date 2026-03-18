@@ -88,7 +88,9 @@ function isMarkerNewer(a, b) {
 Page({
   data: {
     goodsCategory: 'all',
+    goodsCategoryExpanded: false,
     goodsCategoryOptions: GOODS_CATEGORY_OPTIONS,
+    currentGoodsCategoryLabel: GOODS_CATEGORY_LABEL_MAP.all,
     goodsTotal: 0,
     // 虚拟瀑布流：只渲染视口附近的 item
     renderLeft: [],
@@ -172,6 +174,9 @@ Page({
     this._refreshGoodsFromTop({ stopPullDown: true });
   },
   onHide() {
+    if (this.data.goodsCategoryExpanded) {
+      this.setData({ goodsCategoryExpanded: false });
+    }
     this._isVisible = false;
     this._savedScrollTop = Number(this._lastScrollTop || 0) || 0;
     this._clearVirtualTimers();
@@ -540,10 +545,33 @@ Page({
       });
     });
   },
-  changeGoodsCategory(e) {
-    const k = e.currentTarget.dataset.k || 'all';
-    if (k === this.data.goodsCategory) return;
-    this.setData({ goodsCategory: k }, () => {
+  _getGoodsCategoryLabel(category = 'all') {
+    const k = pickStr(category) || 'all';
+    return GOODS_CATEGORY_LABEL_MAP[k] || GOODS_CATEGORY_LABEL_MAP.all || '全部';
+  },
+  toggleGoodsCategoryExpand() {
+    this.setData({ goodsCategoryExpanded: !this.data.goodsCategoryExpanded });
+  },
+  closeGoodsCategoryDrawer() {
+    if (!this.data.goodsCategoryExpanded) return;
+    this.setData({ goodsCategoryExpanded: false });
+  },
+  noop() {},
+  _applyGoodsCategory(k = 'all') {
+    const nextKey = pickStr(k) || 'all';
+    const nextLabel = this._getGoodsCategoryLabel(nextKey);
+    if (nextKey === this.data.goodsCategory) {
+      this.setData({
+        goodsCategoryExpanded: false,
+        currentGoodsCategoryLabel: nextLabel
+      });
+      return;
+    }
+    this.setData({
+      goodsCategory: nextKey,
+      goodsCategoryExpanded: false,
+      currentGoodsCategoryLabel: nextLabel
+    }, () => {
       // 切换分类后回到顶部：避免在旧滚动位置刷新，导致虚拟列表范围计算不准/出现空白。
       if (wx.pageScrollTo) {
         wx.pageScrollTo({
@@ -559,6 +587,10 @@ Page({
         this.loadGoods(true);
       }
     });
+  },
+  changeGoodsCategory(e) {
+    const k = e.currentTarget.dataset.k || 'all';
+    this._applyGoodsCategory(k);
   },
   retryLoadMore() {
     this.loadMoreGoods(true);

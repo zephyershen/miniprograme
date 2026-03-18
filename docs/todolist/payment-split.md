@@ -154,9 +154,9 @@
 ### 4.2 当前仍未完全收尾的点
 
 - 提现最终到账后的完整回调闭环，还需要继续真机验证
-- 商品“查看卖家主页”仍是占位按钮，未接成真实主页
-- 商品聊天和任务聊天都还没有全局消息中心
-- 商品聊天和任务聊天都还没有订阅消息 / 小程序消息提醒
+- 商品“查看卖家主页”已经接成真实卖家主页，但还缺真实用户场景验证
+- 商品聊天和任务聊天已经接了全局消息中心，但还缺一轮真机回归验证排序 / 未读 / 跳转
+- 商品聊天、手机号申请、任务取消申请都已经接了订阅消息提醒，但当前使用的是一次性订阅模板，仍需做真实触达验证
 - 任务取消申请目前只有“同意”链路，没有“拒绝”入口
 - 手机号查看申请目前只有“同意”链路，没有“拒绝”入口
 - 还缺至少一轮双账号 / 多设备真机回归
@@ -202,6 +202,8 @@
   - 我的商品 / 我买到的
 - `pages/profile/favorites/index`
   - 我的收藏 / 浏览记录
+- `pages/profile/messages/index`
+  - 全局消息中心 / 开启聊天提醒
 - `pages/profile/wallet/index`
   - 钱包
 - `pages/profile/withdraw/index`
@@ -227,6 +229,8 @@
   - 商品咨询会话列表
 - `pages/user/profile/index`
   - 任务场景下查看对方资料 / 申请查看手机号
+- `pages/user/seller/index`
+  - 卖家主页
 
 ---
 
@@ -251,10 +255,14 @@
     - 我的商品 / 我买到的
     - 商品详情权限兜底
     - 删除我的商品记录 / 购买记录
+  - `getSellerHomepage`
+    - 卖家主页
   - `getUserPublicProfile`
     - 商品详情 / 商品聊天读取卖家公开资料
   - `goodsPurchase`
     - 商品支付成功后落库
+  - `chatSendMessage`
+    - 商品聊天 / 任务聊天统一发送入口
   - `markGoodsMessagesRead`
     - 商品聊天服务端已读
   - `imageAuditStart`
@@ -273,6 +281,11 @@
   - `taskContactFlow`
   - `markMessagesReadByOwner`
   - `markMessagesReadByPeer`
+- 消息 / 资料
+  - `getMessageCenter`
+    - 聚合商品 / 任务会话
+  - `getSubscribeConfig`
+    - 前端读取订阅模板配置
 - 钱包 / 提现
   - `walletWithdraw`
 
@@ -591,6 +604,13 @@
   2. 再尝试按“公开 posted 商品”直查
   3. 最后走 `getGoodsProfile action=get_goods_detail`
 - 这是为了兼容数据库权限规则
+- 开发者工具对 `where({ _id, _openid })` 这类查询，可能会提示补一个 `_id + _openid` 组合索引
+- 这个提示里提到的“可删除冗余前缀索引 `_id_`”不要照做：
+  - `_id_` 是系统默认索引，实际不能删除
+  - 即使建了组合索引，`_id_` 也仍会保留，这属于正常现象
+- 所以这里真正要关注的是：
+  - 组合索引是否需要保留，用命中次数和真实慢查询来判断
+  - 不要把开发者工具这条“可删除 `_id_`”的建议当成必须处理的问题
 
 卖家打开自己商品时：
 
@@ -604,10 +624,14 @@
 - 若卖家未删除记录，可以查看 `sold` 商品详情
 - 若卖家已删除记录，会看到空态
 
-当前还没做完的点：
+顶部卖家信息当前已接通：
 
-- 点击顶部卖家信息时，仍然只是 toast：
-  - `查看卖家主页`
+- 点击后会进入 `pages/user/seller/index`
+- 数据来自 `getSellerHomepage`
+- 页面会展示：
+  - 卖家基础资料
+  - 在售商品数 / 已售数 / 已下架数
+  - 最近在售商品列表
 
 ### 8.9 商品聊天当前口径
 
@@ -619,16 +643,31 @@
    - 商品详情底部 `咨询会话`
    - 我的商品卡片 `咨询会话`
    进入 `pages/chat/goods-sessions/index`
+4. 商品消息和任务消息都会汇总到：
+   - `pages/profile/messages/index`
 
 已读逻辑：
 
 - 优先调用 `markGoodsMessagesRead`
 - 如果开发环境没部署，前端会做临时兜底
 
+发送逻辑：
+
+- 商品聊天和任务聊天现在统一走 `chatSendMessage`
+- 这样可以在服务端补订阅消息下发，而不是只在前端直接写 `messages`
+
 未读角标：
 
 - 商品详情页按“当前商品总未读数”聚合
 - 我的商品页按“每个商品的未读数”聚合
+
+订阅消息：
+
+- 全局消息中心页会调用 `getSubscribeConfig`
+- 然后通过 `wx.requestSubscribeMessage` 请求授权
+- 当前配置的是一次性订阅模板：
+  - 用户每同意一次，就获得一次发送机会
+  - 发送一次后，需要下一次再重新请求订阅
 
 ### 8.10 商品模块的权限原则
 
@@ -801,6 +840,22 @@
 - 仍要求开户地址（省、市）
 - 只允许存在 1 笔处理中提现
 
+### 10.6 发布任务 / 发布商品金额下限
+
+当前执行口径：
+
+- 发布任务最低佣金 `0.5` 元
+- 发布商品最低价格 `0.5` 元
+- 前端金额输入改为 `digit`，允许输入小数
+- 前后端统一限制为最多 `2` 位小数
+- 支付云函数也会兜底拦截 `< 0.5` 元的任务 / 商品，避免旧数据或绕过前端直接下单
+
+说明：
+
+- 这一版只先把“最低金额”收口到 `0.5` 元
+- 当前平台分账代码仍按“分”做拆分，非整分结果依旧会落到分级精度处理
+- 如果后面要做到“平台抽成绝不做四舍五入”，还需要继续收口金额步进或改分账计算口径
+
 已确认的第三方现象：
 
 - `DM` 经常失败：
@@ -809,7 +864,7 @@
   - `resp_code=00000000`
   - `trans_stat=P`
 
-### 10.6 资金补偿任务
+### 10.7 资金补偿任务
 
 当前 `financeCompensate` 支持：
 
@@ -1036,7 +1091,31 @@
 - 无环境变量要求
 - 但微信公众平台必须开通“获取手机号”能力
 
-### 13.12 前端配置同步要求
+### 13.12 `chatSendMessage` / `taskContactFlow` / `taskCancelFlow` / `getSubscribeConfig`
+
+- `chatSendMessage` / `taskContactFlow` / `taskCancelFlow` 必配：
+  - `SUBSCRIBE_CHAT_TEMPLATE_ID`
+  - `SUBSCRIBE_CHAT_THING_KEY`
+  - `SUBSCRIBE_CHAT_NAME_KEY`
+  - `SUBSCRIBE_CHAT_TIME_KEY`
+- `getSubscribeConfig` 至少要配：
+  - `SUBSCRIBE_CHAT_TEMPLATE_ID`
+- 可选：
+  - `MINIPROGRAM_STATE`
+- 当前正式环境已对齐为：
+  - `SUBSCRIBE_CHAT_TEMPLATE_ID=fr1B4Z9_K2xBdWVj68DeRsYrUFokFNZxcaK944TcOTk`
+  - `SUBSCRIBE_CHAT_THING_KEY=thing1`
+  - `SUBSCRIBE_CHAT_NAME_KEY=thing7`
+  - `SUBSCRIBE_CHAT_TIME_KEY=time2`
+  - `MINIPROGRAM_STATE=formal`
+- 当前模板类型是“一次性订阅”：
+  - 不是“这个模板全局只能发一次”
+  - 而是“同一个用户每同意一次，就给一次发送机会”
+  - 这次机会被用掉后，需要下一次再重新拉起订阅
+- 字段 key 必须和微信公众平台模板详情页完全一致：
+  - 当前这套模板对应的是 `thing1 + thing7 + time2`
+
+### 13.13 前端配置同步要求
 
 这不是环境变量，但每次新环境接手都要对齐：
 
@@ -1067,8 +1146,12 @@
   - `adminFinanceCompensate`
 - 商品：
   - `getGoodsProfile`
+  - `getSellerHomepage`
   - `getUserPublicProfile`
   - `goodsPurchase`
+  - `chatSendMessage`
+  - `getMessageCenter`
+  - `getSubscribeConfig`
   - `markGoodsMessagesRead`
   - `imageAuditStart`
   - `imageAuditCallback`
@@ -1121,6 +1204,10 @@
 - `exchangePhoneNumber`
 - `getGoodsProfile`
 - `getUserPublicProfile`
+- `getSellerHomepage`
+- `chatSendMessage`
+- `getMessageCenter`
+- `getSubscribeConfig`
 - `markGoodsMessagesRead`
 - `taskContactFlow`
 - `markMessagesReadByOwner`
@@ -1227,6 +1314,7 @@
 - `need_fix` 时能看到修图提示
 - 卖家能编辑并重新提交
 - 卖家能上下架
+- 商品详情点卖家资料能进入卖家主页
 - 买家能购买
 - 买家购买后：
   - 卖家看到 `已售出`
@@ -1248,7 +1336,15 @@
 - 聊天里能发起查看手机号申请
 - 对方同意后能看到完整手机号
 
-### 16.3 钱包 / 提现链路
+### 16.3 消息与提醒链路
+
+- 我的页“消息中心”入口能进入全局消息中心
+- 商品会话和任务会话都能聚合在一起
+- 未读数、最后一条消息、跳转目标都正确
+- “开启聊天提醒”能拉起订阅授权
+- 双账号发消息后，订阅消息能真实触达
+
+### 16.4 钱包 / 提现链路
 
 - 钱包页能查到汇付余额
 - 已绑卡用户再次进入页面时表单折叠
@@ -1256,7 +1352,7 @@
 - 提现处理中时可主动同步状态
 - 同一账号连续点击提现，只会受理一笔
 
-### 16.4 补偿与回调
+### 16.5 补偿与回调
 
 - `financeCompensateTimer` 周期性写入 `finance_compensate_logs`
 - `huifuPayNotify` 能收到并处理真实回调
@@ -1283,10 +1379,14 @@
   - 先看 `getGoodsProfile` 是否部署
 - 已购商品详情打开失败
   - 先看 `getGoodsProfile action=get_goods_detail`
+- 卖家主页打开失败
+  - 先看 `getSellerHomepage` 是否已部署最新版
 - 收藏 / 浏览记录状态不更新
   - 先看 `getGoodsProfile action=get_goods_snapshots`
 - 商品聊天未读不消
   - 先看 `markGoodsMessagesRead`
+- 商品 / 任务发消息失败
+  - 先看 `chatSendMessage`
 
 ### 17.3 任务问题先查什么
 
@@ -1299,6 +1399,10 @@
   - 再看 `taskContactFlow`
 - 聊天已读异常
   - 先看 `markMessagesReadByOwner / markMessagesReadByPeer`
+- 消息中心报：
+  - `用户信息未初始化`
+  - 先看 `getMessageCenter` 是否已部署最新版
+  - 老用户 `userInfo` 文档里可能只有 `_id` 没有 `id`，最新版会自动回退到 `_id`
 
 ### 17.4 提现问题先查什么
 
@@ -1326,8 +1430,7 @@
 ### 18.1 已知风险
 
 - 提现最终到账回调闭环还没完全真机验证完
-- 商品卖家主页仍是占位
-- 商品聊天 / 任务聊天都没有全局消息中心
+- 卖家主页 / 消息中心 / 订阅消息虽然已接通，但还缺双账号真机验证
 - 手机号申请和任务取消申请都没有“拒绝”动作
 - 还缺一轮完整双账号并发回归
 
@@ -1340,10 +1443,10 @@
    - 同一商品双人抢购
    - 同账号重复提现
    - 任务确认完成连续点击
-4. 如果继续补商品侧：
-   - 接真实卖家主页
-   - 做全局消息中心
-   - 做订阅消息
+4. 再做一次消息链路真机联调：
+   - 卖家主页跳转
+   - 全局消息中心聚合 / 未读 / 跳转
+   - 一次性订阅消息真实触达
 5. 如果继续补任务协商：
    - 增加拒绝手机号申请
    - 增加拒绝取消申请

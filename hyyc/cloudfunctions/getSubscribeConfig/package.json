@@ -1,0 +1,9 @@
+{
+  "name": "getSubscribeConfig",
+  "version": "1.0.0",
+  "description": "返回前端可用的订阅消息模板配置",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

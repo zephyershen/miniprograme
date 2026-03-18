@@ -31,29 +31,30 @@
 
       <view class="gap-item">
         <ui-field label="分类" hint="买家可以按分类筛选" error="{{errors.category || ''}}" required="{{true}}">
-          <view class="row wrap row-gap-8">
-            <block wx:for="{{categoryOptions}}" wx:key="key">
-              <view
-                class="{{'badge row-gap-item ' + (form.category === item.key ? 'badge-primary' : '')}}"
-                data-v="{{item.key}}"
-                bindtap="onCategoryTap"
-              >
-                {{item.label}}
+          <view class="{{'publish-category-trigger ' + (form.category ? 'is-selected ' : '') + (errors.category ? 'is-error' : '')}}" bindtap="openCategorySheet">
+            <view class="publish-category-trigger-main">
+              <text class="publish-category-trigger-label">已选分类</text>
+              <view class="{{'publish-category-value ' + (form.category ? 'is-selected' : '')}}">
+                <text class="{{'publish-category-value-text ' + (form.category ? 'is-selected' : '')}}">{{categoryDisplayLabel}}</text>
               </view>
-            </block>
+            </view>
+            <view class="publish-category-trigger-side">
+              <text class="publish-category-trigger-action">{{form.category ? '重新选择' : '点击选择'}}</text>
+              <text class="publish-category-trigger-arrow">›</text>
+            </view>
           </view>
         </ui-field>
       </view>
 
       <view class="gap-item">
-        <ui-field label="价格（元）" error="{{errors.price || ''}}" required="{{true}}">
-          <input class="input" type="number" placeholder="如：88" value="{{form.price}}" data-k="price" bindinput="onInput" />
+        <ui-field label="价格（元）" hint="最低 0.5 元，支持两位小数" error="{{errors.price || ''}}" required="{{true}}">
+          <input class="input" type="digit" placeholder="如：0.5" value="{{form.price}}" data-k="price" bindinput="onInput" />
         </ui-field>
       </view>
 
       <view class="gap-item">
         <ui-field label="原价（元）" hint="可选" error="{{errors.originalPrice || ''}}">
-          <input class="input" type="number" placeholder="如：199" value="{{form.originalPrice}}" data-k="originalPrice" bindinput="onInput" />
+          <input class="input" type="digit" placeholder="如：199.9" value="{{form.originalPrice}}" data-k="originalPrice" bindinput="onInput" />
         </ui-field>
       </view>
 
@@ -110,6 +111,34 @@
     <view class="btn-bar">
       <view class="btn btn-outline btn-flex" bindtap="reset">清空</view>
       <view class="btn btn-primary btn-flex2" bindtap="submit">{{editGoodsId ? '保存修改并重新审核' : '发布商品'}}</view>
+    </view>
+  </view>
+</view>
+
+<view wx:if="{{categorySheetVisible}}" class="publish-category-sheet-mask" bindtap="closeCategorySheet" catchtouchmove="noop">
+  <view class="publish-category-sheet" catchtap="noop">
+    <view class="publish-category-sheet-handle"></view>
+
+    <view class="publish-category-sheet-head">
+      <view class="publish-category-sheet-head-main">
+        <text class="publish-category-sheet-title">选择商品分类</text>
+        <text class="publish-category-sheet-sub">买家会按这个分类筛选你的商品</text>
+      </view>
+      <text class="publish-category-sheet-close" bindtap="closeCategorySheet">收起</text>
+    </view>
+
+    <view class="publish-category-sheet-grid">
+      <block wx:for="{{categoryOptions}}" wx:key="key">
+        <view class="publish-category-sheet-cell">
+          <view
+            class="{{'publish-category-sheet-chip ' + (form.category === item.key ? 'is-active' : '')}}"
+            data-v="{{item.key}}"
+            bindtap="onCategoryTap"
+          >
+            <text class="publish-category-sheet-chip-text">{{item.label}}</text>
+          </view>
+        </view>
+      </block>
     </view>
   </view>
 </view>

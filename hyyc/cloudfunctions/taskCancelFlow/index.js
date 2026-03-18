@@ -173,6 +173,54 @@ function yyyymmdd(date = new Date()) {
   return `${year}${month}${day}`;
 }
 
+function formatDateTime(date = new Date()) {
+  const d = date instanceof Date ? date : new Date(date);
+  const yyyy = d.getFullYear();
+  const mm = `${d.getMonth() + 1}`.padStart(2, '0');
+  const dd = `${d.getDate()}`.padStart(2, '0');
+  const hh = `${d.getHours()}`.padStart(2, '0');
+  const mi = `${d.getMinutes()}`.padStart(2, '0');
+  return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
+}
+
+function cutText(text = '', max = 20) {
+  const normalized = pickStr(text).replace(/\s+/g, ' ');
+  if (!normalized) return '';
+  return normalized.length > max ? `${normalized.slice(0, max - 1)}…` : normalized;
+}
+
+function getSubscribeConfig() {
+  return {
+    templateId: pickStr(process.env.SUBSCRIBE_CHAT_TEMPLATE_ID),
+    thingKey: pickStr(process.env.SUBSCRIBE_CHAT_THING_KEY, 'thing1'),
+    nameKey: pickStr(process.env.SUBSCRIBE_CHAT_NAME_KEY, 'name2'),
+    timeKey: pickStr(process.env.SUBSCRIBE_CHAT_TIME_KEY, 'time3'),
+    miniprogramState: pickStr(process.env.MINIPROGRAM_STATE, 'formal'),
+  };
+}
+
+async function sendSubscribeMessage({ touser = '', senderName = '', preview = '', page = '' }) {
+  const targetOpenid = pickStr(touser);
+  const cfg = getSubscribeConfig();
+  if (!targetOpenid || !cfg.templateId) return;
+  try {
+    await cloud.openapi.subscribeMessage.send({
+      touser: targetOpenid,
+      templateId: cfg.templateId,
+      page: pickStr(page),
+      lang: 'zh_CN',
+      miniprogramState: cfg.miniprogramState,
+      data: {
+        [cfg.thingKey]: { value: cutText(preview, 20) || '你收到一条新消息' },
+        [cfg.nameKey]: { value: cutText(senderName, 10) || '邻里用户' },
+        [cfg.timeKey]: { value: formatDateTime(new Date()) },
+      }
+    });
+  } catch (err) {
+    console.warn('[taskCancelFlow] subscribe send failed', err);
+  }
+}
+
 function extractRespCode(huifuResp = {}) {
   return pickStr(
     huifuResp.sub_resp_code,
@@ -878,6 +926,13 @@ exports.main = async (event = {}) => {
         }
       });
 
+      await sendSubscribeMessage({
+        touser: workerOpenid,
+        senderName: requesterName,
+        preview: '申请取消任务',
+        page: `/pages/chat/room/index?tid=${encodeURIComponent(taskId)}`,
+      });
+
       return { ok: true, status: 'pending', requestId, messageId, taskCancel: payload };
     }
 
@@ -968,6 +1023,12 @@ exports.main = async (event = {}) => {
             approvedByName,
             refund: processingRefund,
           }));
+          await sendSubscribeMessage({
+            touser: pickStr(prepared.ownerOpenid, ownerOpenid),
+            senderName: approvedByName,
+            preview: '已同意取消，退款处理中',
+            page: `/pages/chat/room/index?tid=${encodeURIComponent(taskId)}&peerUserId=${encodeURIComponent(pickStr(prepared.workerId, workerId))}`,
+          });
           return {
             ok: true,
             status: 'cancelled',
@@ -1040,6 +1101,12 @@ exports.main = async (event = {}) => {
       });
 
       await syncCancelRequestMessage(pickStr(preparedCancel.messageId), payload);
+      await sendSubscribeMessage({
+        touser: pickStr(prepared.ownerOpenid, ownerOpenid),
+        senderName: approvedByName,
+        preview: refund.status === 'success' ? '已同意取消，退款已完成' : '已同意取消，退款处理中',
+        page: `/pages/chat/room/index?tid=${encodeURIComponent(taskId)}&peerUserId=${encodeURIComponent(pickStr(prepared.workerId, workerId))}`,
+      });
 
       if (refund.status === 'success') {
         try {

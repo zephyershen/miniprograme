@@ -53,17 +53,18 @@
 </template>
 
 <view class="px-24 py-16">
-  <!-- 分类筛选（清爽白底 + 绿色强调） -->
-  <view class="row mt-16 row-gap-8 wrap goods-chips">
-    <block wx:for="{{goodsCategoryOptions}}" wx:key="key">
-      <view
-        class="{{'goods-chip row-gap-item ' + (goodsCategory===item.key ? 'goods-chip-active' : '')}}"
-        bindtap="changeGoodsCategory"
-        data-k="{{item.key}}"
-      >
-        {{item.label}}
+  <!-- 分类筛选：常驻一行，点击展开为底部抽屉 -->
+  <view class="goods-category-trigger mt-16" bindtap="toggleGoodsCategoryExpand">
+    <view class="goods-category-trigger-main">
+      <text class="goods-category-trigger-title">商品分类</text>
+      <view class="goods-category-current">
+        <text class="goods-category-current-text">{{currentGoodsCategoryLabel}}</text>
       </view>
-    </block>
+    </view>
+    <view class="goods-category-trigger-side">
+      <text class="goods-category-trigger-side-text">全部分类</text>
+      <view class="{{'goods-category-trigger-arrow ' + (goodsCategoryExpanded ? 'is-expanded' : '')}}"></view>
+    </view>
   </view>
 
   <!-- 商品瀑布流（虚拟列表渲染）：只渲染视口附近的卡片，避免商品很多时滚动卡顿 -->
@@ -99,5 +100,33 @@
   <view wx:if="{{(!goodsTotal || goodsTotal === 0) && !isLoading}}" class="center" style="height: 50vh;">
     <text wx:if="{{loadMoreError}}" class="c-muted" bindtap="retryLoadMore">加载失败，点我重试</text>
     <text wx:else class="c-muted">暂无商品，去发布一个吧 ~</text>
+  </view>
+</view>
+
+<view wx:if="{{goodsCategoryExpanded}}" class="goods-category-sheet-mask" bindtap="closeGoodsCategoryDrawer" catchtouchmove="noop">
+  <view class="goods-category-sheet" catchtap="noop">
+    <view class="goods-category-sheet-handle"></view>
+
+    <view class="goods-category-sheet-head">
+      <view class="goods-category-sheet-head-main">
+        <text class="goods-category-sheet-title">全部分类</text>
+        <text class="goods-category-sheet-sub">当前筛选：{{currentGoodsCategoryLabel}}</text>
+      </view>
+      <text class="goods-category-sheet-close" bindtap="closeGoodsCategoryDrawer">收起</text>
+    </view>
+
+    <view class="goods-category-sheet-grid">
+      <block wx:for="{{goodsCategoryOptions}}" wx:key="key">
+        <view class="goods-category-sheet-cell">
+          <view
+            class="{{'goods-category-sheet-chip ' + (goodsCategory===item.key ? 'goods-category-sheet-chip-active' : '')}}"
+            bindtap="changeGoodsCategory"
+            data-k="{{item.key}}"
+          >
+            <text class="goods-category-sheet-chip-text">{{item.label}}</text>
+          </view>
+        </view>
+      </block>
+    </view>
   </view>
 </view>

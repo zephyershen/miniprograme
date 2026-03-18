@@ -13,8 +13,8 @@
         </ui-field>
       </view>
       <view class="gap-item">
-        <ui-field label="佣金（元）" error="{{errors.amount || ''}}" required="{{true}}">
-          <input class="input" type="number" placeholder="如：10" value="{{form.amount}}" data-k="amount" bindinput="onInput" />
+        <ui-field label="佣金（元）" hint="最低 0.5 元，支持两位小数" error="{{errors.amount || ''}}" required="{{true}}">
+          <input class="input" type="digit" placeholder="如：0.5" value="{{form.amount}}" data-k="amount" bindinput="onInput" />
         </ui-field>
       </view>
       <view class="gap-item">
