@@ -3,6 +3,18 @@ const { getStoredUser } = require('../../../utils/userIdentity');
 
 const db = wx.cloud.database();
 const MSG_COLLECTION = 'messages';
+const MESSAGE_WATCH_FIELDS = {
+  bizType: true,
+  ownerId: true,
+  sellerId: true,
+  peerUserId: true,
+  fromUserId: true,
+  readBySeller: true,
+  readByBuyer: true,
+  readByOwner: true,
+  readByPeer: true,
+  createTime: true,
+};
 
 function pickStr(...vals) {
   for (let i = 0; i < vals.length; i += 1) {
@@ -98,6 +110,7 @@ Page({
     const meId = pickStr(this._messageCenterUserId);
     if (!meId) return;
     const unread = this._computeWatchedUnreadCount(this._mergeWatchedMessageDocs(), meId);
+    if (Number(this.data.messageCenterUnread) === unread) return;
     this.setData({ messageCenterUnread: unread });
   },
   _openMessageCenterWatch(rawUser = {}) {
@@ -120,6 +133,7 @@ Page({
 
     this._messageCenterWatchers = watchList.map((item) => db.collection(MSG_COLLECTION)
       .where(item.where)
+      .field(MESSAGE_WATCH_FIELDS)
       .watch({
         onChange: (snapshot) => {
           this._messageWatchBuckets[item.key] = (snapshot && snapshot.docs) || [];

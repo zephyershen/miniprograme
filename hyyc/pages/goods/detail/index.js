@@ -5,6 +5,7 @@ const access = require('../../../config/access');
 const { getStoredUser, patchStoredUser } = require('../../../utils/userIdentity');
 
 const db = wx.cloud.database();
+const _ = db.command;
 const GOODS_COLLECTION = 'goods';
 const MSG_COLLECTION = 'messages';
 const USER_COLLECTION = 'userInfo';
@@ -543,6 +544,24 @@ Page({
     }
     return where;
   },
+  _buildGoodsChatUnreadWhere(goods = {}) {
+    const where = this._buildGoodsChatWhere(goods);
+    if (!where) return null;
+    const sellerOpenid = pickStr(goods && goods._openid);
+    const sellerId = pickStr(goods && goods.ownerId);
+    const unreadWhere = {
+      ...where,
+      readBySeller: _.neq(true),
+    };
+    if (sellerOpenid) {
+      unreadWhere.fromOpenid = _.neq(sellerOpenid);
+    } else if (sellerId) {
+      unreadWhere.fromUserId = _.neq(sellerId);
+    } else {
+      return null;
+    }
+    return unreadWhere;
+  },
   _isGoodsSellerMessage(doc = {}, goods = {}) {
     const sellerOpenid = pickStr(goods && goods._openid);
     const sellerId = pickStr(goods && goods.ownerId);
@@ -561,21 +580,21 @@ Page({
     const gid = pickStr(goods && (goods.id || goods._id), this.data.goods && this.data.goods.id);
     const currentGoodsId = pickStr(this.data.goods && this.data.goods.id);
     if (gid && currentGoodsId && gid !== currentGoodsId) return;
-    this.setData({ goodsChatUnreadCount: Number(unreadCount) || 0 });
+    const nextUnreadCount = Number(unreadCount) || 0;
+    if (Number(this.data.goodsChatUnreadCount) === nextUnreadCount) return;
+    this.setData({ goodsChatUnreadCount: nextUnreadCount });
   },
   loadGoodsChatUnread(goods = {}) {
-    const where = this._buildGoodsChatWhere(goods);
-    if (!where) {
+    const unreadWhere = this._buildGoodsChatUnreadWhere(goods);
+    if (!unreadWhere) {
       this.setData({ goodsChatUnreadCount: 0 });
       return;
     }
     db.collection(MSG_COLLECTION)
-      .where(where)
-      .limit(500)
-      .get({
+      .where(unreadWhere)
+      .count({
         success: (res) => {
-          const docs = (res && res.data) || [];
-          this._applyGoodsChatUnreadCount(this._computeGoodsChatUnreadCount(docs, goods), goods);
+          this._applyGoodsChatUnreadCount(Number(res && res.total) || 0, goods);
         },
         fail: (err) => {
           console.error('加载商品咨询未读失败', err);
@@ -584,19 +603,20 @@ Page({
       });
   },
   openGoodsChatBadgeWatch(goods = {}) {
-    const where = this._buildGoodsChatWhere(goods);
-    if (!where) {
+    const unreadWhere = this._buildGoodsChatUnreadWhere(goods);
+    if (!unreadWhere) {
       this.clearGoodsChatBadgeWatch();
       this.setData({ goodsChatUnreadCount: 0 });
       return;
     }
     this.clearGoodsChatBadgeWatch();
     this._goodsChatBadgeWatcher = db.collection(MSG_COLLECTION)
-      .where(where)
+      .where(unreadWhere)
+      .field({ _id: true })
       .watch({
         onChange: (snapshot) => {
           const docs = (snapshot && snapshot.docs) || [];
-          this._applyGoodsChatUnreadCount(this._computeGoodsChatUnreadCount(docs, goods), goods);
+          this._applyGoodsChatUnreadCount(docs.length, goods);
         },
         onError: (err) => {
           console.error('商品详情咨询未读 watch error', err);

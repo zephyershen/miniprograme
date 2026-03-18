@@ -4,6 +4,18 @@ const { getStoredUser, patchStoredUser } = require('../../../utils/userIdentity'
 const db = wx.cloud.database();
 const MSG_COLLECTION = 'messages';
 const GOODS_COLLECTION = 'goods';
+const GOODS_SESSION_MESSAGE_FIELDS = {
+  peerUserId: true,
+  peerNickname: true,
+  peerOpenid: true,
+  fromUserId: true,
+  fromNickname: true,
+  fromOpenid: true,
+  type: true,
+  text: true,
+  readBySeller: true,
+  createTime: true,
+};
 
 function pickStr(...vals) {
   for (let i = 0; i < vals.length; i += 1) {
@@ -25,6 +37,19 @@ function safeDecode(v = '') {
   } catch (err) {
     return raw;
   }
+}
+
+function buildGoodsSessionListSignature(list = []) {
+  return (Array.isArray(list) ? list : []).map((item) => (
+    [
+      item && item.peerUserId,
+      item && item.peerName,
+      item && item.peerOpenid,
+      item && item.lastText,
+      item && item.lastTs,
+      item && item.unreadCount,
+    ].join('::')
+  )).join('||');
 }
 
 Page({
@@ -190,14 +215,12 @@ Page({
     this.setData({ isLoading: true });
     db.collection(MSG_COLLECTION)
       .where(where)
+      .field(GOODS_SESSION_MESSAGE_FIELDS)
       .limit(500)
       .get({
         success: (res) => {
           const docs = (res && res.data) || [];
-          this.setData({
-            list: this.buildSessionListFromDocs(docs, currentUserId),
-            isLoading: false,
-          });
+          this._applySessionList(this.buildSessionListFromDocs(docs, currentUserId), false);
         },
         fail: (err) => {
           console.error('加载商品咨询会话失败', err);
@@ -272,6 +295,17 @@ Page({
       .map((key) => map[key])
       .sort((a, b) => (b.lastTs || 0) - (a.lastTs || 0));
   },
+  _applySessionList(list = [], isLoading = false) {
+    const nextSignature = buildGoodsSessionListSignature(list);
+    if (this._sessionListSignature === nextSignature && this.data.isLoading === !!isLoading) {
+      return;
+    }
+    this._sessionListSignature = nextSignature;
+    this.setData({
+      list,
+      isLoading: !!isLoading,
+    });
+  },
 
   toChat(e) {
     const peerUserId = pickStr(e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.peer);
@@ -293,13 +327,11 @@ Page({
     this.clearSessionsWatch();
     this._sessionsWatcher = db.collection(MSG_COLLECTION)
       .where(where)
+      .field(GOODS_SESSION_MESSAGE_FIELDS)
       .watch({
         onChange: (snapshot) => {
           const docs = (snapshot && snapshot.docs) || [];
-          this.setData({
-            list: this.buildSessionListFromDocs(docs, currentUserId),
-            isLoading: false,
-          });
+          this._applySessionList(this.buildSessionListFromDocs(docs, currentUserId), false);
         },
         onError: (err) => {
           console.error('商品咨询会话 watch error', err);

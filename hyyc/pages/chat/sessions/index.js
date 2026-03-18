@@ -4,6 +4,15 @@ const { getStoredUser } = require('../../../utils/userIdentity');
 // 使用云开发数据库 messages 集合作为聊天数据源
 const db = wx.cloud.database();
 const MSG_COLLECTION = 'messages';
+const SESSION_MESSAGE_FIELDS = {
+  peerUserId: true,
+  fromUserId: true,
+  fromNickname: true,
+  type: true,
+  text: true,
+  readByOwner: true,
+  createTime: true,
+};
 
 function buildTaskSessionPreview(doc = {}) {
   const type = String(doc && doc.type || 'text').trim();
@@ -12,6 +21,19 @@ function buildTaskSessionPreview(doc = {}) {
   if (type === 'task_release_request') return '申请释放任务';
   if (type === 'contact_request') return '申请查看手机号';
   return String(doc && doc.text || '').trim();
+}
+
+function buildSessionListSignature(list = []) {
+  return (Array.isArray(list) ? list : []).map((item) => (
+    [
+      item && item.peerUserId,
+      item && item.peerName,
+      item && item.lastType,
+      item && item.lastText,
+      item && item.lastTs,
+      item && item.unreadCount,
+    ].join('::')
+  )).join('||');
 }
 
 Page({
@@ -71,13 +93,13 @@ Page({
 
     db.collection(MSG_COLLECTION)
       .where({ tid, ownerId })
+      .field(SESSION_MESSAGE_FIELDS)
       .orderBy('createTime', 'desc')
       .limit(500)
       .get({
         success: (res) => {
           const docs = (res && res.data) || [];
-          const list = this.buildSessionListFromDocs(docs, ownerId);
-          this.setData({ list, isLoading: false });
+          this._applySessionList(this.buildSessionListFromDocs(docs, ownerId), false);
         },
         fail: (err) => {
           console.error('加载聊天会话失败', err);
@@ -158,6 +180,14 @@ Page({
       .map(k => map[k])
       .sort((a, b) => (b.lastTs || 0) - (a.lastTs || 0));
   },
+  _applySessionList(list = [], isLoading = false) {
+    const nextSignature = buildSessionListSignature(list);
+    if (this._sessionListSignature === nextSignature && this.data.isLoading === !!isLoading) {
+      return;
+    }
+    this._sessionListSignature = nextSignature;
+    this.setData({ list, isLoading: !!isLoading });
+  },
 
   // 会话列表的实时监听：保证业主停留在本页时，列表和未读角标实时刷新
   openSessionsWatch() {
@@ -171,12 +201,12 @@ Page({
     const self = this;
     this._sessionsWatcher = db.collection(MSG_COLLECTION)
       .where({ tid, ownerId })
+      .field(SESSION_MESSAGE_FIELDS)
       .orderBy('createTime', 'desc')
       .watch({
         onChange(snapshot) {
           const docs = (snapshot && snapshot.docs) || [];
-          const list = self.buildSessionListFromDocs(docs, ownerId);
-          self.setData({ list, isLoading: false });
+          self._applySessionList(self.buildSessionListFromDocs(docs, ownerId), false);
         },
         onError(err) {
           console.error('聊天会话列表 watch error', err);

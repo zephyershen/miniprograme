@@ -8,7 +8,8 @@ const db = wx.cloud.database();
 const _ = db.command;
 const TASK_COLLECTION = 'tasks';
 const MSG_COLLECTION = 'messages';
-const REFUND_SYNC_INTERVAL_MS = 3000;
+const REFUND_SYNC_MIN_DELAY_MS = 30000;
+const REFUND_SYNC_MAX_DELAY_MS = 5 * 60 * 1000;
 const TEMP_URL_BATCH_SIZE = 20;
 
 function pickStr(...vals) {
@@ -34,6 +35,13 @@ function safeFormatDateTime(ts) {
   const d = new Date(ts);
   if (!d || Number.isNaN(d.getTime())) return '';
   return formatDateTime(d);
+}
+
+function isRefundSyncHardStop(code = '') {
+  const normalized = pickStr(code);
+  return normalized === 'MISSING_REFUND_META'
+    || normalized === 'TASK_NOT_FOUND'
+    || normalized === 'NO_PERMISSION';
 }
 
 function resolveTaskCancelState(task = {}) {
@@ -86,11 +94,20 @@ Page({
 	    // 任务发布者视角下，该任务下所有会话的未读消息总数（以“有未读的会话数量”计）
 	    unreadCount: 0,
 	    // 普通住户视角：当前任务下，与业主聊天的未读消息条数
-	    peerUnreadCount: 0
+		    peerUnreadCount: 0
+		  },
+	  _refundSyncing: false,
+	  _refundSyncTimer: null,
+	  _refundSyncRetryCount: 0,
+	  _pageVisible: false,
+	  _setNumericDataIfChanged(key = '', value = 0) {
+	    const field = pickStr(key);
+	    if (!field) return;
+	    const nextValue = Number(value) || 0;
+	    if (Number(this.data[field]) === nextValue) return;
+	    this.setData({ [field]: nextValue });
 	  },
-  _refundSyncing: false,
-  _refundSyncTimer: null,
-  async _getTempFileURLMap(fileIDs = []) {
+	  async _getTempFileURLMap(fileIDs = []) {
     const uniq = [];
     const seen = {};
     normalizeImageList(fileIDs).forEach((fileID) => {
@@ -273,10 +290,11 @@ Page({
       }
     });
   },
-		  onLoad(q){
-    const id = q.id;
-    this._loadTaskDetail(id);
-		  },
+			  onLoad(q){
+	    this._pageVisible = true;
+	    const id = q.id;
+	    this._loadTaskDetail(id);
+			  },
   _maybeSyncPendingRefund(task = {}) {
     const resolved = resolveTaskCancelState(task);
     if (pickStr(resolved.payStatus) !== 'refund_pending') {
@@ -285,18 +303,32 @@ Page({
     }
     const taskId = pickStr(task._id, task.id, this.data.task && this.data.task.id);
     if (!taskId) return;
-    if (!this._refundSyncTimer) {
-      this._refundSyncTimer = setInterval(() => {
-        this._runRefundSync(taskId);
-      }, REFUND_SYNC_INTERVAL_MS);
-    }
+    this._refundSyncRetryCount = 0;
     this._runRefundSync(taskId);
+  },
+  _scheduleRefundSync(taskId = '') {
+    const currentTaskId = pickStr(taskId, this.data.task && this.data.task.id);
+    if (!currentTaskId || !this._pageVisible) return;
+    if (this._refundSyncTimer) {
+      clearTimeout(this._refundSyncTimer);
+      this._refundSyncTimer = null;
+    }
+    const delay = Math.min(
+      REFUND_SYNC_MIN_DELAY_MS * Math.pow(2, Math.max(0, this._refundSyncRetryCount - 1)),
+      REFUND_SYNC_MAX_DELAY_MS
+    );
+    this._refundSyncTimer = setTimeout(() => {
+      this._refundSyncTimer = null;
+      if (!this._pageVisible) return;
+      this._runRefundSync(currentTaskId);
+    }, delay);
   },
   _clearRefundSyncTimer() {
     if (this._refundSyncTimer) {
-      clearInterval(this._refundSyncTimer);
+      clearTimeout(this._refundSyncTimer);
       this._refundSyncTimer = null;
     }
+    this._refundSyncRetryCount = 0;
   },
   _runRefundSync(taskId = '') {
     const currentTaskId = pickStr(taskId, this.data.task && this.data.task.id);
@@ -318,82 +350,89 @@ Page({
       if (ret && ret.ok && (ret.already || (ret.refund && pickStr(ret.refund.status) === 'success'))) {
         this._clearRefundSyncTimer();
         this._loadTaskDetail(currentTaskId, { silent: true });
+        return;
       }
-      if (ret && ret.ok === false && pickStr(ret.code) === 'MISSING_REFUND_META') {
+      if (ret && ret.ok === false && isRefundSyncHardStop(ret.code)) {
         this._clearRefundSyncTimer();
+        return;
       }
+      this._refundSyncRetryCount += 1;
+      this._scheduleRefundSync(currentTaskId);
     }).catch((err) => {
       console.warn('同步退款状态失败', err);
+      this._refundSyncRetryCount += 1;
+      this._scheduleRefundSync(currentTaskId);
     }).finally(() => {
       this._refundSyncing = false;
     });
   },
-		  onShow(){
-		    // 从其它页面返回时重新拉最新任务状态，避免按钮沿用旧缓存
-		    const task = this.data.task || {};
-		    if (!task.id) return;
+			  onShow(){
+	    this._pageVisible = true;
+			    // 从其它页面返回时重新拉最新任务状态，避免按钮沿用旧缓存
+			    const task = this.data.task || {};
+			    if (!task.id) return;
         this._loadTaskDetail(task.id, { silent: true });
-		  },
+			  },
 
-		  onHide(){
-		    // 离开详情页时关闭监听，避免重复监听和资源浪费
-		    this.clearBadgeWatch();
+			  onHide(){
+	    this._pageVisible = false;
+			    // 离开详情页时关闭监听，避免重复监听和资源浪费
+			    this.clearBadgeWatch();
         this._clearRefundSyncTimer();
-		  },
+			  },
 
-		  onUnload(){
-		    this.clearBadgeWatch();
+			  onUnload(){
+	    this._pageVisible = false;
+			    this.clearBadgeWatch();
         this._clearRefundSyncTimer();
-		  },
-	  // 统计当前任务下，发布者视角的未读消息总数（按“消息条数”统计）
-	  loadUnreadCount(tid, ownerId){
-    if (!tid || !ownerId) {
-      this.setData({ unreadCount: 0 });
-      return;
-    }
-    this.setData({ unreadCount: 0 });
-	    db.collection(MSG_COLLECTION)
-	      .where({
-          tid,
+			  },
+		  // 统计当前任务下，发布者视角的未读消息总数（按“消息条数”统计）
+		  loadUnreadCount(tid, ownerId){
+	    if (!tid || !ownerId) {
+	      this._setNumericDataIfChanged('unreadCount', 0);
+	      return;
+	    }
+		    db.collection(MSG_COLLECTION)
+		      .where({
+	          tid,
           ownerId,
           fromUserId: _.neq(ownerId),
           readByOwner: _.neq(true)
         })
-	      .count({
-	        success: (res) => {
-	          this.setData({ unreadCount: Number(res && res.total) || 0 });
-	        },
-	        fail: (err) => {
-	          console.error('统计未读消息失败', err);
-	          this.setData({ unreadCount: 0 });
-	        }
-	      });
-	  },
-		  // 普通住户视角：统计当前任务下与业主会话中的未读消息条数
-	  loadPeerUnread(tid, ownerId, peerUserId){
-	    if (!tid || !ownerId || !peerUserId) {
-	      this.setData({ peerUnreadCount: 0 });
-	      return;
-	    }
-	    this.setData({ peerUnreadCount: 0 });
-	    db.collection(MSG_COLLECTION)
-	      .where({
-          tid,
+		      .count({
+		        success: (res) => {
+		          this._setNumericDataIfChanged('unreadCount', Number(res && res.total) || 0);
+		        },
+		        fail: (err) => {
+		          console.error('统计未读消息失败', err);
+		          this._setNumericDataIfChanged('unreadCount', 0);
+		        }
+		      });
+		  },
+			  // 普通住户视角：统计当前任务下与业主会话中的未读消息条数
+		  loadPeerUnread(tid, ownerId, peerUserId){
+		    if (!tid || !ownerId || !peerUserId) {
+		      this._setNumericDataIfChanged('peerUnreadCount', 0);
+		      return;
+		    }
+		    db.collection(MSG_COLLECTION)
+		      .where({
+	          tid,
           ownerId,
           peerUserId,
           fromUserId: ownerId,
           readByPeer: _.neq(true)
         })
-	      .count({
-	        success: (res) => {
-	          this.setData({ peerUnreadCount: Number(res && res.total) || 0 });
-	        },
-	        fail: (err) => {
-	          console.error('统计住户未读消息失败', err);
-	          this.setData({ peerUnreadCount: 0 });
-	        }
-		      });
-	  },
+		      .count({
+		        success: (res) => {
+		          this._setNumericDataIfChanged('peerUnreadCount', Number(res && res.total) || 0);
+		        },
+		        fail: (err) => {
+		          console.error('统计住户未读消息失败', err);
+		          this._setNumericDataIfChanged('peerUnreadCount', 0);
+		        }
+			      });
+		  },
 
 	  // 根据当前身份，为任务详情页挂载实时监听，用于实时刷新未读角标
 	  setupBadgeWatch(task, myId, isOwner){
