@@ -857,14 +857,136 @@ async function applyRefundStateToTask({ taskId = '', task = {}, refund = {}, now
   };
 }
 
+async function syncRefundStatusForTask({
+  taskId = '',
+  task = null,
+  openid = '',
+  systemCompensate = false,
+  now = new Date(),
+}) {
+  const normalizedTaskId = pickStr(taskId, task && task._id);
+  if (!normalizedTaskId) {
+    return { ok: false, code: 'MISSING_TASK_ID', msg: '缺少 taskId' };
+  }
+
+  const currentTask = task || await getTaskById(normalizedTaskId);
+  if (!currentTask) {
+    return { ok: false, code: 'TASK_NOT_FOUND', msg: '任务不存在', taskId: normalizedTaskId };
+  }
+
+  const ownerOpenid = pickStr(currentTask._openid);
+  const workerOpenid = pickStr(currentTask.workerOpenid, currentTask.worker_openid);
+  const pay = currentTask.pay && typeof currentTask.pay === 'object' ? currentTask.pay : {};
+  const payStatus = pickStr(pay.status);
+
+  if (!systemCompensate && pickStr(openid) !== ownerOpenid && pickStr(openid) !== workerOpenid) {
+    return { ok: false, code: 'NO_PERMISSION', msg: '无权同步退款状态', taskId: normalizedTaskId };
+  }
+
+  const queryMeta = buildRefundQueryMeta(currentTask);
+  if (!queryMeta.refundHfSeqId && !(queryMeta.refundReqDate && queryMeta.refundReqSeqId)) {
+    return { ok: false, code: 'MISSING_REFUND_META', msg: '缺少退款查询参数', taskId: normalizedTaskId };
+  }
+
+  if (payStatus === 'refunded') {
+    return {
+      ok: true,
+      already: true,
+      changed: false,
+      stillPending: false,
+      taskId: normalizedTaskId,
+      status: 'cancelled',
+      refundStatus: 'success',
+      msg: '退款已完成'
+    };
+  }
+
+  const queryRes = await cloud.callFunction({
+    name: 'huifuMiniappPay',
+    data: {
+      action: 'scanpay_refund_query',
+      refundReqDate: queryMeta.refundReqDate,
+      refundReqSeqId: queryMeta.refundReqSeqId,
+      refundHfSeqId: queryMeta.refundHfSeqId,
+    }
+  });
+  const ret = queryRes && queryRes.result ? queryRes.result : null;
+  if (!ret || !ret.ok) {
+    const err = ret && ret.err
+      ? (typeof ret.err === 'string' ? { code: 'REFUND_QUERY_FAILED', msg: ret.err } : ret.err)
+      : { code: 'REFUND_QUERY_FAILED', msg: '退款查询失败' };
+    return {
+      ok: false,
+      code: err.code || 'REFUND_QUERY_FAILED',
+      msg: err.msg || '退款查询失败',
+      err,
+      taskId: normalizedTaskId,
+    };
+  }
+
+  const huifuResp = ret.huifuResp || {};
+  const refundStatus = resolveRefundStatus(huifuResp);
+  const refund = buildResolvedRefundMeta(currentTask, huifuResp, refundStatus, now);
+
+  if (refundStatus === 'failed') {
+    return {
+      ok: false,
+      code: extractRespCode(huifuResp) || 'REFUND_QUERY_FAILED',
+      msg: extractRespDesc(huifuResp) || '退款查询未返回成功结果',
+      refund,
+      taskId: normalizedTaskId,
+    };
+  }
+
+  await applyRefundStateToTask({ taskId: normalizedTaskId, task: currentTask, refund, now });
+  return {
+    ok: true,
+    changed: refundStatus === 'success' && payStatus !== 'refunded',
+    stillPending: refundStatus !== 'success',
+    taskId: normalizedTaskId,
+    status: 'cancelled',
+    refund,
+    refundStatus,
+    msg: refundStatus === 'success' ? '退款已完成' : '退款处理中',
+  };
+}
+
 exports.main = async (event = {}) => {
   const { OPENID } = cloud.getWXContext();
   const systemCompensate = isSystemCompensateCall(event);
   const action = pickStr(event.action);
-  if (systemCompensate && action !== 'sync_refund_status') {
+  if (systemCompensate && action !== 'sync_refund_status' && action !== 'batch_sync_refund_status') {
     return { ok: false, code: 'SYSTEM_ACTION_NOT_ALLOWED', msg: '系统补偿仅支持退款状态同步' };
   }
   if (!OPENID && !systemCompensate) return { ok: false, code: 'MISSING_OPENID', msg: '缺少 OPENID' };
+  const taskIds = Array.isArray(event.taskIds)
+    ? event.taskIds.map((item) => pickStr(item)).filter(Boolean).slice(0, 5)
+    : [];
+  if (action === 'batch_sync_refund_status') {
+    if (!taskIds.length) return { ok: false, code: 'MISSING_TASK_IDS', msg: '缺少 taskIds' };
+    const uniqueTaskIds = taskIds.filter((item, index) => taskIds.indexOf(item) === index);
+    const results = await Promise.allSettled(uniqueTaskIds.map((currentTaskId) => (
+      syncRefundStatusForTask({
+        taskId: currentTaskId,
+        openid: OPENID,
+        systemCompensate,
+        now: new Date(),
+      })
+    )));
+    return {
+      ok: true,
+      results: results.map((item, index) => (
+        item && item.status === 'fulfilled'
+          ? item.value
+          : {
+            ok: false,
+            taskId: uniqueTaskIds[index],
+            code: 'BATCH_SYNC_FAILED',
+            msg: item && item.reason && item.reason.message ? item.reason.message : '批量同步退款状态失败',
+          }
+      ))
+    };
+  }
   const taskId = pickStr(event.taskId, event.tid, event.id);
   if (!taskId) return { ok: false, code: 'MISSING_TASK_ID', msg: '缺少 taskId' };
 
@@ -1350,56 +1472,13 @@ exports.main = async (event = {}) => {
     }
 
     if (action === 'sync_refund_status') {
-      if (!systemCompensate && pickStr(OPENID) !== ownerOpenid && pickStr(OPENID) !== workerOpenid) {
-        return { ok: false, code: 'NO_PERMISSION', msg: '无权同步退款状态' };
-      }
-
-      const queryMeta = buildRefundQueryMeta(task);
-      if (!queryMeta.refundHfSeqId && !(queryMeta.refundReqDate && queryMeta.refundReqSeqId)) {
-        return { ok: false, code: 'MISSING_REFUND_META', msg: '缺少退款查询参数' };
-      }
-
-      if (payStatus === 'refunded') {
-        return { ok: true, already: true, status: 'cancelled', refundStatus: 'success', msg: '退款已完成' };
-      }
-
-      const queryRes = await cloud.callFunction({
-        name: 'huifuMiniappPay',
-        data: {
-          action: 'scanpay_refund_query',
-          refundReqDate: queryMeta.refundReqDate,
-          refundReqSeqId: queryMeta.refundReqSeqId,
-          refundHfSeqId: queryMeta.refundHfSeqId,
-        }
+      return syncRefundStatusForTask({
+        taskId,
+        task,
+        openid: OPENID,
+        systemCompensate,
+        now,
       });
-      const ret = queryRes && queryRes.result ? queryRes.result : null;
-      if (!ret || !ret.ok) {
-        const err = ret && ret.err
-          ? (typeof ret.err === 'string' ? { code: 'REFUND_QUERY_FAILED', msg: ret.err } : ret.err)
-          : { code: 'REFUND_QUERY_FAILED', msg: '退款查询失败' };
-        return { ok: false, code: err.code || 'REFUND_QUERY_FAILED', msg: err.msg || '退款查询失败', err };
-      }
-
-      const huifuResp = ret.huifuResp || {};
-      const refundStatus = resolveRefundStatus(huifuResp);
-      const refund = buildResolvedRefundMeta(task, huifuResp, refundStatus, now);
-
-      if (refundStatus === 'failed') {
-        return {
-          ok: false,
-          code: extractRespCode(huifuResp) || 'REFUND_QUERY_FAILED',
-          msg: extractRespDesc(huifuResp) || '退款查询未返回成功结果',
-          refund,
-        };
-      }
-
-      await applyRefundStateToTask({ taskId, task, refund, now });
-      return {
-        ok: true,
-        status: 'cancelled',
-        refund,
-        msg: refundStatus === 'success' ? '退款已完成' : '退款处理中',
-      };
     }
 
     return { ok: false, code: 'UNSUPPORTED_ACTION', msg: `unsupported_action: ${action}` };

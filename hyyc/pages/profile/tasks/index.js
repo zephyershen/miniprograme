@@ -5,7 +5,11 @@ const { getStoredUser } = require('../../../utils/userIdentity');
 // 使用云开发数据库 tasks 集合加载「我的任务」
 const db = wx.cloud.database();
 const TASK_COLLECTION = 'tasks';
-const REFUND_SYNC_INTERVAL_MS = 3000;
+const REFUND_SYNC_MIN_DELAY_MS = 30000;
+const REFUND_SYNC_MAX_DELAY_MS = 5 * 60 * 1000;
+const AUTO_CLEAN_DELAY_MS = 1500;
+const AUTO_CLEAN_COOLDOWN_MS = 12 * 60 * 60 * 1000;
+const AUTO_CLEAN_STORAGE_KEY = 'hyyc_profile_tasks_owner_autoclean_at';
 
 function pickStr(...vals) {
   for (const v of vals) {
@@ -66,6 +70,114 @@ function canWorkerDeleteTaskRecord(statusRaw = '', payStatus = '') {
     || (status === 'cancelled' && pay === 'refunded');
 }
 
+function buildTaskListView(doc = {}, options = {}) {
+  const now = Number(options.now) || Date.now();
+  const isOwnerTab = !!options.isOwnerTab;
+  const selectedIds = Array.isArray(options.selectedIds) ? options.selectedIds : [];
+  const ONE_DAY = 24 * 60 * 60 * 1000;
+  const ONE_WEEK = 7 * ONE_DAY;
+  const resolvedCancelState = resolveTaskCancelState(doc);
+  const statusRaw = resolvedCancelState.statusRaw;
+  const payStatus = resolvedCancelState.payStatus;
+  const statusMap = {
+    '': '已发布',
+    posted: '已发布',
+    pay_pending: '待付款',
+    accepted: '已接单',
+    submitted: '待确认',
+    completed: '已完成',
+    cancelled: '已取消'
+  };
+  const statusText = statusRaw === 'cancelled' && payStatus === 'refund_pending'
+    ? '退款中'
+    : (statusMap[statusRaw] || statusRaw || '已发布');
+
+  const rawDeadline = doc.deadline;
+  const createdAt = doc.createdAt;
+  const createdTs = createdAt && createdAt.getTime ? createdAt.getTime() : null;
+  const effectiveDeadline = rawDeadline != null
+    ? rawDeadline
+    : (createdTs ? (createdTs + ONE_WEEK) : null);
+  const hasDeadline = effectiveDeadline != null;
+  const isExpired = hasDeadline && effectiveDeadline <= now;
+  const isActive = hasDeadline ? effectiveDeadline > now : true;
+  let ownerActionText = '';
+  if (isOwnerTab) {
+    if (statusRaw === 'pay_pending') {
+      ownerActionText = '删除';
+    } else if (statusRaw === 'posted') {
+      ownerActionText = '删除';
+    } else if (statusRaw === 'accepted' || statusRaw === 'submitted') {
+      ownerActionText = '申请取消';
+    } else if (statusRaw === 'completed') {
+      ownerActionText = '删除记录';
+    } else if (statusRaw === 'cancelled' && payStatus === 'refunded') {
+      ownerActionText = '删除记录';
+    }
+  }
+
+  const id = pickStr(doc._id, doc.id);
+  return {
+    id,
+    title: pickStr(doc.title, '未命名任务'),
+    workerId: pickStr(doc.workerId),
+    amountText: formatMoney(doc.amount),
+    statusRaw,
+    payStatus,
+    statusText,
+    canPay: isOwnerTab && statusRaw === 'pay_pending',
+    canEdit: isOwnerTab && statusRaw === 'posted',
+    ownerActionText,
+    canRefundDirect: isOwnerTab && statusRaw === 'posted',
+    needsCancelRequest: isOwnerTab && (statusRaw === 'accepted' || statusRaw === 'submitted'),
+    canDeleteRecord: isOwnerTab
+      ? canOwnerDeleteTaskRecord(statusRaw, payStatus)
+      : canWorkerDeleteTaskRecord(statusRaw, payStatus),
+    deadlineText: hasDeadline ? formatDateTime(effectiveDeadline) : '默认 7 天内有效',
+    isActive,
+    isExpired,
+    selected: selectedIds.indexOf(id) > -1,
+  };
+}
+
+function getPendingRefundTaskIds(list = []) {
+  return (Array.isArray(list) ? list : [])
+    .filter((item) => pickStr(item && item.payStatus) === 'refund_pending')
+    .map((item) => pickStr(item && item.id))
+    .filter(Boolean)
+    .slice(0, 5);
+}
+
+function isHardStopRefundSyncError(result = {}) {
+  const code = pickStr(result && result.code);
+  return code === 'TASK_NOT_FOUND'
+    || code === 'NO_PERMISSION'
+    || code === 'MISSING_REFUND_META';
+}
+
+function getExpiredAutoCleanupTaskIds(docs = [], now = Date.now()) {
+  const ONE_DAY = 24 * 60 * 60 * 1000;
+  const ONE_WEEK = 7 * ONE_DAY;
+  const ONE_MONTH = 30 * ONE_DAY;
+  return (Array.isArray(docs) ? docs : [])
+    .map((doc) => {
+      const statusRaw = pickStr(doc && doc.status);
+      const pay = doc && doc.pay && typeof doc.pay === 'object' ? doc.pay : {};
+      const payStatus = pickStr(pay.status);
+      const canAutoDelete = statusRaw === 'pay_pending' || (statusRaw === 'cancelled' && payStatus === 'refunded');
+      if (!canAutoDelete) return '';
+      const rawDeadline = doc && doc.deadline;
+      const createdAt = doc && doc.createdAt;
+      const createdTs = createdAt && createdAt.getTime ? createdAt.getTime() : null;
+      const effectiveDeadline = rawDeadline != null
+        ? rawDeadline
+        : (createdTs ? (createdTs + ONE_WEEK) : null);
+      if (!effectiveDeadline) return '';
+      return now - effectiveDeadline >= ONE_MONTH ? pickStr(doc && doc._id) : '';
+    })
+    .filter(Boolean);
+}
+
 Page({
   data: {
     tab: 'owner',
@@ -81,20 +193,39 @@ Page({
   _syncingPendingRefunds: false,
   _loadingTasks: false,
   _pendingRefundTimer: null,
-  onShow(){ this.load(); },
-  onHide(){ this._stopPendingRefundTimer(); },
-  onUnload(){ this._stopPendingRefundTimer(); },
+  _pendingRefundTaskIds: [],
+  _pendingRefundRetryCount: 0,
+  _autoCleanupTimer: null,
+  _pageVisible: false,
+  onShow(){
+    this._pageVisible = true;
+    this.load();
+  },
+  onHide(){
+    this._pageVisible = false;
+    this._stopPendingRefundTimer();
+    this._stopAutoCleanupTimer();
+  },
+  onUnload(){
+    this._pageVisible = false;
+    this._stopPendingRefundTimer();
+    this._stopAutoCleanupTimer();
+  },
   setTab(e){
     // 切换 tab 时退出批量模式
     this._stopPendingRefundTimer();
+    this._stopAutoCleanupTimer();
     this.setData({ tab: e.currentTarget.dataset.k, batchMode: false, selectedIds: [] }, ()=> this.load());
   },
   load(options = {}){
     const silent = !!(options && options.silent);
+    const skipRefundSync = !!(options && options.skipRefundSync);
     if (this._loadingTasks) return;
     this._loadingTasks = true;
     const u = getStoredUser();
     if (!u || !u.realname) {
+      this._stopPendingRefundTimer();
+      this._stopAutoCleanupTimer();
       this._loadingTasks = false;
       wx.navigateTo({ url: '/pages/welcome/index' });
       return;
@@ -102,6 +233,8 @@ Page({
 
     const userId = u.id || '';
     if (!userId) {
+      this._stopPendingRefundTimer();
+      this._stopAutoCleanupTimer();
       this._loadingTasks = false;
       this.setData({ list: [], isLoading: false });
       return;
@@ -116,14 +249,24 @@ Page({
 
     db.collection(TASK_COLLECTION)
       .where({ [field]: userId })
+      .field({
+        title: true,
+        amount: true,
+        status: true,
+        pay: true,
+        cancelRequest: true,
+        deadline: true,
+        createdAt: true,
+        ownerDeletedAt: true,
+        workerDeletedAt: true,
+        workerId: true,
+      })
       .orderBy('createdAt', 'desc')
       .get({
         success: (res) => {
           const now = Date.now();
-          const ONE_DAY = 24 * 60 * 60 * 1000;
-          const ONE_WEEK = 7 * ONE_DAY;
-          const ONE_MONTH = 30 * ONE_DAY;
           const isOwnerTab = this.data.tab === 'owner';
+          const prevSelectedIds = Array.isArray(this.data.selectedIds) ? this.data.selectedIds : [];
           const docs = (res.data || []).filter((doc) => {
             if (isOwnerTab) {
               return !doc || !doc.ownerDeletedAt;
@@ -131,173 +274,171 @@ Page({
             return !doc || !doc.workerDeletedAt;
           });
 
-          const list = docs.map(doc => {
-            const resolvedCancelState = resolveTaskCancelState(doc);
-            const statusRaw = resolvedCancelState.statusRaw;
-            const payStatus = resolvedCancelState.payStatus;
-            const statusMap = {
-              '': '已发布',
-              posted: '已发布',
-              pay_pending: '待付款',
-              accepted: '已接单',
-              submitted: '待确认',
-              completed: '已完成',
-              cancelled: '已取消'
-            };
-            const statusText = statusRaw === 'cancelled' && payStatus === 'refund_pending'
-              ? '退款中'
-              : (statusMap[statusRaw] || statusRaw || '已发布');
-
-            const rawDeadline = doc.deadline;
-            const createdAt = doc.createdAt;
-            const createdTs = createdAt && createdAt.getTime ? createdAt.getTime() : null;
-            // 没有设置截止时间时，默认从创建时间起 7 天内有效
-            const effectiveDeadline = rawDeadline != null
-              ? rawDeadline
-              : (createdTs ? (createdTs + ONE_WEEK) : null);
-            const hasDeadline = effectiveDeadline != null;
-            const isExpired = hasDeadline && effectiveDeadline <= now;
-            const isActive = hasDeadline ? effectiveDeadline > now : true;
-            let ownerActionText = '';
-            if (isOwnerTab) {
-              if (statusRaw === 'pay_pending') {
-                ownerActionText = '删除';
-              } else if (statusRaw === 'posted') {
-                ownerActionText = '删除';
-              } else if (statusRaw === 'accepted' || statusRaw === 'submitted') {
-                ownerActionText = '申请取消';
-              } else if (statusRaw === 'completed') {
-                ownerActionText = '删除记录';
-              } else if (statusRaw === 'cancelled' && payStatus === 'refunded') {
-                ownerActionText = '删除记录';
-              }
-            }
-            return {
-              ...doc,
-              id: doc._id,
-              amountText: formatMoney(doc.amount),
-              statusRaw,
-              payStatus,
-              statusText,
-              canPay: isOwnerTab && statusRaw === 'pay_pending',
-              canEdit: isOwnerTab && statusRaw === 'posted',
-              ownerActionText,
-              canRefundDirect: isOwnerTab && statusRaw === 'posted',
-              needsCancelRequest: isOwnerTab && (statusRaw === 'accepted' || statusRaw === 'submitted'),
-              canDeleteRecord: isOwnerTab
-                ? canOwnerDeleteTaskRecord(statusRaw, payStatus)
-                : canWorkerDeleteTaskRecord(statusRaw, payStatus),
-              // 未设置截止时间时，展示默认过期时间
-              deadlineText: hasDeadline ? formatDateTime(effectiveDeadline) : '默认 7 天内有效',
-              isActive,
-              isExpired
-            };
-          });
+          const list = docs.map((doc) => buildTaskListView(doc, {
+            now,
+            isOwnerTab,
+            selectedIds: prevSelectedIds,
+          }));
+          const deletableIds = isOwnerTab
+            ? list.filter((item) => item && item.canDeleteRecord).map((item) => item.id)
+            : [];
+          const selectedIds = isOwnerTab
+            ? prevSelectedIds.filter((id) => deletableIds.indexOf(id) > -1)
+            : [];
+          if (selectedIds.length !== prevSelectedIds.length) {
+            list.forEach((item) => {
+              item.selected = selectedIds.indexOf(item.id) > -1;
+            });
+          }
+          const isAllSelected = !!(deletableIds.length && selectedIds.length === deletableIds.length);
+          const isPartialSelected = !!(selectedIds.length && selectedIds.length < deletableIds.length);
 
           this.setData({
             list,
             isLoading: false,
-            deletableCount: isOwnerTab ? list.filter(item => item && item.canDeleteRecord).length : 0
+            selectedIds,
+            isAllSelected,
+            isPartialSelected,
+            deletableCount: isOwnerTab ? deletableIds.length : 0
           });
-          this._syncPendingRefunds(list);
-          this._updatePendingRefundTimer(list);
-          this._loadingTasks = false;
-
-          // 仅在“我发布的”列表中，自动清理：已过期且超过 30 天的任务（连同聊天记录一起删除）
-          if (this.data.tab === 'owner' && docs.length) {
-              const expiredTooLongIds = docs
-              .map(doc => {
-                const statusRaw = (doc.status == null ? '' : String(doc.status).trim());
-                const pay = doc.pay && typeof doc.pay === 'object' ? doc.pay : {};
-                const payStatus = (pay.status == null ? '' : String(pay.status).trim());
-                const canAutoDelete = statusRaw === 'pay_pending' || (statusRaw === 'cancelled' && payStatus === 'refunded');
-                if (!canAutoDelete) return null;
-                const rawDeadline = doc.deadline;
-                const createdAt = doc.createdAt;
-                const createdTs = createdAt && createdAt.getTime ? createdAt.getTime() : null;
-                const effectiveDeadline = rawDeadline != null
-                  ? rawDeadline
-                  : (createdTs ? (createdTs + ONE_WEEK) : null);
-                if (!effectiveDeadline) return null;
-                if (now - effectiveDeadline >= ONE_MONTH) {
-                  return doc._id;
-                }
-                return null;
-              })
-              .filter(id => !!id);
-
-            if (expiredTooLongIds.length) {
-              Promise.all(
-                expiredTooLongIds.map(id => this._deleteTaskWithMessages(id))
-              ).then(() => {
-                // 自动清理后刷新一次列表
-                this.load();
-              }).catch(err => {
-                console.error('自动清理过期任务失败', err);
-              });
-            }
+          this._scheduleAutoCleanup(docs, now);
+          if (skipRefundSync) {
+            this._updatePendingRefundTimer(list);
+          } else {
+            this._pendingRefundRetryCount = 0;
+            this._syncPendingRefunds(list);
           }
+          this._loadingTasks = false;
         },
         fail: (err) => {
           console.error('加载我的任务失败', err);
+          this._stopPendingRefundTimer();
+          this._stopAutoCleanupTimer();
           this.setData({ isLoading: false, list: [] });
           this._loadingTasks = false;
           wx.showToast({ title: '任务加载失败', icon: 'none' });
         }
       });
   },
-  _startPendingRefundTimer() {
-    if (this._pendingRefundTimer) return;
-    this._pendingRefundTimer = setInterval(() => {
-      this.load({ silent: true });
-    }, REFUND_SYNC_INTERVAL_MS);
+  _schedulePendingRefundSync() {
+    if (!this._pageVisible || !this._pendingRefundTaskIds.length) return;
+    if (this._pendingRefundTimer) {
+      clearTimeout(this._pendingRefundTimer);
+      this._pendingRefundTimer = null;
+    }
+    const delay = Math.min(
+      REFUND_SYNC_MIN_DELAY_MS * Math.pow(2, Math.max(0, this._pendingRefundRetryCount - 1)),
+      REFUND_SYNC_MAX_DELAY_MS
+    );
+    this._pendingRefundTimer = setTimeout(() => {
+      this._pendingRefundTimer = null;
+      if (!this._pageVisible) return;
+      this._syncPendingRefunds();
+    }, delay);
   },
   _stopPendingRefundTimer() {
     if (this._pendingRefundTimer) {
-      clearInterval(this._pendingRefundTimer);
+      clearTimeout(this._pendingRefundTimer);
       this._pendingRefundTimer = null;
     }
+    this._pendingRefundTaskIds = [];
+    this._pendingRefundRetryCount = 0;
   },
   _updatePendingRefundTimer(list = []) {
-    const hasPendingRefund = (Array.isArray(list) ? list : [])
-      .some(item => pickStr(item && item.payStatus) === 'refund_pending');
-    if (hasPendingRefund) {
-      this._startPendingRefundTimer();
+    const pendingTaskIds = getPendingRefundTaskIds(list);
+    this._pendingRefundTaskIds = pendingTaskIds;
+    if (pendingTaskIds.length) {
+      this._schedulePendingRefundSync();
     } else {
       this._stopPendingRefundTimer();
     }
   },
   _syncPendingRefunds(list = []) {
     if (this._syncingPendingRefunds) return;
-    const pendingTaskIds = (Array.isArray(list) ? list : [])
-      .filter(item => pickStr(item && item.payStatus) === 'refund_pending')
-      .map(item => pickStr(item && item.id))
-      .filter(Boolean)
-      .slice(0, 5);
-    if (!pendingTaskIds.length) return;
+    const pendingTaskIds = (Array.isArray(list) && list.length)
+      ? getPendingRefundTaskIds(list)
+      : (Array.isArray(this._pendingRefundTaskIds) ? this._pendingRefundTaskIds.slice(0, 5) : []);
+    if (!pendingTaskIds.length) {
+      this._stopPendingRefundTimer();
+      return;
+    }
+    if (!this._pageVisible) return;
+    this._pendingRefundTaskIds = pendingTaskIds;
 
     this._syncingPendingRefunds = true;
-    Promise.allSettled(
-      pendingTaskIds.map(taskId => wx.cloud.callFunction({
-        name: 'taskCancelFlow',
-        data: {
-          action: 'sync_refund_status',
-          taskId,
-        }
-      }))
-    ).then((results) => {
-      const shouldReload = results.some((item) => {
-        const ret = item && item.status === 'fulfilled' && item.value ? item.value.result : null;
-        return !!(
-          ret
-          && ret.ok
-          && (ret.already || (ret.refund && pickStr(ret.refund.status) === 'success'))
-        );
-      });
-      if (shouldReload) this.load({ silent: true });
+    wx.cloud.callFunction({
+      name: 'taskCancelFlow',
+      data: {
+        action: 'batch_sync_refund_status',
+        taskIds: pendingTaskIds,
+      }
+    }).then((res) => {
+      const result = res && res.result ? res.result : null;
+      const results = result && Array.isArray(result.results) ? result.results : [];
+      if (!result || result.ok !== true || !results.length) {
+        this._pendingRefundRetryCount += 1;
+        this._schedulePendingRefundSync();
+        return;
+      }
+      const shouldReload = results.some((item) => !!(item && item.ok && (item.changed || item.already)));
+      const retryTaskIds = results
+        .filter((item) => {
+          if (!item) return false;
+          if (item.ok) {
+            return !!item.stillPending || pickStr(item.refundStatus, item.refund && item.refund.status) === 'processing';
+          }
+          return !isHardStopRefundSyncError(item);
+        })
+        .map((item) => pickStr(item && item.taskId))
+        .filter(Boolean);
+      if (shouldReload) {
+        this._pendingRefundTaskIds = retryTaskIds;
+        this._pendingRefundRetryCount = 0;
+        this.load({ silent: true, skipRefundSync: true });
+        return;
+      }
+      if (retryTaskIds.length) {
+        this._pendingRefundTaskIds = retryTaskIds;
+        this._pendingRefundRetryCount += 1;
+        this._schedulePendingRefundSync();
+      } else {
+        this._stopPendingRefundTimer();
+      }
+    }).catch((err) => {
+      console.error('同步退款状态失败', err);
+      this._pendingRefundRetryCount += 1;
+      this._schedulePendingRefundSync();
     }).finally(() => {
       this._syncingPendingRefunds = false;
     });
+  },
+  _stopAutoCleanupTimer() {
+    if (this._autoCleanupTimer) {
+      clearTimeout(this._autoCleanupTimer);
+      this._autoCleanupTimer = null;
+    }
+  },
+  _scheduleAutoCleanup(docs = [], now = Date.now()) {
+    this._stopAutoCleanupTimer();
+    if (!this._pageVisible || this.data.tab !== 'owner') return;
+    const expiredTooLongIds = getExpiredAutoCleanupTaskIds(docs, now);
+    if (!expiredTooLongIds.length) return;
+    const lastAt = Number(wx.getStorageSync(AUTO_CLEAN_STORAGE_KEY)) || 0;
+    if (lastAt && now - lastAt < AUTO_CLEAN_COOLDOWN_MS) return;
+    this._autoCleanupTimer = setTimeout(() => {
+      this._autoCleanupTimer = null;
+      if (!this._pageVisible || this.data.tab !== 'owner') return;
+      wx.setStorageSync(AUTO_CLEAN_STORAGE_KEY, Date.now());
+      Promise.all(expiredTooLongIds.map((id) => this._deleteTaskWithMessages(id)))
+        .then(() => {
+          if (this._pageVisible && this.data.tab === 'owner') {
+            this.load({ silent: true, skipRefundSync: true });
+          }
+        })
+        .catch((err) => {
+          console.error('自动清理过期任务失败', err);
+        });
+    }, AUTO_CLEAN_DELAY_MS);
   },
   async onDeleteTask(e){
     const id = e.currentTarget.dataset.id;
@@ -379,18 +520,26 @@ Page({
     }
   },
   // 编辑我发布的任务：跳转到发布页，并带上要编辑的任务 ID
-  onEditTask(e){
+  async onEditTask(e){
     const id = e.currentTarget.dataset.id;
     if (!id) return;
-    // 在当前列表中找到对应任务的数据，方便在发布页直接回填，而不用再请求一次云端
-    const list = this.data.list || [];
-    const task = list.find(t => t.id === id || t._id === id) || null;
-    // 把要编辑的任务 ID 和原始任务对象暂存到本地，再切换到底部「发布」tab
-    wx.setStorageSync('hyyc_edit_task_id', id);
-    if (task) {
+    wx.showLoading({ title: '加载中', mask: true });
+    try {
+      const res = await db.collection(TASK_COLLECTION).doc(id).get();
+      const task = (res && res.data) || null;
+      wx.hideLoading();
+      if (!task) {
+        toast('任务不存在');
+        return;
+      }
+      wx.setStorageSync('hyyc_edit_task_id', id);
       wx.setStorageSync('hyyc_edit_task_data', task);
+      wx.switchTab({ url: '/pages/publish/index/index' });
+    } catch (err) {
+      console.error('加载待编辑任务失败', err);
+      wx.hideLoading();
+      toast('加载任务失败，请稍后重试');
     }
-    wx.switchTab({ url: '/pages/publish/index/index' });
   },
   // 对“待付款(pay_pending)”的任务，继续拉起支付
   async onPayTask(e){
