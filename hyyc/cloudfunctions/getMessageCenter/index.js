@@ -106,6 +106,7 @@ function buildPreview(doc = {}) {
   const type = pickStr(doc.type, 'text');
   if (type === 'image') return '[图片]';
   if (type === 'task_cancel_request') return '申请取消任务';
+  if (type === 'task_release_request') return '申请释放任务';
   if (type === 'contact_request') return '申请查看手机号';
   return pickStr(doc.text, '[消息]');
 }

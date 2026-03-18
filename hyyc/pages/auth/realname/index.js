@@ -3,6 +3,7 @@ const { toast } = require('../../../utils/ui');
 const { exchangePhoneNumber } = require('../_shared/api');
 const { distanceMeters } = require('../_shared/geo');
 const communityCfg = require('../../../config/community');
+const { setStoredUser } = require('../../../utils/userIdentity');
 
 function pickStr(v) {
   return String(v == null ? '' : v).trim();
@@ -630,7 +631,7 @@ Page({
 
       // 本地缓存一份，兼容后续页面读取
       try {
-        wx.setStorageSync('hyyc_user', user);
+        setStoredUser(user);
       } catch (e) {
         console.error('缓存实名用户信息失败', e);
       }

@@ -1,5 +1,6 @@
 const { formatMoney, formatDate, formatDateTime } = require('../../../utils/format');
 const { toast } = require('../../../utils/ui');
+const { getStoredUser, patchStoredUser } = require('../../../utils/userIdentity');
 
 const db = wx.cloud.database();
 const _ = db.command;
@@ -128,7 +129,7 @@ Page({
     this.onLoadMore();
   },
   async loadWallet({ reset = false, filterKey = '', panelOnly = false, reloadBalance = reset && !panelOnly } = {}) {
-    const u = wx.getStorageSync('hyyc_user') || {};
+    const u = getStoredUser();
     if (!u || !u.realname) {
       wx.navigateTo({ url: '/pages/welcome/index' });
       return;
@@ -635,14 +636,14 @@ Page({
     });
   },
   async _ensureOpenid() {
-    const u = wx.getStorageSync('hyyc_user') || {};
+    const u = getStoredUser();
     let openid = String(u._openid || u.openid || u.openId || '').trim();
     if (openid) return openid;
     try {
       const res = await wx.cloud.callFunction({ name: 'login' });
       openid = String(res && res.result && res.result.openid || '').trim();
       if (openid) {
-        wx.setStorageSync('hyyc_user', { ...u, _openid: openid });
+        patchStoredUser({ _openid: openid });
       }
     } catch (e) { /* ignore */ }
     return openid;

@@ -12,18 +12,6 @@
     </view>
   </view>
 
-  <view class="subscribe card">
-    <view class="subscribe-copy">
-      <text class="subscribe-title">微信外部提醒</text>
-      <text class="subscribe-sub">
-        {{subscribeEnabled ? '开启后，别人给你发新消息时，微信可直接提醒你。' : '当前还没配置订阅模板，先补环境变量再开启。'}}
-      </text>
-    </view>
-    <button class="subscribe-btn" bindtap="onEnableSubscribe" disabled="{{!subscribeEnabled || subscribeLoading}}">
-      {{subscribeLoading ? '请求中...' : '开启聊天提醒'}}
-    </button>
-  </view>
-
   <view class="filter-row">
     <view class="filter-chip {{filter === 'all' ? 'filter-chip-active' : ''}}" data-filter="all" bindtap="onFilterTap">
       全部

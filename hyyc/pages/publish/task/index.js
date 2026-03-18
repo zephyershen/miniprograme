@@ -1,5 +1,6 @@
 const { required } = require('../../../utils/validators');
 const { toast } = require('../../../utils/ui');
+const { getStoredUser } = require('../../../utils/userIdentity');
 
 // 使用云开发数据库 tasks 集合存储任务
 const db = wx.cloud.database();
@@ -45,7 +46,7 @@ Page({
     editTaskId: ''
   },
   onShow(){
-    const u = wx.getStorageSync('hyyc_user');
+    const u = getStoredUser();
     if (!u || !u.realname) {
       wx.navigateTo({ url: '/pages/welcome/index' });
       return;
@@ -365,7 +366,7 @@ Page({
       }
     }
 
-    const u = wx.getStorageSync('hyyc_user') || {};
+    const u = getStoredUser();
     if (!u || !u.realname) {
       toast('请先完成实名信息');
       wx.navigateTo({ url: '/pages/welcome/index' });
@@ -389,7 +390,7 @@ Page({
       const okPay = await new Promise((resolve) => {
         wx.showModal({
           title: '发布任务需先付款',
-          content: `发布任务需要先支付 ¥${amountYuan.toFixed(2)}。\n任务完成后：96% 给接单人，平台收 4%。\n是否继续？`,
+          content: `发布任务需要先支付 ¥${amountYuan.toFixed(2)}。\n是否继续？`,
           confirmText: '去支付',
           cancelText: '取消',
           success: (res) => resolve(!!(res && res.confirm)),

@@ -1,0 +1,9 @@
+{
+  "name": "adminRepairUserIdentity",
+  "version": "1.0.0",
+  "description": "管理员执行用户ID与业务数据口径修复",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

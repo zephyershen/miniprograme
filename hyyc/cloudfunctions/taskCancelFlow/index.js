@@ -3,6 +3,7 @@ const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
 const db = cloud.database();
+const _ = db.command;
 const TASK_COLLECTION = 'tasks';
 const MSG_COLLECTION = 'messages';
 const WALLET_COLLECTION = 'wallets';
@@ -173,54 +174,6 @@ function yyyymmdd(date = new Date()) {
   return `${year}${month}${day}`;
 }
 
-function formatDateTime(date = new Date()) {
-  const d = date instanceof Date ? date : new Date(date);
-  const yyyy = d.getFullYear();
-  const mm = `${d.getMonth() + 1}`.padStart(2, '0');
-  const dd = `${d.getDate()}`.padStart(2, '0');
-  const hh = `${d.getHours()}`.padStart(2, '0');
-  const mi = `${d.getMinutes()}`.padStart(2, '0');
-  return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
-}
-
-function cutText(text = '', max = 20) {
-  const normalized = pickStr(text).replace(/\s+/g, ' ');
-  if (!normalized) return '';
-  return normalized.length > max ? `${normalized.slice(0, max - 1)}…` : normalized;
-}
-
-function getSubscribeConfig() {
-  return {
-    templateId: pickStr(process.env.SUBSCRIBE_CHAT_TEMPLATE_ID),
-    thingKey: pickStr(process.env.SUBSCRIBE_CHAT_THING_KEY, 'thing1'),
-    nameKey: pickStr(process.env.SUBSCRIBE_CHAT_NAME_KEY, 'name2'),
-    timeKey: pickStr(process.env.SUBSCRIBE_CHAT_TIME_KEY, 'time3'),
-    miniprogramState: pickStr(process.env.MINIPROGRAM_STATE, 'formal'),
-  };
-}
-
-async function sendSubscribeMessage({ touser = '', senderName = '', preview = '', page = '' }) {
-  const targetOpenid = pickStr(touser);
-  const cfg = getSubscribeConfig();
-  if (!targetOpenid || !cfg.templateId) return;
-  try {
-    await cloud.openapi.subscribeMessage.send({
-      touser: targetOpenid,
-      templateId: cfg.templateId,
-      page: pickStr(page),
-      lang: 'zh_CN',
-      miniprogramState: cfg.miniprogramState,
-      data: {
-        [cfg.thingKey]: { value: cutText(preview, 20) || '你收到一条新消息' },
-        [cfg.nameKey]: { value: cutText(senderName, 10) || '邻里用户' },
-        [cfg.timeKey]: { value: formatDateTime(new Date()) },
-      }
-    });
-  } catch (err) {
-    console.warn('[taskCancelFlow] subscribe send failed', err);
-  }
-}
-
 function extractRespCode(huifuResp = {}) {
   return pickStr(
     huifuResp.sub_resp_code,
@@ -376,6 +329,17 @@ function buildCancelMessagePayload({ task = {}, requestId = '', status = 'pendin
   };
 }
 
+function buildReleaseMessagePayload({ task = {}, requestId = '', status = 'pending', requesterName = '', approvedByName = '' }) {
+  return {
+    requestId,
+    status,
+    taskTitle: pickStr(task.title, task.desc, '任务'),
+    requesterName: pickStr(requesterName),
+    approverUserId: pickStr(task.ownerId),
+    approvedByName: pickStr(approvedByName),
+  };
+}
+
 async function addCancelRequestMessage({ task, requestId, requesterName, now }) {
   const payload = buildCancelMessagePayload({
     task,
@@ -402,12 +366,49 @@ async function addCancelRequestMessage({ task, requestId, requesterName, now }) 
   return pickStr(res && res._id);
 }
 
+async function addReleaseRequestMessage({ task, requestId, requesterName, now }) {
+  const payload = buildReleaseMessagePayload({
+    task,
+    requestId,
+    status: 'pending',
+    requesterName,
+  });
+  const res = await db.collection(MSG_COLLECTION).add({
+    data: {
+      tid: pickStr(task._id),
+      ownerId: pickStr(task.ownerId),
+      peerUserId: pickStr(task.workerId),
+      fromUserId: pickStr(task.workerId),
+      fromNickname: requesterName,
+      type: 'task_release_request',
+      taskRelease: payload,
+      text: '',
+      imageUrl: '',
+      createTime: now,
+      readByOwner: false,
+      readByPeer: true,
+    }
+  });
+  return pickStr(res && res._id);
+}
+
 async function syncCancelRequestMessage(messageId, payload) {
   const msgId = pickStr(messageId);
   if (!msgId) return;
   await db.collection(MSG_COLLECTION).doc(msgId).update({
     data: {
       taskCancel: payload,
+      updatedAt: new Date(),
+    }
+  });
+}
+
+async function syncReleaseRequestMessage(messageId, payload) {
+  const msgId = pickStr(messageId);
+  if (!msgId) return;
+  await db.collection(MSG_COLLECTION).doc(msgId).update({
+    data: {
+      taskRelease: payload,
       updatedAt: new Date(),
     }
   });
@@ -881,6 +882,111 @@ exports.main = async (event = {}) => {
     const pay = task.pay && typeof task.pay === 'object' ? task.pay : {};
     const payStatus = pickStr(pay.status);
     const currentCancel = task.cancelRequest && typeof task.cancelRequest === 'object' ? task.cancelRequest : {};
+    const currentRelease = task.releaseRequest && typeof task.releaseRequest === 'object' ? task.releaseRequest : {};
+
+    if (action === 'request_release') {
+      if (pickStr(OPENID) !== workerOpenid) {
+        return { ok: false, code: 'NOT_WORKER', msg: '只有接单人可以申请释放任务' };
+      }
+      if (taskStatus !== 'accepted') {
+        return { ok: false, code: 'INVALID_STATUS', msg: '当前任务状态不支持释放接单', status: taskStatus };
+      }
+      if (pickStr(currentRelease.status) === 'pending') {
+        return { ok: true, already: true, requestId: pickStr(currentRelease.requestId), status: 'pending' };
+      }
+
+      const requestId = `RR${Date.now()}${randomId(8)}`;
+      const workerDisplayName = pickStr(task.workerNickname, task.workerName, '接单人');
+      const messageId = await addReleaseRequestMessage({
+        task,
+        requestId,
+        requesterName: workerDisplayName,
+        now,
+      });
+
+      const payload = buildReleaseMessagePayload({
+        task,
+        requestId,
+        status: 'pending',
+        requesterName: workerDisplayName,
+      });
+
+      await db.collection(TASK_COLLECTION).doc(taskId).update({
+        data: {
+          releaseRequest: {
+            requestId,
+            status: 'pending',
+            requestedAt: now,
+            requestedByOpenid: OPENID,
+            requestedByUserId: workerId,
+            messageId,
+            requesterName: workerDisplayName,
+          },
+          updatedAt: now,
+        }
+      });
+
+      return { ok: true, status: 'pending', requestId, messageId, taskRelease: payload };
+    }
+
+    if (action === 'approve_release') {
+      const requestId = pickStr(event.requestId);
+      if (!requestId) return { ok: false, code: 'MISSING_REQUEST_ID', msg: '缺少 requestId' };
+      if (pickStr(OPENID) !== ownerOpenid) {
+        return { ok: false, code: 'NOT_OWNER', msg: '只有发布者可以同意释放任务' };
+      }
+      if (taskStatus === 'posted' && pickStr(currentRelease.requestId) === requestId && pickStr(currentRelease.status) === 'approved') {
+        return { ok: true, already: true, status: 'posted', msg: '任务已恢复为可接单状态' };
+      }
+      if (taskStatus !== 'accepted') {
+        return { ok: false, code: 'INVALID_STATUS', msg: '当前任务状态不支持释放接单', status: taskStatus };
+      }
+      if (pickStr(currentRelease.requestId) !== requestId || pickStr(currentRelease.status) !== 'pending') {
+        return { ok: false, code: 'INVALID_RELEASE_REQUEST', msg: '释放申请不存在或已处理' };
+      }
+
+      const ownerDisplayName = pickStr(task.ownerNickname, task.ownerName, '发布者');
+      const nextRelease = {
+        ...currentRelease,
+        status: 'approved',
+        approvedAt: now,
+        approvedByOpenid: OPENID,
+        approvedByUserId: ownerId,
+        approvedByName: ownerDisplayName,
+      };
+
+      await db.collection(TASK_COLLECTION).doc(taskId).update({
+        data: {
+          status: 'posted',
+          updatedAt: now,
+          workerOpenid: '',
+          worker_openid: '',
+          workerId: '',
+          workerName: '',
+          workerNickname: '',
+          workerAvatarFileID: '',
+          workerHuifuId: '',
+          acceptedAt: _.remove(),
+          submit: _.remove(),
+          releaseRequest: nextRelease,
+        }
+      });
+
+      await syncReleaseRequestMessage(pickStr(currentRelease.messageId), buildReleaseMessagePayload({
+        task,
+        requestId,
+        status: 'approved',
+        requesterName: pickStr(currentRelease.requesterName, task.workerNickname, task.workerName, '接单人'),
+        approvedByName: ownerDisplayName,
+      }));
+
+      return {
+        ok: true,
+        status: 'posted',
+        requestId,
+        msg: '任务已释放，其他用户可继续接单'
+      };
+    }
 
     if (action === 'request') {
       if (pickStr(OPENID) !== ownerOpenid) {
@@ -924,13 +1030,6 @@ exports.main = async (event = {}) => {
           },
           updatedAt: now,
         }
-      });
-
-      await sendSubscribeMessage({
-        touser: workerOpenid,
-        senderName: requesterName,
-        preview: '申请取消任务',
-        page: `/pages/chat/room/index?tid=${encodeURIComponent(taskId)}`,
       });
 
       return { ok: true, status: 'pending', requestId, messageId, taskCancel: payload };
@@ -1023,12 +1122,6 @@ exports.main = async (event = {}) => {
             approvedByName,
             refund: processingRefund,
           }));
-          await sendSubscribeMessage({
-            touser: pickStr(prepared.ownerOpenid, ownerOpenid),
-            senderName: approvedByName,
-            preview: '已同意取消，退款处理中',
-            page: `/pages/chat/room/index?tid=${encodeURIComponent(taskId)}&peerUserId=${encodeURIComponent(pickStr(prepared.workerId, workerId))}`,
-          });
           return {
             ok: true,
             status: 'cancelled',
@@ -1101,13 +1194,6 @@ exports.main = async (event = {}) => {
       });
 
       await syncCancelRequestMessage(pickStr(preparedCancel.messageId), payload);
-      await sendSubscribeMessage({
-        touser: pickStr(prepared.ownerOpenid, ownerOpenid),
-        senderName: approvedByName,
-        preview: refund.status === 'success' ? '已同意取消，退款已完成' : '已同意取消，退款处理中',
-        page: `/pages/chat/room/index?tid=${encodeURIComponent(taskId)}&peerUserId=${encodeURIComponent(pickStr(prepared.workerId, workerId))}`,
-      });
-
       if (refund.status === 'success') {
         try {
           const amount = roundMoney(preparedTask.amount);

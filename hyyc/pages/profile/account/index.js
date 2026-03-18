@@ -1,7 +1,9 @@
 const { toast } = require('../../../utils/ui');
+const { getStoredUser, patchStoredUser, setStoredUser } = require('../../../utils/userIdentity');
 
 const db = wx.cloud.database();
 const USER_COLLECTION = 'userInfo';
+const RESET_CONFIRM_TEXT = 'CLEAR_TEST_DATA';
 
 function pickStr(...vals) {
   for (const v of vals) {
@@ -35,8 +37,24 @@ Page({
       password: '',
       limit: '30',
     },
+    identityRepairForm: {
+      username: '',
+      password: '',
+      scanLimit: '500',
+    },
+    resetDataForm: {
+      username: '',
+      password: '',
+      scanLimit: '2000',
+      confirmText: '',
+      includeFiles: true,
+    },
     financeRunning: '',
     financeResultText: '',
+    identityRepairRunning: '',
+    identityRepairResultText: '',
+    resetDataRunning: '',
+    resetDataResultText: '',
     buildingRange: [],
     buildingIndex: 0,
     doorRange: [[], []],
@@ -53,7 +71,7 @@ Page({
 
   async onShow() {
     this.setData({ isLoading: true });
-    let u = wx.getStorageSync('hyyc_user') || {};
+    let u = getStoredUser();
     const openid = await this._ensureOpenid();
     if (openid) {
       try {
@@ -62,7 +80,7 @@ Page({
         if (list.length) {
           const doc = list[0];
           u = { ...doc, id: doc._id || doc.id, isSuperAdmin: !!u.isSuperAdmin };
-          wx.setStorageSync('hyyc_user', u);
+          setStoredUser(u);
         }
       } catch (err) {
         console.warn('读取最新账户信息失败，继续使用缓存', err);
@@ -118,6 +136,25 @@ Page({
     this.setData({ [`financeForm.${key}`]: value });
   },
 
+  onIdentityRepairInput(e) {
+    const key = e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.key;
+    if (!key) return;
+    const value = e && e.detail ? e.detail.value : '';
+    this.setData({ [`identityRepairForm.${key}`]: value });
+  },
+
+  onResetDataInput(e) {
+    const key = e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.key;
+    if (!key) return;
+    const value = e && e.detail ? e.detail.value : '';
+    this.setData({ [`resetDataForm.${key}`]: value });
+  },
+
+  onResetDataToggleFiles(e) {
+    const checked = !!(e && e.detail && e.detail.value);
+    this.setData({ 'resetDataForm.includeFiles': checked });
+  },
+
   onDoorChange(e) {
     const value = e.detail.value || [0, 0];
     const fi = Number(value[0] || 0);
@@ -153,8 +190,8 @@ Page({
         }
       });
 
-      const cached = wx.getStorageSync('hyyc_user') || {};
-      wx.setStorageSync('hyyc_user', {
+      const cached = getStoredUser();
+      setStoredUser({
         ...cached,
         id: docId,
         nickname: f.nickname,
@@ -178,6 +215,22 @@ Page({
 
   async onFinanceRunTap() {
     await this._runFinanceCompensate(false);
+  },
+
+  async onIdentityRepairDryRunTap() {
+    await this._runIdentityRepair(true);
+  },
+
+  async onIdentityRepairRunTap() {
+    await this._runIdentityRepair(false);
+  },
+
+  async onResetDataDryRunTap() {
+    await this._runResetTestData(true);
+  },
+
+  async onResetDataRunTap() {
+    await this._runResetTestData(false);
   },
 
   async _runFinanceCompensate(dryRun) {
@@ -250,14 +303,162 @@ Page({
     }
   },
 
+  async _runIdentityRepair(dryRun) {
+    if (!this.data.isSuperAdmin) {
+      toast('仅管理员可用');
+      return;
+    }
+    if (this.data.identityRepairRunning) return;
+
+    const repairForm = this.data.identityRepairForm || {};
+    const username = pickStr(repairForm.username);
+    const password = pickStr(repairForm.password);
+    const scanLimit = Math.max(1, Math.min(5000, Number(repairForm.scanLimit) || 500));
+    if (!username || !password) {
+      toast('请输入管理员账号和密码');
+      return;
+    }
+
+    const identityRepairRunning = dryRun ? 'dryRun' : 'run';
+    const title = dryRun ? '预检查中...' : '执行修复中...';
+    this.setData({
+      identityRepairRunning,
+      identityRepairResultText: `${dryRun ? '准备执行身份数据预检查' : '准备执行身份数据修复'}...\nscanLimit=${scanLimit}\n时间=${new Date().toLocaleString()}`,
+    });
+    wx.showLoading({ title, mask: true });
+
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'adminRepairUserIdentity',
+        data: {
+          username,
+          password,
+          dryRun: !!dryRun,
+          scanLimit,
+        }
+      });
+      const ret = (res && res.result) || res || null;
+      console.log('[account] adminRepairUserIdentity result', ret);
+
+      const output = {
+        calledAt: new Date().toISOString(),
+        dryRun: !!dryRun,
+        scanLimit,
+        ret,
+      };
+      this.setData({
+        identityRepairResultText: stringifyResult(output),
+      });
+
+      if (ret && ret.ok) {
+        toast(dryRun ? '预检查完成' : '修复执行完成');
+      } else {
+        toast(pickStr(ret && ret.msg, '执行失败'));
+      }
+    } catch (err) {
+      console.error('[account] adminRepairUserIdentity failed', err);
+      this.setData({
+        identityRepairResultText: stringifyResult({
+          calledAt: new Date().toISOString(),
+          dryRun: !!dryRun,
+          scanLimit,
+          error: pickStr(err && err.message, err),
+        }),
+      });
+      toast('调用失败，请查看结果区和日志');
+    } finally {
+      wx.hideLoading();
+      this.setData({ identityRepairRunning: '' });
+    }
+  },
+
+  async _runResetTestData(dryRun) {
+    if (!this.data.isSuperAdmin) {
+      toast('仅管理员可用');
+      return;
+    }
+    if (this.data.resetDataRunning) return;
+
+    const resetForm = this.data.resetDataForm || {};
+    const username = pickStr(resetForm.username);
+    const password = pickStr(resetForm.password);
+    const scanLimit = Math.max(1, Math.min(20000, Number(resetForm.scanLimit) || 2000));
+    const confirmText = pickStr(resetForm.confirmText);
+    const includeFiles = resetForm.includeFiles !== false;
+    if (!username || !password) {
+      toast('请输入管理员账号和密码');
+      return;
+    }
+    if (!dryRun && confirmText !== RESET_CONFIRM_TEXT) {
+      toast(`请输入确认口令：${RESET_CONFIRM_TEXT}`);
+      return;
+    }
+
+    const resetDataRunning = dryRun ? 'dryRun' : 'run';
+    const title = dryRun ? '预检查中...' : '执行清空中...';
+    this.setData({
+      resetDataRunning,
+      resetDataResultText: `${dryRun ? '准备执行测试数据预检查' : '准备执行测试数据清空'}...\nscanLimit=${scanLimit}\nincludeFiles=${includeFiles}\n时间=${new Date().toLocaleString()}`,
+    });
+    wx.showLoading({ title, mask: true });
+
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'adminResetTestData',
+        data: {
+          username,
+          password,
+          dryRun: !!dryRun,
+          scanLimit,
+          includeFiles,
+          confirmText,
+        }
+      });
+      const ret = (res && res.result) || res || null;
+      console.log('[account] adminResetTestData result', ret);
+
+      const output = {
+        calledAt: new Date().toISOString(),
+        dryRun: !!dryRun,
+        scanLimit,
+        includeFiles,
+        ret,
+      };
+      this.setData({
+        resetDataResultText: stringifyResult(output),
+      });
+
+      if (ret && ret.ok) {
+        toast(dryRun ? '预检查完成' : '测试数据已清空');
+      } else {
+        toast(pickStr(ret && ret.msg, '执行失败'));
+      }
+    } catch (err) {
+      console.error('[account] adminResetTestData failed', err);
+      this.setData({
+        resetDataResultText: stringifyResult({
+          calledAt: new Date().toISOString(),
+          dryRun: !!dryRun,
+          scanLimit,
+          includeFiles,
+          error: pickStr(err && err.message, err),
+        }),
+      });
+      toast('调用失败，请查看结果区和日志');
+    } finally {
+      wx.hideLoading();
+      this.setData({ resetDataRunning: '' });
+    }
+  },
+
   async _ensureOpenid() {
-    const u = wx.getStorageSync('hyyc_user') || {};
+    const u = getStoredUser();
     let openid = pickStr(u._openid, u.openid, u.openId);
     if (openid) return openid;
     try {
       const res = await wx.cloud.callFunction({ name: 'login' });
       openid = pickStr(res && res.result && res.result.openid);
-      if (openid) wx.setStorageSync('hyyc_user', { ...u, _openid: openid });
+      if (openid) patchStoredUser({ _openid: openid });
     } catch (e) {
       openid = '';
     }
@@ -265,7 +466,7 @@ Page({
   },
 
   async _resolveUserDocId() {
-    const cached = wx.getStorageSync('hyyc_user') || {};
+    const cached = getStoredUser();
     const cachedDocId = pickStr(this.data.userDocId, cached.id, cached._id);
     if (cachedDocId) return cachedDocId;
 
@@ -280,7 +481,7 @@ Page({
     const docId = pickStr(doc._id, doc.id);
     const nextUser = { ...cached, ...doc, id: docId, isSuperAdmin: !!cached.isSuperAdmin };
     this.setData({ userDocId: docId });
-    wx.setStorageSync('hyyc_user', nextUser);
+    setStoredUser(nextUser);
     return docId;
   }
 });

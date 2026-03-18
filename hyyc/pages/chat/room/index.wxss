@@ -119,6 +119,17 @@
   opacity: 0;
 }
 
+.chat-history-bar {
+  margin-bottom: 16rpx;
+  padding: 14rpx 20rpx;
+  border-radius: 999rpx;
+  background: #F6E7E1;
+  color: #8A4A3A;
+  font-size: 24rpx;
+  line-height: 1.5;
+  text-align: center;
+}
+
 /* 底部输入栏，使用 flex 布局而非 fixed 定位 */
 .chat-input-safe {
   flex-shrink: 0; /* 不被压缩 */

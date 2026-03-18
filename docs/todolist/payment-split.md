@@ -1,6 +1,6 @@
 # HYYC 项目开发交接手册
 
-更新时间：2026-03-17
+更新时间：2026-03-18
 
 这份文档的目标不是讲概念，而是让一个完全没接触过本项目的人在第一次打开仓库后，能尽量少踩坑地完成：
 
@@ -36,7 +36,7 @@
 1. 微信开发者工具请直接打开 `hyyc/` 目录，不要打开仓库根目录。
 2. 小程序是“源码 + 云函数仓库”形态，不是有后端服务和自动部署流水线的工程。
 3. `hyyc/app.js` 里当前把云开发环境 ID 写死成了 `hyyc-1gi3f5sqc5becabf`，切环境时别只改控制台不改代码。
-4. `hyyc/cloudbaserc.json` 不是完整的云函数部署清单，很多当前实际在用的函数没有写进去。
+4. `hyyc/cloudbaserc.json` 现在已经补齐了核心云函数清单，但环境变量仍然建议以云开发控制台为准核对。
 5. 云数据库权限规则不在仓库里，必须去云开发控制台确认；不要假设“前端能查就代表权限设计是对的”。
 6. 商品模块现在强依赖 `getGoodsProfile`，如果这个函数没部署，`我的商品 / 我买到的 / 收藏 / 浏览记录 / 已售后详情` 都会不完整。
 7. 买家或卖家跨角色读取商品/消息时，很多场景必须走云函数，不能偷懒直接前端查库，否则很容易报 `database permission denied`。
@@ -149,6 +149,8 @@
   - 延时分账重试
   - 钱包修复
   - 管理员补偿入口
+  - 管理员身份数据修复入口
+  - 管理员测试数据清空入口
   - 定时补偿任务
 
 ### 4.2 当前仍未完全收尾的点
@@ -156,7 +158,7 @@
 - 提现最终到账后的完整回调闭环，还需要继续真机验证
 - 商品“查看卖家主页”已经接成真实卖家主页，但还缺真实用户场景验证
 - 商品聊天和任务聊天已经接了全局消息中心，但还缺一轮真机回归验证排序 / 未读 / 跳转
-- 商品聊天、手机号申请、任务取消申请都已经接了订阅消息提醒，但当前使用的是一次性订阅模板，仍需做真实触达验证
+- 订阅消息已主动下线，当前只保留站内消息中心，不再做微信外部提醒
 - 任务取消申请目前只有“同意”链路，没有“拒绝”入口
 - 手机号查看申请目前只有“同意”链路，没有“拒绝”入口
 - 还缺至少一轮双账号 / 多设备真机回归
@@ -167,6 +169,7 @@
   - 可以提审
   - 可以灰度发布
   - 可以继续往真实用户场景联调
+  - 可以按本文档交接给下一位开发
 - 尚未达到：
   - 可以无观察直接全量放量
 
@@ -195,7 +198,7 @@
 - `pages/profile/index/index`
   - 我的
 - `pages/profile/account/index`
-  - 账户信息 / 管理员补偿入口
+  - 账户信息 / 管理员工具（补偿 / 身份修复 / 清空测试数据）
 - `pages/profile/tasks/index`
   - 我的任务
 - `pages/profile/goods/index`
@@ -203,7 +206,7 @@
 - `pages/profile/favorites/index`
   - 我的收藏 / 浏览记录
 - `pages/profile/messages/index`
-  - 全局消息中心 / 开启聊天提醒
+  - 全局消息中心
 - `pages/profile/wallet/index`
   - 钱包
 - `pages/profile/withdraw/index`
@@ -249,6 +252,8 @@
   - `registerUserByIdCard`
   - `adminLogin`
   - `adminFinanceCompensate`
+  - `adminRepairUserIdentity`
+  - `adminResetTestData`
 - 商品主链路
   - `getGoodsProfile`
     - 收藏 / 浏览记录最新快照
@@ -284,8 +289,6 @@
 - 消息 / 资料
   - `getMessageCenter`
     - 聚合商品 / 任务会话
-  - `getSubscribeConfig`
-    - 前端读取订阅模板配置
 - 钱包 / 提现
   - `walletWithdraw`
 
@@ -342,6 +345,13 @@
 - 提现绑卡快照
 - 商品收藏 `goodsFavorites`
 - 商品浏览记录 `goodsBrowseHistory`
+
+用户 ID 口径现在统一为：
+
+- 数据库主键以 `_id` 为准
+- 前端缓存和业务字段里的 `id`，本质上视为 `_id` 的别名
+- 新注册用户会同时落 `id = _id` 作为兼容字段
+- 读历史数据时，不能假设 `userInfo.id` 一定存在；要始终兼容 `_id`
 
 ### 7.2 `goods`
 
@@ -654,20 +664,18 @@
 发送逻辑：
 
 - 商品聊天和任务聊天现在统一走 `chatSendMessage`
-- 这样可以在服务端补订阅消息下发，而不是只在前端直接写 `messages`
+- 这样可以在服务端统一落库和收口消息结构，而不是只在前端直接写 `messages`
 
 未读角标：
 
 - 商品详情页按“当前商品总未读数”聚合
 - 我的商品页按“每个商品的未读数”聚合
 
-订阅消息：
+当前不做微信订阅消息：
 
-- 全局消息中心页会调用 `getSubscribeConfig`
-- 然后通过 `wx.requestSubscribeMessage` 请求授权
-- 当前配置的是一次性订阅模板：
-  - 用户每同意一次，就获得一次发送机会
-  - 发送一次后，需要下一次再重新请求订阅
+- 页面里不再提供“开启聊天提醒”
+- 云函数也不再发送微信外部提醒
+- 当前只保留站内消息中心和未读聚合
 
 ### 8.10 商品模块的权限原则
 
@@ -1068,6 +1076,35 @@
 - 代码会回退到默认账号密码
 - 生产环境不建议这么做
 
+### 13.8.1 `adminRepairUserIdentity`
+
+- 复用：
+  - `ADMIN_USERNAME`
+  - `ADMIN_PASSWORD`
+- 无新增环境变量
+- 作用：
+  - 上线前统一修复测试库里的 `id/_id`
+  - 回填 `userInfo.id = _id`
+  - 同步修复 `tasks / goods / messages` 里的用户 ID 字段口径
+
+### 13.8.2 `adminResetTestData`
+
+- 复用：
+  - `ADMIN_USERNAME`
+  - `ADMIN_PASSWORD`
+- 无新增环境变量
+- 作用：
+  - 一键清空测试库业务数据
+  - 保留 `legal_docs`
+  - 可选同时删除数据库里已关联的云存储 fileID
+  - 适合“重新从注册开始完整跑一遍”
+
+注意：
+
+- 不会重置汇付侧已经存在的开户 / 绑卡 / 业务入驻等外部状态
+- `huifu_notify_logs`、`finance_compensate_logs` 这类日志集合，后续联调时可能再次自动生成
+- 更适合测试环境，不适合把它当成正式环境的数据清理方案
+
 ### 13.9 `imageAuditStart`
 
 - 必配：
@@ -1091,29 +1128,18 @@
 - 无环境变量要求
 - 但微信公众平台必须开通“获取手机号”能力
 
-### 13.12 `chatSendMessage` / `taskContactFlow` / `taskCancelFlow` / `getSubscribeConfig`
+### 13.12 订阅消息当前状态
 
-- `chatSendMessage` / `taskContactFlow` / `taskCancelFlow` 必配：
+- 订阅消息能力已主动下线
+- 当前前端不再调用 `wx.requestSubscribeMessage`
+- 当前云函数不再发送微信订阅消息
+- 所以当前版本不需要配置：
   - `SUBSCRIBE_CHAT_TEMPLATE_ID`
   - `SUBSCRIBE_CHAT_THING_KEY`
   - `SUBSCRIBE_CHAT_NAME_KEY`
   - `SUBSCRIBE_CHAT_TIME_KEY`
-- `getSubscribeConfig` 至少要配：
-  - `SUBSCRIBE_CHAT_TEMPLATE_ID`
-- 可选：
   - `MINIPROGRAM_STATE`
-- 当前正式环境已对齐为：
-  - `SUBSCRIBE_CHAT_TEMPLATE_ID=fr1B4Z9_K2xBdWVj68DeRsYrUFokFNZxcaK944TcOTk`
-  - `SUBSCRIBE_CHAT_THING_KEY=thing1`
-  - `SUBSCRIBE_CHAT_NAME_KEY=thing7`
-  - `SUBSCRIBE_CHAT_TIME_KEY=time2`
-  - `MINIPROGRAM_STATE=formal`
-- 当前模板类型是“一次性订阅”：
-  - 不是“这个模板全局只能发一次”
-  - 而是“同一个用户每同意一次，就给一次发送机会”
-  - 这次机会被用掉后，需要下一次再重新拉起订阅
-- 字段 key 必须和微信公众平台模板详情页完全一致：
-  - 当前这套模板对应的是 `thing1 + thing7 + time2`
+- 如果以后重新恢复，再单独补页面入口、模板配置和云函数发送
 
 ### 13.13 前端配置同步要求
 
@@ -1144,6 +1170,8 @@
   - `registerUserByIdCard`
   - `adminLogin`
   - `adminFinanceCompensate`
+  - `adminResetTestData`
+  - `adminRepairUserIdentity`
 - 商品：
   - `getGoodsProfile`
   - `getSellerHomepage`
@@ -1151,7 +1179,6 @@
   - `goodsPurchase`
   - `chatSendMessage`
   - `getMessageCenter`
-  - `getSubscribeConfig`
   - `markGoodsMessagesRead`
   - `imageAuditStart`
   - `imageAuditCallback`
@@ -1183,47 +1210,55 @@
 - 它们不一定在当前用户页面直接出现
 - 但排查历史数据或手工修复时会用到
 
-### 14.3 `cloudbaserc.json` 当前不完整
+### 14.3 `cloudbaserc.json` 已补齐核心部署清单
 
-当前 `hyyc/cloudbaserc.json` 只列了一部分核心函数，例如：
+当前 `hyyc/cloudbaserc.json` 已经把当前核心云函数都列进去了，包括：
 
-- `registerUserByIdCard`
-- `huifuMiniappPay`
-- `taskCreate`
-- `taskPaySuccess`
-- `taskAccept`
-- `taskSubmit`
-- `taskCancelFlow`
-- `goodsPurchase`
-- `walletWithdraw`
-- `huifuPayNotify`
+- 登录注册：
+  - `login`
+  - `exchangePhoneNumber`
+  - `registerUserByIdCard`
+- 商品：
+  - `getGoodsProfile`
+  - `getSellerHomepage`
+  - `chatSendMessage`
+  - `markGoodsMessagesRead`
+  - `goodsPurchase`
+  - `imageAuditStart`
+  - `imageAuditCallback`
+- 任务：
+  - `taskCreate`
+  - `taskPaySuccess`
+  - `taskAccept`
+  - `taskSubmit`
+  - `taskCancelFlow`
+  - `taskContactFlow`
+  - `deleteTaskWithMessages`
+  - `markMessagesReadByOwner`
+  - `markMessagesReadByPeer`
+- 用户资料 / 消息：
+  - `getUserPublicProfile`
+  - `getMessageCenter`
+- 资金：
+  - `huifuMiniappPay`
+  - `walletWithdraw`
+  - `huifuPayNotify`
+  - `financeCompensate`
+  - `financeCompensateTimer`
+- 管理员 / 修复：
+  - `adminLogin`
+  - `adminFinanceCompensate`
+  - `adminResetTestData`
+  - `adminRepairUserIdentity`
+- 其他辅助：
+  - `checkUserByIdNumber`
+  - `huifuUserApplyForMe`
+  - `huifuIndvOpenForMe`
 
-但没有列出很多现在真实在用的函数，例如：
+但要注意两件事：
 
-- `login`
-- `exchangePhoneNumber`
-- `getGoodsProfile`
-- `getUserPublicProfile`
-- `getSellerHomepage`
-- `chatSendMessage`
-- `getMessageCenter`
-- `getSubscribeConfig`
-- `markGoodsMessagesRead`
-- `taskContactFlow`
-- `markMessagesReadByOwner`
-- `markMessagesReadByPeer`
-- `imageAuditStart`
-- `imageAuditCallback`
-- `financeCompensate`
-- `financeCompensateTimer`
-- `adminLogin`
-- `adminFinanceCompensate`
-
-所以：
-
-- 不要把 `cloudbaserc.json` 当成完整部署清单
-- 手动部署或补全脚本都可以
-- 但最终必须按本节清单核对
+- `cloudbaserc.json` 解决的是“函数清单”和默认超时，不等于环境变量已经自动配好
+- 涉及模板 ID、管理员账号密码、COS 密钥、补偿 token 这类敏感配置，仍然要以云开发控制台里的环境变量为准
 
 ### 14.4 超时建议
 
@@ -1261,10 +1296,20 @@
    - 存储权限
    - 云函数环境变量
 4. 按本文件第 14 节把云函数部署齐
-5. 确认回调地址：
+5. 如果当前还是测试库，先决定走哪条路径：
+   - 保留历史测试数据：
+     - `身份数据修复 -> 预检查`
+     - `身份数据修复 -> 执行修复`
+   - 想从空库重新开始：
+     - `清空测试数据 -> 预检查`
+     - 输入确认口令 `CLEAR_TEST_DATA`
+     - `清空测试数据 -> 执行清空`
+   - 这两个工具都在：
+     - `pages/profile/account/index`
+6. 确认回调地址：
    - `huifuPayNotify`
    - `imageAuditCallback`
-6. 确认以下集合至少存在或可被自动创建：
+7. 确认以下集合至少存在或可被自动创建：
    - `userInfo`
    - `goods`
    - `tasks`
@@ -1275,28 +1320,25 @@
    - `image_audit_jobs`
    - `huifu_notify_logs`
    - `finance_compensate_logs`
-7. 真机至少跑一次：
-   - 登录
-   - 注册实名
-   - 商品发布
-   - 商品审核
-   - 商品购买
-   - 任务发布支付
-   - 任务接单 / 提交 / 确认
+8. 真机至少跑一次：
+   - 登录 / 注册实名
+   - 商品发布 / 商品审核 / 卖家主页 / 商品聊天 / 商品购买
+   - 全局消息中心
+   - 任务发布支付 / 任务接单 / 提交 / 确认
    - 提现
-8. 如果先改商品模块：
+9. 如果先改商品模块：
    - 先读
      - `hyyc/pages/profile/goods/index.js`
      - `hyyc/pages/goods/detail/index.js`
      - `hyyc/utils/userGoodsStore.js`
      - `hyyc/cloudfunctions/getGoodsProfile/index.js`
-9. 如果先改任务模块：
+10. 如果先改任务模块：
    - 先读
      - `hyyc/pages/chat/room/index.js`
      - `hyyc/pages/task/detail/index.js`
      - `hyyc/cloudfunctions/taskCancelFlow/index.js`
      - `hyyc/cloudfunctions/taskContactFlow/index.js`
-10. 如果先改资金模块：
+11. 如果先改资金模块：
    - 先读
      - `hyyc/cloudfunctions/huifuMiniappPay/index.js`
      - `hyyc/cloudfunctions/walletWithdraw/index.js`
@@ -1341,8 +1383,7 @@
 - 我的页“消息中心”入口能进入全局消息中心
 - 商品会话和任务会话都能聚合在一起
 - 未读数、最后一条消息、跳转目标都正确
-- “开启聊天提醒”能拉起订阅授权
-- 双账号发消息后，订阅消息能真实触达
+- 不再出现“开启聊天提醒”之类的订阅入口
 
 ### 16.4 钱包 / 提现链路
 
@@ -1357,6 +1398,23 @@
 - `financeCompensateTimer` 周期性写入 `finance_compensate_logs`
 - `huifuPayNotify` 能收到并处理真实回调
 - `imageAuditCallback` 能把商品状态从 `pending` 收口到 `posted / need_fix`
+
+### 16.6 上线前测试库处理
+
+- 如果沿用历史测试库：
+  - 管理员登录后进入账户页
+  - 先执行 `身份数据修复 -> 预检查`
+  - 确认返回结果里没有异常重复 openid
+  - 再执行 `身份数据修复 -> 执行修复`
+  - 修复后再跑消息中心、卖家主页、聊天、商品发布、任务发布等主链路回归
+- 如果想从空库重新开始：
+  - 管理员登录后进入账户页
+  - 先执行 `清空测试数据 -> 预检查`
+  - 确认结果里 `hasTruncatedScan=false`
+  - 输入确认口令 `CLEAR_TEST_DATA`
+  - 再执行 `清空测试数据 -> 执行清空`
+  - `legal_docs` 会保留，其余业务集合会被清空
+- 这两条路径二选一即可，不要把“先清空”再“修复历史数据”混在一次交接里
 
 ---
 
@@ -1430,7 +1488,7 @@
 ### 18.1 已知风险
 
 - 提现最终到账回调闭环还没完全真机验证完
-- 卖家主页 / 消息中心 / 订阅消息虽然已接通，但还缺双账号真机验证
+- 卖家主页 / 消息中心还缺双账号真机验证
 - 手机号申请和任务取消申请都没有“拒绝”动作
 - 还缺一轮完整双账号并发回归
 
@@ -1446,7 +1504,6 @@
 4. 再做一次消息链路真机联调：
    - 卖家主页跳转
    - 全局消息中心聚合 / 未读 / 跳转
-   - 一次性订阅消息真实触达
 5. 如果继续补任务协商：
    - 增加拒绝手机号申请
    - 增加拒绝取消申请
@@ -1472,3 +1529,5 @@
 - 数据库权限 / 环境变量 / 回调配置口径
 
 如果你改了页面，却没同步云函数和部署配置，最后看到的通常不是“明显报错”，而是“某个链路只有一半能用”。先核对部署和配置，再判断是不是代码逻辑问题。
+
+如果当前接手的是测试环境，先决定“保留历史测试数据并修复”还是“直接清空测试库重来”，再开始联调，不要一边跑业务一边临时改数据口径。

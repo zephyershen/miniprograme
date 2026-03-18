@@ -2,8 +2,10 @@ const { formatMoney, formatDateTime } = require('../../../utils/format');
 const { toast } = require('../../../utils/ui');
 const { startImageAudit } = require('../../../utils/imageAudit');
 const access = require('../../../config/access');
+const { getStoredUser, patchStoredUser } = require('../../../utils/userIdentity');
 
 const db = wx.cloud.database();
+const _ = db.command;
 const GOODS_COLLECTION = 'goods';
 const MSG_COLLECTION = 'messages';
 const GOODS_REFRESH_TOKEN_KEY = 'hyyc_goods_refresh_token';
@@ -85,11 +87,11 @@ Page({
     viewMode: 'published',
     tab: 'all',
     list: [],
-    publishedList: [],
-    purchasedList: [],
     isLoading: true,
     goodsChatEnabled: !!(access && access.features && access.features.goodsChat)
   },
+  _publishedRecords: [],
+  _purchasedRecords: [],
   onShow() {
     this.load();
   },
@@ -105,7 +107,7 @@ Page({
     });
   },
   async _ensureOpenid() {
-    const u = wx.getStorageSync('hyyc_user') || {};
+    const u = getStoredUser();
     let openid = pickStr(u._openid || u.openid || u.openId);
     if (openid) return openid;
 
@@ -114,7 +116,7 @@ Page({
       openid = pickStr(res && res.result && res.result.openid);
       if (openid) {
         try {
-          wx.setStorageSync('hyyc_user', { ...u, _openid: openid });
+          patchStoredUser({ _openid: openid });
         } catch (e) {
           // ignore
         }
@@ -138,8 +140,8 @@ Page({
   syncList() {
     const viewMode = pickStr(this.data.viewMode, 'published');
     let source = viewMode === 'purchased'
-      ? (Array.isArray(this.data.purchasedList) ? this.data.purchasedList : [])
-      : (Array.isArray(this.data.publishedList) ? this.data.publishedList : []);
+      ? (Array.isArray(this._purchasedRecords) ? this._purchasedRecords : [])
+      : (Array.isArray(this._publishedRecords) ? this._publishedRecords : []);
 
     if (viewMode === 'published') {
       const tab = normalizePublishedTab(this.data.tab);
@@ -148,7 +150,25 @@ Page({
       }
     }
 
-    this.setData({ list: source });
+    this.setData({
+      list: source.map((item) => ({
+        id: pickStr(item && item.id),
+        title: pickStr(item && item.title),
+        status: pickStr(item && item.status),
+        statusText: pickStr(item && item.statusText),
+        statusBadge: pickStr(item && item.statusBadge),
+        priceText: pickStr(item && item.priceText),
+        createdAtText: pickStr(item && item.createdAtText),
+        sellerText: pickStr(item && item.sellerText),
+        needFixText: pickStr(item && item.needFixText),
+        auditError: pickStr(item && item.auditError),
+        paymentLockActive: !!(item && item.paymentLockActive),
+        goodsChatUnreadCount: Number(item && item.goodsChatUnreadCount) || 0,
+        ownerId: pickStr(item && item.ownerId),
+        _openid: pickStr(item && item._openid),
+        isPurchased: !!(item && item.isPurchased),
+      }))
+    });
   },
   _buildGoodsChatWhere(openid = '', userId = '') {
     const sellerOpenid = pickStr(openid);
@@ -183,13 +203,19 @@ Page({
   },
   _applyGoodsUnreadMap(unreadMap = {}) {
     this._goodsUnreadMap = unreadMap && typeof unreadMap === 'object' ? unreadMap : {};
-    const publishedList = (Array.isArray(this.data.publishedList) ? this.data.publishedList : []).map((item) => ({
-      ...item,
-      goodsChatUnreadCount: Number(this._goodsUnreadMap[pickStr(item && item.id)]) || 0,
-    }));
-    this.setData({ publishedList }, () => {
-      if (this.data.viewMode === 'published') this.syncList();
+    let changed = false;
+    this._publishedRecords = (Array.isArray(this._publishedRecords) ? this._publishedRecords : []).map((item) => {
+      const nextUnread = Number(this._goodsUnreadMap[pickStr(item && item.id)]) || 0;
+      if (Number(item && item.goodsChatUnreadCount) !== nextUnread) {
+        changed = true;
+      }
+      return {
+        ...item,
+        goodsChatUnreadCount: nextUnread,
+      };
     });
+    if (!changed) return;
+    if (this.data.viewMode === 'published') this.syncList();
   },
   loadGoodsUnreadSummary(openid = '', userId = '') {
     const where = this._buildGoodsChatWhere(openid, userId);
@@ -197,13 +223,24 @@ Page({
       this._applyGoodsUnreadMap({});
       return;
     }
+    const sellerOpenid = pickStr(openid);
+    const sellerId = pickStr(userId);
+    const unreadWhere = {
+      ...where,
+      readBySeller: _.neq(true),
+    };
+    if (sellerOpenid) {
+      unreadWhere.fromOpenid = _.neq(sellerOpenid);
+    } else if (sellerId) {
+      unreadWhere.fromUserId = _.neq(sellerId);
+    }
     db.collection(MSG_COLLECTION)
-      .where(where)
-      .limit(1000)
+      .where(unreadWhere)
+      .limit(500)
       .get({
         success: (res) => {
           const docs = (res && res.data) || [];
-          this._applyGoodsUnreadMap(this._buildGoodsUnreadMap(docs, pickStr(openid), pickStr(userId)));
+          this._applyGoodsUnreadMap(this._buildGoodsUnreadMap(docs, sellerOpenid, sellerId));
         },
         fail: (err) => {
           console.error('加载商品咨询未读汇总失败', err);
@@ -245,8 +282,8 @@ Page({
       ? `请替换第 ${needFixIdx.map((i) => Number(i) + 1).join('、')} 张图片`
       : '';
     return {
-      ...doc,
       id: pickStr(doc._id, doc.id),
+      title: pickStr(doc.title, doc.desc, '未命名商品'),
       status: pickStr(doc.status),
       statusText: st.text,
       statusBadge: st.badge,
@@ -255,7 +292,11 @@ Page({
       needFixText,
       auditError: pickStr(doc.auditError),
       paymentLockActive,
-      goodsChatUnreadCount: Number((this._goodsUnreadMap || {})[pickStr(doc._id, doc.id)]) || 0
+      goodsChatUnreadCount: Number((this._goodsUnreadMap || {})[pickStr(doc._id, doc.id)]) || 0,
+      ownerId: pickStr(doc.ownerId),
+      _openid: pickStr(doc._openid),
+      images: Array.isArray(doc.images) ? doc.images.slice() : [],
+      isPurchased: false,
     };
   },
   _mapPurchasedGoods(doc = {}) {
@@ -266,8 +307,8 @@ Page({
     if (doc.building) sellerParts.push(doc.building);
 
     return {
-      ...doc,
       id: pickStr(doc._id, doc.id),
+      title: pickStr(doc.title, doc.desc, '未命名商品'),
       status: 'sold',
       statusText: '已买到',
       statusBadge: 'badge-primary',
@@ -284,7 +325,8 @@ Page({
       name: 'getGoodsProfile',
       data: {
         action: 'list_my_goods',
-        limit: 100
+        limit: 100,
+        compact: true
       }
     });
     const result = (res && res.result) || {};
@@ -336,7 +378,7 @@ Page({
     }
   },
   async load() {
-    const u = wx.getStorageSync('hyyc_user') || {};
+    const u = getStoredUser();
     if (!u || !u.realname) {
       wx.navigateTo({ url: '/pages/welcome/index' });
       return;
@@ -353,28 +395,28 @@ Page({
     try {
       const goodsData = await this._loadMyGoodsData(openid);
       const tab = normalizePublishedTab(this.data.tab);
-      const publishedList = (Array.isArray(goodsData.published) ? goodsData.published : []).map((doc) => this._mapPublishedGoods(doc));
-      const purchasedList = (Array.isArray(goodsData.purchased) ? goodsData.purchased : []).map((doc) => this._mapPurchasedGoods(doc));
+      this._publishedRecords = (Array.isArray(goodsData.published) ? goodsData.published : []).map((doc) => this._mapPublishedGoods(doc));
+      this._purchasedRecords = (Array.isArray(goodsData.purchased) ? goodsData.purchased : []).map((doc) => this._mapPurchasedGoods(doc));
 
       this.setData({
         tab,
-        publishedList,
-        purchasedList,
         isLoading: false
       }, () => this.syncList());
 
+      this.clearGoodsChatWatch();
       this.loadGoodsUnreadSummary(openid, pickStr(u.id));
-      this.openGoodsChatWatch(openid, pickStr(u.id));
     } catch (err) {
       console.error('加载我的商品失败', err);
-      this.setData({ list: [], publishedList: [], purchasedList: [], isLoading: false });
+      this._publishedRecords = [];
+      this._purchasedRecords = [];
+      this.setData({ list: [], isLoading: false });
       this.clearGoodsChatWatch();
       toast('加载失败，请稍后重试');
     }
   },
   _applyLocalShelfChange(id = '', nextStatus = '') {
-    const publishedList = Array.isArray(this.data.publishedList) ? this.data.publishedList.slice() : [];
-    const idx = publishedList.findIndex((item) => item && (item.id === id || item._id === id));
+    const publishedList = Array.isArray(this._publishedRecords) ? this._publishedRecords.slice() : [];
+    const idx = publishedList.findIndex((item) => item && item.id === id);
     if (idx < 0) {
       this.setData({ isLoading: false });
       return;
@@ -389,10 +431,12 @@ Page({
       paymentLockActive: false
     };
 
-    this.setData({
-      publishedList,
+      this.setData({
       isLoading: false
-    }, () => this.syncList());
+    }, () => {
+      this._publishedRecords = publishedList;
+      this.syncList();
+    });
   },
   onView(e) {
     const id = pickStr(e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id);
@@ -428,9 +472,9 @@ Page({
     if (!id) return;
 
     const sourceList = this.data.viewMode === 'purchased'
-      ? (this.data.purchasedList || [])
-      : (this.data.publishedList || []);
-    const item = sourceList.find((entry) => entry && pickStr(entry.id, entry._id) === id);
+      ? (this._purchasedRecords || [])
+      : (this._publishedRecords || []);
+    const item = sourceList.find((entry) => entry && pickStr(entry.id) === id);
     if (!item) return;
 
     const isPurchased = !!item.isPurchased;
@@ -581,7 +625,7 @@ Page({
     const id = pickStr(e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id);
     if (!id) return;
 
-    const item = (this.data.publishedList || []).find((x) => x && (x.id === id || x._id === id));
+    const item = (this._publishedRecords || []).find((x) => x && x.id === id);
     if (!item || !Array.isArray(item.images) || !item.images.length) {
       toast('找不到图片');
       return;

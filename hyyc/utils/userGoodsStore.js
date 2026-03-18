@@ -1,4 +1,5 @@
 const db = wx.cloud.database();
+const { getStoredUser, patchStoredUser, setStoredUser } = require('./userIdentity');
 
 const USER_COLLECTION = 'userInfo';
 const GOODS_FAVORITES_MAX = 60;
@@ -169,7 +170,7 @@ function mergeLatestSnapshotList(list = [], latestMap = {}, timeField = '', maxC
 }
 
 async function ensureOpenid() {
-  const cached = wx.getStorageSync('hyyc_user') || {};
+  const cached = getStoredUser();
   let openid = pickStr(cached._openid, cached.openid, cached.openId);
   if (openid) return openid;
 
@@ -177,7 +178,7 @@ async function ensureOpenid() {
     const res = await wx.cloud.callFunction({ name: 'login' });
     openid = pickStr(res && res.result && res.result.openid);
     if (openid) {
-      wx.setStorageSync('hyyc_user', { ...cached, _openid: openid });
+      patchStoredUser({ _openid: openid });
     }
   } catch (e) {
     openid = '';
@@ -187,7 +188,7 @@ async function ensureOpenid() {
 }
 
 async function resolveUserDoc() {
-  const cachedUser = wx.getStorageSync('hyyc_user') || {};
+  const cachedUser = getStoredUser();
   const cachedDocId = pickStr(cachedUser.id, cachedUser._id);
   const openid = await ensureOpenid();
 
@@ -207,7 +208,7 @@ async function resolveUserDoc() {
     const docId = pickStr(userDoc && userDoc._id, userDoc && userDoc.id, cachedDocId);
 
     if (userDoc && docId) {
-      wx.setStorageSync('hyyc_user', { ...cachedUser, ...userDoc, id: docId });
+      setStoredUser({ ...cachedUser, ...userDoc, id: docId });
     }
 
     return { openid, docId, userDoc, cachedUser };
@@ -224,10 +225,10 @@ async function resolveUserDoc() {
 
 function saveCachedUserPatch(docId = '', patch = {}) {
   try {
-    const cached = wx.getStorageSync('hyyc_user') || {};
+    const cached = getStoredUser();
     const next = { ...cached, ...patch };
     if (docId) next.id = docId;
-    wx.setStorageSync('hyyc_user', next);
+    setStoredUser(next);
   } catch (e) {
     // ignore
   }

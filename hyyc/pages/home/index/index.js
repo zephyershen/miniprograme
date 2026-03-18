@@ -1,5 +1,6 @@
 const { formatMoney, formatDateTime } = require('../../../utils/format');
 const access = require('../../../config/access');
+const { getStoredUser } = require('../../../utils/userIdentity');
 
 // 使用云开发数据库 tasks 集合作为任务数据源
 const db = wx.cloud.database();
@@ -24,7 +25,7 @@ Page({
     locationFilterLabels: ['全部', '小区内', '小区外']
   },
   onShow(){
-    const u = wx.getStorageSync('hyyc_user');
+    const u = getStoredUser();
     if (!u || !u.realname) {
       // 未登录：不再在任务广场显示“特定人群说明”，只提示去欢迎页操作
       this.setData({
@@ -54,7 +55,7 @@ Page({
   loadTasks(){
     if (this.data.needsLogin) return;
     this.setData({ isLoading: true });
-    const u = wx.getStorageSync('hyyc_user') || {};
+    const u = getStoredUser();
     const userBuilding = (u.building || '').trim();
     const community = (u.community || '').trim();
 

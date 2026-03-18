@@ -5,7 +5,7 @@
     <text class="hero-label">可提现余额（元）</text>
     <text class="hero-amount">{{availableBalanceText}}</text>
     <text class="hero-sub">消费记录会显示在钱包明细里，但不会影响这里的余额</text>
-    <text class="hero-sub warning" wx:if="{{activeWithdraw}}">当前有一笔提现处理中，可点下面按钮刷新状态</text>
+    <text class="hero-sub warning" wx:if="{{activeWithdraw}}">当前有一笔提现处理中，预计次日到账，请留意银行卡余额变动。</text>
     <view class="btn-secondary {{isSyncingWithdraw ? 'btn-secondary-disabled' : ''}}" wx:if="{{activeWithdraw}}" bindtap="onSyncActiveWithdraw">
       {{isSyncingWithdraw ? '同步中...' : '立即同步提现状态'}}
     </view>
@@ -60,7 +60,7 @@
       <text class="tip-text">先完成上一步绑定银行卡。</text>
     </view>
     <view class="tip-box" wx:elif="{{activeWithdraw}}">
-      <text class="tip-text">当前有一笔提现处理中，可先同步状态再试。</text>
+      <text class="tip-text">当前有一笔提现处理中，预计次日到账，请留意银行卡余额变动。</text>
     </view>
     <block wx:else>
       <view class="tip-box subtle" wx:if="{{!isSelectedCashTypeOpened}}">

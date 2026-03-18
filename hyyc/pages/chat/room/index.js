@@ -1,11 +1,15 @@
 const { resolveAvatarURL, saveAvatarTempURLMap } = require('../../../utils/avatarCache');
+const { getStoredUser } = require('../../../utils/userIdentity');
 
 // 使用云开发数据库 messages 集合做聊天记录
 const db = wx.cloud.database();
+const _ = db.command;
 const MSG_COLLECTION = 'messages';
 const TASK_COLLECTION = 'tasks';
 const TEMP_URL_BATCH_SIZE = 20;
 const REFUND_SYNC_INTERVAL_MS = 3000;
+const CHAT_RECENT_WATCH_LIMIT = 40;
+const CHAT_HISTORY_PAGE_SIZE = 40;
 
 function pickStr(...vals) {
   for (const v of vals) {
@@ -93,10 +97,18 @@ Page({
     pendingTaskCancelRequestId: '',
     approveTaskCancelSubmitting: false,
     localResolvedTaskCancelRequestId: '',
+    canRequestTaskRelease: false,
+    hasPendingTaskRelease: false,
+    canApproveTaskRelease: false,
+    pendingTaskReleaseRequestId: '',
+    approveTaskReleaseSubmitting: false,
+    localResolvedTaskReleaseRequestId: '',
     canApproveContactRequest: false,
     pendingContactRequestId: '',
     approveContactRequestSubmitting: false,
-    localResolvedContactRequestId: ''
+    localResolvedContactRequestId: '',
+    hasMoreHistory: false,
+    loadingHistory: false,
   },
 
   // 用于防抖的滚动定时器
@@ -105,8 +117,14 @@ Page({
   _userScrolling: false,
   // 防止重复触发“同意取消”
   _approvingTaskCancel: false,
+  _approvingTaskRelease: false,
   _approvingContactRequest: false,
   _refundSyncing: false,
+  _roomDocs: [],
+  _lastRenderedMsgSignature: '',
+  _historyDocs: [],
+  _realtimeDocs: [],
+  _historyExhausted: false,
 
   // 姓名脱敏处理：2个字显示"姓*"，3个字及以上显示"姓*尾"
   _maskName(name) {
@@ -170,13 +188,17 @@ Page({
     return map;
   },
 
-  async _fetchPublicProfile(openid = '') {
+  async _fetchPublicProfile(openid = '', userId = '') {
     const targetOpenid = pickStr(openid);
-    if (!targetOpenid) return null;
+    const targetUserId = pickStr(userId);
+    if (!targetOpenid && !targetUserId) return null;
     try {
       const res = await wx.cloud.callFunction({
         name: 'getUserPublicProfile',
-        data: { openid: targetOpenid }
+        data: {
+          openid: targetOpenid,
+          userId: targetUserId,
+        }
       });
       const result = (res && res.result) || {};
       return result && result.ok ? (result.profile || null) : null;
@@ -188,11 +210,11 @@ Page({
 
   _buildTaskParticipantSnapshot(task = {}, role = '', me = {}) {
     const isOwner = role === 'owner';
-    const fallbackName = isOwner ? '发布者' : '接单人';
+    const fallbackName = isOwner ? '发布者' : (pickStr(task.workerId) ? '接单人' : '咨询用户');
     const cached = me && typeof me === 'object' ? me : {};
     const fromTask = {
       role,
-      userId: isOwner ? pickStr(task.ownerId) : pickStr(task.workerId),
+      userId: isOwner ? pickStr(task.ownerId) : pickStr(task.workerId, this.data.peerUserId),
       openid: isOwner ? pickStr(task._openid) : pickStr(task.workerOpenid, task.worker_openid),
       nickname: isOwner ? pickStr(task.ownerNickname) : pickStr(task.workerNickname),
       name: isOwner ? pickStr(task.ownerName) : pickStr(task.workerName),
@@ -237,6 +259,7 @@ Page({
       }
       if (Object.keys(patch).length) {
         this.setData(patch);
+        this._refreshDecoratedMsgs();
       }
     } catch (err) {
       console.warn('快速加载聊天头像失败', err);
@@ -245,7 +268,7 @@ Page({
 
   async _hydrateParticipantProfile(baseProfile = {}) {
     const base = baseProfile && typeof baseProfile === 'object' ? { ...baseProfile } : {};
-    const publicProfile = await this._fetchPublicProfile(base.openid);
+    const publicProfile = await this._fetchPublicProfile(base.openid, base.userId);
     const merged = {
       ...base,
       ...(publicProfile || {}),
@@ -283,6 +306,7 @@ Page({
       peerProfile: peerBase,
       peerDisplayName: pickStr(peerBase.displayName, '对方'),
     });
+    this._refreshDecoratedMsgs();
     this._hydrateParticipantAvatarFast(meBase, peerBase);
 
     Promise.all([
@@ -294,6 +318,7 @@ Page({
         peerProfile,
         peerDisplayName: pickStr(peerProfile && peerProfile.displayName, peerBase.displayName, '对方'),
       });
+      this._refreshDecoratedMsgs();
     }).catch((err) => {
       console.warn('初始化聊天参与方资料失败', err);
     });
@@ -311,20 +336,31 @@ Page({
     const cancelRequest = resolvedCancelState.cancelRequest;
     const requestId = pickStr(cancelRequest.requestId);
     const cancelStatus = pickStr(resolvedCancelState.effectiveCancelStatus);
+    const releaseRequest = t.releaseRequest && typeof t.releaseRequest === 'object' ? t.releaseRequest : {};
+    const releaseRequestId = pickStr(releaseRequest.requestId);
+    const rawReleaseStatus = pickStr(releaseRequest.status);
     const contactRequest = t.contactRequest && typeof t.contactRequest === 'object' ? t.contactRequest : {};
     const contactRequestId = pickStr(contactRequest.requestId);
     const rawContactStatus = pickStr(contactRequest.status);
     const localResolvedTaskCancelRequestId = pickStr(this.data.localResolvedTaskCancelRequestId);
+    const localResolvedTaskReleaseRequestId = pickStr(this.data.localResolvedTaskReleaseRequestId);
     const localResolvedContactRequestId = pickStr(this.data.localResolvedContactRequestId);
     const locallyResolved = !!(requestId && requestId === localResolvedTaskCancelRequestId);
+    const locallyResolvedRelease = !!(releaseRequestId && releaseRequestId === localResolvedTaskReleaseRequestId);
     const locallyResolvedContact = !!(contactRequestId && contactRequestId === localResolvedContactRequestId);
     const effectiveCancelStatus = locallyResolved && cancelStatus === 'pending' ? 'approved' : cancelStatus;
+    const effectiveReleaseStatus = locallyResolvedRelease && rawReleaseStatus === 'pending' ? 'approved' : rawReleaseStatus;
     const effectiveContactStatus = locallyResolvedContact && rawContactStatus === 'pending' ? 'approved' : rawContactStatus;
     const syncedResolved = locallyResolved && effectiveCancelStatus !== 'pending';
+    const syncedResolvedRelease = locallyResolvedRelease && effectiveReleaseStatus !== 'pending';
     const syncedResolvedContact = locallyResolvedContact && effectiveContactStatus !== 'pending';
     const nextCancelRequest = {
       ...cancelRequest,
       ...(effectiveCancelStatus ? { status: effectiveCancelStatus } : {}),
+    };
+    const nextReleaseRequest = {
+      ...releaseRequest,
+      ...(effectiveReleaseStatus ? { status: effectiveReleaseStatus } : {}),
     };
     const nextContactRequest = {
       ...contactRequest,
@@ -334,12 +370,23 @@ Page({
       && meId === ownerId
       && (statusRaw === 'accepted' || statusRaw === 'submitted')
       && !!workerId
+      && effectiveCancelStatus !== 'pending'
+      && effectiveReleaseStatus !== 'pending';
+    const canRequestTaskRelease = meId
+      && meId === workerId
+      && statusRaw === 'accepted'
+      && effectiveReleaseStatus !== 'pending'
       && effectiveCancelStatus !== 'pending';
     const canApproveTaskCancel = meId
       && meId === workerId
       && (statusRaw === 'accepted' || statusRaw === 'submitted')
       && effectiveCancelStatus === 'pending'
       && !!requestId;
+    const canApproveTaskRelease = meId
+      && meId === ownerId
+      && statusRaw === 'accepted'
+      && effectiveReleaseStatus === 'pending'
+      && !!releaseRequestId;
     const canApproveContactRequest = meId
       && effectiveContactStatus === 'pending'
       && !!contactRequestId
@@ -356,6 +403,7 @@ Page({
         ownerId,
         workerId,
         cancelRequest: nextCancelRequest,
+        releaseRequest: nextReleaseRequest,
         contactRequest: nextContactRequest,
       },
       canRequestTaskCancel,
@@ -364,6 +412,12 @@ Page({
       pendingTaskCancelRequestId: requestId,
       localResolvedTaskCancelRequestId: syncedResolved ? '' : localResolvedTaskCancelRequestId,
       approveTaskCancelSubmitting: syncedResolved ? false : this.data.approveTaskCancelSubmitting,
+      canRequestTaskRelease,
+      hasPendingTaskRelease: effectiveReleaseStatus === 'pending',
+      canApproveTaskRelease,
+      pendingTaskReleaseRequestId: releaseRequestId,
+      localResolvedTaskReleaseRequestId: syncedResolvedRelease ? '' : localResolvedTaskReleaseRequestId,
+      approveTaskReleaseSubmitting: syncedResolvedRelease ? false : this.data.approveTaskReleaseSubmitting,
       canApproveContactRequest,
       pendingContactRequestId: contactRequestId,
       localResolvedContactRequestId: syncedResolvedContact ? '' : localResolvedContactRequestId,
@@ -401,6 +455,177 @@ Page({
       clearInterval(this._refundSyncTimer);
       this._refundSyncTimer = null;
     }
+  },
+
+  _closeRoomWatch() {
+    if (this._watcher && this._watcher.close) {
+      this._watcher.close();
+    }
+    this._watcher = null;
+  },
+
+  _closeTaskWatch() {
+    if (this._taskWatcher && this._taskWatcher.close) {
+      this._taskWatcher.close();
+    }
+    this._taskWatcher = null;
+  },
+
+  _bindKeyboardHeightChange() {
+    if (this._keyboardHeightHandler) return;
+    this._keyboardHeightHandler = (res) => {
+      this.setData({ keyboardHeight: res.height || 0 });
+      if (res.height > 0) {
+        setTimeout(() => {
+          this._scrollToBottom();
+        }, 100);
+      }
+    };
+    wx.onKeyboardHeightChange(this._keyboardHeightHandler);
+  },
+
+  _unbindKeyboardHeightChange() {
+    if (!this._keyboardHeightHandler) return;
+    try {
+      wx.offKeyboardHeightChange(this._keyboardHeightHandler);
+    } catch (err) {
+      wx.offKeyboardHeightChange();
+    }
+    this._keyboardHeightHandler = null;
+  },
+
+  _roomHasUnreadForMe(docs = [], ownerId = '', peerUserId = '', meId = '') {
+    const currentMeId = pickStr(meId);
+    if (!currentMeId) return false;
+    if (currentMeId === pickStr(ownerId)) {
+      return (Array.isArray(docs) ? docs : []).some((doc) => (
+        pickStr(doc && doc.fromUserId)
+        && pickStr(doc && doc.fromUserId) !== pickStr(ownerId)
+        && doc.readByOwner !== true
+      ));
+    }
+    if (currentMeId === pickStr(peerUserId)) {
+      return (Array.isArray(docs) ? docs : []).some((doc) => (
+        pickStr(doc && doc.fromUserId) === pickStr(ownerId)
+        && doc.readByPeer !== true
+      ));
+    }
+    return false;
+  },
+
+  _markTaskRoomRead(ownerId = '', peerUserId = '', docs = [], force = false) {
+    const tid = pickStr(this.data.tid);
+    const me = this.data.me || {};
+    const meId = pickStr(me.id);
+    const currentOwnerId = pickStr(ownerId, this.data.ownerId);
+    const currentPeerUserId = pickStr(peerUserId, this.data.peerUserId);
+    if (!tid || !meId || !currentOwnerId || !currentPeerUserId) return;
+    if (!force && !this._roomHasUnreadForMe(docs, currentOwnerId, currentPeerUserId, meId)) return;
+
+    if (meId === currentOwnerId) {
+      wx.cloud.callFunction({
+        name: 'markMessagesReadByOwner',
+        data: { tid, ownerId: currentOwnerId, peerUserId: currentPeerUserId }
+      }).catch(err => {
+        console.error('调用 markMessagesReadByOwner 失败', err);
+      });
+    } else if (meId === currentPeerUserId) {
+      wx.cloud.callFunction({
+        name: 'markMessagesReadByPeer',
+        data: { tid, ownerId: currentOwnerId, peerUserId: currentPeerUserId }
+      }).catch(err => {
+        console.error('调用 markMessagesReadByPeer 失败', err);
+      });
+    }
+  },
+
+  _buildVisibleMsgSignature(msgs = []) {
+    return JSON.stringify((Array.isArray(msgs) ? msgs : []).map((item) => ([
+      pickStr(item && item.id),
+      item && item.mine ? 1 : 0,
+      pickStr(item && item.type),
+      pickStr(item && item.text),
+      pickStr(item && item.imageUrl),
+      pickStr(item && item.avatarUrl),
+      pickStr(item && item.taskCancelStatusText),
+      pickStr(item && item.taskReleaseStatusText),
+      pickStr(item && item.contactRequestStatusText),
+    ])));
+  },
+
+  _getMsgId(doc = {}) {
+    return pickStr(doc && (doc._id || doc.id));
+  },
+
+  _getMsgTs(doc = {}) {
+    const raw = doc && doc.createTime;
+    if (raw instanceof Date) return raw.getTime();
+    if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+    if (raw && typeof raw === 'object' && Number.isFinite(raw.$date)) return raw.$date;
+    const ts = Date.parse(raw);
+    return Number.isFinite(ts) ? ts : 0;
+  },
+
+  _sortRoomDocsAsc(docs = []) {
+    return (Array.isArray(docs) ? docs.slice() : []).sort((a, b) => {
+      const diff = this._getMsgTs(a) - this._getMsgTs(b);
+      if (diff) return diff;
+      return this._getMsgId(a).localeCompare(this._getMsgId(b));
+    });
+  },
+
+  _mergeUniqueRoomDocs(...lists) {
+    const map = {};
+    lists.forEach((list) => {
+      (Array.isArray(list) ? list : []).forEach((doc) => {
+        const id = this._getMsgId(doc);
+        if (!id) return;
+        map[id] = doc;
+      });
+    });
+    return this._sortRoomDocsAsc(Object.keys(map).map((id) => map[id]));
+  },
+
+  _composeRoomDocs() {
+    return this._mergeUniqueRoomDocs(this._historyDocs, this._realtimeDocs);
+  },
+
+  _applyRoomDocs(options = {}) {
+    const firstLoad = !!options.firstLoad || !this.data.contentReady;
+    const docs = this._composeRoomDocs();
+    const msgs = this._decorateMsgs(docs, this.data.me);
+    const renderSignature = this._buildVisibleMsgSignature(msgs);
+    const nextData = {};
+    const shouldRenderMsgs = firstLoad || renderSignature !== this._lastRenderedMsgSignature;
+
+    this._roomDocs = docs;
+
+    if (typeof options.loadingHistory === 'boolean') {
+      nextData.loadingHistory = options.loadingHistory;
+    }
+    if (typeof options.hasMoreHistory === 'boolean') {
+      nextData.hasMoreHistory = options.hasMoreHistory;
+    }
+    if (firstLoad) {
+      nextData.isLoading = false;
+      nextData.contentReady = true;
+      if (msgs.length && !this._userScrolling) {
+        nextData.scrollTop = 999999;
+        nextData.scrollWithAnimation = false;
+      }
+    }
+    if (shouldRenderMsgs) {
+      nextData.msgs = msgs;
+    }
+
+    if (Object.keys(nextData).length) {
+      this.setData(nextData);
+      if (shouldRenderMsgs) {
+        this._lastRenderedMsgSignature = renderSignature;
+      }
+    }
+
+    return msgs;
   },
 
   _runRefundSync(taskId = '') {
@@ -486,6 +711,47 @@ Page({
     });
   },
 
+  _applyLocalTaskReleaseResolved(requestId) {
+    const normalizedRequestId = pickStr(requestId);
+    if (!normalizedRequestId) return;
+    const nextMsgs = (this.data.msgs || []).map((item) => {
+      const taskRelease = item && item.taskRelease && typeof item.taskRelease === 'object' ? item.taskRelease : null;
+      if (!taskRelease || pickStr(taskRelease.requestId) !== normalizedRequestId) return item;
+      return {
+        ...item,
+        taskRelease: { ...taskRelease, status: 'approved' },
+        taskReleaseStatusText: '任务已释放，可继续接单',
+        taskReleaseStatusClass: 'task-cancel-card-status task-cancel-card-status-success',
+      };
+    });
+    const currentTaskInfo = this.data.taskInfo && typeof this.data.taskInfo === 'object'
+      ? this.data.taskInfo
+      : null;
+    const nextTaskInfo = currentTaskInfo ? {
+      ...currentTaskInfo,
+      statusRaw: 'posted',
+      workerId: '',
+      releaseRequest: {
+        ...((currentTaskInfo.releaseRequest && typeof currentTaskInfo.releaseRequest === 'object')
+          ? currentTaskInfo.releaseRequest
+          : {}),
+        requestId: normalizedRequestId,
+        status: 'approved',
+      }
+    } : currentTaskInfo;
+
+    this.setData({
+      msgs: nextMsgs,
+      taskInfo: nextTaskInfo,
+      canRequestTaskCancel: false,
+      canRequestTaskRelease: false,
+      hasPendingTaskRelease: false,
+      canApproveTaskRelease: false,
+      approveTaskReleaseSubmitting: false,
+      localResolvedTaskReleaseRequestId: normalizedRequestId,
+    });
+  },
+
   _applyLocalContactRequestResolved(requestId) {
     const normalizedRequestId = pickStr(requestId);
     if (!normalizedRequestId) return;
@@ -551,8 +817,11 @@ Page({
       wx.showToast({ title: '对方资料暂不可用', icon: 'none' });
       return;
     }
+    const peerProfile = this.data.peerProfile && typeof this.data.peerProfile === 'object' ? this.data.peerProfile : {};
+    const targetUserId = pickStr(peerProfile.userId, this.data.peerUserId);
+    const targetOpenid = pickStr(peerProfile.openid);
     wx.navigateTo({
-      url: `/pages/user/profile/index?tid=${tid}&targetRole=${peerRole}`
+      url: `/pages/user/profile/index?tid=${tid}&targetRole=${peerRole}&targetUserId=${encodeURIComponent(targetUserId)}&targetOpenid=${encodeURIComponent(targetOpenid)}`
     });
   },
 
@@ -568,7 +837,7 @@ Page({
     }
 
     // 从本地缓存里读取当前用户（在欢迎页登录时已写入）
-    const me = wx.getStorageSync('hyyc_user') || null;
+    const me = getStoredUser();
     if (!me || !me.id) {
       wx.showToast({ title: '请先登录', icon: 'none' });
       wx.navigateTo({ url: '/pages/welcome/index' });
@@ -578,42 +847,60 @@ Page({
     // 如果从其他入口（例如未来的列表页）带了 peerUserId，就直接使用
     const peerFromQuery = (q && q.peerUserId) || '';
 
-    this.setData({ tid, me, isLoading: true });
+    this._historyDocs = [];
+    this._realtimeDocs = [];
+    this._roomDocs = [];
+    this._lastRenderedMsgSignature = '';
+    this._historyExhausted = false;
 
-    // 监听键盘高度变化
-    const self = this;
-    wx.onKeyboardHeightChange(function(res) {
-      self.setData({ keyboardHeight: res.height || 0 });
-      // 键盘弹出时滚动到底部
-      if (res.height > 0) {
-        setTimeout(function() {
-          self._scrollToBottom();
-        }, 100);
-      }
+    this.setData({
+      tid,
+      me,
+      isLoading: true,
+      contentReady: false,
+      msgs: [],
+      hasMoreHistory: false,
+      loadingHistory: false,
     });
+
+    this._bindKeyboardHeightChange();
 
     // 先根据任务 ID 查询任务详情，拿到发布人 ownerId，再决定 peerUserId
     this._initRoomWithTask(tid, me, peerFromQuery);
   },
 
-  onUnload() {
-    // 页面销毁时关闭监听，防止内存泄露
-    if (this._watcher && this._watcher.close) {
-      this._watcher.close();
+  onShow() {
+    this._bindKeyboardHeightChange();
+    const tid = pickStr(this.data.tid);
+    if (tid && !this._taskWatcher) {
+      this._openTaskWatch(tid);
     }
-    this._watcher = null;
-    if (this._taskWatcher && this._taskWatcher.close) {
-      this._taskWatcher.close();
+    const ownerId = pickStr(this.data.ownerId);
+    const peerUserId = pickStr(this.data.peerUserId);
+    if (tid && ownerId && peerUserId && !this._watcher) {
+      this.openWatch({ tid, ownerId, peerUserId });
+      this._markTaskRoomRead(ownerId, peerUserId, [], true);
     }
-    this._taskWatcher = null;
+  },
+
+  onHide() {
+    this._closeRoomWatch();
+    this._closeTaskWatch();
     this._clearRefundSyncTimer();
-    // 清理滚动定时器
+    this._unbindKeyboardHeightChange();
     if (this._scrollTimer) {
       clearTimeout(this._scrollTimer);
       this._scrollTimer = null;
     }
-    // 取消键盘监听
-    wx.offKeyboardHeightChange();
+  },
+
+  onUnload() {
+    this.onHide();
+    this._historyDocs = [];
+    this._realtimeDocs = [];
+    this._roomDocs = [];
+    this._lastRenderedMsgSignature = '';
+    this._historyExhausted = false;
   },
 
   // 监听用户滚动，设置防抖标记
@@ -628,6 +915,47 @@ Page({
     this._scrollTimer = setTimeout(function() {
       self._userScrolling = false;
     }, 1500);
+  },
+
+  async loadOlderMsgs() {
+    if (this.data.loadingHistory || !this.data.hasMoreHistory) return;
+    const tid = pickStr(this.data.tid);
+    const ownerId = pickStr(this.data.ownerId);
+    const peerUserId = pickStr(this.data.peerUserId);
+    const oldestDoc = (Array.isArray(this._roomDocs) && this._roomDocs.length)
+      ? this._roomDocs[0]
+      : null;
+    const oldestTs = this._getMsgTs(oldestDoc);
+    if (!tid || !ownerId || !peerUserId || !oldestTs) {
+      this._historyExhausted = true;
+      this.setData({ hasMoreHistory: false });
+      return;
+    }
+
+    this.setData({ loadingHistory: true });
+    try {
+      const res = await db.collection(MSG_COLLECTION)
+        .where({
+          tid,
+          ownerId,
+          peerUserId,
+          createTime: _.lt(new Date(oldestTs)),
+        })
+        .orderBy('createTime', 'desc')
+        .limit(CHAT_HISTORY_PAGE_SIZE)
+        .get();
+      const olderDocs = this._sortRoomDocsAsc((res && res.data) || []);
+      this._historyDocs = this._mergeUniqueRoomDocs(olderDocs, this._historyDocs);
+      this._historyExhausted = olderDocs.length < CHAT_HISTORY_PAGE_SIZE;
+      this._applyRoomDocs({
+        loadingHistory: false,
+        hasMoreHistory: !this._historyExhausted,
+      });
+    } catch (err) {
+      console.error('加载更早任务聊天消息失败', err);
+      this.setData({ loadingHistory: false });
+      wx.showToast({ title: '加载历史消息失败', icon: 'none' });
+    }
   },
 
   // 安全地滚动到底部（不打断用户操作）
@@ -682,24 +1010,8 @@ Page({
         self._initParticipants(task);
         self._openTaskWatch(tid);
 
-        // 进入聊天页时，根据当前身份标记已读：
-        // - 如果是任务发布者（owner），标记 readByOwner = true
-        // - 如果是住户（peerUserId），标记 readByPeer = true
-        if (meId === ownerId) {
-          wx.cloud.callFunction({
-            name: 'markMessagesReadByOwner',
-            data: { tid, ownerId, peerUserId }
-          }).catch(err => {
-            console.error('调用 markMessagesReadByOwner 失败', err);
-          });
-        } else if (meId === peerUserId) {
-          wx.cloud.callFunction({
-            name: 'markMessagesReadByPeer',
-            data: { tid, ownerId, peerUserId }
-          }).catch(err => {
-            console.error('调用 markMessagesReadByPeer 失败', err);
-          });
-        }
+        // 首次进入聊天页时主动回写一次已读。
+        self._markTaskRoomRead(ownerId, peerUserId, [], true);
 
         // 直接开启实时监听，由监听的首帧数据负责渲染历史记录
         self.openWatch({ tid, ownerId, peerUserId });
@@ -713,7 +1025,7 @@ Page({
   },
 
   // 开启实时监听：messages 集合里当前房间（tid + ownerId + peerUserId）的所有变更
-  openWatch(room) {
+  openWatch(room, useFullScanFallback = false) {
     const { tid, ownerId, peerUserId } = room || {};
     if (!tid || !ownerId || !peerUserId) {
       return;
@@ -723,71 +1035,38 @@ Page({
     if (this._watcher && this._watcher.close) {
       this._watcher.close();
     }
-    this._watcher = db.collection(MSG_COLLECTION)
-      .where({ tid, ownerId, peerUserId })
-      .orderBy('createTime', 'asc')
-      .watch({
+    let query = db.collection(MSG_COLLECTION)
+      .where({ tid, ownerId, peerUserId });
+    query = useFullScanFallback
+      ? query.orderBy('createTime', 'asc')
+      : query.orderBy('createTime', 'desc').limit(CHAT_RECENT_WATCH_LIMIT);
+
+    this._watcher = query.watch({
         onChange(snapshot) {
-          const docs = (snapshot && snapshot.docs) || [];
-          const oldMsgsLen = self.data.msgs.length;
-          const msgs = self._decorateMsgs(docs, self.data.me);
-          const last = msgs[msgs.length - 1];
+          const rawDocs = (snapshot && snapshot.docs) || [];
+          const realtimeDocs = useFullScanFallback
+            ? self._sortRoomDocsAsc(rawDocs).slice(-CHAT_RECENT_WATCH_LIMIT)
+            : self._sortRoomDocsAsc(rawDocs);
+          const oldMsgsLen = self._roomDocs.length;
+          self._realtimeDocs = realtimeDocs;
+          const msgs = self._applyRoomDocs({
+            firstLoad: !self.data.contentReady,
+            hasMoreHistory: !self._historyExhausted && (self.data.hasMoreHistory || rawDocs.length >= CHAT_RECENT_WATCH_LIMIT),
+          });
 
-          // 是否为首次加载（用于控制 loading 和首屏展示）
-          const firstLoad = !self.data.contentReady;
-
-          // 基础更新：消息列表 + 关闭 loading + 标记内容已就绪
-          const nextData = {
-            msgs,
-            isLoading: false,
-            contentReady: true
-          };
-
-          // 首次进入时，直接把滚动位置设置到底部，且不做动画，
-          // 保证用户一进来就看到最新消息，而不是从顶部滚动下来
-          if (firstLoad && last && !self._userScrolling) {
-            nextData.scrollTop = 999999;
-            nextData.scrollWithAnimation = false;
-          }
-
-          self.setData(nextData);
-
-          // 非首次加载时，如果有新消息，再用带动画的滚动到底部
-          if (!firstLoad && msgs.length > oldMsgsLen && last) {
+          if (self.data.contentReady && self._roomDocs.length > oldMsgsLen && msgs[msgs.length - 1]) {
             self._scrollToBottom();
           }
 
-          if (docs.some(doc => {
-            const type = pickStr(doc && doc.type);
-            return type === 'task_cancel_request' || type === 'contact_request';
-          })) {
-            self._reloadTaskState();
-          }
-
-          // 实时监听到新消息时，根据当前身份再次标记为“已读”：
-          // - 如果当前是业主：标记 readByOwner = true
-          // - 如果当前是住户：标记 readByPeer = true
-          const me = self.data.me || {};
-          const meId = me.id || '';
-          if (!meId) return;
-          if (meId === ownerId) {
-            wx.cloud.callFunction({
-              name: 'markMessagesReadByOwner',
-              data: { tid, ownerId, peerUserId }
-            }).catch(err => {
-              console.error('watch 调用 markMessagesReadByOwner 失败', err);
-            });
-          } else if (meId === peerUserId) {
-            wx.cloud.callFunction({
-              name: 'markMessagesReadByPeer',
-              data: { tid, ownerId, peerUserId }
-            }).catch(err => {
-              console.error('watch 调用 markMessagesReadByPeer 失败', err);
-            });
-          }
+          // 仅在当前快照里确实存在未读消息时才回写已读，避免重复云函数调用。
+          self._markTaskRoomRead(ownerId, peerUserId, realtimeDocs, false);
         },
         onError(err) {
           console.error('chat watch error', err);
+          if (!useFullScanFallback) {
+            self._closeRoomWatch();
+            self.openWatch(room, true);
+          }
         }
       });
   },
@@ -796,6 +1075,7 @@ Page({
   _decorateMsgs(docs, me) {
     const userId = (me && me.id) || '';
     const localResolvedTaskCancelRequestId = pickStr(this.data.localResolvedTaskCancelRequestId);
+    const localResolvedTaskReleaseRequestId = pickStr(this.data.localResolvedTaskReleaseRequestId);
     const localResolvedContactRequestId = pickStr(this.data.localResolvedContactRequestId);
     const meProfile = this.data.meProfile && typeof this.data.meProfile === 'object' ? this.data.meProfile : {};
     const peerProfile = this.data.peerProfile && typeof this.data.peerProfile === 'object' ? this.data.peerProfile : {};
@@ -803,11 +1083,15 @@ Page({
     const taskInfoCancel = taskInfo.cancelRequest && typeof taskInfo.cancelRequest === 'object' ? taskInfo.cancelRequest : {};
     const taskInfoCancelRequestId = pickStr(taskInfoCancel.requestId);
     const taskInfoCancelStatus = pickStr(taskInfoCancel.status);
+    const taskInfoRelease = taskInfo.releaseRequest && typeof taskInfo.releaseRequest === 'object' ? taskInfo.releaseRequest : {};
+    const taskInfoReleaseRequestId = pickStr(taskInfoRelease.requestId);
+    const taskInfoReleaseStatus = pickStr(taskInfoRelease.status);
     return (docs || []).map(doc => {
       const id = doc._id || doc.id;
       const fromUserId = doc.fromUserId || '';
       const mine = !!(userId && fromUserId === userId);
       const taskCancel = doc.taskCancel && typeof doc.taskCancel === 'object' ? doc.taskCancel : null;
+      const taskRelease = doc.taskRelease && typeof doc.taskRelease === 'object' ? doc.taskRelease : null;
       const contactRequest = doc.contactRequest && typeof doc.contactRequest === 'object' ? doc.contactRequest : null;
       const rawCancelStatus = pickStr(taskCancel && taskCancel.status);
       const cancelStatus = localResolvedTaskCancelRequestId
@@ -820,6 +1104,17 @@ Page({
         && taskInfoCancelStatus
         ? taskInfoCancelStatus
         : cancelStatus;
+      const rawReleaseStatus = pickStr(taskRelease && taskRelease.status);
+      const releaseStatus = localResolvedTaskReleaseRequestId
+        && pickStr(taskRelease && taskRelease.requestId) === localResolvedTaskReleaseRequestId
+        && rawReleaseStatus === 'pending'
+        ? 'approved'
+        : rawReleaseStatus;
+      const effectiveTaskReleaseStatus = taskInfoReleaseRequestId
+        && taskInfoReleaseRequestId === pickStr(taskRelease && taskRelease.requestId)
+        && taskInfoReleaseStatus
+        ? taskInfoReleaseStatus
+        : releaseStatus;
       const rawContactStatus = pickStr(contactRequest && contactRequest.status);
       const contactStatus = localResolvedContactRequestId
         && pickStr(contactRequest && contactRequest.requestId) === localResolvedContactRequestId
@@ -838,6 +1133,16 @@ Page({
         taskCancelStatusText = '已拒绝';
       } else {
         taskCancelStatusText = '等待接单人同意';
+      }
+      let taskReleaseStatusText = '';
+      let taskReleaseStatusClass = 'task-cancel-card-status';
+      if (effectiveTaskReleaseStatus === 'approved') {
+        taskReleaseStatusText = '任务已释放，可继续接单';
+        taskReleaseStatusClass = 'task-cancel-card-status task-cancel-card-status-success';
+      } else if (effectiveTaskReleaseStatus === 'rejected') {
+        taskReleaseStatusText = '已拒绝';
+      } else {
+        taskReleaseStatusText = '等待发布者同意';
       }
       let contactRequestStatusText = '';
       let contactRequestStatusClass = 'task-cancel-card-status';
@@ -859,7 +1164,7 @@ Page({
         avatarUrl,
         avatarClickable: !mine,
         taskCancel,
-        taskCancelText: taskCancel ? '卖家申请取消任务。' : '',
+        taskCancelText: taskCancel ? `${pickStr(taskCancel.requesterName, '发布者')}申请取消任务。` : '',
         taskCancelStatusText,
         taskCancelStatusClass,
         taskCancelActionable: !!(
@@ -867,6 +1172,16 @@ Page({
           && effectiveTaskCancelStatus === 'pending'
           && userId
           && pickStr(taskCancel.approverUserId) === userId
+        ),
+        taskRelease,
+        taskReleaseText: taskRelease ? `${pickStr(taskRelease.requesterName, '接单人')}申请释放当前任务，处理后任务会重新开放接单。` : '',
+        taskReleaseStatusText,
+        taskReleaseStatusClass,
+        taskReleaseActionable: !!(
+          taskRelease
+          && effectiveTaskReleaseStatus === 'pending'
+          && userId
+          && pickStr(taskRelease.approverUserId) === userId
         ),
         contactRequest,
         contactRequestText: contactRequest ? '申请查看对方手机号。' : '',
@@ -880,6 +1195,51 @@ Page({
         ),
       };
     });
+  },
+
+  _refreshDecoratedMsgs() {
+    this._applyRoomDocs();
+  },
+
+  async requestTaskRelease() {
+    if (!this.data.canRequestTaskRelease) {
+      wx.showToast({ title: '当前任务暂不能申请释放', icon: 'none' });
+      return;
+    }
+    const ok = await new Promise((resolve) => {
+      wx.showModal({
+        title: '申请释放任务',
+        content: '发起后，需要发布者同意，任务会恢复为可接单状态，不会退款。是否继续？',
+        confirmText: '申请释放',
+        cancelText: '再想想',
+        success: (res) => resolve(!!(res && res.confirm)),
+        fail: () => resolve(false)
+      });
+    });
+    if (!ok) return;
+
+    wx.showLoading({ title: '发起中', mask: true });
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'taskCancelFlow',
+        data: {
+          action: 'request_release',
+          taskId: this.data.tid,
+        }
+      });
+      const ret = (res && res.result) || {};
+      wx.hideLoading();
+      if (!ret || ret.ok !== true) {
+        wx.showToast({ title: (ret && ret.msg) || '发起失败', icon: 'none' });
+        return;
+      }
+      this._reloadTaskState();
+      wx.showToast({ title: '已申请释放', icon: 'success' });
+    } catch (err) {
+      console.error('申请释放任务失败', err);
+      wx.hideLoading();
+      wx.showToast({ title: '发起失败', icon: 'none' });
+    }
   },
 
   async requestTaskCancel() {
@@ -989,6 +1349,45 @@ Page({
       wx.showToast({ title: maybeTimedOut ? '请求超时，请刷新查看结果' : '处理失败', icon: 'none' });
     } finally {
       this._approvingTaskCancel = false;
+    }
+  },
+
+  async approveTaskRelease(e) {
+    if (this._approvingTaskRelease) return;
+    const requestId = pickStr(e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.requestId);
+    if (!requestId) {
+      wx.showToast({ title: '缺少申请信息', icon: 'none' });
+      return;
+    }
+    this._approvingTaskRelease = true;
+    this.setData({ approveTaskReleaseSubmitting: true });
+    wx.showLoading({ title: '处理中', mask: true });
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'taskCancelFlow',
+        data: {
+          action: 'approve_release',
+          taskId: this.data.tid,
+          requestId,
+        }
+      });
+      const ret = (res && res.result) || {};
+      wx.hideLoading();
+      if (!ret || ret.ok !== true) {
+        this.setData({ approveTaskReleaseSubmitting: false });
+        wx.showToast({ title: (ret && ret.msg) || '处理失败', icon: 'none' });
+        return;
+      }
+      this._applyLocalTaskReleaseResolved(requestId);
+      this._reloadTaskState();
+      wx.showToast({ title: '任务已释放', icon: 'success' });
+    } catch (err) {
+      console.error('同意释放任务失败', err);
+      wx.hideLoading();
+      this.setData({ approveTaskReleaseSubmitting: false });
+      wx.showToast({ title: '处理失败', icon: 'none' });
+    } finally {
+      this._approvingTaskRelease = false;
     }
   },
 

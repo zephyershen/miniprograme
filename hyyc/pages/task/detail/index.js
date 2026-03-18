@@ -1,9 +1,11 @@
 const { formatMoney, formatDateTime } = require('../../../utils/format');
 const { toast, confirm } = require('../../../utils/ui');
 const access = require('../../../config/access');
+const { getStoredUser } = require('../../../utils/userIdentity');
 
 // 使用云开发数据库 tasks 集合加载任务详情
 const db = wx.cloud.database();
+const _ = db.command;
 const TASK_COLLECTION = 'tasks';
 const MSG_COLLECTION = 'messages';
 const REFUND_SYNC_INTERVAL_MS = 3000;
@@ -232,15 +234,12 @@ Page({
     this._hydrateTaskMedia(id, task);
     this._maybeSyncPendingRefund(t);
 
-    // 根据当前身份分别统计未读：
-    // - 任务发布者：统计所有住户会话的未读数量（以会话计）
-    // - 普通住户：统计自己与业主会话中的未读消息条数
+    // 详情页只在进入/返回时刷新未读，不再常驻实时监听，避免长时间停留时持续耗电。
+    this.clearBadgeWatch();
     if (isOwner) {
       this.loadUnreadCount(task.id, myId);
-      this.setupBadgeWatch(task, myId, true);
     } else if (t.ownerId) {
       this.loadPeerUnread(task.id, t.ownerId, myId);
-      this.setupBadgeWatch(task, myId, false);
     }
   },
   _loadTaskDetail(taskId = '', options = {}) {
@@ -254,7 +253,7 @@ Page({
       return;
     }
 
-    const me = wx.getStorageSync('hyyc_user') || {};
+    const me = getStoredUser();
     const myId = me.id || '';
 
     if (!silent) {
@@ -354,17 +353,15 @@ Page({
     }
     this.setData({ unreadCount: 0 });
 	    db.collection(MSG_COLLECTION)
-	      .where({ tid, ownerId })
-	      .orderBy('createTime', 'desc')
-	      .limit(500)
-	      .get({
+	      .where({
+          tid,
+          ownerId,
+          fromUserId: _.neq(ownerId),
+          readByOwner: _.neq(true)
+        })
+	      .count({
 	        success: (res) => {
-	          const docs = (res && res.data) || [];
-	          // 业主未读 = 所有来自住户、且 readByOwner !== true 的消息条数之和
-	          const unreadTotal = (docs || []).filter(doc => {
-	            return doc.fromUserId && doc.fromUserId !== ownerId && doc.readByOwner !== true;
-	          }).length;
-	          this.setData({ unreadCount: unreadTotal });
+	          this.setData({ unreadCount: Number(res && res.total) || 0 });
 	        },
 	        fail: (err) => {
 	          console.error('统计未读消息失败', err);
@@ -380,17 +377,16 @@ Page({
 	    }
 	    this.setData({ peerUnreadCount: 0 });
 	    db.collection(MSG_COLLECTION)
-	      .where({ tid, ownerId, peerUserId })
-	      .orderBy('createTime', 'desc')
-	      .limit(200)
-	      .get({
+	      .where({
+          tid,
+          ownerId,
+          peerUserId,
+          fromUserId: ownerId,
+          readByPeer: _.neq(true)
+        })
+	      .count({
 	        success: (res) => {
-	          const docs = (res && res.data) || [];
-	          // 对住户来说：未读消息 = 来自业主的消息，且 readByPeer !== true
-	          const unread = (docs || []).filter(doc => {
-	            return doc.fromUserId === ownerId && doc.readByPeer !== true;
-	          }).length;
-	          this.setData({ peerUnreadCount: unread });
+	          this.setData({ peerUnreadCount: Number(res && res.total) || 0 });
 	        },
 	        fail: (err) => {
 	          console.error('统计住户未读消息失败', err);
@@ -401,15 +397,7 @@ Page({
 
 	  // 根据当前身份，为任务详情页挂载实时监听，用于实时刷新未读角标
 	  setupBadgeWatch(task, myId, isOwner){
-	    if (!task || !task.id || !task.ownerId || !myId) {
-	      this.clearBadgeWatch();
-	      return;
-	    }
-	    if (isOwner) {
-	      this.openOwnerBadgeWatch(task.id, myId);
-	    } else {
-	      this.openPeerBadgeWatch(task.id, task.ownerId, myId);
-	    }
+	    this.clearBadgeWatch();
 	  },
 
 	  clearBadgeWatch(){

@@ -1,4 +1,5 @@
 const { formatMoney } = require('../../../utils/format');
+const { getStoredUser } = require('../../../utils/userIdentity');
 
 const db = wx.cloud.database();
 const GOODS_COLLECTION = 'goods';
@@ -128,7 +129,7 @@ Page({
   },
   onShow() {
     this._isVisible = true;
-    const u = wx.getStorageSync('hyyc_user');
+    const u = getStoredUser();
     if (!u || !u.realname) {
       wx.navigateTo({ url: '/pages/welcome/index' });
       return;
@@ -199,7 +200,7 @@ Page({
   _openNewGoodsWatch(force = false) {
     if (!this._isVisible) return;
 
-    const u = wx.getStorageSync('hyyc_user') || {};
+    const u = getStoredUser();
     const community = pickStr(u.community);
     const c = pickStr(this.data.goodsCategory) || 'all';
     const key = `${community}::${c}`;
@@ -1032,7 +1033,7 @@ Page({
     this.loadMoreGoods(true);
   },
   _queryGoodsPage(cursor = null, limit = GOODS_PAGE_SIZE) {
-    const u = wx.getStorageSync('hyyc_user') || {};
+    const u = getStoredUser();
     const community = (u.community || '').trim();
     const c = this.data.goodsCategory || 'all';
     const _ = db.command;

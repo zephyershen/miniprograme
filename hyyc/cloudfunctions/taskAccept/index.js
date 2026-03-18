@@ -114,7 +114,7 @@ exports.main = async (event = {}) => {
         data: {
           status: 'accepted',
           workerOpenid: OPENID,
-          workerId: pickStr(worker._id || worker.id),
+          workerId: pickStr(worker.id, worker._id),
           workerName: pickStr(worker.name),
           workerNickname: pickStr(worker.nickname),
           workerAvatarFileID: pickStr(worker.avatarFileID, worker.avatarUrl),

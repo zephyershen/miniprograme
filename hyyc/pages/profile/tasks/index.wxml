@@ -97,6 +97,13 @@
                 bindtap="toDetail">
                 查看
               </view>
+              <view
+                wx:if="{{tab === 'worker' && item.canDeleteRecord}}"
+                class="btn btn-outline btn-sm row-gap-item"
+                data-id="{{item.id}}"
+                bindtap="onDeleteTask">
+                删除记录
+              </view>
             </view>
           </view>
         </ui-card>

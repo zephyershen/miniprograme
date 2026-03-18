@@ -1,5 +1,6 @@
 const { formatMoney, formatDateTime } = require('../../../utils/format');
 const { toast, confirm } = require('../../../utils/ui');
+const { getStoredUser } = require('../../../utils/userIdentity');
 
 // 使用云开发数据库 tasks 集合加载「我的任务」
 const db = wx.cloud.database();
@@ -50,6 +51,21 @@ function resolveTaskCancelState(task = {}) {
   return { statusRaw, payStatus };
 }
 
+function canOwnerDeleteTaskRecord(statusRaw = '', payStatus = '') {
+  const status = pickStr(statusRaw);
+  const pay = pickStr(payStatus);
+  return status === 'pay_pending'
+    || status === 'completed'
+    || (status === 'cancelled' && pay === 'refunded');
+}
+
+function canWorkerDeleteTaskRecord(statusRaw = '', payStatus = '') {
+  const status = pickStr(statusRaw);
+  const pay = pickStr(payStatus);
+  return status === 'completed'
+    || (status === 'cancelled' && pay === 'refunded');
+}
+
 Page({
   data: {
     tab: 'owner',
@@ -77,7 +93,7 @@ Page({
     const silent = !!(options && options.silent);
     if (this._loadingTasks) return;
     this._loadingTasks = true;
-    const u = wx.getStorageSync('hyyc_user') || {};
+    const u = getStoredUser();
     if (!u || !u.realname) {
       this._loadingTasks = false;
       wx.navigateTo({ url: '/pages/welcome/index' });
@@ -107,7 +123,13 @@ Page({
           const ONE_DAY = 24 * 60 * 60 * 1000;
           const ONE_WEEK = 7 * ONE_DAY;
           const ONE_MONTH = 30 * ONE_DAY;
-          const docs = res.data || [];
+          const isOwnerTab = this.data.tab === 'owner';
+          const docs = (res.data || []).filter((doc) => {
+            if (isOwnerTab) {
+              return !doc || !doc.ownerDeletedAt;
+            }
+            return !doc || !doc.workerDeletedAt;
+          });
 
           const list = docs.map(doc => {
             const resolvedCancelState = resolveTaskCancelState(doc);
@@ -137,16 +159,18 @@ Page({
             const isExpired = hasDeadline && effectiveDeadline <= now;
             const isActive = hasDeadline ? effectiveDeadline > now : true;
             let ownerActionText = '';
-            if (statusRaw === 'pay_pending') {
-              ownerActionText = '删除';
-            } else if (statusRaw === 'posted') {
-              ownerActionText = '删除';
-            } else if (statusRaw === 'accepted' || statusRaw === 'submitted') {
-              ownerActionText = '申请取消';
-            } else if (statusRaw === 'completed') {
-              ownerActionText = '删除记录';
-            } else if (statusRaw === 'cancelled' && payStatus === 'refunded') {
-              ownerActionText = '删除记录';
+            if (isOwnerTab) {
+              if (statusRaw === 'pay_pending') {
+                ownerActionText = '删除';
+              } else if (statusRaw === 'posted') {
+                ownerActionText = '删除';
+              } else if (statusRaw === 'accepted' || statusRaw === 'submitted') {
+                ownerActionText = '申请取消';
+              } else if (statusRaw === 'completed') {
+                ownerActionText = '删除记录';
+              } else if (statusRaw === 'cancelled' && payStatus === 'refunded') {
+                ownerActionText = '删除记录';
+              }
             }
             return {
               ...doc,
@@ -155,12 +179,14 @@ Page({
               statusRaw,
               payStatus,
               statusText,
-              canPay: statusRaw === 'pay_pending',
-              canEdit: statusRaw === 'posted',
+              canPay: isOwnerTab && statusRaw === 'pay_pending',
+              canEdit: isOwnerTab && statusRaw === 'posted',
               ownerActionText,
-              canRefundDirect: statusRaw === 'posted',
-              needsCancelRequest: statusRaw === 'accepted' || statusRaw === 'submitted',
-              canDeleteRecord: statusRaw === 'pay_pending' || statusRaw === 'completed' || (statusRaw === 'cancelled' && payStatus === 'refunded'),
+              canRefundDirect: isOwnerTab && statusRaw === 'posted',
+              needsCancelRequest: isOwnerTab && (statusRaw === 'accepted' || statusRaw === 'submitted'),
+              canDeleteRecord: isOwnerTab
+                ? canOwnerDeleteTaskRecord(statusRaw, payStatus)
+                : canWorkerDeleteTaskRecord(statusRaw, payStatus),
               // 未设置截止时间时，展示默认过期时间
               deadlineText: hasDeadline ? formatDateTime(effectiveDeadline) : '默认 7 天内有效',
               isActive,
@@ -171,7 +197,7 @@ Page({
           this.setData({
             list,
             isLoading: false,
-            deletableCount: list.filter(item => item && item.canDeleteRecord).length
+            deletableCount: isOwnerTab ? list.filter(item => item && item.canDeleteRecord).length : 0
           });
           this._syncPendingRefunds(list);
           this._updatePendingRefundTimer(list);
@@ -277,16 +303,38 @@ Page({
     const id = e.currentTarget.dataset.id;
     if (!id) { return; }
 
-    // 只允许在“我发布的”标签下删除
-    if (this.data.tab !== 'owner') {
-      toast('只有自己发布的任务可以删除');
-      return;
-    }
-
     const list = this.data.list || [];
     const item = list.find(t => t.id === id || t._id === id) || null;
     if (!item) {
       toast('任务不存在');
+      return;
+    }
+
+    if (this.data.tab === 'worker') {
+      if (!item.canDeleteRecord) {
+        toast('当前任务暂不能删除记录');
+        return;
+      }
+
+      const okDeleteWorkerRecord = await confirm('删除后只会从“我接受的”里移除，不会影响发布者记录和任务聊天。', '删除记录');
+      if (!okDeleteWorkerRecord) return;
+
+      this.setData({ isLoading: true });
+      try {
+        await this._deleteTaskWithMessages(id, 'worker_record');
+        toast('已删除');
+        this.load();
+      } catch (err) {
+        console.error('删除接单记录失败', err);
+        this.setData({ isLoading: false });
+        toast((err && err.message) || '删除失败，请稍后重试');
+      }
+      return;
+    }
+
+    // 只允许在“我发布的”标签下删除任务本身
+    if (this.data.tab !== 'owner') {
+      toast('只有自己发布的任务可以删除');
       return;
     }
 
@@ -476,11 +524,14 @@ Page({
   // 删除单个任务及其下所有聊天记录
   // 为了绕过小程序端数据库权限（例如 messages 集合“仅创建者可写”），
   // 这里统一通过云函数 deleteTaskWithMessages 来执行真正的删除逻辑。
-  _deleteTaskWithMessages(taskId){
+  _deleteTaskWithMessages(taskId, mode = ''){
     if (!taskId) return Promise.resolve();
     return wx.cloud.callFunction({
       name: 'deleteTaskWithMessages',
-      data: { tid: taskId }
+      data: {
+        tid: taskId,
+        mode: pickStr(mode),
+      }
     }).then(res => {
       const result = (res && res.result) || {};
       if (!result || result.ok !== true) {

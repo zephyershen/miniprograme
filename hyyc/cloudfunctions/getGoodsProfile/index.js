@@ -97,6 +97,41 @@ function buildGoodsSnapshot(doc = {}, openid = '') {
   };
 }
 
+function buildMyGoodsCompactItem(doc = {}, openid = '', role = 'published') {
+  const snapshot = buildGoodsSnapshot(doc, openid);
+  if (role === 'purchased') {
+    return {
+      _id: snapshot._id,
+      id: snapshot.goodsId,
+      title: snapshot.title,
+      price: snapshot.price,
+      soldAt: snapshot.soldAt,
+      updatedAt: snapshot.updatedAt,
+      createdAt: snapshot.createdAt,
+      ownerNickname: snapshot.ownerNickname,
+      ownerName: snapshot.ownerName,
+      community: snapshot.community,
+      building: snapshot.building,
+    };
+  }
+
+  return {
+    _id: snapshot._id,
+    id: snapshot.goodsId,
+    title: snapshot.title,
+    price: snapshot.price,
+    status: snapshot.status,
+    createdAt: snapshot.createdAt,
+    updatedAt: snapshot.updatedAt,
+    auditNeedFixIdx: snapshot.auditNeedFixIdx,
+    auditError: snapshot.auditError,
+    paymentLock: snapshot.paymentLock,
+    ownerId: snapshot.ownerId,
+    _openid: snapshot._openid,
+    images: Array.isArray(snapshot.images) ? snapshot.images : [],
+  };
+}
+
 function canAccessGoodsDetail(doc = {}, openid = '') {
   const ownerOpenid = pickStr(doc._openid, doc.ownerOpenid);
   const buyerOpenid = pickStr(doc.buyerOpenid, doc.buyer_openid, doc.buyerOpenId);
@@ -165,8 +200,9 @@ async function getGoodsSnapshots(ids = [], openid = '') {
     .filter(Boolean);
 }
 
-async function listMyGoods(openid = '', limitRaw = MAX_QUERY_LIMIT) {
+async function listMyGoods(openid = '', limitRaw = MAX_QUERY_LIMIT, options = {}) {
   const limit = clampLimit(limitRaw);
+  const compact = !!(options && options.compact);
   const [publishedRes, purchasedRes] = await Promise.all([
     db.collection(GOODS_COLLECTION)
       .where({ _openid: openid })
@@ -188,8 +224,8 @@ async function listMyGoods(openid = '', limitRaw = MAX_QUERY_LIMIT) {
   );
 
   return {
-    published: publishedDocs.map((doc) => buildGoodsSnapshot(doc, openid)),
-    purchased: purchasedDocs.map((doc) => buildGoodsSnapshot(doc, openid))
+    published: publishedDocs.map((doc) => (compact ? buildMyGoodsCompactItem(doc, openid, 'published') : buildGoodsSnapshot(doc, openid))),
+    purchased: purchasedDocs.map((doc) => (compact ? buildMyGoodsCompactItem(doc, openid, 'purchased') : buildGoodsSnapshot(doc, openid)))
   };
 }
 
@@ -287,7 +323,7 @@ exports.main = async (event = {}) => {
     }
 
     if (action === 'list_my_goods') {
-      const data = await listMyGoods(OPENID, event.limit);
+      const data = await listMyGoods(OPENID, event.limit, { compact: event.compact === true });
       return { ok: true, ...data };
     }
 

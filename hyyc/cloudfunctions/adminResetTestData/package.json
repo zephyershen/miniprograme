@@ -1,7 +1,7 @@
 {
-  "name": "getSubscribeConfig",
+  "name": "adminResetTestData",
   "version": "1.0.0",
-  "description": "返回前端可用的订阅消息模板配置",
+  "description": "管理员一键清空测试数据",
   "main": "index.js",
   "dependencies": {
     "wx-server-sdk": "latest"

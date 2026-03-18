@@ -19,6 +19,21 @@ function pickStr(v) {
   return String(v == null ? '' : v).trim();
 }
 
+function getLogicalUserId(user = {}) {
+  return pickStr(user && user.id, user && user._id);
+}
+
+function canWorkerDeleteTaskRecord(task = {}) {
+  const t = task && typeof task === 'object' ? task : {};
+  const pay = t.pay && typeof t.pay === 'object' ? t.pay : {};
+  const refund = pay.refund && typeof pay.refund === 'object' ? pay.refund : {};
+  const status = pickStr(t.status);
+  const payStatus = pickStr(pay.status);
+  const refundStatus = pickStr(refund.status);
+  return status === 'completed'
+    || (status === 'cancelled' && (payStatus === 'refunded' || refundStatus === 'success'));
+}
+
 function resolveTaskDeleteState(task = {}) {
   const t = task && typeof task === 'object' ? task : {};
   const pay = t.pay && typeof t.pay === 'object' ? t.pay : {};
@@ -46,7 +61,8 @@ function resolveTaskDeleteState(task = {}) {
 }
 
 exports.main = async (event, context) => {
-  const { tid } = event || {};
+  const { tid, mode: rawMode } = event || {};
+  const mode = pickStr(rawMode);
 
   if (!tid) {
     return {
@@ -87,7 +103,7 @@ exports.main = async (event, context) => {
 
     const me = list[0] || null;
 
-    if (!me || !me._id) {
+    if (!me || !getLogicalUserId(me)) {
       return {
         ok: false,
         code: 'USER_NOT_FOUND',
@@ -95,9 +111,9 @@ exports.main = async (event, context) => {
       };
     }
 
-    const myUserId = me._id;
+    const myUserId = getLogicalUserId(me);
 
-    // 2）加载任务，校验当前用户是否是该任务的发布者
+    // 2）加载任务，按模式校验权限
     const taskRes = await db.collection(TASK_COLLECTION).doc(tid).get();
     const task = (taskRes && taskRes.data) || null;
 
@@ -106,6 +122,48 @@ exports.main = async (event, context) => {
         ok: false,
         code: 'TASK_NOT_FOUND',
         msg: '任务不存在或已被删除',
+      };
+    }
+
+    if (mode === 'worker_record') {
+      if (!task.workerId || task.workerId !== myUserId) {
+        return {
+          ok: false,
+          code: 'NOT_WORKER',
+          msg: '只有接单人可以删除该任务记录',
+        };
+      }
+      if (task.workerDeletedAt) {
+        return {
+          ok: true,
+          code: 'OK',
+          msg: '任务记录已删除',
+          already: true,
+          deletedTaskId: tid,
+          deleteMode: 'worker_record',
+        };
+      }
+      if (!canWorkerDeleteTaskRecord(task)) {
+        return {
+          ok: false,
+          code: 'TASK_DELETE_FORBIDDEN',
+          msg: '当前任务暂不支持删除记录',
+        };
+      }
+
+      await db.collection(TASK_COLLECTION).doc(tid).update({
+        data: {
+          workerDeletedAt: new Date(),
+          updatedAt: new Date(),
+        }
+      });
+
+      return {
+        ok: true,
+        code: 'OK',
+        msg: '任务记录已删除',
+        deletedTaskId: tid,
+        deleteMode: 'worker_record',
       };
     }
 

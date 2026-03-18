@@ -1,6 +1,7 @@
 const { required } = require('../../../utils/validators');
 const { toast } = require('../../../utils/ui');
 const { startImageAudit } = require('../../../utils/imageAudit');
+const { getStoredUser, patchStoredUser } = require('../../../utils/userIdentity');
 
 // 使用云开发数据库 goods 集合存储商品
 const db = wx.cloud.database();
@@ -71,7 +72,7 @@ Page({
   },
   async _ensureOpenid() {
     // 数据库安全规则里我们用 auth.openid 判断“是不是本人”，这里需要拿到 openid 才能做“本人写入/更新”。
-    const u = wx.getStorageSync('hyyc_user') || {};
+    const u = getStoredUser();
     let openid = pickStr(u._openid || u.openid || u.openId);
     if (openid) return openid;
 
@@ -80,7 +81,7 @@ Page({
       openid = pickStr(res && res.result && res.result.openid);
       if (openid) {
         try {
-          wx.setStorageSync('hyyc_user', { ...u, _openid: openid });
+          patchStoredUser({ _openid: openid });
         } catch (e) {
           // ignore
         }
@@ -108,7 +109,7 @@ Page({
     }
   },
   onShow() {
-    const u = wx.getStorageSync('hyyc_user');
+    const u = getStoredUser();
     if (!u || !u.realname) {
       wx.navigateTo({ url: '/pages/welcome/index' });
       return;
@@ -147,7 +148,7 @@ Page({
     const gid = String(id || '').trim();
     if (!gid) return;
 
-    const u = wx.getStorageSync('hyyc_user') || {};
+    const u = getStoredUser();
     const userId = u.id || '';
     if (!userId) return;
 
@@ -354,7 +355,7 @@ Page({
       return;
     }
 
-    const u = wx.getStorageSync('hyyc_user') || {};
+    const u = getStoredUser();
     if (!u || !u.realname) {
       toast('请先完成实名信息');
       wx.navigateTo({ url: '/pages/welcome/index' });

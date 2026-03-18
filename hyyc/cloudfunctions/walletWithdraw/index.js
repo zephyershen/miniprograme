@@ -1701,7 +1701,7 @@ exports.main = async (event = {}) => {
     let data = profile.data || {};
     const activeWithdraw = data.activeWithdraw || null;
     if (activeWithdraw) {
-      return { ok: false, err: { code: 'WITHDRAW_PENDING', msg: '当前已有一笔提现处理中，请稍后查看结果' }, buildTag: BUILD_TAG };
+      return { ok: false, err: { code: 'WITHDRAW_PENDING', msg: '当前有一笔提现处理中，预计次日到账，请留意银行卡余额变动。' }, buildTag: BUILD_TAG };
     }
     if (!data.tokenNo) {
       return { ok: false, err: { code: 'CARD_NOT_BOUND', msg: '请先绑定提现银行卡' }, buildTag: BUILD_TAG };

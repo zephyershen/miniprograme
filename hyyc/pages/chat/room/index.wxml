@@ -8,7 +8,9 @@
       <view wx:else class="avatar chat-header-avatar"></view>
       <view class="chat-header-title">{{peerDisplayName || '对方'}}</view>
     </view>
-    <view wx:if="{{canRequestTaskCancel}}" class="chat-header-action" bindtap="requestTaskCancel">申请取消</view>
+    <view wx:if="{{canRequestTaskRelease}}" class="chat-header-action" bindtap="requestTaskRelease">释放任务</view>
+    <view wx:elif="{{hasPendingTaskRelease}}" class="chat-header-action chat-header-action-muted">已申请释放</view>
+    <view wx:elif="{{canRequestTaskCancel}}" class="chat-header-action" bindtap="requestTaskCancel">申请取消</view>
     <view wx:elif="{{hasPendingTaskCancel}}" class="chat-header-action chat-header-action-muted">已发起取消</view>
   </view>
 
@@ -20,7 +22,16 @@
     scroll-with-animation="{{scrollWithAnimation}}"
     scroll-top="{{scrollTop}}"
     bindscroll="onScroll"
+    bindscrolltoupper="loadOlderMsgs"
+    upper-threshold="80"
   >
+    <view
+      wx:if="{{loadingHistory || hasMoreHistory}}"
+      class="chat-history-bar"
+      bindtap="loadOlderMsgs"
+    >
+      {{loadingHistory ? '加载更早消息中...' : '点此或上滑查看更早消息'}}
+    </view>
     <block wx:for="{{msgs}}" wx:key="id">
       <block wx:if="{{item.type === 'task_cancel_request'}}">
         <view class="task-cancel-message">
@@ -28,6 +39,15 @@
             <view class="task-cancel-card-title">任务取消申请</view>
             <view class="task-cancel-card-text">{{item.taskCancelText}}</view>
             <view class="{{item.taskCancelStatusClass}}">{{item.taskCancelStatusText}}</view>
+          </view>
+        </view>
+      </block>
+      <block wx:elif="{{item.type === 'task_release_request'}}">
+        <view class="task-cancel-message">
+          <view class="task-cancel-card">
+            <view class="task-cancel-card-title">释放接单申请</view>
+            <view class="task-cancel-card-text">{{item.taskReleaseText}}</view>
+            <view class="{{item.taskReleaseStatusClass}}">{{item.taskReleaseStatusText}}</view>
           </view>
         </view>
       </block>
@@ -55,9 +75,24 @@
     </block>
   </scroll-view>
 
+  <view wx:if="{{canApproveTaskRelease}}" class="task-cancel-approve-bar">
+    <view class="task-cancel-approve-copy">
+      接单人申请释放当前任务
+    </view>
+    <button
+      class="task-cancel-approve-btn {{approveTaskReleaseSubmitting ? 'task-cancel-approve-btn-disabled' : ''}}"
+      data-request-id="{{pendingTaskReleaseRequestId}}"
+      bindtap="approveTaskRelease"
+      hover-class="task-cancel-approve-btn-hover"
+      disabled="{{approveTaskReleaseSubmitting}}"
+    >
+      {{approveTaskReleaseSubmitting ? '处理中...' : '同意释放'}}
+    </button>
+  </view>
+
   <view wx:if="{{canApproveTaskCancel}}" class="task-cancel-approve-bar">
     <view class="task-cancel-approve-copy">
-      卖家申请取消任务
+      发布者申请取消任务
     </view>
     <button
       class="task-cancel-approve-btn {{approveTaskCancelSubmitting ? 'task-cancel-approve-btn-disabled' : ''}}"

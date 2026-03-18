@@ -4,6 +4,7 @@
 const db = wx.cloud.database();
 const USER_COLLECTION = "userInfo";
 const access = require("../../config/access");
+const { setStoredUser } = require("../../utils/userIdentity");
 
 // 管理员登录成功后，会“冒充/切换”为该 openid 对应的 userInfo 记录（用于后台/排查）。
 // 如需更换管理员进入的账号，就改这里。
@@ -138,7 +139,7 @@ Page({
       const { _id, ...plain } = userDoc;
       const cachedUser = { ...plain, id: _id || plain.id || "me" };
       try {
-        wx.setStorageSync("hyyc_user", cachedUser);
+        setStoredUser(cachedUser);
       } catch (e) {
         // ignore
       }
@@ -292,7 +293,7 @@ Page({
       };
 
       try {
-        wx.setStorageSync("hyyc_user", cachedUser);
+        setStoredUser(cachedUser);
       } catch (e) {
         // ignore
       }

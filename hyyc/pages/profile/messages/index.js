@@ -20,14 +20,10 @@ Page({
       goodsUnread: 0,
       sessionCount: 0,
     },
-    subscribeTemplates: [],
-    subscribeEnabled: false,
-    subscribeLoading: false,
   },
 
   onShow() {
     this.loadMessageCenter();
-    this.loadSubscribeConfig();
   },
 
   _updateDisplayList(nextFilter = this.data.filter, nextList = this.data.list) {
@@ -82,21 +78,6 @@ Page({
     }
   },
 
-  async loadSubscribeConfig() {
-    try {
-      const res = await wx.cloud.callFunction({ name: 'getSubscribeConfig' });
-      const ret = (res && res.result) || {};
-      if (!ret || ret.ok !== true) return;
-      const templates = Array.isArray(ret.templates) ? ret.templates : [];
-      this.setData({
-        subscribeTemplates: templates,
-        subscribeEnabled: !!ret.chatEnabled,
-      });
-    } catch (err) {
-      console.warn('加载订阅消息配置失败', err);
-    }
-  },
-
   onFilterTap(e) {
     const filter = pickStr(e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.filter, 'all');
     this._updateDisplayList(filter, this.data.list);
@@ -106,41 +87,5 @@ Page({
     const url = pickStr(e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.url);
     if (!url) return;
     wx.navigateTo({ url });
-  },
-
-  async onEnableSubscribe() {
-    if (this.data.subscribeLoading) return;
-    const templateIds = (Array.isArray(this.data.subscribeTemplates) ? this.data.subscribeTemplates : [])
-      .map((item) => pickStr(item && item.templateId))
-      .filter(Boolean);
-    if (!templateIds.length) {
-      wx.showToast({ title: '还没配置订阅模板', icon: 'none' });
-      return;
-    }
-    if (!wx.requestSubscribeMessage) {
-      wx.showToast({ title: '当前基础库不支持', icon: 'none' });
-      return;
-    }
-
-    this.setData({ subscribeLoading: true });
-    try {
-      const result = await new Promise((resolve, reject) => {
-        wx.requestSubscribeMessage({
-          tmplIds: templateIds,
-          success: resolve,
-          fail: reject,
-          complete: () => this.setData({ subscribeLoading: false }),
-        });
-      });
-      const acceptedCount = templateIds.filter((id) => pickStr(result && result[id]) === 'accept').length;
-      wx.showToast({
-        title: acceptedCount ? `已开启 ${acceptedCount} 项提醒` : '未同意订阅',
-        icon: 'none',
-      });
-    } catch (err) {
-      console.error('请求订阅消息失败', err);
-      this.setData({ subscribeLoading: false });
-      wx.showToast({ title: '请求订阅失败', icon: 'none' });
-    }
   },
 });

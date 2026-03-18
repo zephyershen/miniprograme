@@ -1,4 +1,5 @@
 const { formatDateTime } = require('../../../utils/format');
+const { getStoredUser, patchStoredUser } = require('../../../utils/userIdentity');
 
 const db = wx.cloud.database();
 const MSG_COLLECTION = 'messages';
@@ -60,7 +61,7 @@ Page({
   },
 
   async _ensureOpenid() {
-    const me = wx.getStorageSync('hyyc_user') || {};
+    const me = getStoredUser();
     let openid = pickStr(me._openid, me.openid, me.openId);
     if (openid) return openid;
     try {
@@ -68,7 +69,7 @@ Page({
       openid = pickStr(res && res.result && res.result.openid);
       if (openid) {
         try {
-          wx.setStorageSync('hyyc_user', { ...me, _openid: openid });
+          patchStoredUser({ _openid: openid });
         } catch (err) {
           // ignore
         }
@@ -99,7 +100,7 @@ Page({
       return;
     }
 
-    const me = wx.getStorageSync('hyyc_user') || {};
+    const me = getStoredUser();
     if (!me || !me.id) {
       wx.showToast({ title: '请先登录', icon: 'none' });
       wx.navigateTo({ url: '/pages/welcome/index' });

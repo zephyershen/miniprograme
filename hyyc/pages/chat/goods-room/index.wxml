@@ -15,7 +15,16 @@
     scroll-with-animation="{{scrollWithAnimation}}"
     scroll-top="{{scrollTop}}"
     bindscroll="onScroll"
+    bindscrolltoupper="loadOlderMsgs"
+    upper-threshold="80"
   >
+    <view
+      wx:if="{{loadingHistory || hasMoreHistory}}"
+      class="chat-history-bar"
+      bindtap="loadOlderMsgs"
+    >
+      {{loadingHistory ? '加载更早消息中...' : '点此或上滑查看更早消息'}}
+    </view>
     <block wx:for="{{msgs}}" wx:key="id">
       <chat-bubble
         id="m{{item.id}}"

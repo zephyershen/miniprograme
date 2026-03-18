@@ -4,7 +4,56 @@
   "functionRoot": "./cloudfunctions",
   "functions": [
     {
+      "name": "adminFinanceCompensate",
+      "timeout": 120
+    },
+    {
+      "name": "adminLogin"
+    },
+    {
+      "name": "adminResetTestData",
+      "timeout": 120
+    },
+    {
+      "name": "adminRepairUserIdentity",
+      "timeout": 120
+    },
+    {
+      "name": "chatSendMessage",
+      "timeout": 60
+    },
+    {
+      "name": "checkUserByIdNumber"
+    },
+    {
       "name": "registerUserByIdCard",
+      "timeout": 60
+    },
+    {
+      "name": "exchangePhoneNumber"
+    },
+    {
+      "name": "financeCompensate",
+      "timeout": 120
+    },
+    {
+      "name": "financeCompensateTimer",
+      "timeout": 120
+    },
+    {
+      "name": "getGoodsProfile",
+      "timeout": 60
+    },
+    {
+      "name": "getMessageCenter",
+      "timeout": 60
+    },
+    {
+      "name": "getSellerHomepage",
+      "timeout": 60
+    },
+    {
+      "name": "getUserPublicProfile",
       "timeout": 60
     },
     {
@@ -12,7 +61,34 @@
       "timeout": 60
     },
     {
+      "name": "huifuIndvOpenForMe",
+      "timeout": 60
+    },
+    {
       "name": "huifuMiniappPay",
+      "timeout": 60
+    },
+    {
+      "name": "imageAuditCallback",
+      "timeout": 60
+    },
+    {
+      "name": "imageAuditStart",
+      "timeout": 60
+    },
+    {
+      "name": "login"
+    },
+    {
+      "name": "markGoodsMessagesRead",
+      "timeout": 60
+    },
+    {
+      "name": "markMessagesReadByOwner",
+      "timeout": 60
+    },
+    {
+      "name": "markMessagesReadByPeer",
       "timeout": 60
     },
     {
@@ -33,6 +109,10 @@
     },
     {
       "name": "taskCancelFlow",
+      "timeout": 60
+    },
+    {
+      "name": "taskContactFlow",
       "timeout": 60
     },
     {

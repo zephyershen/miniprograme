@@ -82,5 +82,97 @@
         <text selectable class="finance-result-text">{{financeResultText || '还没有执行。先点“预检查”，确认没问题再点“执行补偿”。'}}</text>
       </view>
     </view>
+
+    <view wx:if="{{isSuperAdmin}}" class="panel card card-glass finance-panel">
+      <text class="panel-title">身份数据修复</text>
+
+      <view class="finance-tip">
+        <text class="finance-tip-text">上线前建议先跑一次。会扫描 `userInfo / tasks / goods / messages`，把 `id/_id`、ownerId、workerId、sellerId、peerUserId 等口径统一起来。</text>
+      </view>
+
+      <view class="form">
+        <view class="field-row">
+          <text class="field-label">管理员账号</text>
+          <input class="field-input" value="{{identityRepairForm.username}}" bindinput="onIdentityRepairInput" data-key="username" placeholder="输入管理员账号" />
+        </view>
+
+        <view class="field-row">
+          <text class="field-label">管理员密码</text>
+          <input class="field-input" password value="{{identityRepairForm.password}}" bindinput="onIdentityRepairInput" data-key="password" placeholder="输入管理员密码" />
+        </view>
+
+        <view class="field-row">
+          <text class="field-label">扫描数量上限</text>
+          <input class="field-input" type="number" value="{{identityRepairForm.scanLimit}}" bindinput="onIdentityRepairInput" data-key="scanLimit" placeholder="默认 500" />
+        </view>
+      </view>
+
+      <view class="finance-actions">
+        <view class="finance-btn finance-btn-secondary {{identityRepairRunning ? 'finance-btn-disabled' : ''}}" bindtap="onIdentityRepairDryRunTap">
+          {{identityRepairRunning === 'dryRun' ? '预检查中...' : '预检查'}}
+        </view>
+        <view class="finance-btn finance-btn-primary {{identityRepairRunning ? 'finance-btn-disabled' : ''}}" bindtap="onIdentityRepairRunTap">
+          {{identityRepairRunning === 'run' ? '执行中...' : '执行修复'}}
+        </view>
+      </view>
+
+      <view class="finance-result">
+        <text class="finance-result-title">返回结果</text>
+        <text selectable class="finance-result-text">{{identityRepairResultText || '还没有执行。先点“预检查”，确认影响范围，再点“执行修复”。'}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{isSuperAdmin}}" class="panel card card-glass finance-panel">
+      <text class="panel-title">清空测试数据</text>
+
+      <view class="finance-tip">
+        <text class="finance-tip-text">只用于测试环境。会清空 `userInfo / goods / tasks / messages / wallets / wallet_transactions / wallet_withdraw_requests / image_audit_jobs / huifu_notify_logs / finance_compensate_logs`，但会保留 `legal_docs`。</text>
+      </view>
+
+      <view class="finance-tip">
+        <text class="finance-tip-text">正式执行前必须输入确认口令：`CLEAR_TEST_DATA`。如果勾选“同时删除已关联云文件”，会顺带删除数据库里引用到的头像、商品图、任务图、聊天图等 fileID。</text>
+      </view>
+
+      <view class="form">
+        <view class="field-row">
+          <text class="field-label">管理员账号</text>
+          <input class="field-input" value="{{resetDataForm.username}}" bindinput="onResetDataInput" data-key="username" placeholder="输入管理员账号" />
+        </view>
+
+        <view class="field-row">
+          <text class="field-label">管理员密码</text>
+          <input class="field-input" password value="{{resetDataForm.password}}" bindinput="onResetDataInput" data-key="password" placeholder="输入管理员密码" />
+        </view>
+
+        <view class="field-row">
+          <text class="field-label">扫描数量上限</text>
+          <input class="field-input" type="number" value="{{resetDataForm.scanLimit}}" bindinput="onResetDataInput" data-key="scanLimit" placeholder="默认 2000" />
+        </view>
+
+        <view class="field-row">
+          <text class="field-label">删除关联云文件</text>
+          <switch checked="{{resetDataForm.includeFiles}}" bindchange="onResetDataToggleFiles" color="#111827" />
+        </view>
+
+        <view class="field-row">
+          <text class="field-label">确认口令</text>
+          <input class="field-input" value="{{resetDataForm.confirmText}}" bindinput="onResetDataInput" data-key="confirmText" placeholder="执行清空前输入 CLEAR_TEST_DATA" />
+        </view>
+      </view>
+
+      <view class="finance-actions">
+        <view class="finance-btn finance-btn-secondary {{resetDataRunning ? 'finance-btn-disabled' : ''}}" bindtap="onResetDataDryRunTap">
+          {{resetDataRunning === 'dryRun' ? '预检查中...' : '预检查'}}
+        </view>
+        <view class="finance-btn finance-btn-primary {{resetDataRunning ? 'finance-btn-disabled' : ''}}" bindtap="onResetDataRunTap">
+          {{resetDataRunning === 'run' ? '执行中...' : '执行清空'}}
+        </view>
+      </view>
+
+      <view class="finance-result">
+        <text class="finance-result-title">返回结果</text>
+        <text selectable class="finance-result-text">{{resetDataResultText || '还没有执行。先点“预检查”，确认扫描覆盖完整，再输入确认口令后执行清空。'}}</text>
+      </view>
+    </view>
   </view>
 </view>

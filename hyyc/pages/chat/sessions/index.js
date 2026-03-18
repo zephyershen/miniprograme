@@ -1,8 +1,18 @@
 const { formatDateTime } = require('../../../utils/format');
+const { getStoredUser } = require('../../../utils/userIdentity');
 
 // 使用云开发数据库 messages 集合作为聊天数据源
 const db = wx.cloud.database();
 const MSG_COLLECTION = 'messages';
+
+function buildTaskSessionPreview(doc = {}) {
+  const type = String(doc && doc.type || 'text').trim();
+  if (type === 'image') return '[图片]';
+  if (type === 'task_cancel_request') return '申请取消任务';
+  if (type === 'task_release_request') return '申请释放任务';
+  if (type === 'contact_request') return '申请查看手机号';
+  return String(doc && doc.text || '').trim();
+}
 
 Page({
   data: {
@@ -18,7 +28,7 @@ Page({
       return;
     }
 
-    const me = wx.getStorageSync('hyyc_user') || {};
+    const me = getStoredUser();
     if (!me || !me.id) {
       wx.showToast({ title: '请先登录', icon: 'none' });
       wx.navigateTo({ url: '/pages/welcome/index' });
@@ -106,8 +116,7 @@ Page({
       }
       const lastTimeText = ts ? formatDateTime(ts) : '';
 
-      const isText = doc.type === 'text';
-      const lastText = isText ? (doc.text || '') : '[图片]';
+      const lastText = buildTaskSessionPreview(doc);
 
       // 如果消息是住户发送的，记录住户昵称
       const isPeerSent = doc.fromUserId === peerUserId;

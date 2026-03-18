@@ -85,8 +85,14 @@
 
 .phone-request-btn {
   margin-top: 28rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   height: 84rpx;
-  line-height: 84rpx;
+  line-height: 1;
+  padding: 0;
+  box-sizing: border-box;
+  text-align: center;
   border-radius: 999rpx;
   background: #b95e49;
   color: #ffffff;

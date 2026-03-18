@@ -24,36 +24,6 @@ function buildAvatarSource(user = {}) {
   return pickStr(user.avatarFileID, user.avatarUrl);
 }
 
-function formatDateTime(date = new Date()) {
-  const d = date instanceof Date ? date : new Date(date);
-  const yyyy = d.getFullYear();
-  const mm = `${d.getMonth() + 1}`.padStart(2, '0');
-  const dd = `${d.getDate()}`.padStart(2, '0');
-  const hh = `${d.getHours()}`.padStart(2, '0');
-  const mi = `${d.getMinutes()}`.padStart(2, '0');
-  return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
-}
-
-function cutText(text = '', max = 20) {
-  const normalized = pickStr(text).replace(/\s+/g, ' ');
-  if (!normalized) return '';
-  return normalized.length > max ? `${normalized.slice(0, max - 1)}…` : normalized;
-}
-
-function buildPreview(type = 'text', text = '') {
-  return type === 'image' ? '[图片]' : pickStr(text);
-}
-
-function getSubscribeConfig() {
-  return {
-    templateId: pickStr(process.env.SUBSCRIBE_CHAT_TEMPLATE_ID),
-    thingKey: pickStr(process.env.SUBSCRIBE_CHAT_THING_KEY, 'thing1'),
-    nameKey: pickStr(process.env.SUBSCRIBE_CHAT_NAME_KEY, 'name2'),
-    timeKey: pickStr(process.env.SUBSCRIBE_CHAT_TIME_KEY, 'time3'),
-    miniprogramState: pickStr(process.env.MINIPROGRAM_STATE, 'formal'),
-  };
-}
-
 function getLogicalUserId(user = {}) {
   return pickStr(user && user.id, user && user._id);
 }
@@ -71,48 +41,18 @@ async function getUserByOpenid(openid = '') {
 async function getUserById(userId = '') {
   const targetUserId = pickStr(userId);
   if (!targetUserId) return null;
+  try {
+    const docRes = await db.collection(USER_COLLECTION).doc(targetUserId).get();
+    const matched = (docRes && docRes.data) || null;
+    if (matched) return matched;
+  } catch (err) {
+    // ignore
+  }
   const res = await db.collection(USER_COLLECTION)
     .where({ id: targetUserId })
     .limit(1)
     .get();
-  const matched = ((res && res.data) || [])[0] || null;
-  if (matched) return matched;
-
-  try {
-    const docRes = await db.collection(USER_COLLECTION).doc(targetUserId).get();
-    return (docRes && docRes.data) || null;
-  } catch (err) {
-    return null;
-  }
-}
-
-async function sendSubscribeMessage({ touser = '', senderName = '', preview = '', page = '' }) {
-  const targetOpenid = pickStr(touser);
-  const cfg = getSubscribeConfig();
-  if (!targetOpenid || !cfg.templateId) return { ok: false, skipped: true };
-
-  try {
-    await cloud.openapi.subscribeMessage.send({
-      touser: targetOpenid,
-      templateId: cfg.templateId,
-      page: pickStr(page),
-      lang: 'zh_CN',
-      miniprogramState: cfg.miniprogramState,
-      data: {
-        [cfg.thingKey]: { value: cutText(preview, 20) || '你收到一条新消息' },
-        [cfg.nameKey]: { value: cutText(senderName, 10) || '邻里用户' },
-        [cfg.timeKey]: { value: formatDateTime(new Date()) },
-      },
-    });
-    return { ok: true };
-  } catch (err) {
-    console.warn('chatSendMessage subscribe send failed', err);
-    return {
-      ok: false,
-      code: pickStr(err && err.errCode, err && err.code, 'SUBSCRIBE_SEND_FAILED'),
-      msg: pickStr(err && (err.errMsg || err.message), '订阅消息发送失败'),
-    };
-  }
+  return ((res && res.data) || [])[0] || null;
 }
 
 async function sendTaskMessage({ sender = {}, event = {} }) {
@@ -168,17 +108,6 @@ async function sendTaskMessage({ sender = {}, event = {} }) {
       readByOwner: senderUserId === normalizedOwnerId,
       readByPeer: senderUserId === normalizedPeerUserId,
     }
-  });
-
-  const receiverUserId = senderUserId === normalizedOwnerId ? normalizedPeerUserId : normalizedOwnerId;
-  const receiver = await getUserById(receiverUserId);
-  await sendSubscribeMessage({
-    touser: pickStr(receiver && receiver._openid),
-    senderName: fromNickname,
-    preview: buildPreview(type, text),
-    page: senderUserId === normalizedOwnerId
-      ? `/pages/chat/room/index?tid=${encodeURIComponent(taskId)}`
-      : `/pages/chat/room/index?tid=${encodeURIComponent(taskId)}&peerUserId=${encodeURIComponent(senderUserId)}`,
   });
 
   return { ok: true, messageId: pickStr(addRes && addRes._id) };
@@ -248,16 +177,6 @@ async function sendGoodsMessage({ sender = {}, event = {} }) {
       readBySeller: senderUserId === sellerId,
       readByBuyer: senderUserId === buyerUserId,
     }
-  });
-
-  const receiverOpenid = senderUserId === sellerId ? pickStr(buyer._openid) : sellerOpenid;
-  await sendSubscribeMessage({
-    touser: receiverOpenid,
-    senderName: fromNickname,
-    preview: buildPreview(type, text),
-    page: senderUserId === sellerId
-      ? `/pages/chat/goods-room/index?gid=${encodeURIComponent(goodsId)}`
-      : `/pages/chat/goods-room/index?gid=${encodeURIComponent(goodsId)}&peerUserId=${encodeURIComponent(buyerUserId)}`,
   });
 
   return { ok: true, messageId: pickStr(addRes && addRes._id) };

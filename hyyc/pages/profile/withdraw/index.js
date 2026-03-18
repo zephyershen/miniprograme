@@ -309,7 +309,7 @@ Page({
       return;
     }
     if (this.data.activeWithdraw) {
-      toast('当前已有一笔提现处理中，请稍后再试');
+      toast('当前有一笔提现处理中，预计次日到账，请留意银行卡余额变动。');
       return;
     }
 

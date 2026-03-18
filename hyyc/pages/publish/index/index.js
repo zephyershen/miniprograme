@@ -1,3 +1,5 @@
+const { getStoredUser } = require('../../../utils/userIdentity');
+
 Page({
   data: {
     isLoading: false,
@@ -8,7 +10,7 @@ Page({
     productsIconLoaded: false
   },
   onShow(){
-    const u = wx.getStorageSync('hyyc_user');
+    const u = getStoredUser();
     if (!u || !u.realname) {
       // 避免一进入页面就出现“获取手机号”授权流程：先进入欢迎页，让用户自主选择登录/注册
       wx.navigateTo({ url: '/pages/welcome/index' });

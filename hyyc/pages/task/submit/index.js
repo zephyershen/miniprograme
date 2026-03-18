@@ -1,5 +1,6 @@
 const { toast } = require('../../../utils/ui');
 const access = require('../../../config/access');
+const { getStoredUser } = require('../../../utils/userIdentity');
 Page({
   data: { tid: '', note: '', images: [], isLoading: false },
   onLoad(q){
@@ -39,7 +40,7 @@ Page({
       return;
     }
 
-    const me = wx.getStorageSync('hyyc_user') || {};
+    const me = getStoredUser();
 
     this.setData({ isLoading: true });
     wx.showLoading({ title: '提交中', mask: true });

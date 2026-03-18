@@ -44,19 +44,18 @@ async function getUserByOpenid(openid = '') {
 async function getUserById(userId = '') {
   const targetUserId = pickStr(userId);
   if (!targetUserId) return null;
+  try {
+    const docRes = await db.collection(USER_COLLECTION).doc(targetUserId).get();
+    const matched = (docRes && docRes.data) || null;
+    if (matched) return matched;
+  } catch (err) {
+    // ignore
+  }
   const res = await db.collection(USER_COLLECTION)
     .where({ id: targetUserId })
     .limit(1)
     .get();
-  const matched = ((res && res.data) || [])[0] || null;
-  if (matched) return matched;
-
-  try {
-    const docRes = await db.collection(USER_COLLECTION).doc(targetUserId).get();
-    return (docRes && docRes.data) || null;
-  } catch (err) {
-    return null;
-  }
+  return ((res && res.data) || [])[0] || null;
 }
 
 function mapGoods(doc = {}) {

@@ -80,7 +80,7 @@ exports.main = async (event = {}) => {
       locationType: locationType || '',
       images,
 
-      ownerId: pickStr(user._id || user.id),
+      ownerId: pickStr(user.id, user._id),
       ownerName: pickStr(user.name),
       ownerNickname: pickStr(user.nickname),
       ownerAvatarFileID: pickStr(user.avatarFileID, user.avatarUrl),

@@ -14,6 +14,8 @@ Page({
   data: {
     tid: '',
     targetRole: '',
+    targetUserId: '',
+    targetOpenid: '',
     profile: null,
     isLoading: true,
     requesting: false,
@@ -24,12 +26,14 @@ Page({
   onLoad(options) {
     const tid = pickStr(options && options.tid);
     const targetRole = pickStr(options && options.targetRole).toLowerCase();
+    const targetUserId = pickStr(options && options.targetUserId);
+    const targetOpenid = pickStr(options && options.targetOpenid);
     if (!tid || (targetRole !== 'owner' && targetRole !== 'worker')) {
       wx.showToast({ title: '参数缺失', icon: 'none' });
       this.setData({ isLoading: false });
       return;
     }
-    this.setData({ tid, targetRole }, () => this.loadProfile());
+    this.setData({ tid, targetRole, targetUserId, targetOpenid }, () => this.loadProfile());
   },
 
   async loadProfile() {
@@ -44,6 +48,8 @@ Page({
           action: 'get_profile',
           taskId: tid,
           targetRole,
+          targetUserId: this.data.targetUserId,
+          targetOpenid: this.data.targetOpenid,
         }
       });
       const ret = (res && res.result) || {};
@@ -106,6 +112,8 @@ Page({
           action: 'request_phone',
           taskId: this.data.tid,
           targetRole: this.data.targetRole,
+          targetUserId: this.data.targetUserId,
+          targetOpenid: this.data.targetOpenid,
         }
       });
       const ret = (res && res.result) || {};

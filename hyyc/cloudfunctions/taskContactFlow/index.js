@@ -39,54 +39,6 @@ function maskPhone(phone = '') {
   return text;
 }
 
-function formatDateTime(date = new Date()) {
-  const d = date instanceof Date ? date : new Date(date);
-  const yyyy = d.getFullYear();
-  const mm = `${d.getMonth() + 1}`.padStart(2, '0');
-  const dd = `${d.getDate()}`.padStart(2, '0');
-  const hh = `${d.getHours()}`.padStart(2, '0');
-  const mi = `${d.getMinutes()}`.padStart(2, '0');
-  return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
-}
-
-function cutText(text = '', max = 20) {
-  const normalized = pickStr(text).replace(/\s+/g, ' ');
-  if (!normalized) return '';
-  return normalized.length > max ? `${normalized.slice(0, max - 1)}…` : normalized;
-}
-
-function getSubscribeConfig() {
-  return {
-    templateId: pickStr(process.env.SUBSCRIBE_CHAT_TEMPLATE_ID),
-    thingKey: pickStr(process.env.SUBSCRIBE_CHAT_THING_KEY, 'thing1'),
-    nameKey: pickStr(process.env.SUBSCRIBE_CHAT_NAME_KEY, 'name2'),
-    timeKey: pickStr(process.env.SUBSCRIBE_CHAT_TIME_KEY, 'time3'),
-    miniprogramState: pickStr(process.env.MINIPROGRAM_STATE, 'formal'),
-  };
-}
-
-async function sendSubscribeMessage({ touser = '', senderName = '', preview = '', page = '' }) {
-  const targetOpenid = pickStr(touser);
-  const cfg = getSubscribeConfig();
-  if (!targetOpenid || !cfg.templateId) return;
-  try {
-    await cloud.openapi.subscribeMessage.send({
-      touser: targetOpenid,
-      templateId: cfg.templateId,
-      page: pickStr(page),
-      lang: 'zh_CN',
-      miniprogramState: cfg.miniprogramState,
-      data: {
-        [cfg.thingKey]: { value: cutText(preview, 20) || '你收到一条新消息' },
-        [cfg.nameKey]: { value: cutText(senderName, 10) || '邻里用户' },
-        [cfg.timeKey]: { value: formatDateTime(new Date()) },
-      }
-    });
-  } catch (err) {
-    console.warn('[taskContactFlow] subscribe send failed', err);
-  }
-}
-
 async function getTaskById(taskId) {
   const res = await db.collection(TASK_COLLECTION).doc(taskId).get();
   return (res && res.data) || null;
@@ -98,6 +50,29 @@ async function getUserByOpenid(openid) {
   const res = await db.collection(USER_COLLECTION).where({ _openid: id }).limit(1).get();
   const list = (res && res.data) || [];
   return list[0] || null;
+}
+
+async function getUserById(userId = '') {
+  const targetUserId = pickStr(userId);
+  if (!targetUserId) return null;
+  try {
+    const docRes = await db.collection(USER_COLLECTION).doc(targetUserId).get();
+    const matched = (docRes && docRes.data) || null;
+    if (matched) return matched;
+  } catch (err) {
+    // ignore
+  }
+  const res = await db.collection(USER_COLLECTION).where({ id: targetUserId }).limit(1).get();
+  const list = (res && res.data) || [];
+  return list[0] || null;
+}
+
+async function getUserByIdOrOpenid({ userId = '', openid = '' } = {}) {
+  return (await getUserByOpenid(openid)) || (await getUserById(userId));
+}
+
+function getLogicalUserId(user = {}) {
+  return pickStr(user && user.id, user && user._id);
 }
 
 function getParticipantRole(task = {}, openid = '') {
@@ -139,7 +114,39 @@ function resolveTargetRole(task = {}, event = {}, requesterRole = '') {
 
   if (requesterRole === 'owner') return 'worker';
   if (requesterRole === 'worker') return 'owner';
+  if (requesterRole === 'peer') return 'owner';
   return '';
+}
+
+function resolveTargetIdentity(task = {}, event = {}, targetRole = '') {
+  const explicitUserId = pickStr(event.targetUserId, event.userId);
+  const explicitOpenid = pickStr(event.targetOpenid, event.openid);
+  if (targetRole === 'owner') {
+    return {
+      userId: pickStr(task.ownerId, explicitUserId),
+      openid: pickStr(task._openid, explicitOpenid),
+    };
+  }
+  return {
+    userId: pickStr(task.workerId, explicitUserId),
+    openid: pickStr(task.workerOpenid, task.worker_openid, explicitOpenid),
+  };
+}
+
+async function hasTaskChatRoom(task = {}, peerUserId = '') {
+  const tid = pickStr(task && task._id);
+  const ownerId = pickStr(task && task.ownerId);
+  const targetPeerUserId = pickStr(peerUserId);
+  if (!tid || !ownerId || !targetPeerUserId) return false;
+  const res = await db.collection(MSG_COLLECTION)
+    .where({
+      tid,
+      ownerId,
+      peerUserId: targetPeerUserId,
+    })
+    .limit(1)
+    .get();
+  return ((res && res.data) || []).length > 0;
 }
 
 function isPhoneVisibleToViewer(task = {}, viewerRole = '', targetRole = '') {
@@ -222,8 +229,18 @@ exports.main = async (event = {}) => {
     const task = await getTaskById(taskId);
     if (!task) return { ok: false, code: 'TASK_NOT_FOUND', msg: '任务不存在' };
 
-    const requesterRole = getParticipantRole(task, OPENID);
+    const requesterUser = await getUserByOpenid(OPENID);
+    const requesterUserId = getLogicalUserId(requesterUser);
+    const directRequesterRole = getParticipantRole(task, OPENID);
+    let requesterRole = directRequesterRole;
+    if (!requesterRole && action === 'get_profile' && requesterUserId) {
+      const hasChatAccess = await hasTaskChatRoom(task, requesterUserId);
+      if (hasChatAccess) requesterRole = 'peer';
+    }
     if (!requesterRole) return { ok: false, code: 'NOT_TASK_PARTICIPANT', msg: '只有任务双方可以操作' };
+    if (action !== 'get_profile' && requesterRole !== 'owner' && requesterRole !== 'worker') {
+      return { ok: false, code: 'NOT_TASK_PARTICIPANT', msg: '当前仅支持已接单双方操作手机号申请' };
+    }
 
     const targetRole = resolveTargetRole(task, event, requesterRole);
     if (!targetRole) return { ok: false, code: 'INVALID_TARGET_ROLE', msg: '缺少有效的 targetRole' };
@@ -231,19 +248,53 @@ exports.main = async (event = {}) => {
       return { ok: false, code: 'INVALID_TARGET', msg: '不能申请查看自己的手机号' };
     }
 
-    const targetOpenid = getRoleOpenid(task, targetRole);
-    const targetUserId = getRoleUserId(task, targetRole);
-    const targetUser = await getUserByOpenid(targetOpenid);
+    const targetIdentity = resolveTargetIdentity(task, event, targetRole);
+    const targetOpenid = pickStr(targetIdentity.openid);
+    const targetUserId = pickStr(targetIdentity.userId);
+    const targetUser = await getUserByIdOrOpenid({ userId: targetUserId, openid: targetOpenid });
     const currentRequest = task.contactRequest && typeof task.contactRequest === 'object' ? task.contactRequest : {};
     const currentStatus = pickStr(currentRequest.status);
-    const phoneVisible = isPhoneVisibleToViewer(task, requesterRole, targetRole);
-    const pendingSameDirection = currentStatus === 'pending'
-      && pickStr(currentRequest.requestedByRole) === requesterRole
-      && pickStr(currentRequest.targetRole) === targetRole;
-    const pendingAny = currentStatus === 'pending';
+    const actualWorkerUserId = pickStr(task.workerId);
+    const actualWorkerOpenid = pickStr(task.workerOpenid, task.worker_openid);
+    const targetIsAcceptedParticipant = targetRole === 'owner'
+      ? true
+      : !!(
+        (targetUserId && actualWorkerUserId && targetUserId === actualWorkerUserId)
+        || (targetOpenid && actualWorkerOpenid && targetOpenid === actualWorkerOpenid)
+      );
+    const currentRequestTargetId = pickStr(currentRequest.targetUserId);
+    const currentRequestMatchesTarget = currentStatus === 'pending'
+      && pickStr(currentRequest.targetRole) === targetRole
+      && (!currentRequestTargetId || !targetUserId || currentRequestTargetId === targetUserId);
+    const phoneVisible = (requesterRole === 'owner' || requesterRole === 'worker')
+      && targetIsAcceptedParticipant
+      && isPhoneVisibleToViewer(task, requesterRole, targetRole);
+    const pendingSameDirection = currentRequestMatchesTarget
+      && pickStr(currentRequest.requestedByRole) === requesterRole;
+    const pendingAny = currentRequestMatchesTarget;
+
+    if (action === 'get_profile') {
+      if (requesterRole === 'peer' && targetRole !== 'owner') {
+        return { ok: false, code: 'INVALID_TARGET', msg: '预接单聊天仅支持查看发布者资料' };
+      }
+      if (targetRole === 'worker' && !targetIsAcceptedParticipant) {
+        const canViewWorkerPublicProfile = await hasTaskChatRoom(task, targetUserId);
+        if (!canViewWorkerPublicProfile) {
+          return { ok: false, code: 'INVALID_TARGET', msg: '当前聊天对象资料暂不可用' };
+        }
+      }
+      if (requesterRole === 'peer') {
+        const canViewOwnerPublicProfile = await hasTaskChatRoom(task, requesterUserId);
+        if (!canViewOwnerPublicProfile) {
+          return { ok: false, code: 'INVALID_TARGET', msg: '当前聊天对象资料暂不可用' };
+        }
+      }
+    }
 
     if (action === 'get_profile') {
       const canRequestPhone = requesterRole !== targetRole
+        && (requesterRole === 'owner' || requesterRole === 'worker')
+        && targetIsAcceptedParticipant
         && !phoneVisible
         && !pendingAny
         && !!targetUserId
@@ -274,6 +325,9 @@ exports.main = async (event = {}) => {
     }
 
     if (action === 'request_phone') {
+      if (!targetIsAcceptedParticipant) {
+        return { ok: false, code: 'TARGET_NOT_READY', msg: '当前暂不能申请查看手机号' };
+      }
       if (phoneVisible) {
         return { ok: true, already: true, status: 'approved', msg: '已可查看完整手机号' };
       }
@@ -318,15 +372,6 @@ exports.main = async (event = {}) => {
           },
           updatedAt: now,
         }
-      });
-
-      await sendSubscribeMessage({
-        touser: targetOpenid,
-        senderName: getRoleDisplayName(task, requesterRole),
-        preview: '申请查看你的手机号',
-        page: targetRole === 'owner'
-          ? `/pages/chat/room/index?tid=${encodeURIComponent(taskId)}&peerUserId=${encodeURIComponent(pickStr(task.workerId))}`
-          : `/pages/chat/room/index?tid=${encodeURIComponent(taskId)}`,
       });
 
       return {
@@ -378,15 +423,6 @@ exports.main = async (event = {}) => {
         pickStr(currentRequest.messageId),
         buildContactMessagePayload({ task, request: nextRequest })
       );
-
-      await sendSubscribeMessage({
-        touser: pickStr(currentRequest.requestedByOpenid),
-        senderName: getRoleDisplayName(task, requesterRole),
-        preview: '已同意查看手机号',
-        page: pickStr(currentRequest.requestedByRole) === 'owner'
-          ? `/pages/chat/room/index?tid=${encodeURIComponent(taskId)}&peerUserId=${encodeURIComponent(pickStr(task.workerId))}`
-          : `/pages/chat/room/index?tid=${encodeURIComponent(taskId)}`,
-      });
 
       return { ok: true, status: 'approved', requestId, msg: '已同意查看手机号' };
     }

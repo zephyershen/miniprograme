@@ -7,7 +7,6 @@
 }
 
 .hero,
-.subscribe,
 .session-card,
 .empty {
   padding: 24rpx;
@@ -49,48 +48,6 @@
   margin-top: 6rpx;
   font-size: 22rpx;
   color: #9ca3af;
-}
-
-.subscribe {
-  margin-top: 18rpx;
-  display: flex;
-  gap: 16rpx;
-  align-items: center;
-}
-
-.subscribe-copy {
-  flex: 1;
-  min-width: 0;
-}
-
-.subscribe-title {
-  display: block;
-  font-size: 28rpx;
-  font-weight: 700;
-  color: #111827;
-}
-
-.subscribe-sub {
-  display: block;
-  margin-top: 10rpx;
-  font-size: 22rpx;
-  color: #6b7280;
-  line-height: 1.6;
-}
-
-.subscribe-btn {
-  margin: 0;
-  padding: 0 24rpx;
-  height: 72rpx;
-  line-height: 72rpx;
-  border-radius: 999rpx;
-  background: #111827;
-  color: #ffffff;
-  font-size: 24rpx;
-}
-
-.subscribe-btn[disabled] {
-  opacity: 0.45;
 }
 
 .filter-row {

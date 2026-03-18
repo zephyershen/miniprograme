@@ -463,6 +463,16 @@ exports.main = async (event, context) => {
     if (!txRes || !txRes.ok) return txRes;
     keepIdCardFiles = true;
 
+    if (txRes.id) {
+      try {
+        await db.collection(USER_COLLECTION).doc(txRes.id).update({
+          data: { id: txRes.id }
+        });
+      } catch (err) {
+        console.error('回写 userInfo.id 失败', err);
+      }
+    }
+
     // 5) 注册后自动开户（失败不影响注册）
     const certValidityType = certValidityTypeRaw === 'long' ? 'long' : 'fixed';
     const certBeginDate = normalizeCertDateInput(certBeginDateRaw);

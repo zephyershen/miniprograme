@@ -2,6 +2,7 @@ const { formatMoney } = require('../../../utils/format');
 const { confirm } = require('../../../utils/ui');
 const { setGoodsFavorite, syncGoodsBrowseState } = require('../../../utils/userGoodsStore');
 const access = require('../../../config/access');
+const { getStoredUser, patchStoredUser } = require('../../../utils/userIdentity');
 
 const db = wx.cloud.database();
 const GOODS_COLLECTION = 'goods';
@@ -217,7 +218,7 @@ Page({
   },
   async _ensureOpenid() {
     // 数据库安全规则里用 auth.openid 判断“是不是本人”，这里需要拿到 openid 才能做“本人查询”。
-    const u = wx.getStorageSync('hyyc_user') || {};
+    const u = getStoredUser();
     let openid = pickStr(u._openid || u.openid || u.openId);
     if (openid) return openid;
     try {
@@ -225,7 +226,7 @@ Page({
       openid = pickStr(res && res.result && res.result.openid);
       if (openid) {
         try {
-          wx.setStorageSync('hyyc_user', { ...u, _openid: openid });
+          patchStoredUser({ _openid: openid });
         } catch (e) {
           // ignore
         }
@@ -363,7 +364,7 @@ Page({
     if (!fromPullDown) this.setData({ isLoading: true });
 
     try {
-      const u = wx.getStorageSync('hyyc_user') || {};
+      const u = getStoredUser();
       const community = String(u.community || '').trim();
       const openid = await this._ensureOpenid();
 
@@ -814,7 +815,7 @@ Page({
     }
 
     // 防止购买自己的商品（双保险：即便 canBuy 计算错了也拦一下）
-    const u = wx.getStorageSync('hyyc_user') || {};
+    const u = getStoredUser();
     if (u && u.id && goods.ownerId && String(u.id) === String(goods.ownerId)) {
       return wx.showToast({ title: '不能购买自己发布的商品', icon: 'none' });
     }
@@ -845,7 +846,7 @@ Page({
         let payReqDate = '';
         let payReqSeqId = '';
         let paymentCompleted = false;
-        wx.showLoading({ title: '生成 pay_info', mask: true });
+        wx.showLoading({ title: '支付中', mask: true });
         try {
           const r = await wx.cloud.callFunction({
             name: 'huifuMiniappPay',
@@ -875,7 +876,7 @@ Page({
           payReqSeqId = pickStr(ret && ret.reqSeqId);
 
           wx.hideLoading();
-          wx.showLoading({ title: '调起支付', mask: true });
+          wx.showLoading({ title: '支付中', mask: true });
           await wx.requestPayment({
             ...(ret.payParams || {}),
           });

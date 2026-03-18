@@ -1,9 +1,13 @@
 const { resolveAvatarURL, saveAvatarTempURLMap } = require('../../../utils/avatarCache');
+const { getStoredUser, patchStoredUser } = require('../../../utils/userIdentity');
 
 const db = wx.cloud.database();
+const _ = db.command;
 const MSG_COLLECTION = 'messages';
 const GOODS_COLLECTION = 'goods';
 const TEMP_URL_BATCH_SIZE = 20;
+const CHAT_RECENT_WATCH_LIMIT = 40;
+const CHAT_HISTORY_PAGE_SIZE = 40;
 
 function pickStr(...vals) {
   for (let i = 0; i < vals.length; i += 1) {
@@ -44,12 +48,18 @@ Page({
     peerProfile: null,
     keyboardHeight: 0,
     isOwner: false,
+    hasMoreHistory: false,
+    loadingHistory: false,
   },
 
   _scrollTimer: null,
   _userScrolling: false,
   _roomDocs: [],
   _goodsReadFunctionMissing: false,
+  _lastRenderedMsgSignature: '',
+  _historyDocs: [],
+  _realtimeDocs: [],
+  _historyExhausted: false,
 
   _maskName(name = '') {
     if (!name) return '';
@@ -71,7 +81,7 @@ Page({
   },
 
   async _ensureOpenid() {
-    const me = wx.getStorageSync('hyyc_user') || {};
+    const me = getStoredUser();
     let openid = pickStr(me._openid, me.openid, me.openId);
     if (openid) return openid;
     try {
@@ -79,7 +89,7 @@ Page({
       openid = pickStr(res && res.result && res.result.openid);
       if (openid) {
         try {
-          wx.setStorageSync('hyyc_user', { ...me, _openid: openid });
+          patchStoredUser({ _openid: openid });
         } catch (err) {
           // ignore
         }
@@ -242,7 +252,7 @@ Page({
     const goodsId = pickStr(gid);
     if (!goodsId) return null;
 
-    const me = wx.getStorageSync('hyyc_user') || {};
+    const me = getStoredUser();
     const community = pickStr(me.community);
     let goods = null;
 
@@ -448,10 +458,7 @@ Page({
   },
 
   _refreshDecoratedMsgs() {
-    if (!Array.isArray(this._roomDocs) || !this._roomDocs.length) return;
-    this.setData({
-      msgs: this._decorateMsgs(this._roomDocs),
-    });
+    this._applyRoomDocs();
   },
 
   _isFunctionNotFoundError(err) {
@@ -511,6 +518,128 @@ Page({
     });
   },
 
+  _hasUnreadRoomMessages(docs = []) {
+    const list = Array.isArray(docs) ? docs : [];
+    const sellerId = pickStr(this.data.sellerId);
+    const peerUserId = pickStr(this.data.peerUserId);
+    if (this.data.isOwner) {
+      return list.some((doc) => (
+        pickStr(doc && doc.fromUserId)
+        && pickStr(doc && doc.fromUserId) !== sellerId
+        && doc.readBySeller !== true
+      ));
+    }
+    return list.some((doc) => (
+      pickStr(doc && doc.fromUserId) === sellerId
+      && doc.readByBuyer !== true
+    ));
+  },
+
+  _buildVisibleMsgSignature(msgs = []) {
+    return JSON.stringify((Array.isArray(msgs) ? msgs : []).map((item) => ([
+      pickStr(item && item.id),
+      item && item.mine ? 1 : 0,
+      pickStr(item && item.type),
+      pickStr(item && item.text),
+      pickStr(item && item.imageUrl),
+      pickStr(item && item.avatarUrl),
+    ])));
+  },
+
+  _getMsgId(doc = {}) {
+    return pickStr(doc && (doc._id || doc.id));
+  },
+
+  _sortRoomDocsAsc(docs = []) {
+    return (Array.isArray(docs) ? docs.slice() : []).sort((a, b) => {
+      const diff = this._getMsgTs(a) - this._getMsgTs(b);
+      if (diff) return diff;
+      return this._getMsgId(a).localeCompare(this._getMsgId(b));
+    });
+  },
+
+  _mergeUniqueRoomDocs(...lists) {
+    const map = {};
+    lists.forEach((list) => {
+      (Array.isArray(list) ? list : []).forEach((doc) => {
+        const id = this._getMsgId(doc);
+        if (!id) return;
+        map[id] = doc;
+      });
+    });
+    return this._sortRoomDocsAsc(Object.keys(map).map((id) => map[id]));
+  },
+
+  _composeRoomDocs() {
+    return this._mergeUniqueRoomDocs(this._historyDocs, this._realtimeDocs);
+  },
+
+  _applyRoomDocs(options = {}) {
+    const firstLoad = !!options.firstLoad || !this.data.contentReady;
+    const docs = this._composeRoomDocs();
+    const msgs = this._decorateMsgs(docs);
+    const renderSignature = this._buildVisibleMsgSignature(msgs);
+    const nextData = {};
+    const shouldRenderMsgs = firstLoad || renderSignature !== this._lastRenderedMsgSignature;
+
+    this._roomDocs = docs;
+
+    if (typeof options.loadingHistory === 'boolean') {
+      nextData.loadingHistory = options.loadingHistory;
+    }
+    if (typeof options.hasMoreHistory === 'boolean') {
+      nextData.hasMoreHistory = options.hasMoreHistory;
+    }
+    if (firstLoad) {
+      nextData.isLoading = false;
+      nextData.contentReady = true;
+      if (msgs.length && !this._userScrolling) {
+        nextData.scrollTop = 999999;
+        nextData.scrollWithAnimation = false;
+      }
+    }
+    if (shouldRenderMsgs) {
+      nextData.msgs = msgs;
+    }
+
+    if (Object.keys(nextData).length) {
+      this.setData(nextData);
+      if (shouldRenderMsgs) {
+        this._lastRenderedMsgSignature = renderSignature;
+      }
+    }
+
+    return msgs;
+  },
+
+  _bindKeyboardHeightChange() {
+    if (this._keyboardHeightHandler) return;
+    this._keyboardHeightHandler = (res) => {
+      this.setData({ keyboardHeight: Number(res && res.height) || 0 });
+      if ((res && res.height) > 0) {
+        setTimeout(() => this._scrollToBottom(), 100);
+      }
+    };
+    wx.onKeyboardHeightChange(this._keyboardHeightHandler);
+  },
+
+  _unbindKeyboardHeightChange() {
+    if (!this._keyboardHeightHandler) return;
+    try {
+      wx.offKeyboardHeightChange(this._keyboardHeightHandler);
+    } catch (err) {
+      wx.offKeyboardHeightChange();
+    }
+    this._keyboardHeightHandler = null;
+  },
+
+  _closeRoomWatch() {
+    if (this._watcher && this._watcher.close) {
+      this._watcher.close();
+    }
+    this._watcher = null;
+  },
+
   _scrollToBottom() {
     if (this._userScrolling) return;
     this.setData({
@@ -529,46 +658,83 @@ Page({
     }, 1500);
   },
 
-  openWatch() {
+  async loadOlderMsgs() {
+    if (this.data.loadingHistory || !this.data.hasMoreHistory) return;
+    const roomQuery = this._getRoomQuery();
+    const oldestDoc = (Array.isArray(this._roomDocs) && this._roomDocs.length)
+      ? this._roomDocs[0]
+      : null;
+    const oldestTs = this._getMsgTs(oldestDoc);
+    if (!roomQuery.gid || !roomQuery.sellerId || !roomQuery.peerUserId || !oldestTs) {
+      this._historyExhausted = true;
+      this.setData({ hasMoreHistory: false });
+      return;
+    }
+
+    this.setData({ loadingHistory: true });
+    try {
+      const res = await db.collection(MSG_COLLECTION)
+        .where({
+          ...roomQuery,
+          createTime: _.lt(new Date(oldestTs)),
+        })
+        .orderBy('createTime', 'desc')
+        .limit(CHAT_HISTORY_PAGE_SIZE)
+        .get();
+      const olderDocs = this._sortRoomDocsAsc((res && res.data) || []);
+      this._historyDocs = this._mergeUniqueRoomDocs(olderDocs, this._historyDocs);
+      this._historyExhausted = olderDocs.length < CHAT_HISTORY_PAGE_SIZE;
+      this._applyRoomDocs({
+        loadingHistory: false,
+        hasMoreHistory: !this._historyExhausted,
+      });
+      this._mergePeerProfileFromDocs(olderDocs);
+    } catch (err) {
+      console.error('加载更早商品聊天消息失败', err);
+      this.setData({ loadingHistory: false });
+      wx.showToast({ title: '加载历史消息失败', icon: 'none' });
+    }
+  },
+
+  openWatch(useFullScanFallback = false) {
     const roomQuery = this._getRoomQuery();
     if (!roomQuery.gid || !roomQuery.sellerId || !roomQuery.peerUserId) return;
 
-    if (this._watcher && this._watcher.close) {
-      this._watcher.close();
-    }
+    this._closeRoomWatch();
 
-    this._watcher = db.collection(MSG_COLLECTION)
-      .where(roomQuery)
-      .watch({
+    let query = db.collection(MSG_COLLECTION).where(roomQuery);
+    query = useFullScanFallback
+      ? query
+      : query.orderBy('createTime', 'desc').limit(CHAT_RECENT_WATCH_LIMIT);
+
+    this._watcher = query.watch({
         onChange: (snapshot) => {
-          const docs = (snapshot && snapshot.docs) || [];
-          this._roomDocs = docs;
-          this._mergePeerProfileFromDocs(docs);
-          const oldLen = this.data.msgs.length;
-          const msgs = this._decorateMsgs(docs);
-          const last = msgs[msgs.length - 1];
-          const firstLoad = !this.data.contentReady;
-          const nextData = {
-            msgs,
-            isLoading: false,
-            contentReady: true,
-          };
+          const rawDocs = (snapshot && snapshot.docs) || [];
+          const realtimeDocs = useFullScanFallback
+            ? this._sortRoomDocsAsc(rawDocs).slice(-CHAT_RECENT_WATCH_LIMIT)
+            : this._sortRoomDocsAsc(rawDocs);
+          const oldLen = this._roomDocs.length;
+          this._realtimeDocs = realtimeDocs;
+          this._mergePeerProfileFromDocs(realtimeDocs);
+          const msgs = this._applyRoomDocs({
+            firstLoad: !this.data.contentReady,
+            hasMoreHistory: !this._historyExhausted && (this.data.hasMoreHistory || rawDocs.length >= CHAT_RECENT_WATCH_LIMIT),
+          });
 
-          if (firstLoad && last && !this._userScrolling) {
-            nextData.scrollTop = 999999;
-            nextData.scrollWithAnimation = false;
-          }
-
-          this.setData(nextData);
-
-          if (!firstLoad && msgs.length > oldLen && last) {
+          if (this.data.contentReady && this._roomDocs.length > oldLen && msgs[msgs.length - 1]) {
             this._scrollToBottom();
           }
 
-          this._markRoomRead();
+          if (this._hasUnreadRoomMessages(realtimeDocs)) {
+            this._markRoomRead();
+          }
         },
         onError: (err) => {
           console.error('goods chat watch error', err);
+          if (!useFullScanFallback) {
+            this._closeRoomWatch();
+            this.openWatch(true);
+          }
         },
       });
   },
@@ -616,6 +782,8 @@ Page({
         goodsInfo,
         meOpenid,
         isOwner,
+        hasMoreHistory: false,
+        loadingHistory: false,
       });
       wx.setNavigationBarTitle({ title: isOwner ? '商品咨询' : '聊一聊' });
       this._initParticipants(goods, {
@@ -678,7 +846,7 @@ Page({
       return;
     }
 
-    const me = wx.getStorageSync('hyyc_user') || null;
+    const me = getStoredUser();
     if (!me || !me.id) {
       wx.showToast({ title: '请先登录', icon: 'none' });
       wx.navigateTo({ url: '/pages/welcome/index' });
@@ -689,14 +857,19 @@ Page({
       gid,
       me,
       isLoading: true,
+      contentReady: false,
+      msgs: [],
+      hasMoreHistory: false,
+      loadingHistory: false,
     });
 
-    wx.onKeyboardHeightChange((res) => {
-      this.setData({ keyboardHeight: Number(res && res.height) || 0 });
-      if ((res && res.height) > 0) {
-        setTimeout(() => this._scrollToBottom(), 100);
-      }
-    });
+    this._historyDocs = [];
+    this._realtimeDocs = [];
+    this._roomDocs = [];
+    this._lastRenderedMsgSignature = '';
+    this._historyExhausted = false;
+
+    this._bindKeyboardHeightChange();
 
     this._initRoom(gid, me, {
       peerUserId: pickStr(query && query.peerUserId),
@@ -705,17 +878,30 @@ Page({
     });
   },
 
-  onUnload() {
-    if (this._watcher && this._watcher.close) {
-      this._watcher.close();
+  onShow() {
+    this._bindKeyboardHeightChange();
+    if (pickStr(this.data.gid) && pickStr(this.data.sellerId) && pickStr(this.data.peerUserId) && !this._watcher) {
+      this.openWatch();
+      this._markRoomRead();
     }
-    this._watcher = null;
+  },
+
+  onHide() {
+    this._closeRoomWatch();
+    this._unbindKeyboardHeightChange();
     if (this._scrollTimer) {
       clearTimeout(this._scrollTimer);
       this._scrollTimer = null;
     }
+  },
+
+  onUnload() {
+    this.onHide();
+    this._historyDocs = [];
+    this._realtimeDocs = [];
     this._roomDocs = [];
-    wx.offKeyboardHeightChange();
+    this._lastRenderedMsgSignature = '';
+    this._historyExhausted = false;
   },
 
   onInput(e) {
