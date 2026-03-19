@@ -1,8 +1,8 @@
-<!-- canvas 原生层在 hidden 切换时可能留下残影，因此这里改成显隐时直接挂载/销毁 -->
-<view wx:if="{{rendered}}" class="loading-mask">
+<view wx:if="{{show}}" class="loading-mask">
   <view class="loading-card card">
-    <view class="lottie-box">
-      <canvas type="2d" class="lottie-canvas"></canvas>
+    <view class="spinner" aria-hidden="true">
+      <view class="spinner-ring spinner-ring-a"></view>
+      <view class="spinner-ring spinner-ring-b"></view>
     </view>
     <view class="loading-text-row">
       <text class="loading-text">{{text}}</text>

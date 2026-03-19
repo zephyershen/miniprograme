@@ -8,6 +8,7 @@ const USER_COLLECTION = 'userInfo';
 const MSG_COLLECTION = 'messages';
 const TASK_COLLECTION = 'tasks';
 const GOODS_COLLECTION = 'goods';
+const MESSAGE_CENTER_HIDDEN_COLLECTION = 'message_center_hidden';
 const QUERY_LIMIT = 1000;
 const BATCH_LIMIT = 100;
 
@@ -34,6 +35,13 @@ function toTs(value) {
   if (value && typeof value === 'object' && Number.isFinite(value.$date)) return value.$date;
   const ts = Date.parse(value);
   return Number.isFinite(ts) ? ts : 0;
+}
+
+function isCollectionNotExists(err = {}, collectionName = '') {
+  const targetName = pickStr(collectionName);
+  const errCode = Number(err && err.errCode);
+  const errMsg = pickStr(err && err.errMsg, err && err.message);
+  return errCode === -502005 && (!targetName || errMsg.indexOf(targetName) > -1);
 }
 
 async function getUserByOpenid(openid = '') {
@@ -100,6 +108,31 @@ async function fetchMessagesForUser(currentUserId = '') {
   return Object.keys(mergedMap)
     .map((key) => mergedMap[key])
     .sort((a, b) => toTs(b && b.createTime) - toTs(a && a.createTime));
+}
+
+async function fetchHiddenSessionMap(currentUserId = '') {
+  const userId = pickStr(currentUserId);
+  if (!userId) return {};
+
+  let res = null;
+  try {
+    res = await db.collection(MESSAGE_CENTER_HIDDEN_COLLECTION)
+      .where({ userId })
+      .limit(QUERY_LIMIT)
+      .get();
+  } catch (err) {
+    if (isCollectionNotExists(err, MESSAGE_CENTER_HIDDEN_COLLECTION)) {
+      return {};
+    }
+    throw err;
+  }
+
+  return ((res && res.data) || []).reduce((acc, doc) => {
+    const sessionKey = pickStr(doc && doc.sessionKey);
+    if (!sessionKey) return acc;
+    acc[sessionKey] = toTs(doc && doc.hiddenAt);
+    return acc;
+  }, {});
 }
 
 function buildPreview(doc = {}) {
@@ -195,7 +228,10 @@ exports.main = async () => {
       return { ok: false, code: 'USER_NOT_READY', msg: '用户信息未初始化' };
     }
 
-    const messages = await fetchMessagesForUser(currentUserId);
+    const [messages, hiddenSessionMap] = await Promise.all([
+      fetchMessagesForUser(currentUserId),
+      fetchHiddenSessionMap(currentUserId),
+    ]);
     const taskIds = [];
     const goodsIds = [];
     messages.forEach((doc) => {
@@ -241,6 +277,11 @@ exports.main = async () => {
 
     const list = Object.keys(sessionMap)
       .map((key) => sessionMap[key])
+      .filter((item) => {
+        const hiddenAt = Number(hiddenSessionMap[pickStr(item && item.key)]) || 0;
+        if (!hiddenAt) return true;
+        return Number(item && item.lastTs) > hiddenAt;
+      })
       .sort((a, b) => (b.lastTs || 0) - (a.lastTs || 0));
 
     const summary = list.reduce((acc, item) => {

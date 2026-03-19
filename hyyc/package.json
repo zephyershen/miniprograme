@@ -10,7 +10,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@babel/runtime": "^7.28.4",
-    "lottie-miniprogram": "^1.0.12"
+    "@babel/runtime": "^7.28.4"
   }
 }

@@ -1,7 +1,9 @@
 <view class="error-mask" wx:if="{{show}}">
   <view class="error-card card">
-    <view class="lottie-box">
-      <canvas type="2d" id="error-canvas" class="lottie-canvas"></canvas>
+    <view class="error-illustration" aria-hidden="true">
+      <view class="error-circle">
+        <text class="error-mark">!</text>
+      </view>
     </view>
     <view class="title" wx:if="{{title}}">{{title}}</view>
     <view class="message">{{message}}</view>

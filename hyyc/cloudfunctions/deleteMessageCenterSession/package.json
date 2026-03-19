@@ -1,0 +1,9 @@
+{
+  "name": "deleteMessageCenterSession",
+  "version": "1.0.0",
+  "description": "消息中心左滑删除：隐藏当前用户的会话并清理旧未读",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

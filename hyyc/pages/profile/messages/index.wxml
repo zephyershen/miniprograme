@@ -28,22 +28,45 @@
     <view
       wx:for="{{displayList}}"
       wx:key="key"
-      class="session-card card"
-      data-url="{{item.jumpUrl}}"
-      bindtap="onSessionTap"
+      class="session-swipe"
+      data-key="{{item.key}}"
+      bindtouchstart="onSessionTouchStart"
+      bindtouchmove="onSessionTouchMove"
+      bindtouchend="onSessionTouchEnd"
+      bindtouchcancel="onSessionTouchCancel"
     >
-      <view class="session-head">
-        <view class="session-left">
-          <text class="session-kind session-kind-{{item.kind}}">{{item.sceneText}}</text>
-          <text class="session-title">{{item.title}}</text>
+      <view
+        class="session-delete-action {{deletingKey === item.key ? 'session-delete-action-disabled' : ''}}"
+        data-key="{{item.key}}"
+        data-kind="{{item.kind}}"
+        data-target-id="{{item.targetId}}"
+        data-peer-user-id="{{item.peerUserId}}"
+        catchtap="onDeleteTap"
+      >
+        {{deletingKey === item.key ? '删除中' : '删除'}}
+      </view>
+      <view
+        class="session-swipe-content {{item.swipeMoving ? 'session-swipe-content-moving' : ''}}"
+        style="transform: translateX(-{{item.swipeOffsetPx || 0}}px);"
+        data-key="{{item.key}}"
+        data-url="{{item.jumpUrl}}"
+        bindtap="onSessionTap"
+      >
+        <view class="session-card card">
+          <view class="session-head">
+            <view class="session-left">
+              <text class="session-kind session-kind-{{item.kind}}">{{item.sceneText}}</text>
+              <text class="session-title">{{item.title}}</text>
+            </view>
+            <text class="session-time">{{item.lastTimeText}}</text>
+          </view>
+          <view class="session-sub">
+            <text class="session-peer">{{item.peerName || '对方'}}</text>
+            <text wx:if="{{item.unreadCount}}" class="session-unread">{{item.unreadCount}}</text>
+          </view>
+          <text class="session-preview">{{item.lastText || '[消息]'}}</text>
         </view>
-        <text class="session-time">{{item.lastTimeText}}</text>
       </view>
-      <view class="session-sub">
-        <text class="session-peer">{{item.peerName || '对方'}}</text>
-        <text wx:if="{{item.unreadCount}}" class="session-unread">{{item.unreadCount}}</text>
-      </view>
-      <text class="session-preview">{{item.lastText || '[消息]'}}</text>
     </view>
   </view>
   <view wx:else class="empty card">还没有消息，等真实用户开始聊天后这里会自动聚合。</view>

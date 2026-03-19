@@ -2,11 +2,25 @@ const { required, isPhone } = require('../../../utils/validators');
 const { toast } = require('../../../utils/ui');
 const { exchangePhoneNumber } = require('../_shared/api');
 const { distanceMeters } = require('../_shared/geo');
-const communityCfg = require('../../../config/community');
+const communityCfg = require('../_shared/community');
 const { setStoredUser } = require('../../../utils/userIdentity');
 
 function pickStr(v) {
   return String(v == null ? '' : v).trim();
+}
+
+function shouldBypassLocationFenceForLocalDev() {
+  try {
+    const info = wx.getAccountInfoSync && wx.getAccountInfoSync();
+    const envVersion = info && info.miniProgram ? info.miniProgram.envVersion : '';
+    if (envVersion !== 'develop') return false;
+
+    const sys = wx.getSystemInfoSync ? wx.getSystemInfoSync() : {};
+    const platform = pickStr(sys && sys.platform).toLowerCase();
+    return platform === 'devtools';
+  } catch (err) {
+    return false;
+  }
 }
 
 function chooseSingleImage() {
@@ -313,16 +327,8 @@ Page({
       locationStatus: ''
     });
 
-    // 仅在 develop 环境跳过定位围栏校验（方便本地联调）；体验版/正式版必须真实校验
-    let devMode = false;
-    try {
-      const info = wx.getAccountInfoSync && wx.getAccountInfoSync();
-      const envVersion = info && info.miniProgram ? info.miniProgram.envVersion : '';
-      devMode = envVersion === 'develop';
-    } catch (e) {
-      devMode = false;
-    }
-    if (devMode) {
+    // 只在开发者工具本地模拟器里跳过围栏校验，手机预览/体验版/正式版都要真实定位。
+    if (shouldBypassLocationFenceForLocalDev()) {
       const c0 = this._getSelectedCommunity();
       const name = (c0 && c0.name) || '小区';
       this.setData({

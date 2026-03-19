@@ -76,6 +76,41 @@
   gap: 16rpx;
 }
 
+.session-swipe {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24rpx;
+}
+
+.session-swipe-content {
+  position: relative;
+  z-index: 2;
+  transition: transform 180ms ease;
+}
+
+.session-swipe-content-moving {
+  transition: none;
+}
+
+.session-delete-action {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 160rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.session-delete-action-disabled {
+  background: #f87171;
+}
+
 .session-head,
 .session-sub {
   display: flex;
