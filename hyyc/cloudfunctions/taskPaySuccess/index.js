@@ -302,7 +302,7 @@ exports.main = async (event = {}) => {
             type: 'task_expense',
             bizKey: `task_expense:${taskId}:${bizReqSeqId}`,
             title: pickStr(txResult.title, '任务付款'),
-            summary: `通过微信支付发布任务 ¥${amount.toFixed(2)}，不扣汇付余额`,
+            summary: `通过微信支付发布任务 ¥${amount.toFixed(2)}`,
             relatedId: taskId,
             affectsBalance: false,
             fundChannel: 'wechat_pay',

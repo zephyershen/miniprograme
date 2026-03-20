@@ -169,6 +169,13 @@
   box-shadow: none;
 }
 
+.quick-icon-activity-admin {
+  width: 80rpx;
+  height: 80rpx;
+  background: none;
+  box-shadow: none;
+}
+
 .quick-icon-favorite {
   width: 80rpx;
   height: 80rpx;
@@ -189,6 +196,11 @@
 .quick-icon-wallet .quick-icon-svg {
   width: 80rpx;
   height: 80rpx;
+}
+
+.quick-icon-activity-admin .quick-icon-svg {
+  width: 76rpx;
+  height: 76rpx;
 }
 
 .quick-badge {

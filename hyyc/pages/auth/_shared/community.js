@@ -14,7 +14,8 @@ const LIST = [
     areaId: '320500',
     districtId: '320507',
     center: { lat: 31.37973700000001, lng: 120.64747499999999 },
-    radiusMeters: 220
+    // 按公开地址、道路边界和项目占地做保守放宽，减少楼栋边缘和 GPS 漂移误判。
+    radiusMeters: 420
   }
 ];
 

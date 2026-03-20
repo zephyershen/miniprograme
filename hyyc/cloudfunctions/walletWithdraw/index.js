@@ -10,7 +10,7 @@ const USER_COLLECTION = 'userInfo';
 const WALLET_COLLECTION = 'wallets';
 const TRANSACTIONS_COLLECTION = 'wallet_transactions';
 const WITHDRAW_COLLECTION = 'wallet_withdraw_requests';
-const BUILD_TAG = 'walletWithdraw@2026-03-16.2';
+const BUILD_TAG = 'walletWithdraw@2026-03-20.4';
 const DEFAULT_AUTO_CASH_TYPE = 'D1';
 const ALLOWED_CASH_TYPES = ['DM', 'D1', 'T1'];
 const WITHDRAW_SUBMIT_LOCK_TTL_MS = Math.max(60 * 1000, Number(process.env.WITHDRAW_SUBMIT_LOCK_TTL_MS) || 2 * 60 * 1000);
@@ -144,6 +144,20 @@ function buildPrimaryWalletSnapshot(openid, walletDocs = [], now = new Date()) {
   };
 }
 
+function buildEmptyPrimaryWalletSnapshot(openid, now = new Date()) {
+  return {
+    _openid: pickStr(openid),
+    balance: 0,
+    incomeTotal: 0,
+    expenseTotal: 0,
+    createdAt: now,
+    updatedAt: now,
+    walletRole: 'primary',
+    isPrimary: true,
+    shadowedWalletIds: [],
+  };
+}
+
 async function markLegacyWalletDocs(tx, legacyDocs = [], primaryId = '', now = new Date()) {
   for (const item of Array.isArray(legacyDocs) ? legacyDocs : []) {
     const legacyId = pickStr(item && item._id);
@@ -170,7 +184,11 @@ async function ensurePrimaryWalletDoc(tx, openid, now = new Date()) {
     .limit(20)
     .get();
   const walletDocs = (walletRes && walletRes.data) || [];
-  if (!walletDocs.length) return { walletId: primaryId, wallet: null, legacyDocs: [] };
+  if (!walletDocs.length) {
+    const snapshot = buildEmptyPrimaryWalletSnapshot(ownerOpenid, now);
+    await tx.collection(WALLET_COLLECTION).doc(primaryId).set({ data: snapshot });
+    return { walletId: primaryId, wallet: { ...snapshot, _id: primaryId }, legacyDocs: [] };
+  }
 
   const primaryDoc = walletDocs.find((item) => pickStr(item._id) === primaryId) || null;
   const legacyDocs = walletDocs.filter((item) => pickStr(item._id) && pickStr(item._id) !== primaryId);
@@ -302,7 +320,7 @@ function decorateCashTypeError(msg = '') {
   const matched = text.match(/用户未开通([A-Z0-9]+)取现/i);
   if (!matched) return text;
   const cashType = String(matched[1] || '').toUpperCase();
-  return `${text}，请联系汇付对接人/渠道商为当前 upper_huifu_id 开通 ${cashType} 取现权限；开通后回到小程序重新操作即可`;
+  return `${text}，请联系平台客服开通 ${cashType} 提现权限，然后回到小程序再试一次`;
 }
 
 function pickTokenNo({ cardInfo = null, cashCardList = [] } = {}) {
@@ -557,8 +575,18 @@ async function getUserByOpenid(openid) {
 async function getWalletByOpenid(openid) {
   const ownerOpenid = pickStr(openid);
   if (!ownerOpenid) return null;
+  await ensureCollectionExists(WALLET_COLLECTION);
   const res = await db.collection(WALLET_COLLECTION).where({ _openid: ownerOpenid }).limit(20).get();
   const list = (res && res.data) || [];
+  if (!list.length) {
+    try {
+      const created = await ensurePrimaryWalletByOpenid(ownerOpenid);
+      if (created) return created;
+    } catch (err) {
+      console.error('[walletWithdraw] init wallet doc failed', err);
+    }
+    return null;
+  }
   const primaryId = getPrimaryWalletId(ownerOpenid);
   const primaryDoc = list.find((item) => pickStr(item && item._id) === primaryId) || null;
   const hasActionableLegacy = list.some((item) => {
@@ -982,7 +1010,7 @@ function normalizeUserCertInfo(user = {}) {
 async function loadHuifuProfile(user = {}, opts = {}) {
   const huifuId = pickStr(user.huifu_id, user.huifuId, user.huifuUserId);
   if (!huifuId) {
-    return { ok: false, err: { code: 'MISSING_HUIFU_ID', msg: '用户尚未开通汇付账户' } };
+    return { ok: false, err: { code: 'MISSING_HUIFU_ID', msg: '请先完成收款开通' } };
   }
   if (pickStr(user.huifu_open_status) !== 'success' || pickStr(user.user_busi_status) !== 'success') {
     return { ok: false, err: { code: 'USER_NOT_READY', msg: '收款未就绪，暂时无法提现' } };
@@ -1127,12 +1155,15 @@ async function loadWalletSummary(user = {}) {
   const acctInfoList = ensureArray(parseJsonField(balanceResp.acctInfo_list));
   const preferredAcct = pickPreferredAcct(acctInfoList);
   const availableBalance = roundMoney(preferredAcct && Number(preferredAcct.avl_bal || 0));
+  const walletDoc = await getWalletByOpenid(pickStr(user._openid));
+  const localBalance = roundMoney(walletDoc && Number(walletDoc.balance || 0));
 
   return {
     ok: true,
     data: {
       huifuId,
       availableBalance,
+      localBalance,
     }
   };
 }
@@ -1145,8 +1176,8 @@ exports.main = async (event = {}) => {
 
   const { OPENID } = cloud.getWXContext();
   const systemCompensate = isSystemCompensateCall(event);
-  if (systemCompensate && action !== 'sync_active_withdraw') {
-    return { ok: false, err: { code: 'SYSTEM_ACTION_NOT_ALLOWED', msg: '系统补偿仅支持同步提现状态' }, buildTag: BUILD_TAG };
+  if (systemCompensate && !['sync_active_withdraw', 'activity_credit', 'activity_revert', 'wallet_summary'].includes(action)) {
+    return { ok: false, err: { code: 'SYSTEM_ACTION_NOT_ALLOWED', msg: '当前系统只支持同步提现状态、补发活动奖励或回退测试奖励' }, buildTag: BUILD_TAG };
   }
   const effectiveOpenid = pickStr(systemCompensate ? event.targetOpenid : '', OPENID);
   console.log('[walletWithdraw] invoke', JSON.stringify({
@@ -1235,6 +1266,128 @@ exports.main = async (event = {}) => {
           statusText: pickStr(activeWithdraw.statusText, activeWithdraw.status),
         } : null,
       },
+      buildTag: BUILD_TAG,
+    };
+  }
+
+  if (action === 'activity_credit') {
+    if (!systemCompensate) {
+      return { ok: false, err: { code: 'NO_PERMISSION', msg: '活动奖励发放仅支持系统调用' }, buildTag: BUILD_TAG };
+    }
+    const amount = roundMoney(event.amount);
+    if (!(amount > 0)) {
+      return { ok: false, err: { code: 'INVALID_AMOUNT', msg: '活动奖励金额不正确' }, buildTag: BUILD_TAG };
+    }
+    const campaignId = pickStr(event.campaignId);
+    const drawRecordId = pickStr(event.drawRecordId);
+    const payoutLogId = pickStr(event.payoutLogId);
+    const bizKey = pickStr(event.bizKey, `activity_income:${campaignId}:${drawRecordId || payoutLogId || randomId(12)}`);
+    const ledgerRes = await recordWalletTransaction({
+      openid: effectiveOpenid,
+      amount,
+      type: 'activity_income',
+      bizKey,
+      title: pickStr(event.title, '活动奖金'),
+      summary: pickStr(event.summary, `活动奖金到账 ¥${formatMoney(amount)}`),
+      relatedId: pickStr(event.relatedId, drawRecordId, payoutLogId, campaignId),
+      extra: {
+        campaignId,
+        drawRecordId,
+        payoutLogId,
+      }
+    });
+    if (!ledgerRes || !ledgerRes.ok) {
+      return { ok: false, err: { code: 'LEDGER_FAILED', msg: '活动奖励记录写入失败' }, buildTag: BUILD_TAG };
+    }
+    return {
+      ok: true,
+      ledgerId: pickStr(ledgerRes.tx && ledgerRes.tx._id, ledgerRes.tx && ledgerRes.tx.id),
+      tx: ledgerRes.tx || null,
+      buildTag: BUILD_TAG,
+    };
+  }
+
+  if (action === 'activity_revert') {
+    if (!systemCompensate) {
+      return { ok: false, err: { code: 'NO_PERMISSION', msg: '活动奖励回退仅支持系统调用' }, buildTag: BUILD_TAG };
+    }
+    const campaignId = pickStr(event.campaignId);
+    const drawRecordId = pickStr(event.drawRecordId);
+    const payoutLogId = pickStr(event.payoutLogId);
+    const sourceBizKey = pickStr(
+      event.sourceBizKey,
+      campaignId && drawRecordId ? `activity_income:${campaignId}:${drawRecordId}` : ''
+    );
+    if (!sourceBizKey) {
+      return { ok: false, err: { code: 'MISSING_SOURCE_BIZKEY', msg: '缺少原奖励记录标识' }, buildTag: BUILD_TAG };
+    }
+    const revertBizKey = pickStr(
+      event.revertBizKey,
+      `activity_revert:${campaignId}:${drawRecordId || payoutLogId || randomId(12)}`
+    );
+
+    const [sourceRes, revertRes] = await Promise.all([
+      db.collection(TRANSACTIONS_COLLECTION).where({
+        _openid: effectiveOpenid,
+        bizKey: sourceBizKey,
+      }).limit(1).get(),
+      db.collection(TRANSACTIONS_COLLECTION).where({
+        _openid: effectiveOpenid,
+        bizKey: revertBizKey,
+      }).limit(1).get(),
+    ]);
+    const sourceTx = ((sourceRes && sourceRes.data) || [])[0] || null;
+    const existingRevertTx = ((revertRes && revertRes.data) || [])[0] || null;
+    if (existingRevertTx) {
+      return {
+        ok: true,
+        existed: true,
+        ledgerId: pickStr(existingRevertTx._id),
+        tx: existingRevertTx,
+        buildTag: BUILD_TAG,
+      };
+    }
+    if (!sourceTx) {
+      return { ok: false, err: { code: 'SOURCE_LEDGER_NOT_FOUND', msg: '未找到原活动奖励记录' }, buildTag: BUILD_TAG };
+    }
+
+    const amount = roundMoney(
+      event.amount != null && event.amount !== ''
+        ? event.amount
+        : Number(sourceTx.amount || 0)
+    );
+    if (!(amount > 0)) {
+      return { ok: false, err: { code: 'INVALID_AMOUNT', msg: '活动奖励回退金额不正确' }, buildTag: BUILD_TAG };
+    }
+
+    const revertSummary = pickStr(
+      event.summary,
+      `测试活动删除，已回退本地奖励 ¥${formatMoney(amount)}`
+    );
+    const ledgerRes = await recordWalletTransaction({
+      openid: effectiveOpenid,
+      amount: -amount,
+      balanceDelta: -amount,
+      type: 'activity_revert',
+      bizKey: revertBizKey,
+      title: pickStr(event.title, '活动奖励回退'),
+      summary: revertSummary,
+      relatedId: pickStr(event.relatedId, drawRecordId, payoutLogId, campaignId),
+      extra: {
+        campaignId,
+        drawRecordId,
+        payoutLogId,
+        sourceBizKey,
+        sourceLedgerId: pickStr(sourceTx._id),
+      }
+    });
+    if (!ledgerRes || !ledgerRes.ok) {
+      return { ok: false, err: { code: 'LEDGER_FAILED', msg: '活动奖励回退记录写入失败' }, buildTag: BUILD_TAG };
+    }
+    return {
+      ok: true,
+      ledgerId: pickStr(ledgerRes.tx && ledgerRes.tx._id, ledgerRes.tx && ledgerRes.tx.id),
+      tx: ledgerRes.tx || null,
       buildTag: BUILD_TAG,
     };
   }
@@ -1332,6 +1485,8 @@ exports.main = async (event = {}) => {
       summary: {
         availableBalance: data.availableBalance,
         availableBalanceText: formatMoney(data.availableBalance),
+        localBalance: data.localBalance,
+        localBalanceText: formatMoney(data.localBalance),
       },
       buildTag: BUILD_TAG,
     };

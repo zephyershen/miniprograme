@@ -1,0 +1,9 @@
+{
+  "name": "activityUser",
+  "version": "1.0.0",
+  "description": "Activity user queries and draw flow",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

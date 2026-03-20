@@ -1,0 +1,9 @@
+{
+  "name": "activityAdmin",
+  "version": "1.0.0",
+  "description": "Activity admin management for campaigns, slots and payout logs",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

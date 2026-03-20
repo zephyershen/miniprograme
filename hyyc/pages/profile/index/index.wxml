@@ -54,6 +54,12 @@
           </view>
           <text class="quick-label">钱包</text>
         </view>
+        <view wx:if="{{user.isPlatformAdmin}}" class="quick-item" bindtap="gotoActivityAdmin">
+          <view class="quick-icon quick-icon-activity-admin">
+            <image class="quick-icon-svg" src="/assets/tabbar/present-clicked.png" mode="aspectFit"></image>
+          </view>
+          <text class="quick-label">活动管理</text>
+        </view>
       </view>
     </view>
 

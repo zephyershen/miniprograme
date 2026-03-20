@@ -1,3 +1,5 @@
+const { normalizePlatformAdminUser } = require('./platformAdmin');
+
 function pickStr(...vals) {
   for (let i = 0; i < vals.length; i += 1) {
     const s = String(vals[i] == null ? '' : vals[i]).trim();
@@ -15,7 +17,7 @@ function normalizeStoredUser(user = {}) {
   const normalized = { ...source };
   const userId = pickUserId(source);
   if (userId) normalized.id = userId;
-  return normalized;
+  return normalizePlatformAdminUser(normalized);
 }
 
 function getStoredUser() {

@@ -1,0 +1,382 @@
+<ui-loading show="{{isLoading}}" />
+
+<view class="admin-page" wx:if="{{!isLoading && loadError}}">
+  <view class="hero-card">
+    <text class="hero-kicker">平台管理员</text>
+    <text class="hero-title">活动管理页加载失败</text>
+    <text class="hero-subtitle">{{errorText || '请稍后重试'}}</text>
+  </view>
+  <view class="action-btn action-btn-primary" bindtap="onRefresh">重新加载</view>
+</view>
+
+<view class="admin-page" wx:elif="{{!isLoading}}">
+  <view class="hero-card">
+    <text class="hero-kicker">平台管理员</text>
+    <text class="hero-title">活动发布与开奖</text>
+    <text class="hero-subtitle">这里负责创建活动、设置开奖时间、支付活动金额，并跟进统一开奖后的发放状态。</text>
+  </view>
+
+  <view class="summary-card" wx:if="{{summary}}">
+    <view class="summary-grid">
+      <view class="summary-item">
+        <text class="summary-label">活动总数</text>
+        <text class="summary-value">{{summary.totalCampaigns}}</text>
+      </view>
+      <view class="summary-item">
+        <text class="summary-label">参与中</text>
+        <text class="summary-value">{{summary.scheduledCount}}</text>
+      </view>
+      <view class="summary-item">
+        <text class="summary-label">开奖中</text>
+        <text class="summary-value">{{summary.openCount}}</text>
+      </view>
+      <view class="summary-item">
+        <text class="summary-label">待派奖</text>
+        <text class="summary-value">{{summary.pendingPayoutCount}}</text>
+      </view>
+      <view class="summary-item">
+        <text class="summary-label">失败派奖</text>
+        <text class="summary-value">{{summary.failedPayoutCount}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="panel-card">
+    <view class="section-head">
+      <view>
+        <text class="section-title">活动表单</text>
+        <text class="section-desc">{{selectedCampaignId ? '当前载入的是已存在活动' : '当前正在新建活动'}}</text>
+      </view>
+      <view class="mini-btn" bindtap="onNewCampaign">新建活动</view>
+    </view>
+
+    <view class="field-block">
+      <text class="field-label">活动标题</text>
+      <input class="field-input" value="{{form.title}}" data-field="title" bindinput="onFieldInput" placeholder="例如：春日福利活动"></input>
+    </view>
+
+    <view class="field-block">
+      <text class="field-label">副标题</text>
+      <input class="field-input" value="{{form.subtitle}}" data-field="subtitle" bindinput="onFieldInput" placeholder="例如：开奖时会从已参与用户中自动抽出中奖人"></input>
+    </view>
+
+    <view class="field-block">
+      <text class="field-label">活动说明</text>
+      <textarea class="field-textarea" value="{{form.description}}" data-field="description" bindinput="onFieldInput" placeholder="说明这场活动的规则与氛围"></textarea>
+    </view>
+
+    <view class="field-grid">
+      <view class="field-block">
+        <text class="field-label">总奖金（元）</text>
+        <input class="field-input" type="digit" value="{{form.totalAmountYuan}}" data-field="totalAmountYuan" bindinput="onFieldInput"></input>
+      </view>
+      <view class="field-block">
+        <text class="field-label">中奖人数</text>
+        <input class="field-input" type="number" value="{{form.winnerCount}}" data-field="winnerCount" bindinput="onFieldInput"></input>
+      </view>
+    </view>
+
+    <view class="field-grid">
+      <view class="field-block">
+        <text class="field-label">奖金方式</text>
+        <picker mode="selector" range="{{amountModeOptions}}" range-key="label" value="{{pickerIndex.amountMode}}" data-field="amountMode" data-list="amountModeOptions" bindchange="onPickerChange">
+          <view class="picker-field">{{amountModeOptions[pickerIndex.amountMode].label}}</view>
+        </picker>
+      </view>
+      <view class="field-block">
+        <text class="field-label">封面主题</text>
+        <picker mode="selector" range="{{coverThemeOptions}}" range-key="label" value="{{pickerIndex.coverTheme}}" data-field="coverTheme" data-list="coverThemeOptions" bindchange="onPickerChange">
+          <view class="picker-field">{{coverThemeOptions[pickerIndex.coverTheme].label}}</view>
+        </picker>
+      </view>
+    </view>
+
+    <view class="field-grid">
+      <view class="field-block">
+        <text class="field-label">开奖日期</text>
+        <picker mode="date" value="{{form.drawAtDate}}" bindchange="onFieldInput" data-field="drawAtDate">
+          <view class="picker-field">{{form.drawAtDate}}</view>
+        </picker>
+      </view>
+      <view class="field-block">
+        <text class="field-label">开奖时间</text>
+        <picker mode="time" value="{{form.drawAtTime}}" bindchange="onFieldInput" data-field="drawAtTime">
+          <view class="picker-field">{{form.drawAtTime}}</view>
+        </picker>
+      </view>
+    </view>
+
+    <view class="field-block">
+      <text class="field-label">中奖提示</text>
+      <input class="field-input" value="{{form.winnerNotice}}" data-field="winnerNotice" bindinput="onFieldInput"></input>
+    </view>
+
+    <view class="field-block">
+      <text class="field-label">活动规则</text>
+      <textarea class="field-textarea field-textarea-lg" value="{{form.rulesText}}" data-field="rulesText" bindinput="onFieldInput"></textarea>
+    </view>
+
+    <view class="preview-box">
+      <text class="preview-title">发布预览</text>
+      <text class="preview-text">{{formPreviewText}}</text>
+      <text class="preview-hint {{equalModeInvalid ? 'preview-hint-danger' : ''}}">{{amountModeHint}}</text>
+    </view>
+
+    <view class="funding-box">
+      <view class="section-head">
+        <view>
+          <text class="section-title">活动金额入池</text>
+          <text class="section-desc">先把活动金额支付进去，再发布活动。普通用户抽中的奖金会从这里发出。</text>
+        </view>
+        <text class="funding-badge {{selectedCampaign ? selectedCampaign.fundingStatusClass : 'funding-badge-default'}}">{{selectedCampaign ? selectedCampaign.fundingStatusLabel : '待保存'}}</text>
+      </view>
+      <view class="funding-grid">
+        <view class="funding-item">
+          <text class="summary-label">活动金额</text>
+          <text class="summary-value">{{selectedCampaign ? selectedCampaign.totalAmountLabel : ('¥' + (form.totalAmountYuan || '0.00'))}}</text>
+        </view>
+        <view class="funding-item">
+          <text class="summary-label">已入池</text>
+          <text class="summary-value">{{selectedCampaign ? selectedCampaign.fundedAmountLabel : '¥0.00'}}</text>
+        </view>
+        <view class="funding-item">
+          <text class="summary-label">待确认</text>
+          <text class="summary-value">{{selectedCampaign ? selectedCampaign.fundingPendingLabel : '¥0.00'}}</text>
+        </view>
+        <view class="funding-item">
+          <text class="summary-label">还差金额</text>
+          <text class="summary-value">{{selectedCampaign ? selectedCampaign.fundingRemainingLabel : ('¥' + (form.totalAmountYuan || '0.00'))}}</text>
+        </view>
+      </view>
+      <view class="action-row">
+        <view class="action-btn action-btn-warm" bindtap="onPayFunding">
+          {{isSubmitting ? '处理中...' : ((selectedCampaign && selectedCampaign.fundingRemainingLabel === '¥0.00') ? '活动金额已入池' : ((selectedCampaign && !selectedCampaign.editable) ? '补活动金额' : '支付活动金额'))}}
+        </view>
+      </view>
+    </view>
+
+    <view class="action-row">
+      <view class="action-btn action-btn-secondary" bindtap="onSaveDraft">{{isSubmitting ? '处理中...' : '保存草稿'}}</view>
+    </view>
+
+    <view class="action-row">
+      <view class="action-btn action-btn-primary" bindtap="onPublishCampaign">{{isSubmitting ? '处理中...' : '保存并发布'}}</view>
+    </view>
+
+    <view class="action-row" wx:if="{{selectedCampaignId}}">
+      <view class="action-btn action-btn-muted" bindtap="onOfflineCampaign">下线活动</view>
+      <view class="action-btn action-btn-danger" bindtap="onFinishCampaign">结束活动</view>
+    </view>
+
+    <view class="action-row" wx:if="{{selectedCampaignId}}">
+      <view class="action-btn action-btn-secondary" bindtap="onRefundCampaignFunding">退回活动资金</view>
+      <view class="action-btn action-btn-outline-danger" bindtap="onDeleteCampaign">删除活动</view>
+    </view>
+  </view>
+
+  <view class="panel-card">
+    <view class="section-head">
+      <view>
+        <text class="section-title">已创建活动</text>
+        <text class="section-desc">点卡片会载入表单并展示详情</text>
+      </view>
+      <view class="mini-btn" bindtap="onRefresh">刷新</view>
+    </view>
+    <view wx:if="{{campaignList.length}}" class="campaign-list">
+      <view wx:for="{{campaignList}}" wx:key="id" class="campaign-item {{selectedCampaignId === item.id ? 'campaign-item-active' : ''}} {{item.themeClass}}" data-id="{{item.id}}" bindtap="onSelectCampaign">
+        <view class="campaign-top">
+          <view>
+            <text class="campaign-title">{{item.title}}</text>
+            <text class="campaign-sub">{{item.totalAmountLabel}} · {{item.winnerCount}} 人中奖 · {{item.amountModeLabel}}</text>
+          </view>
+          <text class="campaign-status">{{item.statusText}}</text>
+        </view>
+        <view class="campaign-meta-row">
+          <text class="campaign-meta">开奖 {{item.drawAtLabel}}</text>
+          <text class="campaign-meta">已参与 {{item.participantCountLabel}} 人</text>
+        </view>
+        <view class="campaign-meta-row">
+          <text class="campaign-meta">剩余名额 {{item.remainingWinnerLabel}}</text>
+          <text class="campaign-meta">剩余奖金 {{item.remainingAmountLabel}}</text>
+        </view>
+        <view class="campaign-meta-row">
+          <text class="campaign-meta">入池 {{item.fundingStatusLabel}}</text>
+          <text class="campaign-meta">已入池 {{item.fundedAmountLabel}}</text>
+        </view>
+        <text wx:if="{{item.drawLocked}}" class="campaign-warn">已有参与记录，当前只能查看、下线或结束，不能再改金额规则。</text>
+      </view>
+    </view>
+    <view wx:else class="empty-text">暂时还没有创建过活动</view>
+  </view>
+
+  <view class="panel-card" wx:if="{{selectedCampaign}}">
+    <view class="section-head">
+      <view>
+        <text class="section-title">当前活动详情</text>
+        <text class="section-desc">{{selectedCampaign.title}} · {{selectedCampaign.statusText}}</text>
+      </view>
+      <text class="detail-accent">{{selectedCampaign.theme.label}}</text>
+    </view>
+
+    <view class="detail-grid">
+      <view class="detail-stat">
+        <text class="detail-label">活动金额</text>
+        <text class="detail-value">{{selectedCampaign.totalAmountLabel}}</text>
+      </view>
+      <view class="detail-stat">
+        <text class="detail-label">中奖人数</text>
+        <text class="detail-value">{{selectedCampaign.winnerCount}}</text>
+      </view>
+      <view class="detail-stat">
+        <text class="detail-label">奖金方式</text>
+        <text class="detail-value">{{selectedCampaign.amountModeLabel}}</text>
+      </view>
+      <view class="detail-stat">
+        <text class="detail-label">已参与人数</text>
+        <text class="detail-value">{{selectedCampaign.participantCountLabel}}</text>
+      </view>
+      <view class="detail-stat">
+        <text class="detail-label">剩余奖金</text>
+        <text class="detail-value">{{selectedCampaign.remainingAmountLabel}}</text>
+      </view>
+      <view class="detail-stat">
+        <text class="detail-label">入池状态</text>
+        <text class="detail-value">{{selectedCampaign.fundingStatusLabel}}</text>
+      </view>
+      <view class="detail-stat">
+        <text class="detail-label">已入池</text>
+        <text class="detail-value">{{selectedCampaign.fundedAmountLabel}}</text>
+      </view>
+      <view class="detail-stat">
+        <text class="detail-label">待确认</text>
+        <text class="detail-value">{{selectedCampaign.fundingPendingLabel}}</text>
+      </view>
+      <view class="detail-stat">
+        <text class="detail-label">还差金额</text>
+        <text class="detail-value">{{selectedCampaign.fundingRemainingLabel}}</text>
+      </view>
+    </view>
+
+    <view class="detail-section" wx:if="{{anomalySummary}}">
+      <view class="section-head">
+        <view>
+          <text class="section-title">异常处理</text>
+          <text class="section-desc">先看问题类型，再决定补活动金额、查余额、重试还是退回活动资金。</text>
+        </view>
+      </view>
+      <view class="detail-grid">
+        <view class="detail-stat">
+          <text class="detail-label">失败派奖</text>
+          <text class="detail-value">{{anomalySummary.failedPayoutCount}}</text>
+        </view>
+        <view class="detail-stat">
+          <text class="detail-label">处理中派奖</text>
+          <text class="detail-value">{{anomalySummary.pendingPayoutCount}}</text>
+        </view>
+        <view class="detail-stat">
+          <text class="detail-label">还差奖金</text>
+          <text class="detail-value">{{anomalySummary.fundingGapLabel}}</text>
+        </view>
+        <view class="detail-stat">
+          <text class="detail-label">可退回资金</text>
+          <text class="detail-value">{{anomalySummary.refundableFundingLabel}}</text>
+        </view>
+      </view>
+      <view wx:if="{{anomalySummary.lines.length}}" class="issue-list">
+        <text wx:for="{{anomalySummary.lines}}" wx:key="*this" class="issue-item">{{index + 1}}. {{item}}</text>
+      </view>
+      <view wx:else class="empty-text">当前没有明显异常，活动资金和派奖状态看起来正常。</view>
+    </view>
+
+    <view class="detail-section">
+      <text class="detail-section-title">入池记录</text>
+      <view wx:if="{{fundingOrders.length}}" class="detail-list">
+        <view wx:for="{{fundingOrders}}" wx:key="id" class="detail-item detail-item-payout">
+          <view class="detail-item-main">
+            <text class="detail-item-title">目标奖金 {{item.amountLabel}} · {{item.statusLabel}}</text>
+            <text class="detail-item-sub">{{item.updatedAtLabel}}</text>
+            <text wx:if="{{item.hasFeeDetail}}" class="detail-item-sub">实付 {{item.orderAmountLabel}}，预计扣费/缓冲 {{item.estimatedFeeLabel}}{{item.paymentFeeFen ? ('，回调手续费 ' + item.paymentFeeLabel) : ''}}</text>
+            <text wx:if="{{item.refundableAmountFen > 0}}" class="detail-item-tip">当前可退回 {{item.refundableAmountLabel}}</text>
+            <text wx:if="{{item.lastErrorMsg}}" class="detail-item-error">{{item.lastErrorMsg}}</text>
+          </view>
+        </view>
+      </view>
+      <view wx:else class="empty-text">暂时还没有入池记录</view>
+    </view>
+
+    <view class="detail-section">
+      <text class="detail-section-title">中奖记录</text>
+      <view wx:if="{{winners.length}}" class="detail-list">
+        <view wx:for="{{winners}}" wx:key="id" class="detail-item">
+          <view>
+            <text class="detail-item-title">{{item.nicknameText}}</text>
+            <text class="detail-item-sub">{{item.drawAtLabel}}</text>
+          </view>
+          <text class="detail-item-amount">{{item.amountLabel}}</text>
+        </view>
+      </view>
+      <view wx:else class="empty-text">暂时还没有中奖记录</view>
+    </view>
+
+    <view class="detail-section">
+      <text class="detail-section-title">派奖日志</text>
+      <view wx:if="{{payoutLogs.length}}" class="detail-list">
+        <view wx:for="{{payoutLogs}}" wx:key="id" class="detail-item detail-item-payout">
+          <view class="detail-item-main">
+            <text class="detail-item-title">{{item.amountLabel}} · {{item.statusLabel}}</text>
+            <text class="detail-item-sub">{{item.nicknameText}} · {{item.openidText}}</text>
+            <text class="detail-item-sub">{{item.updatedAtLabel}} · {{item.retryLabel}}</text>
+            <text wx:if="{{item.adviceText}}" class="detail-item-tip">{{item.adviceText}}</text>
+            <text wx:if="{{item.lastErrorMsg}}" class="detail-item-error">{{item.lastErrorMsg}}</text>
+          </view>
+          <view wx:if="{{item.canRetry}}" class="detail-item-actions">
+            <view class="mini-btn" data-id="{{item.id}}" data-openid="{{item.openid}}" data-name="{{item.nicknameText}}" data-amount="{{item.amountLabel}}" bindtap="onInspectPayoutWallet">{{isInspectingWallet && inspectingPayoutLogId === item.id ? '查询中' : '查余额'}}</view>
+            <view class="mini-btn" data-id="{{item.id}}" bindtap="onRetryPayout">重试</view>
+            <view class="mini-btn" data-id="{{item.id}}" bindtap="onRetryPayoutToWallet">发到余额</view>
+          </view>
+        </view>
+      </view>
+      <view wx:else class="empty-text">暂时还没有派奖日志</view>
+    </view>
+
+    <view class="detail-section" wx:if="{{walletInspection}}">
+      <view class="section-head">
+        <view>
+          <text class="section-title">用户余额核对</text>
+          <text class="section-desc">{{walletInspection.targetName}} · {{walletInspection.amountLabel}}</text>
+        </view>
+        <view class="mini-btn" bindtap="onClearWalletInspection">清空</view>
+      </view>
+      <view class="detail-grid">
+        <view class="detail-stat">
+          <text class="detail-label">汇付可提现</text>
+          <text class="detail-value">{{walletInspection.availableBalanceText}}</text>
+        </view>
+        <view class="detail-stat">
+          <text class="detail-label">本地余额</text>
+          <text class="detail-value">{{walletInspection.localBalanceText}}</text>
+        </view>
+        <view class="detail-stat">
+          <text class="detail-label">手机号</text>
+          <text class="detail-value detail-value-sm">{{walletInspection.targetPhone || '未留存'}}</text>
+        </view>
+        <view class="detail-stat">
+          <text class="detail-label">收款账号</text>
+          <text class="detail-value detail-value-sm">{{walletInspection.huifuId || '未开通'}}</text>
+        </view>
+      </view>
+      <text class="detail-item-tip wallet-status-text">{{walletInspection.statusText}}</text>
+      <view wx:if="{{walletInspection.recentTransactions.length}}" class="detail-list">
+        <view wx:for="{{walletInspection.recentTransactions}}" wx:key="id" class="detail-item">
+          <view>
+            <text class="detail-item-title">{{item.title || item.type}}</text>
+            <text class="detail-item-sub">{{item.createdAtLabel}}</text>
+            <text wx:if="{{item.summary}}" class="detail-item-sub">{{item.summary}}</text>
+          </view>
+          <text class="detail-item-amount detail-item-amount-sm">{{item.balanceDeltaLabel}}</text>
+        </view>
+      </view>
+      <view wx:else class="empty-text">最近没有本地钱包流水</view>
+    </view>
+  </view>
+</view>

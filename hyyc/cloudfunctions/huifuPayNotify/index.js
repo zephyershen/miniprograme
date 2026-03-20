@@ -18,6 +18,8 @@ const db = cloud.database();
 
 const GOODS_COLLECTION = 'goods';
 const TASK_COLLECTION = 'tasks';
+const ACTIVITY_CAMPAIGN_COLLECTION = 'activity_campaigns';
+const ACTIVITY_FUNDING_COLLECTION = 'activity_funding_orders';
 const MSG_COLLECTION = 'messages';
 const USER_COLLECTION = 'userInfo';
 const NOTIFY_LOG_COLLECTION = 'huifu_notify_logs';
@@ -537,6 +539,207 @@ async function recordWalletTransaction({
   });
 }
 
+function getActivityFundingOrderRefMs(order = {}) {
+  return toWalletDateMs(order.requestedAt) || toWalletDateMs(order.updatedAt) || toWalletDateMs(order.createdAt);
+}
+
+function isActivityFundingOrderPending(order = {}, nowMs = Date.now()) {
+  const status = pickStr(order.status);
+  if (!['request_sent', 'processing'].includes(status)) return false;
+  const refMs = getActivityFundingOrderRefMs(order);
+  const ttlMs = Math.max(5 * 60 * 1000, Number(process.env.ACTIVITY_FUNDING_PENDING_TTL_MS) || 30 * 60 * 1000);
+  return !refMs || (nowMs - refMs) <= ttlMs;
+}
+
+function buildActivityFundingSummary(campaign = {}, orders = []) {
+  const totalAmountFen = Math.max(0, Math.round(Number(campaign.totalAmountFen || 0)));
+  let paidAmountFen = 0;
+  let pendingAmountFen = 0;
+  let paidOrderCount = 0;
+  let pendingOrderCount = 0;
+  let failedOrderCount = 0;
+  let lastOrderId = '';
+  let lastOrderStatus = '';
+  let lastPaidAt = null;
+  let lastPaidMs = 0;
+  let lastOrderMs = 0;
+  const nowMs = Date.now();
+
+  for (const item of Array.isArray(orders) ? orders : []) {
+    const order = item && typeof item === 'object' ? item : {};
+    const status = isActivityFundingOrderPending(order, nowMs) ? pickStr(order.status) : (pickStr(order.status) === 'paid' ? 'paid' : 'cancelled');
+    const amountFen = Math.max(0, Math.round(Number(order.amountFen || 0)));
+    const refMs = getActivityFundingOrderRefMs(order);
+    if (refMs >= lastOrderMs) {
+      lastOrderMs = refMs;
+      lastOrderId = pickStr(order._id);
+      lastOrderStatus = status;
+    }
+    if (status === 'paid') {
+      paidAmountFen += amountFen;
+      paidOrderCount += 1;
+      const paidMs = toWalletDateMs(order.paidAt) || refMs;
+      if (paidMs >= lastPaidMs) {
+        lastPaidMs = paidMs;
+        lastPaidAt = order.paidAt || order.updatedAt || order.createdAt || null;
+      }
+    } else if (['request_sent', 'processing'].includes(status)) {
+      pendingAmountFen += amountFen;
+      pendingOrderCount += 1;
+    } else if (['failed', 'cancelled'].includes(status)) {
+      failedOrderCount += 1;
+    }
+  }
+
+  let status = 'unpaid';
+  if (paidAmountFen >= totalAmountFen && totalAmountFen > 0) status = 'paid';
+  else if (paidAmountFen > 0 && pendingAmountFen > 0) status = 'partial_pending';
+  else if (pendingAmountFen > 0) status = 'pending';
+  else if (paidAmountFen > 0) status = 'partial';
+
+  return {
+    totalAmountFen,
+    paidAmountFen,
+    pendingAmountFen,
+    remainingAmountFen: Math.max(0, totalAmountFen - paidAmountFen),
+    payableAmountFen: pendingAmountFen > 0 ? 0 : Math.max(0, totalAmountFen - paidAmountFen),
+    paidOrderCount,
+    pendingOrderCount,
+    failedOrderCount,
+    lastOrderId,
+    lastOrderStatus,
+    lastPaidAt,
+    updatedAt: new Date(),
+    status,
+  };
+}
+
+async function syncActivityCampaignFunding(campaignId = '') {
+  const id = pickStr(campaignId);
+  if (!id) return null;
+  const campaignRes = await db.collection(ACTIVITY_CAMPAIGN_COLLECTION).doc(id).get().catch(() => null);
+  const campaign = campaignRes && campaignRes.data ? campaignRes.data : null;
+  if (!campaign) return null;
+  const ordersRes = await db.collection(ACTIVITY_FUNDING_COLLECTION)
+    .where({ campaignId: id })
+    .limit(100)
+    .get()
+    .catch(() => null);
+  const orders = (ordersRes && ordersRes.data) || [];
+  const funding = buildActivityFundingSummary(campaign, orders);
+  await db.collection(ACTIVITY_CAMPAIGN_COLLECTION).doc(id).update({
+    data: {
+      funding,
+      updatedAt: new Date(),
+    }
+  }).catch(() => null);
+  return funding;
+}
+
+async function tryMarkActivityFundingPaidByReq({ reqDate, reqSeqId, huifuData, rawBody }) {
+  const rd = pickStr(reqDate);
+  const rs = pickStr(reqSeqId);
+  if (!rd || !rs) return { ok: false, code: 'MISSING_REQ', msg: '缺少 req_date/req_seq_id' };
+
+  const res = await db.collection(ACTIVITY_FUNDING_COLLECTION)
+    .where({ reqDate: rd, reqSeqId: rs })
+    .limit(2)
+    .get()
+    .catch(() => null);
+  const list = (res && res.data) || [];
+  if (!list.length) return { ok: true, code: 'NO_ACTIVITY_FUNDING_MATCH', msg: '未找到匹配的活动金额订单' };
+  if (list.length > 1) return { ok: false, code: 'MULTI_ACTIVITY_FUNDING_MATCH', msg: '活动金额订单匹配到多条记录' };
+
+  const order = list[0] || {};
+  const orderId = pickStr(order._id);
+  if (!orderId) return { ok: false, code: 'FUNDING_ORDER_ID_MISSING', msg: '活动金额订单缺少 ID' };
+
+  const now = new Date();
+  const tradeAmountYuan = roundMoney(Number(huifuData && (huifuData.trans_amt || huifuData.ord_amt || order.amountYuanText || 0)));
+  const tradeAmountFen = Math.max(0, Math.round(tradeAmountYuan * 100));
+  const feeAmountYuan = roundMoney(Number(huifuData && (huifuData.fee_amount || huifuData.fee_amt || 0)));
+  const feeAmountFen = Math.max(0, Math.round(feeAmountYuan * 100));
+  const unconfirmAmountYuan = roundMoney(Number(huifuData && (huifuData.unconfirm_amt || 0)));
+  const confirmableAmountYuan = unconfirmAmountYuan > 0
+    ? unconfirmAmountYuan
+    : roundMoney(Math.max(0, tradeAmountYuan - feeAmountYuan));
+  const unconfirmAmountFen = Math.max(0, Math.round(confirmableAmountYuan * 100));
+  const confirmedAmountYuan = roundMoney(Number(huifuData && (huifuData.confirmed_amt || 0)));
+  const confirmedAmountFen = Math.max(0, Math.round(confirmedAmountYuan * 100));
+  const hfSeqId = pickStr(huifuData && (huifuData.hf_seq_id || huifuData.hfSeqId), order.channelSeqId, order.orgHfSeqId);
+  if (pickStr(order.status) !== 'paid') {
+    await db.collection(ACTIVITY_FUNDING_COLLECTION).doc(orderId).update({
+      data: {
+        status: 'paid',
+        paidAt: order.paidAt || now,
+        updatedAt: now,
+        fundingMode: 'delay_split',
+        delayAcctFlag: 'Y',
+        orgReqDate: pickStr(order.orgReqDate, rd),
+        orgReqSeqId: pickStr(order.orgReqSeqId, rs),
+        orgHfSeqId: hfSeqId,
+        orderAmountFen: tradeAmountFen || Math.max(0, Math.round(Number(order.amountFen || 0))),
+        orderAmountYuanText: tradeAmountYuan > 0 ? formatMoney(tradeAmountYuan) : pickStr(order.amountYuanText),
+        unconfirmAmountFen,
+        confirmedAmountFen,
+        paymentFeeFen: feeAmountFen,
+        paymentFeeYuanText: feeAmountYuan > 0 ? formatMoney(feeAmountYuan) : '',
+        splitSuccessAmountFen: Math.max(0, Math.round(Number(order.splitSuccessAmountFen || 0))),
+        splitPendingAmountFen: Math.max(0, Math.round(Number(order.splitPendingAmountFen || 0))),
+        lastErrorCode: '',
+        lastErrorMsg: '',
+        channelSeqId: hfSeqId,
+        channelRespCode: pickStr(huifuData && (huifuData.sub_resp_code || huifuData.resp_code), order.channelRespCode),
+        channelRespDesc: pickStr(huifuData && (huifuData.sub_resp_desc || huifuData.resp_desc), order.channelRespDesc),
+        rawRespBrief: (() => {
+          try {
+            const s = JSON.stringify(rawBody || {});
+            return s.length <= 1200 ? s : `${s.slice(0, 1200)}...`;
+          } catch (e) {
+            return '';
+          }
+        })(),
+      }
+    });
+  } else {
+    await db.collection(ACTIVITY_FUNDING_COLLECTION).doc(orderId).update({
+      data: {
+        updatedAt: now,
+        fundingMode: 'delay_split',
+        delayAcctFlag: 'Y',
+        orgReqDate: pickStr(order.orgReqDate, rd),
+        orgReqSeqId: pickStr(order.orgReqSeqId, rs),
+        orgHfSeqId: hfSeqId,
+        orderAmountFen: tradeAmountFen || Math.max(0, Math.round(Number(order.orderAmountFen || order.amountFen || 0))),
+        orderAmountYuanText: tradeAmountYuan > 0 ? formatMoney(tradeAmountYuan) : pickStr(order.orderAmountYuanText, order.amountYuanText),
+        unconfirmAmountFen,
+        confirmedAmountFen,
+        paymentFeeFen: feeAmountFen,
+        paymentFeeYuanText: feeAmountYuan > 0 ? formatMoney(feeAmountYuan) : '',
+        channelSeqId: hfSeqId,
+        channelRespCode: pickStr(huifuData && (huifuData.sub_resp_code || huifuData.resp_code), order.channelRespCode),
+        channelRespDesc: pickStr(huifuData && (huifuData.sub_resp_desc || huifuData.resp_desc), order.channelRespDesc),
+        rawRespBrief: (() => {
+          try {
+            const s = JSON.stringify(rawBody || {});
+            return s.length <= 1200 ? s : `${s.slice(0, 1200)}...`;
+          } catch (e) {
+            return '';
+          }
+        })(),
+      }
+    }).catch(() => null);
+  }
+
+  await syncActivityCampaignFunding(order.campaignId);
+  return {
+    ok: true,
+    code: 'ACTIVITY_FUNDING_PAID',
+    msg: `活动金额已入池:${orderId}`,
+    campaignId: pickStr(order.campaignId),
+  };
+}
+
 async function tryMarkTaskPaidByReq({ reqDate, reqSeqId, huifuData, rawBody }) {
   const rd = pickStr(reqDate);
   const rs = pickStr(reqSeqId);
@@ -633,7 +836,7 @@ async function tryMarkTaskPaidByReq({ reqDate, reqSeqId, huifuData, rawBody }) {
       type: 'task_expense',
       bizKey: `task_expense:${txResult.taskId}:${rs}`,
       title: pickStr(txResult.title, '任务付款'),
-      summary: `通过微信支付发布任务 ¥${amount.toFixed(2)}，不扣汇付余额`,
+      summary: `通过微信支付发布任务 ¥${amount.toFixed(2)}`,
       relatedId: txResult.taskId,
       affectsBalance: false,
       fundChannel: 'wechat_pay',
@@ -739,7 +942,7 @@ async function tryMarkGoodsPaidByReq({ reqDate, reqSeqId, huifuData, rawBody }) 
         type: 'goods_expense',
         bizKey: `goods_expense:${txResult.goodsId}:${rs}`,
         title: pickStr(txResult.title, '商品购买'),
-        summary: `通过微信支付购买商品 ¥${totalAmount.toFixed(2)}，不扣汇付余额`,
+        summary: `通过微信支付购买商品 ¥${totalAmount.toFixed(2)}`,
         relatedId: txResult.goodsId,
         affectsBalance: false,
         fundChannel: 'wechat_pay',
@@ -753,7 +956,7 @@ async function tryMarkGoodsPaidByReq({ reqDate, reqSeqId, huifuData, rawBody }) 
         type: 'goods_income',
         bizKey: `goods_income:${txResult.goodsId}:${rs}`,
         title: pickStr(txResult.title, '商品购买'),
-        summary: `商品售出到账 ¥${sellerIncome.toFixed(2)}，已计入汇付余额，平台费 ¥${feeAmount.toFixed(2)}`,
+        summary: `商品售出到账 ¥${sellerIncome.toFixed(2)}，服务费 ¥${feeAmount.toFixed(2)}`,
         relatedId: txResult.goodsId,
         extra: { reqDate: rd, reqSeqId: rs, notify: true },
       })
@@ -1188,6 +1391,16 @@ exports.main = async (event = {}) => {
   const reqSeqId = pickStr(data && (data.req_seq_id || data.reqSeqId));
 
   let handled = { ok: true, code: 'ACK', msg: 'ack' };
+  if (success === true && reqDate && reqSeqId) {
+    try {
+      const activityFunding = await tryMarkActivityFundingPaidByReq({ reqDate, reqSeqId, huifuData: data, rawBody: top });
+      if (activityFunding && activityFunding.code !== 'NO_ACTIVITY_FUNDING_MATCH') handled = activityFunding;
+    } catch (e) {
+      console.error('[huifuPayNotify] mark activity funding paid failed', e);
+      handled = { ok: false, code: 'MARK_ACTIVITY_FUNDING_FAILED', msg: String(e && e.message ? e.message : e) };
+    }
+  }
+
   if (success === true && reqDate && reqSeqId) {
     try {
       const goodsPaid = await tryMarkGoodsPaidByReq({ reqDate, reqSeqId, huifuData: data, rawBody: top });

@@ -1,0 +1,9 @@
+{
+  "name": "activityReveal",
+  "version": "1.0.0",
+  "description": "Activity join-then-reveal flow",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

@@ -133,15 +133,21 @@ Page({
   async loadDoc(type) {
     this.setData({ isLoading: true, doc: null, blocks: [] });
     try {
-      const res = await db.collection(LEGAL_COLLECTION)
-        .where({ type })
+      const activeRes = await db.collection(LEGAL_COLLECTION)
+        .where({ type, status: 'active' })
         .limit(20)
         .get();
+      const activeList = (activeRes && activeRes.data) || [];
 
-      const list = (res && res.data) || [];
-      // 优先取 active 的那一条；如果有多条 active，按时间字段尽量取最新
-      const activeList = list.filter(d => d && d.status === 'active');
-      const doc = activeList.length ? pickLatest(activeList) : pickLatest(list);
+      let doc = activeList.length ? pickLatest(activeList) : null;
+      if (!doc) {
+        const res = await db.collection(LEGAL_COLLECTION)
+          .where({ type })
+          .limit(20)
+          .get();
+        const list = (res && res.data) || [];
+        doc = pickLatest(list);
+      }
 
       if (!doc) {
         wx.showToast({ title: '未配置协议内容', icon: 'none' });

@@ -1,16 +1,15 @@
 <view wx:if="{{show}}" class="loading-mask">
   <view class="loading-card card">
     <view class="spinner" aria-hidden="true">
-      <view class="spinner-ring spinner-ring-a"></view>
-      <view class="spinner-ring spinner-ring-b"></view>
-    </view>
-    <view class="loading-text-row">
-      <text class="loading-text">{{text}}</text>
-      <view class="dots">
-        <view class="dot d1"></view>
-        <view class="dot d2"></view>
-        <view class="dot d3"></view>
+      <view class="spinner-wheel">
+        <view
+          wx:for="{{spokes}}"
+          wx:key="id"
+          class="spinner-spoke {{item.className}}">
+        </view>
       </view>
     </view>
+    <text class="loading-text">{{text}}</text>
+    <text class="loading-subtext">请稍候片刻</text>
   </view>
 </view>

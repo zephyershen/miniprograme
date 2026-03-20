@@ -1,0 +1,9 @@
+{
+  "name": "adminRestoreUserAccount",
+  "version": "1.0.0",
+  "description": "管理员恢复被误删用户的旧收款账号",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

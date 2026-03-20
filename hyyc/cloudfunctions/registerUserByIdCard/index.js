@@ -14,7 +14,8 @@ const USER_COLLECTION = 'userInfo';
 const USER_COMMUNITY_COLLECTION = 'user_community';
 const LEGAL_COLLECTION = 'legal_docs';
 const VERIFY_LOG_COLLECTION = 'realname_verify_logs';
-const BUILD_TAG = 'registerUserByIdCard@2026-03-13.3';
+const WALLET_COLLECTION = 'wallets';
+const BUILD_TAG = 'registerUserByIdCard@2026-03-20.4';
 
 function pickStr(...vals) {
   for (const v of vals) {
@@ -238,10 +239,27 @@ function pickLatest(list) {
 }
 
 async function getActiveLegalDoc(transaction, type) {
+  const activeRes = await transaction.collection(LEGAL_COLLECTION).where({ type, status: 'active' }).limit(20).get();
+  const activeList = (activeRes && activeRes.data) || [];
+  if (activeList.length) return pickLatest(activeList);
+
   const res = await transaction.collection(LEGAL_COLLECTION).where({ type }).limit(20).get();
   const list = (res && res.data) || [];
-  const activeList = list.filter((d) => d && d.status === 'active');
-  return activeList.length ? pickLatest(activeList) : pickLatest(list);
+  return pickLatest(list);
+}
+
+function buildPrimaryWalletDoc(openid = '', now = new Date()) {
+  return {
+    _openid: pickStr(openid),
+    balance: 0,
+    incomeTotal: 0,
+    expenseTotal: 0,
+    createdAt: now,
+    updatedAt: now,
+    walletRole: 'primary',
+    isPrimary: true,
+    shadowedWalletIds: [],
+  };
 }
 
 exports.main = async (event, context) => {
@@ -368,6 +386,7 @@ exports.main = async (event, context) => {
     }
 
     // 4) 写入注册信息（事务：避免并发重复写入）
+    await ensureCollectionExists(WALLET_COLLECTION);
     const txRes = await db.runTransaction(async (transaction) => {
       const coll = transaction.collection(USER_COLLECTION);
 
@@ -446,6 +465,15 @@ exports.main = async (event, context) => {
       } else {
         await ucColl.add({
           data: { _id: openid, community, updatedAt: now, createdAt: now }
+        });
+      }
+
+      const walletColl = transaction.collection(WALLET_COLLECTION);
+      const walletRes = await walletColl.where({ _openid: openid }).limit(5).get();
+      const walletList = (walletRes && walletRes.data) || [];
+      if (!walletList.length) {
+        await walletColl.doc(openid).set({
+          data: buildPrimaryWalletDoc(openid, now)
         });
       }
 

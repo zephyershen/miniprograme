@@ -19,6 +19,30 @@
       "timeout": 120
     },
     {
+      "name": "adminRestoreUserAccount",
+      "timeout": 60
+    },
+    {
+      "name": "adminLegalDocsSync",
+      "timeout": 60
+    },
+    {
+      "name": "activityAdmin",
+      "timeout": 60
+    },
+    {
+      "name": "activityUser",
+      "timeout": 60
+    },
+    {
+      "name": "activityPayout",
+      "timeout": 60
+    },
+    {
+      "name": "activityReveal",
+      "timeout": 60
+    },
+    {
       "name": "chatSendMessage",
       "timeout": 60
     },

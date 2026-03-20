@@ -1,0 +1,9 @@
+{
+  "name": "activityPayout",
+  "version": "1.0.0",
+  "description": "Activity payout orchestration for lottery rewards",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

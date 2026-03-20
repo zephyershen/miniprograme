@@ -1,0 +1,187 @@
+<ui-loading show="{{isLoading}}" />
+
+<view class="activity-page theme-cozy_gift" wx:if="{{needsLogin}}">
+  <view class="hero-card theme-cozy_gift">
+    <view class="hero-glow hero-glow-left"></view>
+    <view class="hero-glow hero-glow-right"></view>
+    <text class="hero-title">登录后才能参与抽奖</text>
+    <text class="hero-subtitle">管理员准备好活动奖金后，大家可以先参与，到了开奖时间系统会统一开奖。</text>
+  </view>
+
+  <view class="empty-card">
+    <text class="empty-title">先完成登录或实名</text>
+    <text class="empty-text">活动会用到你的账户信息和钱包能力，先完成注册更稳妥。</text>
+    <view class="primary-btn" bindtap="gotoWelcome">去登录</view>
+  </view>
+</view>
+
+<view class="activity-page" wx:elif="{{!isLoading && loadError}}">
+  <view class="hero-card theme-cozy_gift">
+    <text class="hero-title">活动加载失败</text>
+    <text class="hero-subtitle">{{errorText || '请稍后重试'}}</text>
+  </view>
+
+  <view class="empty-card">
+    <text class="empty-title">暂时没拿到活动数据</text>
+    <text class="empty-text">云函数或网络状态有波动，重新加载一次看最新结果。</text>
+    <view class="primary-btn" bindtap="onRetryLoad">重新加载</view>
+  </view>
+</view>
+
+<view class="activity-page {{campaign.themeClass || 'theme-cozy_gift'}}" wx:elif="{{!isLoading}}">
+  <view class="hero-card {{campaign.themeClass || 'theme-cozy_gift'}}">
+    <view class="hero-glow hero-glow-left"></view>
+    <view class="hero-glow hero-glow-right"></view>
+    <view class="hero-top-row">
+      <view>
+        <text class="hero-title">{{campaign ? campaign.titleDisplay : '活动暂未发布'}}</text>
+        <text class="hero-subtitle">{{campaign ? campaign.subtitleDisplay : '管理员发布后，这里会出现最新活动'}}</text>
+      </view>
+      <view wx:if="{{isPlatformAdmin}}" class="admin-link" bindtap="gotoAdmin">活动管理</view>
+    </view>
+  </view>
+
+  <view wx:if="{{campaign}}" class="summary-card">
+    <view class="summary-head">
+      <view>
+        <text class="summary-title">{{campaign.titleDisplay}}</text>
+        <text class="summary-desc">{{campaign.descriptionDisplay}}</text>
+      </view>
+      <view class="status-pill">{{campaign.statusText}}</view>
+    </view>
+
+    <view class="summary-grid">
+      <view class="summary-stat">
+        <text class="summary-stat-label">总奖金</text>
+        <text class="summary-stat-value">{{campaign.totalAmountLabel}}</text>
+      </view>
+      <view class="summary-stat">
+        <text class="summary-stat-label">中奖名额</text>
+        <text class="summary-stat-value">{{campaign.winnerCountLabel}}</text>
+      </view>
+    </view>
+
+    <view class="summary-meta-row">
+      <text class="summary-meta">开奖时间 {{campaign.drawAtText}}</text>
+      <text class="summary-meta">剩余奖金 {{campaign.remainingAmountLabel}}</text>
+    </view>
+    <view class="summary-meta-row">
+      <text class="summary-meta">剩余中奖名额 {{campaign.remainingWinnerLabel}}</text>
+      <text class="summary-meta">已参与 {{campaign.participantCountLabel}} 人</text>
+    </view>
+  </view>
+
+  <view wx:if="{{campaign}}" class="status-card">
+    <view class="status-top">
+      <view>
+        <text class="status-title">{{countdownText ? '开奖倒计时' : '当前状态'}}</text>
+        <text class="status-hint">{{actionHint}}</text>
+      </view>
+      <text class="countdown-text" wx:if="{{countdownText}}">{{countdownText}}</text>
+    </view>
+
+    <view class="join-panel">
+      <view class="join-panel-badge">{{campaign.stageBadge}}</view>
+      <view class="join-window {{actionDisabled ? 'join-window-waiting' : 'join-window-ready'}}">
+        <view class="join-window-glow join-window-glow-left"></view>
+        <view class="join-window-glow join-window-glow-right"></view>
+        <view class="join-ticket">
+          <view class="join-ticket-header">
+            <text class="join-ticket-title">{{campaign.stageTitle}}</text>
+          </view>
+          <view class="join-ticket-grid">
+            <view class="join-ticket-pill">
+              <text class="join-ticket-label">开奖时间</text>
+              <text class="join-ticket-value">{{campaign.drawAtText}}</text>
+            </view>
+            <view class="join-ticket-pill">
+              <text class="join-ticket-label">已参与</text>
+              <text class="join-ticket-value">{{campaign.participantCountLabel}} 人</text>
+            </view>
+          </view>
+        </view>
+        <text class="draw-stage-footer">{{countdownText ? '开奖前都可以参与，时间到了系统会自动开奖' : campaign.stageFooter}}</text>
+      </view>
+      <view class="draw-btn {{actionDisabled ? 'draw-btn-disabled' : ''}}" bindtap="onJoinTap">
+        {{actionLoading ? '提交中...' : actionText}}
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{myRecord}}" class="panel-card">
+    <view class="section-head">
+      <text class="section-title">我的结果</text>
+      <text class="record-badge {{myRecord.resultClass}}">{{myRecord.resultBadge}}</text>
+    </view>
+    <view class="record-body">
+      <text class="record-amount">{{myRecord.amountLabel}}</text>
+      <text class="record-text">{{myRecord.resultTextResolved}}</text>
+      <text wx:if="{{myRecord.payoutStatusLabel}}" class="record-payout">{{myRecord.payoutStatusLabel}}</text>
+      <text class="record-time">{{myRecord.displayTimeText}}</text>
+    </view>
+  </view>
+
+  <view wx:if="{{winnerFeedPreview.length}}" class="panel-card winner-panel-card" bindtap="onOpenWinnerSheet">
+    <view class="section-head">
+      <text class="section-title">最新开奖结果</text>
+      <text class="section-desc">{{winnerPreviewLabel}}</text>
+    </view>
+    <view class="winner-list">
+      <view wx:for="{{winnerFeedPreview}}" wx:key="id" class="winner-item">
+        <view>
+          <text class="winner-name">{{item.nicknameText}}</text>
+          <text class="winner-sub">{{item.buildingText}} · {{item.drawAtLabel}}</text>
+        </view>
+        <text class="winner-amount">{{item.amountLabel}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{!campaign}}" class="empty-card">
+    <text class="empty-title">管理员还没发布活动</text>
+    <text class="empty-text">活动一旦发布，这里会展示总奖金、开奖时间和参与入口。</text>
+  </view>
+
+  <view class="panel-card">
+    <view class="section-head">
+      <text class="section-title">历史活动</text>
+      <text class="section-desc">点开可查看详情</text>
+    </view>
+    <view wx:if="{{historyCampaigns.length}}" class="history-list">
+      <view wx:for="{{historyCampaigns}}" wx:key="id" class="history-item {{item.themeClass}}" data-id="{{item.id}}" bindtap="onHistoryTap">
+        <view>
+          <text class="history-title">{{item.title}}</text>
+          <text class="history-sub">{{item.drawAtLabel}} · 已参与 {{item.participantCountText}} 人</text>
+        </view>
+        <view class="history-meta">
+          <text class="history-amount">{{item.totalAmountLabel}}</text>
+          <text class="history-status">{{item.statusLabel}}</text>
+        </view>
+      </view>
+    </view>
+    <view wx:else class="history-empty">暂时还没有历史活动</view>
+  </view>
+
+  <view wx:if="{{showWinnerSheet}}" class="sheet-mask" bindtap="onCloseWinnerSheet">
+    <view class="sheet-panel" catchtap="noop">
+      <view class="sheet-handle"></view>
+      <view class="sheet-head">
+        <text class="sheet-title">完整开奖结果</text>
+        <text class="sheet-close" bindtap="onCloseWinnerSheet">关闭</text>
+      </view>
+      <view wx:if="{{winnerSheetLoading}}" class="sheet-empty">正在加载开奖结果...</view>
+      <view wx:elif="{{winnerSheetItems.length}}" class="sheet-list">
+        <scroll-view class="sheet-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+          <view wx:for="{{winnerSheetItems}}" wx:key="id" class="sheet-item">
+            <view>
+              <text class="winner-name">{{item.nicknameText}}</text>
+              <text class="winner-sub">{{item.buildingText}} · {{item.drawAtLabel}}</text>
+            </view>
+            <text class="winner-amount">{{item.amountLabel}}</text>
+          </view>
+        </scroll-view>
+      </view>
+      <view wx:else class="sheet-empty">这场活动还没有开奖记录</view>
+    </view>
+  </view>
+</view>

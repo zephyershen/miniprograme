@@ -3,11 +3,13 @@
     "pages/welcome/index",
     "pages/home/index/index",
     "pages/goods/index/index",
+    "pages/activity/index/index",
     "pages/goods/detail/index",
     "pages/publish/index/index",
     "pages/publish/task/index",
     "pages/publish/goods/index",
     "pages/profile/index/index",
+    "pages/activity/admin/index",
     "pages/profile/account/index",
     "pages/profile/tasks/index",
     "pages/profile/goods/index",
@@ -74,6 +76,12 @@
         "text": "商品",
         "iconPath": "assets/tabbar/goods-unclick.png",
         "selectedIconPath": "assets/tabbar/goods-clicked.png"
+      },
+      {
+        "pagePath": "pages/activity/index/index",
+        "text": "活动",
+        "iconPath": "assets/tabbar/present.png",
+        "selectedIconPath": "assets/tabbar/present-clicked.png"
       },
       {
         "pagePath": "pages/publish/index/index",

@@ -1,5 +1,6 @@
-const { toast } = require('../../../utils/ui');
+const { toast, confirm } = require('../../../utils/ui');
 const { getStoredUser, patchStoredUser, setStoredUser } = require('../../../utils/userIdentity');
+const { isPlatformAdminUser } = require('../../../utils/platformAdmin');
 
 const db = wx.cloud.database();
 const USER_COLLECTION = 'userInfo';
@@ -49,12 +50,21 @@ Page({
       confirmText: '',
       includeFiles: true,
     },
+    restoreForm: {
+      targetOpenid: '',
+      targetPhone: '',
+      targetHuifuId: '',
+    },
     financeRunning: '',
     financeResultText: '',
     identityRepairRunning: '',
     identityRepairResultText: '',
     resetDataRunning: '',
     resetDataResultText: '',
+    restoreRunning: '',
+    restoreResultText: '',
+    legalDocsRunning: false,
+    legalDocsResultText: '',
     buildingRange: [],
     buildingIndex: 0,
     doorRange: [[], []],
@@ -79,7 +89,8 @@ Page({
         const list = (queryRes && queryRes.data) || [];
         if (list.length) {
           const doc = list[0];
-          u = { ...doc, id: doc._id || doc.id, isSuperAdmin: !!u.isSuperAdmin };
+          const isSuperAdmin = isPlatformAdminUser(doc) || !!u.isSuperAdmin;
+          u = { ...doc, id: doc._id || doc.id, isSuperAdmin };
           setStoredUser(u);
         }
       } catch (err) {
@@ -100,7 +111,7 @@ Page({
     const roomIdx = Math.max(0, Math.min(3, roomNo - 1));
 
     this.setData({
-      isSuperAdmin: !!u.isSuperAdmin,
+      isSuperAdmin: isPlatformAdminUser(u) || !!u.isSuperAdmin,
       form: {
         nickname: u.nickname || '',
         building: u.building || '',
@@ -153,6 +164,13 @@ Page({
   onResetDataToggleFiles(e) {
     const checked = !!(e && e.detail && e.detail.value);
     this.setData({ 'resetDataForm.includeFiles': checked });
+  },
+
+  onRestoreInput(e) {
+    const key = e && e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.key;
+    if (!key) return;
+    const value = e && e.detail ? e.detail.value : '';
+    this.setData({ [`restoreForm.${key}`]: value });
   },
 
   onDoorChange(e) {
@@ -231,6 +249,194 @@ Page({
 
   async onResetDataRunTap() {
     await this._runResetTestData(false);
+  },
+
+  async onRestorePreviewTap() {
+    await this._runRestoreHuifuPreview();
+  },
+
+  async onRestoreApplyTap() {
+    const proceed = await confirm('恢复后，这个用户的钱包顶部余额和提现能力会切回旧收款账号。确认继续吗？');
+    if (!proceed) return;
+    await this._runRestoreHuifuApply();
+  },
+
+  async onSyncLegalDocsTap() {
+    if (!this.data.isSuperAdmin) {
+      toast('仅管理员可用');
+      return;
+    }
+    if (this.data.legalDocsRunning) return;
+
+    this.setData({
+      legalDocsRunning: true,
+      legalDocsResultText: `准备同步协议文案...\n时间=${new Date().toLocaleString()}`
+    });
+    wx.showLoading({ title: '同步中...', mask: true });
+
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'adminLegalDocsSync',
+        data: {
+          action: 'sync_default_docs',
+        }
+      });
+      const ret = (res && res.result) || res || null;
+      console.log('[account] adminLegalDocsSync result', ret);
+      this.setData({
+        legalDocsResultText: stringifyResult({
+          calledAt: new Date().toISOString(),
+          ret,
+        })
+      });
+      if (ret && ret.ok) {
+        toast('协议已同步');
+      } else {
+        toast(pickStr(ret && ret.msg, '同步失败'));
+      }
+    } catch (err) {
+      console.error('[account] adminLegalDocsSync failed', err);
+      this.setData({
+        legalDocsResultText: stringifyResult({
+          calledAt: new Date().toISOString(),
+          error: pickStr(err && err.message, err),
+        })
+      });
+      toast('调用失败，请查看结果区');
+    } finally {
+      wx.hideLoading();
+      this.setData({ legalDocsRunning: false });
+    }
+  },
+
+  async _runRestoreHuifuPreview() {
+    if (!this.data.isSuperAdmin) {
+      toast('仅管理员可用');
+      return;
+    }
+    if (this.data.restoreRunning) return;
+
+    const form = this.data.restoreForm || {};
+    const targetOpenid = pickStr(form.targetOpenid);
+    const targetPhone = pickStr(form.targetPhone);
+    const targetHuifuId = pickStr(form.targetHuifuId);
+    if (!targetOpenid && !targetPhone) {
+      toast('请先输入用户 openid 或手机号');
+      return;
+    }
+
+    this.setData({
+      restoreRunning: 'preview',
+      restoreResultText: `准备查找旧收款账号...\n时间=${new Date().toLocaleString()}`
+    });
+    wx.showLoading({ title: '查找中...', mask: true });
+
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'adminRestoreUserAccount',
+        data: {
+          action: 'preview_restore',
+          targetOpenid,
+          targetPhone,
+          manualHuifuId: targetHuifuId,
+        }
+      });
+      const ret = (res && res.result) || res || null;
+      console.log('[account] adminRestoreUserAccount preview result', ret);
+      this.setData({
+        restoreResultText: stringifyResult({
+          calledAt: new Date().toISOString(),
+          action: 'preview_restore',
+          ret,
+        })
+      });
+      if (ret && ret.ok) {
+        const recommended = pickStr(ret.preview && ret.preview.recommendedHuifuId);
+        if (recommended && !targetHuifuId) {
+          this.setData({ 'restoreForm.targetHuifuId': recommended });
+        }
+        toast(recommended ? '已找到推荐旧账号' : '已完成预检查');
+      } else {
+        toast(pickStr(ret && ret.msg, '查找失败'));
+      }
+    } catch (err) {
+      console.error('[account] adminRestoreUserAccount preview failed', err);
+      this.setData({
+        restoreResultText: stringifyResult({
+          calledAt: new Date().toISOString(),
+          action: 'preview_restore',
+          error: pickStr(err && err.message, err),
+        })
+      });
+      toast('调用失败，请查看结果区');
+    } finally {
+      wx.hideLoading();
+      this.setData({ restoreRunning: '' });
+    }
+  },
+
+  async _runRestoreHuifuApply() {
+    if (!this.data.isSuperAdmin) {
+      toast('仅管理员可用');
+      return;
+    }
+    if (this.data.restoreRunning) return;
+
+    const form = this.data.restoreForm || {};
+    const targetOpenid = pickStr(form.targetOpenid);
+    const targetPhone = pickStr(form.targetPhone);
+    const targetHuifuId = pickStr(form.targetHuifuId);
+    if (!targetOpenid && !targetPhone) {
+      toast('请先输入用户 openid 或手机号');
+      return;
+    }
+
+    this.setData({
+      restoreRunning: 'apply',
+      restoreResultText: `准备恢复旧收款账号...\n时间=${new Date().toLocaleString()}`
+    });
+    wx.showLoading({ title: '恢复中...', mask: true });
+
+    try {
+      const res = await wx.cloud.callFunction({
+        name: 'adminRestoreUserAccount',
+        data: {
+          action: 'apply_restore',
+          targetOpenid,
+          targetPhone,
+          targetHuifuId,
+        }
+      });
+      const ret = (res && res.result) || res || null;
+      console.log('[account] adminRestoreUserAccount apply result', ret);
+      this.setData({
+        restoreResultText: stringifyResult({
+          calledAt: new Date().toISOString(),
+          action: 'apply_restore',
+          ret,
+        })
+      });
+      if (ret && ret.ok) {
+        const restored = pickStr(ret && ret.restoredHuifuId);
+        if (restored) this.setData({ 'restoreForm.targetHuifuId': restored });
+        toast(ret.noChange ? '当前已经是这个账号' : '恢复成功');
+      } else {
+        toast(pickStr(ret && ret.msg, '恢复失败'));
+      }
+    } catch (err) {
+      console.error('[account] adminRestoreUserAccount apply failed', err);
+      this.setData({
+        restoreResultText: stringifyResult({
+          calledAt: new Date().toISOString(),
+          action: 'apply_restore',
+          error: pickStr(err && err.message, err),
+        })
+      });
+      toast('调用失败，请查看结果区');
+    } finally {
+      wx.hideLoading();
+      this.setData({ restoreRunning: '' });
+    }
   },
 
   async _runFinanceCompensate(dryRun) {
@@ -479,7 +685,7 @@ Page({
 
     const doc = list[0];
     const docId = pickStr(doc._id, doc.id);
-    const nextUser = { ...cached, ...doc, id: docId, isSuperAdmin: !!cached.isSuperAdmin };
+    const nextUser = { ...cached, ...doc, id: docId, isSuperAdmin: isPlatformAdminUser(doc) || !!cached.isSuperAdmin };
     this.setData({ userDocId: docId });
     setStoredUser(nextUser);
     return docId;

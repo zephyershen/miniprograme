@@ -45,6 +45,64 @@
     </view>
 
     <view wx:if="{{isSuperAdmin}}" class="panel card card-glass finance-panel">
+      <text class="panel-title">旧钱包恢复</text>
+
+      <view class="finance-tip">
+        <text class="finance-tip-text">用于误删 `userInfo` 后重新注册的用户。先按用户 openid 或手机号查旧收款账号，再执行恢复。自动候选主要来自历史提现和活动记录；如果该用户从未提现，可以手动填旧收款账号。</text>
+      </view>
+
+      <view class="form">
+        <view class="field-row">
+          <text class="field-label">用户 OpenID</text>
+          <input class="field-input" value="{{restoreForm.targetOpenid}}" bindinput="onRestoreInput" data-key="targetOpenid" placeholder="输入当前这位用户的 openid" />
+        </view>
+
+        <view class="field-row">
+          <text class="field-label">用户手机号</text>
+          <input class="field-input" value="{{restoreForm.targetPhone}}" bindinput="onRestoreInput" data-key="targetPhone" placeholder="或输入当前这位用户的手机号" />
+        </view>
+
+        <view class="field-row">
+          <text class="field-label">旧收款账号</text>
+          <input class="field-input" value="{{restoreForm.targetHuifuId}}" bindinput="onRestoreInput" data-key="targetHuifuId" placeholder="选填，查不到时可手动填旧收款账号" />
+        </view>
+      </view>
+
+      <view class="finance-actions">
+        <view class="finance-btn finance-btn-secondary {{restoreRunning ? 'finance-btn-disabled' : ''}}" bindtap="onRestorePreviewTap">
+          {{restoreRunning === 'preview' ? '查找中...' : '查找旧账号'}}
+        </view>
+        <view class="finance-btn finance-btn-primary {{restoreRunning ? 'finance-btn-disabled' : ''}}" bindtap="onRestoreApplyTap">
+          {{restoreRunning === 'apply' ? '恢复中...' : '执行恢复'}}
+        </view>
+      </view>
+
+      <view class="finance-result">
+        <text class="finance-result-title">返回结果</text>
+        <text selectable class="finance-result-text">{{restoreResultText || '先点“查找旧账号”。如果返回里有 recommendedHuifuId，会自动回填到旧收款账号输入框。确认无误后再点“执行恢复”。'}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{isSuperAdmin}}" class="panel card card-glass finance-panel">
+      <text class="panel-title">协议文案同步</text>
+
+      <view class="finance-tip">
+        <text class="finance-tip-text">会把最新的用户协议和隐私政策写入当前协议版本，并把旧生效版本归档。之后新用户注册会自动记录这次版本。</text>
+      </view>
+
+      <view class="finance-actions">
+        <view class="finance-btn finance-btn-primary {{legalDocsRunning ? 'finance-btn-disabled' : ''}}" bindtap="onSyncLegalDocsTap">
+          {{legalDocsRunning ? '同步中...' : '同步最新协议'}}
+        </view>
+      </view>
+
+      <view class="finance-result">
+        <text class="finance-result-title">返回结果</text>
+        <text selectable class="finance-result-text">{{legalDocsResultText || '还没有执行。点击“同步最新协议”后，会覆盖当前生效的协议版本。'}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{isSuperAdmin}}" class="panel card card-glass finance-panel">
       <text class="panel-title">资金补偿调试</text>
 
       <view class="finance-tip">

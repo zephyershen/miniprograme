@@ -1,0 +1,9 @@
+{
+  "name": "adminLegalDocsSync",
+  "version": "1.0.0",
+  "description": "管理员同步 legal_docs 默认协议文案",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

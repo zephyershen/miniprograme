@@ -21,7 +21,7 @@ const DATE_FILTER_OPTIONS = [
   { key: 'custom', label: '自定义' },
 ];
 const EXTERNAL_PAYMENT_TYPES = ['goods_expense', 'task_expense'];
-const BALANCE_CHANGE_TYPES = ['goods_income', 'task_income', 'withdraw', 'withdraw_fee', 'withdraw_refund', 'refund'];
+const BALANCE_CHANGE_TYPES = ['goods_income', 'task_income', 'activity_income', 'activity_revert', 'withdraw', 'withdraw_fee', 'withdraw_refund', 'refund'];
 
 function pickStr(...vals) {
   for (const v of vals) {
@@ -67,6 +67,11 @@ function normalizeTransactionSummary(type = '', summary = '') {
   if (!raw) return '';
   let normalized = raw
     .replace(/[，,]\s*不扣汇付余额/gi, '')
+    .replace(/[，,]\s*不扣可提现余额/gi, '')
+    .replace(/汇付可提现余额/gi, '可提现余额')
+    .replace(/已计入汇付余额/gi, '已到账')
+    .replace(/平台钱包账本/gi, '钱包余额')
+    .replace(/钱包账本/gi, '钱包余额')
     .replace(/\s{2,}/g, ' ')
     .trim();
 
@@ -383,12 +388,16 @@ Page({
     if (profileResult && profileResult.ok && profileResult.profile) {
       const profile = profileResult.profile || {};
       const balance = Number(profile.availableBalance || 0);
+      const localBalance = Number(profile.localBalance || 0);
+      const gap = Math.max(0, Math.round((localBalance - balance) * 100) / 100);
       return {
         balance,
         balanceText: pickStr(profile.availableBalanceText, formatMoney(balance)),
         canWithdraw: balance >= WITHDRAW_MIN,
-        balancePrimaryTip: '最低提现 1 元',
-        balanceSecondaryTip: '',
+        balancePrimaryTip: gap > 0 ? '顶部显示可提现余额' : '最低提现 1 元',
+        balanceSecondaryTip: gap > 0
+          ? `钱包明细余额 ¥${pickStr(profile.localBalanceText, formatMoney(localBalance))}，其中 ¥${formatMoney(gap)} 正在同步到可提现余额`
+          : '',
         balanceAlertText: '',
       };
     }
@@ -522,6 +531,8 @@ Page({
       task_income: '任务收入',
       task_expense: '任务付款',
       goods_income: '商品售出',
+      activity_income: '活动奖金',
+      activity_revert: '奖励回退',
       goods_expense: '商品购买',
       withdraw: '提现',
       withdraw_fee: '提现手续费',
