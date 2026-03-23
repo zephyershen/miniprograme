@@ -21,7 +21,7 @@
     </view>
 
     <view class="actions">
-      <!-- 合并为一个按钮：已注册 -> 登录；未注册 -> 选择小区后进入注册页 -->
+      <!-- 合并为一个按钮：已注册 -> 登录；未注册 -> 选择小区后进入基础注册页 -->
       <view class="action-btn action-login" bindtap="onStartTap">
         <block wx:if="{{isLoading}}">处理中…</block>
         <block wx:else>登录 / 注册</block>
@@ -83,7 +83,7 @@
 
         <view class="picker-actions">
           <view class="picker-btn picker-btn-cancel" bindtap="closeCommunityPicker">取消</view>
-          <view class="picker-btn picker-btn-ok" bindtap="confirmCommunityPicker">确定并去注册</view>
+          <view class="picker-btn picker-btn-ok" bindtap="confirmCommunityPicker">确定并继续</view>
         </view>
       </view>
     </view>

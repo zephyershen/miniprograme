@@ -3,6 +3,8 @@ const { getStoredUser } = require('../../../utils/userIdentity');
 Page({
   data: {
     isLoading: false,
+    needsLogin: false,
+    needsRealname: false,
     taskIconSrc: '',
     productsIconSrc: '',
     // 只用于控制 loading：两张图片都“有结果（加载成功/失败）”后才关掉遮罩
@@ -11,10 +13,16 @@ Page({
   },
   onShow(){
     const u = getStoredUser();
-    if (!u || !u.realname) {
-      // 避免一进入页面就出现“获取手机号”授权流程：先进入欢迎页，让用户自主选择登录/注册
-      wx.navigateTo({ url: '/pages/welcome/index' });
+    if (!u || !u.id) {
+      this.setData({ needsLogin: true, needsRealname: false, isLoading: false });
       return;
+    }
+    if (!u.realname) {
+      this.setData({ needsLogin: false, needsRealname: true, isLoading: false });
+      return;
+    }
+    if (this.data.needsLogin || this.data.needsRealname) {
+      this.setData({ needsLogin: false, needsRealname: false });
     }
 
     // 兼容「从我的任务点编辑」：先切到发布 tab，再自动跳到发布任务表单页
@@ -170,6 +178,12 @@ Page({
   },
   onChoosePublishGoods(){
     wx.navigateTo({ url: '/pages/publish/goods/index' });
+  },
+  goWelcome() {
+    wx.navigateTo({ url: '/pages/welcome/index' });
+  },
+  goRealname() {
+    wx.navigateTo({ url: '/pages/auth/realname/index' });
   },
   onTaskIconLoad() {
     this.setData({ taskIconLoaded: true });

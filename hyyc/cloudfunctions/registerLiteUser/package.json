@@ -1,0 +1,9 @@
+{
+  "name": "registerLiteUser",
+  "version": "1.0.0",
+  "description": "云函数：基础注册（不采集身份证）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

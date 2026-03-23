@@ -236,6 +236,7 @@ function getClockInterval(campaign = null) {
 Page({
   data: {
     needsLogin: false,
+    needsRealname: false,
     isPlatformAdmin: false,
     isLoading: true,
     loadError: false,
@@ -258,10 +259,11 @@ Page({
   onShow() {
     const user = getStoredUser();
     this.setData({
-      needsLogin: !user || !user.realname,
+      needsLogin: !user || !user.id,
+      needsRealname: !!(user && user.id && !user.realname),
       isPlatformAdmin: !!(user && user.isPlatformAdmin),
     });
-    if (!user || !user.realname) {
+    if (!user || !user.id || !user.realname) {
       this._clearClock();
       this.setData({
         isLoading: false,
@@ -588,6 +590,9 @@ Page({
   noop() {},
   gotoWelcome() {
     wx.navigateTo({ url: '/pages/welcome/index' });
+  },
+  gotoRealname() {
+    wx.navigateTo({ url: '/pages/auth/realname/index' });
   },
   gotoAdmin() {
     wx.navigateTo({ url: '/pages/activity/admin/index' });

@@ -40,6 +40,17 @@
   margin-bottom: 48rpx;
 }
 
+.publish-gate-text {
+  margin-top: 28rpx;
+  font-size: 28rpx;
+  line-height: 1.8;
+  color: #6B7280;
+}
+
+.publish-gate-btn {
+  margin-top: 28rpx;
+}
+
 .publish-type-icon {
   width: 280rpx;
   height: 280rpx;

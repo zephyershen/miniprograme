@@ -135,8 +135,13 @@ Page({
   },
   async loadWallet({ reset = false, filterKey = '', panelOnly = false, reloadBalance = reset && !panelOnly } = {}) {
     const u = getStoredUser();
-    if (!u || !u.realname) {
+    if (!u || !u.id) {
       wx.navigateTo({ url: '/pages/welcome/index' });
+      return;
+    }
+    if (!u.realname) {
+      toast('请先完成实名后再查看钱包');
+      wx.navigateTo({ url: '/pages/auth/realname/index' });
       return;
     }
 

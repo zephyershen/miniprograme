@@ -3,7 +3,7 @@ const { toast } = require('../../../utils/ui');
 const { exchangePhoneNumber } = require('../_shared/api');
 const { distanceMeters } = require('../_shared/geo');
 const communityCfg = require('../_shared/community');
-const { setStoredUser } = require('../../../utils/userIdentity');
+const { getStoredUser, setStoredUser } = require('../../../utils/userIdentity');
 
 function pickStr(v) {
   return String(v == null ? '' : v).trim();
@@ -204,7 +204,9 @@ Page({
     } catch (e) {
       prefillCommunity = '';
     }
-    const prefillIdx = prefillCommunity ? labels.indexOf(prefillCommunity) : -1;
+    const storedUser = getStoredUser();
+    const resolvedPrefillCommunity = pickStr(prefillCommunity, storedUser.community);
+    const prefillIdx = resolvedPrefillCommunity ? labels.indexOf(resolvedPrefillCommunity) : -1;
     const idx = prefillIdx >= 0 ? prefillIdx : defaultIdx;
     const name = labels[idx] || '';
     this.setData({
@@ -212,7 +214,12 @@ Page({
       doorRange: [floors, rooms],
       communityLabels: labels,
       communityIndex: idx,
-      'form.community': name
+      'form.community': name,
+      'form.nickname': pickStr(storedUser.nickname),
+      'form.phone': pickStr(storedUser.phone),
+      phoneVerified: !!pickStr(storedUser.phone),
+      avatarUrl: pickStr(storedUser.avatarUrl, storedUser.avatarFileID),
+      avatarFileID: pickStr(storedUser.avatarFileID),
     });
 
     // 用完就清掉，避免下次进入仍然沿用旧值

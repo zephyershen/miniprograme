@@ -379,8 +379,13 @@ Page({
   },
   async load() {
     const u = getStoredUser();
-    if (!u || !u.realname) {
+    if (!u || !u.id) {
       wx.navigateTo({ url: '/pages/welcome/index' });
+      return;
+    }
+    if (!u.realname) {
+      toast('请先完成实名后再查看商品');
+      wx.navigateTo({ url: '/pages/auth/realname/index' });
       return;
     }
     const openid = await this._ensureOpenid();

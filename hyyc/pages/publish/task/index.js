@@ -47,8 +47,13 @@ Page({
   },
   onShow(){
     const u = getStoredUser();
-    if (!u || !u.realname) {
+    if (!u || !u.id) {
       wx.navigateTo({ url: '/pages/welcome/index' });
+      return;
+    }
+    if (!u.realname) {
+      toast('请先完成实名信息');
+      wx.navigateTo({ url: '/pages/auth/realname/index' });
       return;
     }
     // 初始化楼栋列表 & 楼层/户号列表
@@ -367,9 +372,14 @@ Page({
     }
 
     const u = getStoredUser();
-    if (!u || !u.realname) {
-      toast('请先完成实名信息');
+    if (!u || !u.id) {
+      toast('请先登录');
       wx.navigateTo({ url: '/pages/welcome/index' });
+      return;
+    }
+    if (!u.realname) {
+      toast('请先完成实名信息');
+      wx.navigateTo({ url: '/pages/auth/realname/index' });
       return;
     }
 

@@ -15,6 +15,21 @@
   </view>
 </view>
 
+<view class="activity-page theme-cozy_gift" wx:elif="{{needsRealname}}">
+  <view class="hero-card theme-cozy_gift">
+    <view class="hero-glow hero-glow-left"></view>
+    <view class="hero-glow hero-glow-right"></view>
+    <text class="hero-title">实名后才能查看和参与活动</text>
+    <text class="hero-subtitle">活动会涉及社区身份、中奖结果和钱包收款，完成实名后再开放更稳妥。</text>
+  </view>
+
+  <view class="empty-card">
+    <text class="empty-title">基础注册已完成</text>
+    <text class="empty-text">你已经有账号了，还差最后一步实名。实名完成后，才能查看活动、参与抽奖和收款。</text>
+    <view class="primary-btn" bindtap="gotoRealname">去实名</view>
+  </view>
+</view>
+
 <view class="activity-page" wx:elif="{{!isLoading && loadError}}">
   <view class="hero-card theme-cozy_gift">
     <text class="hero-title">活动加载失败</text>

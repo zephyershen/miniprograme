@@ -96,7 +96,29 @@ Page({
 	    // 普通住户视角：当前任务下，与业主聊天的未读消息条数
 		    peerUnreadCount: 0
 		  },
-	  _refundSyncing: false,
+    _guardRealnameAccess() {
+      const me = getStoredUser();
+      if (me && me.realname) return true;
+      const hasUser = !!(me && me.id);
+      wx.showModal({
+        title: hasUser ? '完成实名后可查看任务' : '请先登录',
+        content: hasUser
+          ? '你已经完成基础注册，但还需要完成实名，才能查看任务详情和接单。'
+          : '请先登录后再查看任务详情。',
+        confirmText: hasUser ? '去实名' : '去登录',
+        cancelText: '返回',
+        success: (res) => {
+          if (res && res.confirm) {
+            wx.navigateTo({ url: hasUser ? '/pages/auth/realname/index' : '/pages/welcome/index' });
+            return;
+          }
+          wx.navigateBack({ fail: () => wx.switchTab({ url: '/pages/profile/index/index' }) });
+        }
+      });
+      this.setData({ isLoading: false });
+      return false;
+    },
+  _refundSyncing: false,
 	  _refundSyncTimer: null,
 	  _refundSyncRetryCount: 0,
 	  _pageVisible: false,
@@ -291,6 +313,7 @@ Page({
     });
   },
 			  onLoad(q){
+      if (!this._guardRealnameAccess()) return;
 	    this._pageVisible = true;
 	    const id = q.id;
 	    this._loadTaskDetail(id);
@@ -367,6 +390,7 @@ Page({
     });
   },
 			  onShow(){
+      if (!this._guardRealnameAccess()) return;
 	    this._pageVisible = true;
 			    // 从其它页面返回时重新拉最新任务状态，避免按钮沿用旧缓存
 			    const task = this.data.task || {};

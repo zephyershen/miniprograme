@@ -50,6 +50,11 @@ Page({
       isLoading: false,
     });
     this._hydrateAvatar(rawUser);
+    if (!rawUser || !rawUser.realname) {
+      this.setData({ messageCenterUnread: 0 });
+      this._clearMessageCenterWatch();
+      return;
+    }
     this._loadMessageCenterSummary();
     this._openMessageCenterWatch(rawUser);
   },
@@ -61,7 +66,7 @@ Page({
   },
   async _loadMessageCenterSummary() {
     const me = getStoredUser();
-    if (!me || !Object.keys(me).length) {
+    if (!me || !Object.keys(me).length || !me.realname) {
       this.setData({ messageCenterUnread: 0 });
       return;
     }
@@ -114,6 +119,11 @@ Page({
     this.setData({ messageCenterUnread: unread });
   },
   _openMessageCenterWatch(rawUser = {}) {
+    if (!rawUser || rawUser.realname !== true) {
+      this._clearMessageCenterWatch();
+      this.setData({ messageCenterUnread: 0 });
+      return;
+    }
     const userId = pickStr(rawUser && rawUser.id);
     if (!userId) {
       this._clearMessageCenterWatch();
@@ -176,13 +186,59 @@ Page({
   },
   // 点击“账户信息”卡片，进入账户详情页
   gotoAccount(){
+    const user = getStoredUser();
+    if (!user || !user.id) {
+      wx.navigateTo({ url: '/pages/welcome/index' });
+      return;
+    }
     wx.navigateTo({ url: '/pages/profile/account/index' });
   },
-  gotoMyTasks(){ wx.navigateTo({ url: '/pages/profile/tasks/index' }); },
-  gotoMyGoods(){ wx.navigateTo({ url: '/pages/profile/goods/index' }); },
-  gotoFavorites(){ wx.navigateTo({ url: '/pages/profile/favorites/index' }); },
-  gotoMessages(){ wx.navigateTo({ url: '/pages/profile/messages/index' }); },
-  gotoWallet(){ wx.navigateTo({ url: '/pages/profile/wallet/index' }); },
+  _ensureRealnameFeature(featureText = '') {
+    const user = getStoredUser();
+    if (user && user.realname) return true;
+    const hasUser = !!(user && user.id);
+    wx.showModal({
+      title: hasUser ? '完成实名后可用' : '请先登录',
+      content: hasUser
+        ? (featureText || '基础注册完成后，还需要完成实名，才能使用这个功能。')
+        : '请先登录或完成基础注册后再使用这个功能。',
+      confirmText: hasUser ? '去实名' : '去登录',
+      cancelText: '稍后',
+      success: (res) => {
+        if (res && res.confirm) {
+          if (hasUser) {
+            this.gotoRealname();
+          } else {
+            wx.navigateTo({ url: '/pages/welcome/index' });
+          }
+        }
+      }
+    });
+    return false;
+  },
+  gotoRealname() {
+    wx.navigateTo({ url: '/pages/auth/realname/index' });
+  },
+  gotoMyTasks(){
+    if (!this._ensureRealnameFeature('完成实名后才能查看任务、接单和沟通。')) return;
+    wx.navigateTo({ url: '/pages/profile/tasks/index' });
+  },
+  gotoMyGoods(){
+    if (!this._ensureRealnameFeature('完成实名后才能查看商品、购买和咨询。')) return;
+    wx.navigateTo({ url: '/pages/profile/goods/index' });
+  },
+  gotoFavorites(){
+    if (!this._ensureRealnameFeature('完成实名后才能查看收藏和浏览过的商品。')) return;
+    wx.navigateTo({ url: '/pages/profile/favorites/index' });
+  },
+  gotoMessages(){
+    if (!this._ensureRealnameFeature('完成实名后才能查看任务和商品消息。')) return;
+    wx.navigateTo({ url: '/pages/profile/messages/index' });
+  },
+  gotoWallet(){
+    if (!this._ensureRealnameFeature('完成实名并开通收款后才能查看钱包和提现。')) return;
+    wx.navigateTo({ url: '/pages/profile/wallet/index' });
+  },
   gotoActivityAdmin(){ wx.navigateTo({ url: '/pages/activity/admin/index' }); },
 
   // 退出登录：清掉本地缓存的用户信息，并回到欢迎页

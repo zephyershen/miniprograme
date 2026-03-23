@@ -10,6 +10,17 @@
   </ui-card>
 </view>
 
+<view wx:elif="{{needsRealname}}" class="px-24 py-16">
+  <ui-card title="完成实名后可查看任务">
+    <view class="text-sm c-muted" style="line-height: 1.6;">
+      你已经完成基础注册，但社区任务属于小区内部信息。完成实名后，才会开放任务查看、接单和沟通功能。
+    </view>
+    <view class="mt-16 row">
+      <view class="btn btn-primary" bindtap="goRealname">去实名</view>
+    </view>
+  </ui-card>
+</view>
+
 <view wx:else class="px-24 py-16">
   <view class="row mt-16 row-gap-8 wrap">
     <view class="{{'badge row-gap-item ' + (filter==='all'?'badge-primary':'')}}" bindtap="changeFilter" data-k="all">

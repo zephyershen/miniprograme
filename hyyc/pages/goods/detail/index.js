@@ -184,7 +184,30 @@ Page({
     canBuy: false,
     buyButtonText: '立即购买'
   },
+  _guardRealnameAccess() {
+    const me = getStoredUser();
+    if (me && me.realname) return true;
+    const hasUser = !!(me && me.id);
+    wx.showModal({
+      title: hasUser ? '完成实名后可查看商品' : '请先登录',
+      content: hasUser
+        ? '你已经完成基础注册，但还需要完成实名，才能查看商品详情、购买和咨询。'
+        : '请先登录后再查看商品详情。',
+      confirmText: hasUser ? '去实名' : '去登录',
+      cancelText: '返回',
+      success: (res) => {
+        if (res && res.confirm) {
+          wx.navigateTo({ url: hasUser ? '/pages/auth/realname/index' : '/pages/welcome/index' });
+          return;
+        }
+        wx.navigateBack({ fail: () => wx.switchTab({ url: '/pages/profile/index/index' }) });
+      }
+    });
+    this.setData({ isLoading: false, goods: null, imagesPreview: [] });
+    return false;
+  },
   onLoad(options) {
+    if (!this._guardRealnameAccess()) return;
     const id = String((options && options.id) || '').trim();
     if (!id) {
       wx.showToast({ title: '缺少商品参数', icon: 'none' });
@@ -194,6 +217,10 @@ Page({
     this.setData({ id }, () => this.loadGoodsDetail());
   },
   onPullDownRefresh() {
+    if (!this._guardRealnameAccess()) {
+      wx.stopPullDownRefresh();
+      return;
+    }
     this.loadGoodsDetail(true);
   },
   _showGoodsUnavailable() {

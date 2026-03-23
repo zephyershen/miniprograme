@@ -6,9 +6,12 @@ const db = cloud.database();
 const _ = db.command;
 
 const GOODS_COLLECTION = 'goods';
+const USER_COLLECTION = 'userInfo';
 const MAX_SNAPSHOT_IDS = 100;
 const MAX_QUERY_LIMIT = 100;
 const SNAPSHOT_BATCH_SIZE = 50;
+const DEFAULT_PUBLIC_GOODS_LIMIT = 30;
+const MAX_PUBLIC_GOODS_SCAN_BATCHES = 6;
 
 function pickStr(...vals) {
   for (let i = 0; i < vals.length; i += 1) {
@@ -16,6 +19,16 @@ function pickStr(...vals) {
     if (s) return s;
   }
   return '';
+}
+
+async function getUserByOpenid(openid = '') {
+  const targetOpenid = pickStr(openid);
+  if (!targetOpenid) return null;
+  const res = await db.collection(USER_COLLECTION)
+    .where({ _openid: targetOpenid })
+    .limit(1)
+    .get();
+  return ((res && res.data) || [])[0] || null;
 }
 
 function toTimeMs(v) {
@@ -27,10 +40,45 @@ function toTimeMs(v) {
   return Number.isNaN(t) ? 0 : t;
 }
 
+function normalizeDateValue(v) {
+  if (!v) return null;
+  if (typeof v.getTime === 'function') return v;
+  if (typeof v === 'number' && Number.isFinite(v)) return new Date(v);
+  if (v && typeof v === 'object' && Number.isFinite(v.$date)) return new Date(v.$date);
+  const t = Date.parse(v);
+  return Number.isNaN(t) ? null : new Date(t);
+}
+
 function clampLimit(v, fallback = MAX_QUERY_LIMIT) {
   const n = Number(v);
   if (!Number.isFinite(n) || n <= 0) return fallback;
   return Math.max(1, Math.min(MAX_QUERY_LIMIT, Math.floor(n)));
+}
+
+function buildCursorWhere(cursor = null) {
+  const createdAt = normalizeDateValue(cursor && cursor.createdAt);
+  const id = pickStr(cursor && cursor.id);
+  if (!createdAt) return null;
+  if (id) {
+    return _.or([
+      { createdAt: _.lt(createdAt) },
+      { createdAt, _id: _.lt(id) }
+    ]);
+  }
+  return { createdAt: _.lt(createdAt) };
+}
+
+function buildAnchorWhere(anchor = null) {
+  const createdAt = normalizeDateValue(anchor && anchor.createdAt);
+  const id = pickStr(anchor && anchor.id);
+  if (!createdAt) return null;
+  if (id) {
+    return _.or([
+      { createdAt: _.lt(createdAt) },
+      { createdAt, _id: _.lte(id) }
+    ]);
+  }
+  return { createdAt: _.lte(createdAt) };
 }
 
 function safeMoney(v) {
@@ -229,6 +277,95 @@ async function listMyGoods(openid = '', limitRaw = MAX_QUERY_LIMIT, options = {}
   };
 }
 
+async function queryPublicGoodsBatch({
+  community = '',
+  category = '',
+  cursor = null,
+  anchor = null,
+  limit = DEFAULT_PUBLIC_GOODS_LIMIT,
+}) {
+  const whereParts = [{ status: 'posted' }];
+  const normalizedCommunity = pickStr(community);
+  const normalizedCategory = pickStr(category);
+  const cursorWhere = buildCursorWhere(cursor);
+  const anchorWhere = buildAnchorWhere(anchor);
+
+  if (normalizedCommunity) whereParts.push({ community: normalizedCommunity });
+  if (normalizedCategory && normalizedCategory !== 'all') whereParts.push({ category: normalizedCategory });
+  if (anchorWhere) whereParts.push(anchorWhere);
+  if (cursorWhere) whereParts.push(cursorWhere);
+
+  const whereCond = whereParts.length === 1 ? whereParts[0] : _.and(whereParts);
+  return db.collection(GOODS_COLLECTION)
+    .where(whereCond)
+    .orderBy('createdAt', 'desc')
+    .orderBy('_id', 'desc')
+    .limit(clampLimit(limit, DEFAULT_PUBLIC_GOODS_LIMIT))
+    .get();
+}
+
+async function listPublicGoods(openid = '', currentUser = {}, options = {}) {
+  const limit = clampLimit(options.limit, DEFAULT_PUBLIC_GOODS_LIMIT);
+  const community = pickStr(options.community, currentUser && currentUser.community);
+  const category = pickStr(options.category);
+  const anchor = options && options.anchor && typeof options.anchor === 'object'
+    ? {
+        createdAt: normalizeDateValue(options.anchor.createdAt),
+        id: pickStr(options.anchor.id)
+      }
+    : null;
+  let cursor = options && options.cursor && typeof options.cursor === 'object'
+    ? {
+        createdAt: normalizeDateValue(options.cursor.createdAt),
+        id: pickStr(options.cursor.id)
+      }
+    : null;
+
+  const docs = [];
+  let batches = 0;
+  let hasMore = true;
+
+  while (docs.length < limit && batches < MAX_PUBLIC_GOODS_SCAN_BATCHES) {
+    const res = await queryPublicGoodsBatch({
+      community,
+      category,
+      cursor,
+      anchor,
+      limit
+    });
+    const list = (res && res.data) || [];
+    batches += 1;
+
+    if (!list.length) {
+      hasMore = false;
+      break;
+    }
+
+    list.forEach((doc) => {
+      if (docs.length >= limit) return;
+      if (doc && !doc.sellerDeletedAt) docs.push(doc);
+    });
+
+    const last = list[list.length - 1];
+    cursor = last
+      ? { createdAt: normalizeDateValue(last.createdAt), id: pickStr(last._id, last.id) }
+      : cursor;
+
+    if (list.length < limit) {
+      hasMore = false;
+      break;
+    }
+  }
+
+  return {
+    items: docs,
+    nextCursor: docs.length && hasMore ? cursor : null,
+    hasMore: !!(docs.length && hasMore),
+    communityUsed: community,
+    categoryUsed: category || 'all',
+  };
+}
+
 async function getGoodsDetail(goodsId = '', openid = '') {
   const id = pickStr(goodsId);
   if (!id) return { ok: false, code: 'MISSING_GOODS_ID', message: '缺少商品信息' };
@@ -317,6 +454,11 @@ exports.main = async (event = {}) => {
   }
 
   try {
+    const currentUser = await getUserByOpenid(OPENID);
+    if (!currentUser || currentUser.realname !== true) {
+      return { ok: false, code: 'USER_NOT_READY', message: '请先完成实名后再使用商品功能' };
+    }
+
     if (action === 'get_goods_snapshots') {
       const items = await getGoodsSnapshots(event.ids, OPENID);
       return { ok: true, items };
@@ -324,6 +466,17 @@ exports.main = async (event = {}) => {
 
     if (action === 'list_my_goods') {
       const data = await listMyGoods(OPENID, event.limit, { compact: event.compact === true });
+      return { ok: true, ...data };
+    }
+
+    if (action === 'list_public_goods') {
+      const data = await listPublicGoods(OPENID, currentUser, {
+        community: event.community,
+        category: event.category,
+        limit: event.limit,
+        cursor: event.cursor,
+        anchor: event.anchor,
+      });
       return { ok: true, ...data };
     }
 

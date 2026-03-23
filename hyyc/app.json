@@ -22,6 +22,7 @@
     {
       "root": "pages/auth",
       "pages": [
+        "register/index",
         "realname/index",
         "legal/doc/index"
       ]

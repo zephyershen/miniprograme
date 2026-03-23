@@ -223,11 +223,19 @@ Page({
     if (this._loadingTasks) return;
     this._loadingTasks = true;
     const u = getStoredUser();
-    if (!u || !u.realname) {
+    if (!u || !u.id) {
       this._stopPendingRefundTimer();
       this._stopAutoCleanupTimer();
       this._loadingTasks = false;
       wx.navigateTo({ url: '/pages/welcome/index' });
+      return;
+    }
+    if (!u.realname) {
+      this._stopPendingRefundTimer();
+      this._stopAutoCleanupTimer();
+      this._loadingTasks = false;
+      toast('请先完成实名后再查看任务');
+      wx.navigateTo({ url: '/pages/auth/realname/index' });
       return;
     }
 

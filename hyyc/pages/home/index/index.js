@@ -17,6 +17,7 @@ Page({
     isLoading: false,
     // 未登录/未实名时：展示简单的“请先登录”提示（不在任务广场展示特定人群说明）
     needsLogin: false,
+    needsRealname: false,
     allowedCommunities: (access && access.allowedCommunities) || [],
     allowedCommunitiesText: ((access && access.allowedCommunities) || []).join(' / ') || '',
     // 任务地点筛选：all（全部）、inside（小区内）、outside（小区外）
@@ -26,20 +27,32 @@ Page({
   },
   onShow(){
     const u = getStoredUser();
-    if (!u || !u.realname) {
-      // 未登录：不再在任务广场显示“特定人群说明”，只提示去欢迎页操作
+    if (!u || !u.id) {
       this.setData({
         needsLogin: true,
+        needsRealname: false,
         isLoading: false,
         list: []
       });
       return;
     }
-    if (this.data.needsLogin) this.setData({ needsLogin: false });
+    if (!u.realname) {
+      this.setData({
+        needsLogin: false,
+        needsRealname: true,
+        isLoading: false,
+        list: []
+      });
+      return;
+    }
+    if (this.data.needsLogin || this.data.needsRealname) this.setData({ needsLogin: false, needsRealname: false });
     this.loadTasks();
   },
   goWelcome() {
     wx.navigateTo({ url: '/pages/welcome/index' });
+  },
+  goRealname() {
+    wx.navigateTo({ url: '/pages/auth/realname/index' });
   },
   changeFilter(e){ this.setData({ filter: e.currentTarget.dataset.k }, ()=> this.loadTasks()); },
   // 任务地点下拉筛选
@@ -53,7 +66,7 @@ Page({
   },
   // 加载任务列表
   loadTasks(){
-    if (this.data.needsLogin) return;
+    if (this.data.needsLogin || this.data.needsRealname) return;
     this.setData({ isLoading: true });
     const u = getStoredUser();
     const userBuilding = (u.building || '').trim();

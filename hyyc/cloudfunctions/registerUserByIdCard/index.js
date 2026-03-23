@@ -15,7 +15,7 @@ const USER_COMMUNITY_COLLECTION = 'user_community';
 const LEGAL_COLLECTION = 'legal_docs';
 const VERIFY_LOG_COLLECTION = 'realname_verify_logs';
 const WALLET_COLLECTION = 'wallets';
-const BUILD_TAG = 'registerUserByIdCard@2026-03-20.4';
+const BUILD_TAG = 'registerUserByIdCard@2026-03-20.5';
 
 function pickStr(...vals) {
   for (const v of vals) {
@@ -262,6 +262,10 @@ function buildPrimaryWalletDoc(openid = '', now = new Date()) {
   };
 }
 
+function isRealnameReady(user = {}) {
+  return !!(user && user.realname === true && user.verified === true);
+}
+
 exports.main = async (event, context) => {
   const wxContext = cloud.getWXContext();
   const openid = wxContext.OPENID || wxContext.openId || '';
@@ -311,9 +315,13 @@ exports.main = async (event, context) => {
     }
 
     // 先做“重复注册”拦截（省钱也省时间）：同一个微信（openid）只允许一条实名记录
-    const openidRes = await db.collection(USER_COLLECTION).where({ _openid: openid }).limit(1).get();
+    const openidRes = await db.collection(USER_COLLECTION).where({ _openid: openid }).limit(2).get();
     const openidList = (openidRes && openidRes.data) || [];
-    if (openidList.length > 0) {
+    if (openidList.length > 1) {
+      return { ok: false, code: 'DUPLICATE_USER', msg: '当前账号存在多条记录，请联系管理员处理' };
+    }
+    const existingOpenidUser = openidList[0] || null;
+    if (existingOpenidUser && isRealnameReady(existingOpenidUser)) {
       return { ok: false, code: 'OPENID_EXISTS', msg: '该用户已存在，请直接登录' };
     }
 
@@ -379,9 +387,10 @@ exports.main = async (event, context) => {
     });
 
     // 3) 身份证唯一：同一个身份证只允许注册一次
-    const idRes = await db.collection(USER_COLLECTION).where({ idNumber }).limit(1).get();
+    const idRes = await db.collection(USER_COLLECTION).where({ idNumber }).limit(5).get();
     const idList = (idRes && idRes.data) || [];
-    if (idList.length > 0) {
+    const idConflict = idList.find((item) => pickStr(item && item._id) !== pickStr(existingOpenidUser && existingOpenidUser._id));
+    if (idConflict) {
       return { ok: false, code: 'ID_EXISTS', msg: '该用户已存在，请直接登录' };
     }
 
@@ -391,16 +400,21 @@ exports.main = async (event, context) => {
       const coll = transaction.collection(USER_COLLECTION);
 
       // 再兜底一次：同一个微信只允许一条记录
-      const txOpenidRes = await coll.where({ _openid: openid }).limit(1).get();
+      const txOpenidRes = await coll.where({ _openid: openid }).limit(2).get();
       const txOpenidList = (txOpenidRes && txOpenidRes.data) || [];
-      if (txOpenidList.length > 0) {
+      if (txOpenidList.length > 1) {
+        return { ok: false, code: 'DUPLICATE_USER', msg: '当前账号存在多条记录，请联系管理员处理' };
+      }
+      const existingLiteUser = txOpenidList[0] || null;
+      if (existingLiteUser && isRealnameReady(existingLiteUser)) {
         return { ok: false, code: 'OPENID_EXISTS', msg: '该用户已存在，请直接登录' };
       }
 
       // 再兜底一次：同一个身份证只允许一条记录
-      const txIdRes = await coll.where({ idNumber }).limit(1).get();
+      const txIdRes = await coll.where({ idNumber }).limit(5).get();
       const txIdList = (txIdRes && txIdRes.data) || [];
-      if (txIdList.length > 0) {
+      const txIdConflict = txIdList.find((item) => pickStr(item && item._id) !== pickStr(existingLiteUser && existingLiteUser._id));
+      if (txIdConflict) {
         return { ok: false, code: 'ID_EXISTS', msg: '该用户已存在，请直接登录' };
       }
 
@@ -429,29 +443,60 @@ exports.main = async (event, context) => {
         }
       };
 
-      const dataToAdd = {
+      const baseUserData = {
         ...form,
         // 统一去掉前后空格，避免 “community 不一致” 导致权限判断失败
         community,
+        nickname: pickStr(form.nickname, existingLiteUser && existingLiteUser.nickname),
         name,
         idNumber,
         legalAddr: ocrLegalAddr,
         idCardFrontFileID,
         idCardBackFileID,
         // 用户头像（云存储 fileID）
-        avatarFileID,
+        avatarFileID: pickStr(avatarFileID, existingLiteUser && existingLiteUser.avatarFileID),
         // 为了兼容登录流程中通过 _openid 查询 userInfo，这里手动写入 _openid
         _openid: openid,
         realname: true,
         verified: true,
+        registerStage: 'realname',
         // 注册后自动开户：先标记为 pending，后续再更新成功/失败
         huifu_open_status: 'pending',
+        huifu_open_fail_reason: '',
+        user_busi_status: '',
+        user_busi_fail_reason: '',
         legalAcceptance,
-        createdAt: now
+        updatedAt: now,
       };
-
-      const addRes = await coll.add({ data: dataToAdd });
-      const newId = (addRes && addRes._id) || '';
+      let newId = '';
+      let nextUser = null;
+      if (existingLiteUser && existingLiteUser._id) {
+        newId = existingLiteUser._id;
+        const updateData = {
+          ...baseUserData,
+          createdAt: existingLiteUser.createdAt || now,
+          liteRegisteredAt: existingLiteUser.liteRegisteredAt || existingLiteUser.createdAt || now,
+        };
+        await coll.doc(newId).update({ data: updateData });
+        nextUser = {
+          ...existingLiteUser,
+          ...updateData,
+          _id: newId,
+          id: pickStr(existingLiteUser.id, newId) || newId
+        };
+      } else {
+        const createData = {
+          ...baseUserData,
+          createdAt: now
+        };
+        const addRes = await coll.add({ data: createData });
+        newId = (addRes && addRes._id) || '';
+        nextUser = {
+          ...createData,
+          _id: newId,
+          id: newId
+        };
+      }
 
       // 同步写入 user_community：用 openid 作为 docId（有则更新，无则创建）
       const ucColl = transaction.collection(USER_COMMUNITY_COLLECTION);
@@ -480,11 +525,7 @@ exports.main = async (event, context) => {
       return {
         ok: true,
         id: newId,
-        user: {
-          ...dataToAdd,
-          _id: newId,
-          id: newId
-        }
+        user: nextUser
       };
     });
 

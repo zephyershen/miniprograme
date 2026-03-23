@@ -145,9 +145,9 @@ Page({
       }
 
       closeLoading();
-      wx.showToast({ title: "登录成功", icon: "success" });
+      wx.showToast({ title: userDoc.realname ? "登录成功" : "已登录", icon: "success" });
       setTimeout(() => {
-        wx.switchTab({ url: "/pages/home/index/index" });
+        wx.switchTab({ url: userDoc.realname ? "/pages/home/index/index" : "/pages/profile/index/index" });
       }, 350);
     } catch (err) {
       console.error("登录/注册入口失败", err);
@@ -229,7 +229,7 @@ Page({
     }
 
     this.setData({ showCommunityPicker: false });
-    wx.navigateTo({ url: "/pages/auth/realname/index" });
+    wx.navigateTo({ url: "/pages/auth/register/index" });
   },
 
   // 管理员弹窗（仅开发环境可见）

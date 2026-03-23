@@ -1,9 +1,6 @@
 const { formatMoney } = require('../../../utils/format');
 const { getStoredUser } = require('../../../utils/userIdentity');
 
-const db = wx.cloud.database();
-const GOODS_COLLECTION = 'goods';
-
 const GOODS_CATEGORY_OPTIONS = [
   { key: 'all', label: '全部' },
   { key: 'digital', label: '电子数码' },
@@ -44,6 +41,7 @@ const TEMP_URL_BATCH_SIZE = 50;
 const GOODS_PAGE_SIZE = 30;
 // 发布商品后用于触发商品列表刷新
 const GOODS_REFRESH_TOKEN_KEY = 'hyyc_goods_refresh_token';
+const NEW_GOODS_POLL_INTERVAL_MS = 25000;
 
 // 商品瀑布流：封面高度 = 列宽 * coverRatio(height/width)，这里做一个夹逼，避免“海报图”极端拉长
 const WATERFALL_COVER_RATIO_MIN = 0.85;
@@ -86,8 +84,21 @@ function isMarkerNewer(a, b) {
   return String(a.id) > String(b.id);
 }
 
+function isFunctionNotFoundError(err = {}) {
+  const text = pickStr(
+    err && err.errMsg,
+    err && err.message,
+    err
+  );
+  return text.includes('FunctionName parameter could not be found')
+    || text.includes('FUNCTION_NOT_FOUND')
+    || text.includes('-501000');
+}
+
 Page({
   data: {
+    needsLogin: false,
+    needsRealname: false,
     goodsCategory: 'all',
     goodsCategoryExpanded: false,
     goodsCategoryOptions: GOODS_CATEGORY_OPTIONS,
@@ -110,6 +121,7 @@ Page({
   onLoad() {
     // Tab 页会被缓存：onShow 会频繁触发，但不希望每次都重刷列表。
     this._pageInited = false;
+    this._effectiveGoodsCommunity = '';
     this._handledRefreshToken = Number(wx.getStorageSync(GOODS_REFRESH_TOKEN_KEY) || 0) || 0;
     this._savedScrollTop = 0;
 
@@ -118,6 +130,7 @@ Page({
     this._newGoodsWatchKey = '';
     this._newGoodsWatchInited = false;
     this._newGoodsWatchLatest = null;
+    this._newGoodsPollTimer = null;
 
     // 缩略图预加载缓存：thumbUrl -> wxfile temp path
     this._thumbLocalByUrl = {};
@@ -130,9 +143,42 @@ Page({
   onShow() {
     this._isVisible = true;
     const u = getStoredUser();
-    if (!u || !u.realname) {
-      wx.navigateTo({ url: '/pages/welcome/index' });
+    if (!u || !u.id) {
+      this._effectiveGoodsCommunity = '';
+      this._clearVirtualTimers();
+      this._clearNewGoodsWatch();
+      this.setData({
+        needsLogin: true,
+        needsRealname: false,
+        isLoading: false,
+        goodsTotal: 0,
+        renderLeft: [],
+        renderRight: [],
+        hasMore: false,
+        loadMoreError: '',
+        showNewGoodsTip: false,
+      });
       return;
+    }
+    if (!u.realname) {
+      this._effectiveGoodsCommunity = '';
+      this._clearVirtualTimers();
+      this._clearNewGoodsWatch();
+      this.setData({
+        needsLogin: false,
+        needsRealname: true,
+        isLoading: false,
+        goodsTotal: 0,
+        renderLeft: [],
+        renderRight: [],
+        hasMore: false,
+        loadMoreError: '',
+        showNewGoodsTip: false,
+      });
+      return;
+    }
+    if (this.data.needsLogin || this.data.needsRealname) {
+      this.setData({ needsLogin: false, needsRealname: false });
     }
     this._initVirtualEnv();
 
@@ -188,52 +234,77 @@ Page({
     this._clearVirtualTimers();
     this._clearNewGoodsWatch();
   },
+  goWelcome() {
+    wx.navigateTo({ url: '/pages/welcome/index' });
+  },
+  goRealname() {
+    wx.navigateTo({ url: '/pages/auth/realname/index' });
+  },
   _clearNewGoodsWatch() {
     if (this._newGoodsWatcher && this._newGoodsWatcher.close) {
       this._newGoodsWatcher.close();
     }
     this._newGoodsWatcher = null;
+    if (this._newGoodsPollTimer) {
+      clearTimeout(this._newGoodsPollTimer);
+    }
+    this._newGoodsPollTimer = null;
     this._newGoodsWatchKey = '';
     this._newGoodsWatchInited = false;
     this._newGoodsWatchLatest = null;
+  },
+  _scheduleNewGoodsPoll(delay = NEW_GOODS_POLL_INTERVAL_MS) {
+    if (!this._isVisible) return;
+    if (this._newGoodsPollTimer) clearTimeout(this._newGoodsPollTimer);
+    this._newGoodsPollTimer = setTimeout(() => {
+      this._newGoodsPollTimer = null;
+      this._pollLatestGoods();
+    }, Math.max(3000, Number(delay) || NEW_GOODS_POLL_INTERVAL_MS));
   },
   _openNewGoodsWatch(force = false) {
     if (!this._isVisible) return;
 
     const u = getStoredUser();
-    const community = pickStr(u.community);
+    const community = pickStr(this._effectiveGoodsCommunity, u.community);
     const c = pickStr(this.data.goodsCategory) || 'all';
     const key = `${community}::${c}`;
 
-    if (!force && this._newGoodsWatcher && this._newGoodsWatchKey === key) return;
+    if (!force && this._newGoodsWatchKey === key && this._newGoodsPollTimer) return;
 
     this._clearNewGoodsWatch();
     this._newGoodsWatchKey = key;
-
-    const where = { status: 'posted' };
-    if (community) where.community = community;
-    if (c && c !== 'all') where.category = c;
-
+    this._pollLatestGoods(true);
+  },
+  async _pollLatestGoods(immediate = false) {
+    if (!this._isVisible) return;
+    const c = pickStr(this.data.goodsCategory) || 'all';
     try {
-      this._newGoodsWatcher = db.collection(GOODS_COLLECTION)
-        .where(where)
-        .orderBy('createdAt', 'desc')
-        .orderBy('_id', 'desc')
-        .limit(1)
-        .watch({
-          onChange: (snapshot) => this._onNewGoodsWatchChange(snapshot),
-          onError: (err) => {
-            console.error('商品列表新商品 watch error', err);
-          }
-        });
-    } catch (e) {
-      console.error('开启新商品监听失败', e);
+      const res = await wx.cloud.callFunction({
+        name: 'getGoodsProfile',
+        data: {
+          action: 'list_public_goods',
+          category: c,
+          limit: 1
+        }
+      });
+      const result = (res && res.result) || {};
+      if (result.ok !== true) {
+        throw new Error(result.message || result.code || '轮询商品失败');
+      }
+      if (typeof result.communityUsed === 'string') {
+        this._effectiveGoodsCommunity = pickStr(result.communityUsed);
+      }
+      const items = Array.isArray(result.items) ? result.items : [];
+      const latest = toMarkerFromDoc(items[0]);
+      this._applyLatestGoodsMarker(latest);
+      this._scheduleNewGoodsPoll(immediate ? NEW_GOODS_POLL_INTERVAL_MS : NEW_GOODS_POLL_INTERVAL_MS);
+    } catch (err) {
+      console.warn('商品列表新商品轮询失败', err);
+      this._scheduleNewGoodsPoll(NEW_GOODS_POLL_INTERVAL_MS * 2);
     }
   },
-  _onNewGoodsWatchChange(snapshot) {
+  _applyLatestGoodsMarker(latest) {
     if (!this._isVisible) return;
-    const docs = (snapshot && snapshot.docs) || [];
-    const latest = toMarkerFromDoc(docs[0]);
     if (!latest || !latest.id) return;
 
     // 列表还在加载时，不提示（刚进页面那次加载是最新的，不需要提示条）
@@ -1033,66 +1104,42 @@ Page({
     this.loadMoreGoods(true);
   },
   _queryGoodsPage(cursor = null, limit = GOODS_PAGE_SIZE) {
-    const u = getStoredUser();
-    const community = (u.community || '').trim();
     const c = this.data.goodsCategory || 'all';
-    const _ = db.command;
-
-    return new Promise((resolve, reject) => {
-      // cursor 分页：用 (createdAt desc, _id desc) 做稳定排序
-      // 下一页条件：createdAt < lastCreatedAt OR (createdAt == lastCreatedAt AND _id < lastId)
-      const baseWhere = {};
-      if (community) baseWhere.community = community;
-      if (c && c !== 'all') baseWhere.category = c;
-      // 只展示已上架（posted）的商品：
-      // 审核中（pending）/需修改（need_fix）的内容不会出现在商品广场里。
-      baseWhere.status = 'posted';
-
-      let cursorWhere = null;
-      if (cursor && cursor.createdAt) {
-        if (cursor.id) {
-          cursorWhere = _.or([
-            { createdAt: _.lt(cursor.createdAt) },
-            { createdAt: cursor.createdAt, _id: _.lt(cursor.id) }
-          ]);
-        } else {
-          cursorWhere = { createdAt: _.lt(cursor.createdAt) };
-        }
+    return wx.cloud.callFunction({
+      name: 'getGoodsProfile',
+      data: {
+        action: 'list_public_goods',
+        category: c,
+        limit: Math.max(1, Number(limit) || 1),
+        cursor: cursor && cursor.createdAt
+          ? {
+              createdAt: cursor.createdAt,
+              id: cursor.id || ''
+            }
+          : null,
+        anchor: this._goodsAnchor && this._goodsAnchor.createdAt
+          ? {
+              createdAt: this._goodsAnchor.createdAt,
+              id: this._goodsAnchor.id || ''
+            }
+          : null
       }
-
-      let anchorWhere = null;
-      const anchor = this._goodsAnchor;
-      if (anchor && anchor.createdAt) {
-        // createdAt < anchorAt OR (createdAt == anchorAt AND _id <= anchorId)
-        if (anchor.id) {
-          anchorWhere = _.or([
-            { createdAt: _.lt(anchor.createdAt) },
-            { createdAt: anchor.createdAt, _id: _.lte(anchor.id) }
-          ]);
-        } else {
-          anchorWhere = { createdAt: _.lte(anchor.createdAt) };
-        }
+    }).then((res) => {
+      const result = (res && res.result) || {};
+      if (!result.ok) {
+        throw new Error(result.message || result.code || '加载商品失败');
       }
-
-      const andParts = [];
-      if (Object.keys(baseWhere).length) andParts.push(baseWhere);
-      if (anchorWhere) andParts.push(anchorWhere);
-      if (cursorWhere) andParts.push(cursorWhere);
-
-      const whereCond = andParts.length === 1 ? andParts[0] : (andParts.length ? _.and(andParts) : null);
-
-      let q = db.collection(GOODS_COLLECTION);
-      if (whereCond) q = q.where(whereCond);
-
-      q
-        .orderBy('createdAt', 'desc')
-        // 作为同一 createdAt 下的稳定 tie-breaker，避免分页漏数据
-        .orderBy('_id', 'desc')
-        .limit(Math.max(1, Number(limit) || 1))
-        .get({
-          success: resolve,
-          fail: reject
-        });
+      return {
+        data: Array.isArray(result.items) ? result.items : [],
+        hasMore: result.hasMore === true,
+        nextCursor: result.nextCursor || null,
+        communityUsed: pickStr(result.communityUsed)
+      };
+    }).catch((err) => {
+      if (isFunctionNotFoundError(err)) {
+        throw err;
+      }
+      throw err;
     });
   },
   _mapGoodsDoc(doc = {}) {
@@ -1148,13 +1195,20 @@ Page({
     try {
       const res = await this._queryGoodsPage(this._goodsCursor, GOODS_PAGE_SIZE);
       const raw = (res && res.data) ? res.data : [];
+      if (res && typeof res.communityUsed === 'string') {
+        this._effectiveGoodsCommunity = res.communityUsed;
+      }
       // 固定本次列表会话的快照上界：避免分页过程中插入的新数据导致“翻页漏/乱序”
       if (!this._goodsAnchor && raw.length) {
         const first = raw[0];
         if (first && first.createdAt) this._goodsAnchor = { createdAt: first.createdAt, id: first._id };
       }
-      if (raw.length < GOODS_PAGE_SIZE) this._goodsHasMore = false;
-      if (raw.length) {
+      this._goodsHasMore = !!(res && res.hasMore);
+      if (res && res.nextCursor && res.nextCursor.createdAt) {
+        this._goodsCursor = { createdAt: res.nextCursor.createdAt, id: res.nextCursor.id || '' };
+      } else if (!this._goodsHasMore) {
+        this._goodsCursor = null;
+      } else if (raw.length) {
         const last = raw[raw.length - 1];
         if (last && last.createdAt) {
           this._goodsCursor = { createdAt: last.createdAt, id: last._id };

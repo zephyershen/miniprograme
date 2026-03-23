@@ -1,0 +1,96 @@
+<ui-loading show="{{isLoading}}" />
+<view class="apple">
+  <view class="hero">
+    <view>
+      <text class="h1">先完成基础注册</text>
+    </view>
+    <view>
+      <text class="sub">现在不用上传身份证，先把账号建好。查看任务、商品、活动前再去实名。</text>
+    </view>
+  </view>
+
+  <view class="panel">
+    <view class="tips-card">
+      <text class="tips-title">基础注册后可做什么</text>
+      <text class="tips-text">你可以先进入“我的”页面查看说明、完善头像昵称；等需要接单、查看任务和商品时，再完成实名升级。</text>
+    </view>
+
+    <view class="group">
+      <text class="label">头像</text>
+      <view class="avatar-box">
+        <button class="avatar-btn" open-type="chooseAvatar" bind:chooseavatar="onChooseAvatar">
+          <image wx:if="{{avatarUrl}}" class="avatar-img" src="{{avatarUrl}}" mode="aspectFill" />
+          <view wx:else class="avatar-placeholder">
+            <text class="avatar-plus">+</text>
+            <text class="avatar-hint">选择头像</text>
+          </view>
+        </button>
+      </view>
+    </view>
+
+    <view class="group">
+      <text class="label">昵称</text>
+      <view class="row field-row">
+        <input
+          class="control field-input"
+          type="nickname"
+          placeholder="可填写昵称，也可点右侧“获取”后从键盘上方选择微信昵称"
+          value="{{form.nickname}}"
+          focus="{{nicknameFocus}}"
+          bindinput="onInput"
+          data-key="nickname"
+        />
+        <button
+          class="auth-inline-btn"
+          bindtap="onGetWechatProfile"
+        >获取</button>
+      </view>
+    </view>
+
+    <view class="group">
+      <text class="label">手机号<text class="label-star">*</text></text>
+      <view class="row field-row">
+        <input class="control control-disabled field-input" placeholder="请点击右侧“获取”授权获取手机号" placeholder-class="placeholder-disabled" disabled="{{true}}" value="{{form.phone}}" />
+        <button
+          class="auth-inline-btn {{phoneVerified ? 'auth-inline-btn-disabled' : ''}}"
+          open-type="getPhoneNumber"
+          bindgetphonenumber="onGetPhoneNumber"
+          disabled="{{phoneVerified}}"
+        >{{phoneVerified ? '已获取' : '获取'}}</button>
+      </view>
+      <text class="error" wx:if="{{errors.phone}}">{{errors.phone}}</text>
+    </view>
+
+    <view class="group">
+      <text class="label">所属小区<text class="label-star">*</text></text>
+      <picker mode="selector" range="{{communityLabels}}" value="{{communityIndex}}" bindchange="onCommunityChange">
+        <view class="control row space-between">
+          <text class="ellipsis">{{form.community || '请选择小区'}}</text>
+          <text>›</text>
+        </view>
+      </picker>
+      <text class="error" wx:if="{{errors.community}}">{{errors.community}}</text>
+    </view>
+
+    <view class="agreement">
+      <view class="agreement-row">
+        <view class="agreement-check {{agreeChecked ? 'is-checked' : ''}}" bindtap="toggleAgree"></view>
+        <view class="agreement-text" bindtap="toggleAgree">
+          <text>我已阅读并同意</text>
+          <text class="agreement-link" catchtap="openLegalDoc" data-type="user_agreement">「用户协议」</text>
+          <text>和</text>
+          <text class="agreement-link" catchtap="openLegalDoc" data-type="privacy_policy">「隐私政策」</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="actions">
+      <view class="btn btn-primary btn-continue" bindtap="submit">完成基础注册</view>
+      <view class="btn btn-outline btn-direct" bindtap="goRealnameDirect">我想直接实名</view>
+    </view>
+  </view>
+
+  <view class="footer">
+    <text class="footer-text">基础注册不会采集身份证信息；真正使用交易和社区业务功能前，仍需实名核验。</text>
+  </view>
+</view>

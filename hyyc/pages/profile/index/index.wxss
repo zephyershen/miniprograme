@@ -97,6 +97,32 @@
   border-radius: 28rpx;
 }
 
+.verify-card {
+  margin-top: 42rpx;
+  padding: 28rpx 26rpx;
+  border-radius: 28rpx;
+}
+
+.verify-title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1F2328;
+}
+
+.verify-text {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: #6B7280;
+}
+
+.verify-btn {
+  margin-top: 20rpx;
+  text-align: center;
+}
+
 /* 快捷入口（图标+文字） */
 .quick-grid {
   display: grid;

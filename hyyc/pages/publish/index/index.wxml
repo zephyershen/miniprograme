@@ -1,6 +1,20 @@
-<ui-loading show="{{isLoading}}" text="拼命加载中..." />
+<ui-loading show="{{isLoading && !needsLogin && !needsRealname}}" text="拼命加载中..." />
 <view class="publish-type-page safe">
-  <view class="publish-type-card card card-glass">
+  <view wx:if="{{needsLogin}}" class="publish-type-card card card-glass">
+    <view class="publish-type-title">请先登录</view>
+    <view class="publish-type-divider"></view>
+    <view class="publish-gate-text">登录后才能发布任务和商品。</view>
+    <view class="btn btn-primary publish-gate-btn" bindtap="goWelcome">登录 / 注册</view>
+  </view>
+
+  <view wx:elif="{{needsRealname}}" class="publish-type-card card card-glass">
+    <view class="publish-type-title">完成实名后才能发布</view>
+    <view class="publish-type-divider"></view>
+    <view class="publish-gate-text">你已经完成基础注册，但发布任务和商品属于社区交易行为。完成实名后，才会开放发布入口。</view>
+    <view class="btn btn-primary publish-gate-btn" bindtap="goRealname">去实名</view>
+  </view>
+
+  <view wx:else class="publish-type-card card card-glass">
     <view class="publish-type-title">请选择发布类型</view>
     <view class="publish-type-divider"></view>
 

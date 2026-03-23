@@ -10,8 +10,8 @@
         <image wx:if="{{user.avatarDisplayUrl || user.avatarFileID}}" class="avatar avatar-lg" src="{{user.avatarDisplayUrl || user.avatarFileID}}" mode="aspectFill"></image>
         <view wx:else class="avatar avatar-lg"></view>
         <view class="user-text">
-          <text class="user-name">{{user.nickname||'未实名'}}</text>
-          <text class="user-sub">{{user.community||'未设置小区'}} · {{user.realname?'已实名':'未实名'}}</text>
+          <text class="user-name">{{user.nickname || (user.id ? '未实名' : '点击登录')}}</text>
+          <text class="user-sub">{{user.community||'未设置小区'}} · {{user.realname ? '已实名' : (user.id ? '已注册待实名' : '未登录')}}</text>
           <text class="user-sub" wx:if="{{user.building || user.door}}">{{user.building||''}} {{user.door?('· '+user.door):''}}</text>
         </view>
         <text class="user-arrow">›</text>
@@ -61,6 +61,12 @@
           <text class="quick-label">活动管理</text>
         </view>
       </view>
+    </view>
+
+    <view wx:if="{{user.id && !user.realname}}" class="verify-card card">
+      <text class="verify-title">基础注册已完成</text>
+      <text class="verify-text">完成实名后才会开放任务、商品、活动、消息、钱包和发布功能。</text>
+      <view class="btn btn-primary verify-btn" bindtap="gotoRealname">去完成实名</view>
     </view>
 
     <view class="logout-btn" bindtap="logout">退出登录</view>
