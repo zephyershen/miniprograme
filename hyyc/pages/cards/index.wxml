@@ -1,0 +1,33 @@
+<view class="page">
+  <view class="page-header">
+    <view>
+      <view class="eyebrow">KEEP ONLY THE USEFUL</view>
+      <view class="page-title">结论卡</view>
+      <view class="page-subtitle">{{cards.length}} / {{cardLimit}}，不是第二个无限收藏夹。</view>
+    </view>
+    <button class="ghost-button settings-button" bindtap="openSettings">设置</button>
+  </view>
+
+  <view wx:if="{{loading}}" class="loading-copy">正在读取留下的结论…</view>
+
+  <view wx:elif="{{!cards.length}}" class="empty-state card">
+    <view class="empty-title">还没有结论卡</view>
+    <view class="empty-copy">处理一条内容并选择“保留结论”，这里只会留下最小结果。</view>
+  </view>
+
+  <view wx:else class="cards-list">
+    <view wx:for="{{cards}}" wx:key="_id" class="conclusion-card card">
+      <view class="card-meta">
+        <text>{{item.sourceHost}}</text>
+        <text>{{item.createdLabel}}</text>
+      </view>
+      <view class="card-conclusion">{{item.conclusion}}</view>
+      <view class="card-use">什么时候用：{{item.useWhen}}</view>
+      <view class="card-source">{{item.sourceTitle}}</view>
+      <view class="card-actions">
+        <button class="mini-action" data-url="{{item.sourceUrl}}" bindtap="copySource">复制来源</button>
+        <button class="mini-action danger-text" data-id="{{item._id}}" bindtap="deleteCard">删除</button>
+      </view>
+    </view>
+  </view>
+</view>

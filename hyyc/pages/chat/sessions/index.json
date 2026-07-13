@@ -1,8 +1,0 @@
-{
-  "usingComponents": {
-    "ui-card": "/components/ui/card/index",
-    "ui-loading": "/components/ui/loading/index"
-  },
-  "navigationBarTitleText": "聊天会话"
-}
-

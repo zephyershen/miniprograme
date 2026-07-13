@@ -1,9 +1,0 @@
-<view class="field">
-  <view class="field-label-row">
-    <text class="field-label">{{label}}</text>
-    <text wx:if="{{hint}}" class="field-hint">{{hint}}</text>
-    <text wx:if="{{required}}" class="label-star">*</text>
-  </view>
-  <slot></slot>
-  <text wx:if="{{error}}" class="text-sm c-danger" style="margin-top:8rpx">{{error}}</text>
-</view>

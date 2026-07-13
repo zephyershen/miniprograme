@@ -1,0 +1,68 @@
+.settings-button {
+  margin: 2rpx 0 0;
+}
+
+.cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 22rpx;
+}
+
+.conclusion-card {
+  padding: 30rpx;
+}
+
+.card-meta,
+.card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.card-meta {
+  color: #877f73;
+  font-size: 22rpx;
+}
+
+.card-conclusion {
+  margin-top: 22rpx;
+  font-size: 35rpx;
+  font-weight: 730;
+  line-height: 1.5;
+}
+
+.card-use {
+  margin-top: 18rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 16rpx;
+  background: #edf3ed;
+  color: #40584b;
+  line-height: 1.55;
+}
+
+.card-source {
+  margin-top: 18rpx;
+  color: #7b746a;
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+
+.card-actions {
+  justify-content: flex-end;
+  gap: 10rpx;
+  margin-top: 20rpx;
+}
+
+.mini-action {
+  margin: 0;
+  padding: 0 18rpx;
+  background: transparent;
+  color: #1f5b45;
+  font-size: 23rpx;
+  font-weight: 550;
+  line-height: 56rpx;
+}
+
+.danger-text {
+  color: #963f32;
+}

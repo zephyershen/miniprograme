@@ -1,8 +1,0 @@
-{
-  "usingComponents": {
-    "ui-field": "/components/ui/field/index",
-    "ui-loading": "/components/ui/loading/index",
-    "ui-error-dialog": "/components/ui/error-dialog/index"
-  },
-  "navigationBarTitleText": "实名注册"
-}

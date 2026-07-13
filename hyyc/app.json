@@ -1,89 +1,34 @@
 {
   "pages": [
-    "pages/welcome/index",
-    "pages/home/index/index",
-    "pages/goods/index/index",
-    "pages/goods/detail/index",
-    "pages/publish/index/index",
-    "pages/publish/task/index",
-    "pages/publish/goods/index",
-    "pages/profile/index/index",
-    "pages/profile/account/index",
-    "pages/profile/tasks/index",
-    "pages/profile/goods/index",
-    "pages/profile/wallet/index"
-  ],
-  "subPackages": [
-    {
-      "root": "pages/auth",
-      "pages": [
-        "realname/index",
-        "legal/doc/index"
-      ]
-    },
-    {
-      "root": "pages/task",
-      "pages": [
-        "detail/index",
-        "submit/index"
-      ]
-    },
-    {
-      "root": "pages/chat",
-      "pages": [
-        "room/index",
-        "sessions/index"
-      ]
-    }
+    "pages/inbox/index",
+    "pages/digest/index",
+    "pages/cards/index",
+    "pages/settings/index"
   ],
   "window": {
-    "navigationBarTitleText": "HYYC 小区任务",
-    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTitleText": "别收藏了",
+    "navigationBarBackgroundColor": "#f7f4ed",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#F5F6F8",
+    "backgroundColor": "#f7f4ed",
     "backgroundTextStyle": "dark"
   },
-  "style": "v2",
-  "sitemapLocation": "sitemap.json",
   "tabBar": {
-    "color": "#6b7280",
-    "selectedColor": "#B95E49",
-    "backgroundColor": "#ffffff",
-    "borderStyle": "black",
+    "color": "#777168",
+    "selectedColor": "#1f5b45",
+    "backgroundColor": "#fffdf8",
+    "borderStyle": "white",
     "list": [
       {
-        "pagePath": "pages/home/index/index",
-        "text": "任务",
-        "iconPath": "assets/tabbar/task-unclick.png",
-        "selectedIconPath": "assets/tabbar/task-clicked.png"
+        "pagePath": "pages/inbox/index",
+        "text": "待消化"
       },
       {
-        "pagePath": "pages/goods/index/index",
-        "text": "商品",
-        "iconPath": "assets/tabbar/goods-unclick.png",
-        "selectedIconPath": "assets/tabbar/goods-clicked.png"
-      },
-      {
-        "pagePath": "pages/publish/index/index",
-        "text": "发布",
-        "iconPath": "assets/tabbar/add-unclick.png",
-        "selectedIconPath": "assets/tabbar/add-clicked.png"
-      },
-      {
-        "pagePath": "pages/profile/index/index",
-        "text": "我的",
-        "iconPath": "assets/tabbar/profile-unclick.png",
-        "selectedIconPath": "assets/tabbar/profile-clicked.png"
+        "pagePath": "pages/cards/index",
+        "text": "结论卡"
       }
     ]
   },
-  "requiredPrivateInfos": [
-    "getLocation"
-  ],
-  "permission": {
-    "scope.userLocation": {
-      "desc": "用于验证您是否在本小区范围内，以保障社区安全"
-    }
-  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
   "lazyCodeLoading": "requiredComponents"
 }

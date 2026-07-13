@@ -1,8 +1,0 @@
-{
-  "navigationBarTitleText": "账户信息",
-  "usingComponents": {
-    "ui-card": "/components/ui/card/index",
-    "ui-loading": "/components/ui/loading/index"
-  }
-}
-

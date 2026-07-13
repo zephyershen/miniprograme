@@ -1,7 +1,17 @@
 pics/
+project.private.config.json
+*.local.js
+.env
+.env.*
+node_modules/
+hyyc/miniprogram_npm/
+hyyc/cloudfunctions/**/node_modules/
 
 # Cloud function local secrets (do not commit)
 hyyc/cloudfunctions/**/config.local.js
 hyyc/cloudfunctions/**/cert/
 hyyc/cloudfunctions/**/*.pem
 hyyc/cloudfunctions/**/*.key
+
+# Wiki secrets are intentionally local-only.
+wiki/secrets/

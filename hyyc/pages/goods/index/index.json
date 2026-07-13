@@ -1,7 +1,0 @@
-{
-  "usingComponents": {
-    "ui-loading": "/components/ui/loading/index"
-  },
-  "navigationBarTitleText": "商品列表"
-}
-

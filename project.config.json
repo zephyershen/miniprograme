@@ -1,4 +1,6 @@
 {
+  "miniprogramRoot": "hyyc/",
+  "cloudfunctionRoot": "hyyc/cloudfunctions/",
   "setting": {
     "es6": true,
     "postcss": true,
@@ -15,11 +17,13 @@
     "minifyWXML": true
   },
   "compileType": "miniprogram",
+  "libVersion": "3.12.0",
   "simulatorPluginLibVersion": {},
   "packOptions": {
     "ignore": [],
     "include": []
   },
   "appid": "wxcb0f641838abf6e6",
+  "projectname": "别收藏了",
   "editorSetting": {}
 }

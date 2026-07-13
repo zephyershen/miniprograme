@@ -1,24 +1,28 @@
-// 简单格式化：金额、日期等
-function formatMoney(n) {
-  const num = Number(n || 0);
-  return num.toFixed(2);
+const RELEVANCE = {
+  high: { label: '很相关', tone: 'high' },
+  medium: { label: '可能有用', tone: 'medium' },
+  low: { label: '关系较弱', tone: 'low' },
+  none: { label: '目前无关', tone: 'none' }
+};
+
+function formatDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${date.getMonth() + 1}月${date.getDate()}日`;
 }
 
-function formatDate(ts) {
-  const d = new Date(ts);
-  const mm = `${d.getMonth()+1}`.padStart(2,'0');
-  const dd = `${d.getDate()}`.padStart(2,'0');
-  return `${d.getFullYear()}-${mm}-${dd}`;
+function relevanceMeta(level) {
+  return RELEVANCE[level] || RELEVANCE.none;
 }
 
-// 带时间的日期格式化，输出 "YYYY-MM-DD HH:mm"
-function formatDateTime(ts) {
-  const d = new Date(ts);
-  const mm = `${d.getMonth()+1}`.padStart(2,'0');
-  const dd = `${d.getDate()}`.padStart(2,'0');
-  const hh = `${d.getHours()}`.padStart(2,'0');
-  const mi = `${d.getMinutes()}`.padStart(2,'0');
-  return `${d.getFullYear()}-${mm}-${dd} ${hh}:${mi}`;
+function formatMoney(value) {
+  const number = Number(value || 0);
+  return number.toFixed(number >= 1 ? 2 : 3);
 }
 
-module.exports = { formatMoney, formatDate, formatDateTime };
+module.exports = {
+  formatDate,
+  relevanceMeta,
+  formatMoney
+};

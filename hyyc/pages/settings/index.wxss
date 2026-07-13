@@ -1,0 +1,97 @@
+.settings-card {
+  margin-bottom: 22rpx;
+  padding: 30rpx;
+}
+
+.settings-title {
+  font-size: 32rpx;
+  font-weight: 720;
+}
+
+.settings-copy {
+  margin-top: 12rpx;
+  color: #746e64;
+  line-height: 1.65;
+}
+
+.topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin-top: 24rpx;
+}
+
+.topic {
+  padding: 16rpx 22rpx;
+  border: 1rpx solid #d8d1c6;
+  border-radius: 999rpx;
+  background: #f7f3ec;
+  color: #665f56;
+}
+
+.topic-selected {
+  border-color: #1f5b45;
+  background: #dfece4;
+  color: #1f5b45;
+  font-weight: 650;
+}
+
+.save-button,
+.purge-button {
+  margin-top: 26rpx;
+}
+
+.usage-money {
+  margin-top: 18rpx;
+  color: #1f5b45;
+  font-size: 48rpx;
+  font-weight: 750;
+}
+
+.usage-money text {
+  color: #8b8378;
+  font-size: 26rpx;
+  font-weight: 500;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16rpx;
+  margin-top: 24rpx;
+}
+
+.stat {
+  padding: 22rpx;
+  border-radius: 18rpx;
+  background: #f3efe7;
+}
+
+.stat text,
+.stat label {
+  display: block;
+}
+
+.stat text {
+  font-size: 38rpx;
+  font-weight: 730;
+}
+
+.stat label {
+  margin-top: 8rpx;
+  color: #7f786d;
+  font-size: 22rpx;
+}
+
+.validation-copy {
+  margin-top: 20rpx;
+}
+
+.usage-note {
+  margin-top: 12rpx;
+  font-size: 22rpx;
+}
+
+.danger-zone {
+  border-color: #ecd1cb;
+}
