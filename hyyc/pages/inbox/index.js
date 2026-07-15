@@ -31,7 +31,6 @@ function formatFeedDate(value) {
 
 function prepareFeedItems(raw = { items: [] }) {
   return (raw.items || [])
-    .filter((item) => Boolean(item.coverFileId))
     .map((item) => ({
       ...item,
       publishedLabel: formatFeedDate(item.publishedAt),
@@ -67,7 +66,6 @@ function decorateFeed(raw = { items: [] }, activeChannel = 'all', filters = DEFA
     activeChannel,
     activeChannelLabel: channel.label,
     resultCount: visibleItems.length,
-    totalImageCount: allItems.length,
     totalAvailable: Number(raw.totalAvailable) || allItems.length,
     filterSummary: filterSummary(filters, FILTER_OPTIONS)
   };
@@ -82,6 +80,7 @@ Page({
     draftFilters: copyFilters(),
     filterOptions: decorateFilterOptions({ items: [] }, 'all', DEFAULT_FEED_FILTERS),
     filterOpen: false,
+    filterScrollTarget: '',
     draftCount: 0,
     feed: decorateFeed()
   },
@@ -110,7 +109,7 @@ Page({
     const feed = decorateFeed(this.rawFeed || { items: [] }, activeChannel, filters);
     getApp().globalData.knowledgeFeed = {
       ...(this.rawFeed || {}),
-      items: ((this.rawFeed && this.rawFeed.items) || []).filter((item) => item.coverFileId)
+      items: (this.rawFeed && this.rawFeed.items) || []
     };
     this.setData({ feed, activeChannel, feedError });
   },
@@ -129,11 +128,13 @@ Page({
     const draftFilters = copyFilters(this.data.filters);
     const draftCount = decorateFeed(this.rawFeed || { items: [] }, this.data.activeChannel, draftFilters).resultCount;
     const filterOptions = decorateFilterOptions(this.rawFeed || { items: [] }, this.data.activeChannel, draftFilters);
-    this.setData({ filterOpen: true, draftFilters, draftCount, filterOptions });
+    this.setData({ filterOpen: true, draftFilters, draftCount, filterOptions, filterScrollTarget: '' }, () => {
+      this.setData({ filterScrollTarget: 'filter-time-group' });
+    });
   },
 
   closeFilters() {
-    this.setData({ filterOpen: false });
+    this.setData({ filterOpen: false, filterScrollTarget: '' });
   },
 
   stopPropagation() {},

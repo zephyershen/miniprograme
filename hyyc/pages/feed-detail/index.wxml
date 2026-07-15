@@ -46,7 +46,7 @@
       <view
         wx:for="{{item.relatedItems}}"
         wx:key="id"
-        class="related-row"
+        class="related-row {{item.coverFileId ? '' : 'related-row-no-image'}}"
         data-id="{{item.id}}"
         bindtap="openRelated"
       >
@@ -55,7 +55,7 @@
           <view class="related-title">{{item.title}}</view>
           <view class="related-source">{{item.source}} →</view>
         </view>
-        <image class="related-image" src="{{item.coverFileId}}" mode="aspectFill" lazy-load="{{true}}" />
+        <image wx:if="{{item.coverFileId}}" class="related-image" src="{{item.coverFileId}}" mode="aspectFill" lazy-load="{{true}}" />
       </view>
     </view>
 

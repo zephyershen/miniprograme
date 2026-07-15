@@ -89,3 +89,12 @@
 - Sources: 公开 API/Topics 页面、当前代码、CloudBase 云端调用、真实来源封面、51 个 Node 测试、静态检查和微信开发者工具渲染。
 - Sensitive handling: 未读取或记录账号、密码、令牌、OpenID 或个人数据；普通 Wiki 只记录公开资讯和非敏感运行事实。
 - Follow-ups: 继续增加合规图文来源和重点厂商官方直连；若需提高 13 条公开图文数量，应改善真实图片获取，不恢复假封面或缺图条目。
+
+## [2026-07-15] show-text-only-feed | 取消封面展示门槛并修复筛选弹层
+
+- Session: local Codex task
+- Target pages: `wiki/index.md`, `wiki/overview.md`, `wiki/timeline.md`, `wiki/decisions/2026-07-15-editorial-knowledge-platform-ui.md`, `wiki/sources/2026-07-15-aihot-feed-integration.md`, `wiki/log.md`
+- Summary: 按用户新规则公开全部 108 条资讯，无图内容使用纯文字编辑行；首页、详情和相关阅读不再要求封面。筛选弹层改为独立滚动区并修复底部按钮遮挡，同时记录线上 CloudBase 与本地开发浏览器的网络边界。
+- Sources: 本次用户对话、当前代码、CloudBase 线上 108/108 调用、微信开发者工具首页/筛选/无图详情验证、52 个 Node 测试和静态检查。
+- Sensitive handling: 未读取或记录账号、密码、令牌、OpenID 或个人数据；网络说明不包含凭据或内部地址。
+- Follow-ups: 继续提高真实封面命中率和接入其他频道来源，但不得再次以缺图为由隐藏已收录资讯。

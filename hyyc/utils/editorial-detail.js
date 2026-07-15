@@ -49,7 +49,7 @@ function buildReadingGuide(summary) {
 function buildRelatedItems(items, current, limit = 3) {
   if (!current || !Array.isArray(items)) return [];
   return items
-    .filter((item) => item && item.id !== current.id && item.coverFileId)
+    .filter((item) => item && item.id !== current.id)
     .map((item, originalIndex) => ({
       ...item,
       originalIndex,

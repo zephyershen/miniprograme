@@ -75,7 +75,7 @@ function publicItem(item) {
 }
 
 function publicFeed(cache, stale = false) {
-  const items = (cache.items || []).filter((item) => item.coverFileId).map(publicItem);
+  const items = (cache.items || []).map(publicItem);
   return {
     updatedAt: toIso(cache.fetchedAt),
     stale,
@@ -101,7 +101,7 @@ function publicRelatedItem(item) {
 
 function relatedItems(cache, current, limit = 3) {
   return (cache.items || [])
-    .filter((item) => item.id !== current.id && item.coverFileId)
+    .filter((item) => item.id !== current.id)
     .map((item, originalIndex) => ({
       item,
       originalIndex,
@@ -233,7 +233,7 @@ async function getItem(id) {
   }
   const cache = await getCache();
   const item = cache && (cache.items || []).find((entry) => entry.id === id);
-  if (!item || !item.coverFileId) throw new AppError('ITEM_NOT_FOUND', '这条资讯已更新，请返回首页刷新');
+  if (!item) throw new AppError('ITEM_NOT_FOUND', '这条资讯已更新，请返回首页刷新');
   return { ...publicItem(item), relatedItems: relatedItems(cache, item) };
 }
 

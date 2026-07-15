@@ -144,6 +144,16 @@
   border-bottom: 1rpx solid var(--editorial-rule);
 }
 
+.related-row-no-image {
+  min-height: 0;
+  padding: 30rpx 0;
+}
+
+.related-row-no-image .related-copy {
+  padding-left: 20rpx;
+  border-left: 5rpx solid var(--editorial-rule);
+}
+
 .related-copy {
   display: flex;
   flex: 1;

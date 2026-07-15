@@ -13,8 +13,8 @@ function filterFeedItems(items, filters, now = Date.now()) {
   const threshold = now - windowMs;
   return (items || []).filter((item) => {
     const publishedAt = new Date(item.publishedAt).getTime();
-    return Number.isFinite(publishedAt)
-      && publishedAt >= threshold
+    const withinTime = filters.time === '7d' || (Number.isFinite(publishedAt) && publishedAt >= threshold);
+    return withinTime
       && hasTopic(item, filters.company)
       && hasTopic(item, filters.direction);
   });

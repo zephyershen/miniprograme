@@ -20,7 +20,7 @@
       <text class="filter-bar-summary">{{feed.filterSummary}}</text>
     </view>
     <view class="filter-bar-count">
-      <text class="filter-bar-result">{{feed.resultCount}} 条图文 ↘</text>
+      <text class="filter-bar-result">{{feed.resultCount}} 条资讯 ↘</text>
       <text wx:if="{{feed.totalAvailable}}" class="filter-bar-total">本周收录 {{feed.totalAvailable}}</text>
     </view>
   </view>
@@ -45,8 +45,8 @@
   </view>
 
   <block wx:else>
-    <view class="lead-story" data-id="{{feed.leadItem.id}}" bindtap="openFeedItem">
-      <image class="lead-cover" src="{{feed.leadItem.coverFileId}}" mode="aspectFill" lazy-load="{{true}}" />
+    <view class="lead-story {{feed.leadItem.coverFileId ? '' : 'lead-story-text'}}" data-id="{{feed.leadItem.id}}" bindtap="openFeedItem">
+      <image wx:if="{{feed.leadItem.coverFileId}}" class="lead-cover" src="{{feed.leadItem.coverFileId}}" mode="aspectFill" lazy-load="{{true}}" />
       <view class="story-meta">
         <text class="channel-label channel-text-{{feed.leadItem.coverTone}}">{{feed.leadItem.categoryLabel}}</text>
         <text>{{feed.leadItem.source}}</text>
@@ -69,7 +69,7 @@
       <view
         wx:for="{{feed.remainingItems}}"
         wx:key="id"
-        class="story-row"
+        class="story-row {{item.coverFileId ? '' : 'story-row-no-image'}}"
         data-id="{{item.id}}"
         bindtap="openFeedItem"
       >
@@ -81,7 +81,7 @@
           <view class="story-title">{{item.title}}</view>
           <view class="story-action">{{item.source}} · {{item.scoreLabel}}</view>
         </view>
-        <image class="story-thumbnail" src="{{item.coverFileId}}" mode="aspectFill" lazy-load="{{true}}" />
+        <image wx:if="{{item.coverFileId}}" class="story-thumbnail" src="{{item.coverFileId}}" mode="aspectFill" lazy-load="{{true}}" />
       </view>
     </view>
   </block>
@@ -92,13 +92,14 @@
         <view>
           <view class="filter-panel-kicker">内容筛选</view>
           <view class="filter-panel-title">找到你关心的更新</view>
-          <view class="filter-panel-status">本周收录 {{feed.totalAvailable}} 条，当前 {{feed.totalImageCount}} 条带来源配图</view>
+          <view class="filter-panel-status">共收录 {{feed.totalAvailable}} 条，筛选结果按当前频道实时计算</view>
         </view>
         <view class="filter-panel-close" bindtap="closeFilters">关闭</view>
       </view>
 
-      <scroll-view scroll-y enhanced show-scrollbar="{{false}}" class="filter-panel-scroll">
-        <view class="filter-group">
+      <scroll-view scroll-y enhanced show-scrollbar="{{false}}" scroll-into-view="{{filterScrollTarget}}" class="filter-panel-scroll">
+        <view class="filter-scroll-content">
+        <view id="filter-time-group" class="filter-group">
           <view class="filter-group-title">时间范围</view>
           <view class="filter-choice-list">
             <view
@@ -140,6 +141,7 @@
               bindtap="selectFilter"
             ><text>{{item.label}}</text><text class="filter-choice-count">{{item.count}}</text></view>
           </view>
+        </view>
         </view>
       </scroll-view>
 

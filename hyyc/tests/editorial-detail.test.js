@@ -19,7 +19,7 @@ test('splits an overlong sentence at clauses but keeps every clause intact', () 
   assert.equal(combined.includes('…'), false);
 });
 
-test('uses real covered items from the same category before broader channel updates', () => {
+test('keeps text-only related items and still prefers the same category', () => {
   const current = { id: '1', category: 'paper', channelKey: 'ai' };
   const items = [
     current,
@@ -28,7 +28,7 @@ test('uses real covered items from the same category before broader channel upda
     { id: '4', category: 'paper', channelKey: 'ai', coverFileId: 'cloud://4' },
     { id: '5', category: 'paper', channelKey: 'ai', coverFileId: '' }
   ];
-  assert.deepEqual(buildRelatedItems(items, current).map((item) => item.id), ['4', '3', '2']);
+  assert.deepEqual(buildRelatedItems(items, current).map((item) => item.id), ['4', '5', '3']);
 });
 
 test('opens only verified webview hosts and falls back to copying every other source', () => {
