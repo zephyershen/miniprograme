@@ -2,10 +2,10 @@
 title: "“别收藏了”首版产品与技术边界"
 type: decision
 tags: [decision, product, digest-inbox, v1]
-sources: [../sources/2026-07-13-digest-inbox-implementation.md]
+sources: [../sources/2026-07-13-digest-inbox-implementation.md, ../sources/2026-07-15-wechat-e2e-and-runtime-fixes.md]
 date: 2026-07-13
-last_updated: 2026-07-13
-status: accepted
+last_updated: 2026-07-15
+status: superseded
 confidence: high
 ---
 
@@ -17,10 +17,11 @@ confidence: high
 
 ## 最终决策
 
-首版闭环固定为：粘贴公开网页链接 → AI 输出摘要、相关性和关键句 → 用户丢弃或保留 → 生成结论卡。
+首版闭环固定为：粘贴公开网页链接 → 输出摘要 → 用户丢弃或保留 → 生成结论卡。
 
 - 队列最多 5 条，卡片最多 20 张。
-- AI 可以判断文章“目前与你无关”，不得强行关联。
+- AI 可用时可以判断文章“目前与你无关”，不得强行关联。
+- AI 不可用时只提供明确标注的本地临时摘要，不声称完成 AI 翻译或相关性判断。
 - 不做资讯流、抓取订阅、排行榜、每日新闻、推送、支付、广告、会员或公开运营。
 - 原文只允许复制来源链接，不展示任意网页全文。
 - 首月只做微信体验版和个人 30 天验证。
@@ -30,7 +31,8 @@ confidence: high
 - 使用 `digestIngest` 和 `digestStore` 两个 Node.js 18 云函数。
 - 原始正文只在内存中处理一次；数据库保存结构化摘要、队列状态、卡片、统计和成本。
 - 只接受可匿名访问的中英文 HTTPS 文章页，执行 URL、DNS、重定向、大小和输出结构校验。
-- 月度 AI 预算硬上限 10 元，失败不入队，卡片替换必须由用户明确选择。
+- 月度 AI 预算硬上限 10 元；AI 失败时释放预算预留，并按 [透明临时摘要决策](2026-07-15-ai-quota-fallback.md) 保持可处理队列。
+- 卡片替换必须由用户明确选择。
 
 ## 成功标准
 
@@ -38,4 +40,4 @@ confidence: high
 
 ## 状态
 
-`accepted`，本地实现完成；云端部署与 30 天验证尚未开始。
+`superseded`。本地实现、两个云函数部署及真实微信身份下的端到端闭环仍是当前可用的迁移基础，但“不做资讯流”的产品边界已在 2026-07-15 被 [编辑索引式知识平台首页决策](2026-07-15-editorial-knowledge-platform-ui.md) 替代。真正 AI 调用仍受当前套餐 Token 额度限制，体验版上传与官方内容源聚合尚未完成。

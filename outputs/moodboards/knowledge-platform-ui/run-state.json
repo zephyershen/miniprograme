@@ -1,0 +1,11 @@
+{
+  "updatedAt": "2026-07-15T00:58:51.452Z",
+  "paths": {
+    "runStatePath": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\run-state.json",
+    "latestActionPath": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\latest-action.json",
+    "pendingActionsPath": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\pending-actions.jsonl"
+  },
+  "runDirectory": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui",
+  "streamPath": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\data\\stream.json",
+  "appUrl": "http://127.0.0.1:8794/mood-board.html"
+}

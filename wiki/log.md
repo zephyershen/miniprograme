@@ -17,3 +17,57 @@
 - Sources: 当前本地代码、Git 命令、31 个 Node 测试、项目静态检查和本次用户确认的实施方案。
 - Sensitive handling: 仅记录 AppID、环境 ID 和环境变量名称；未保存 AppSecret、AI 密钥、支付私钥、证书、用户数据或旧数据库内容。
 - Follow-ups: 在有权限的微信开发者工具和 CloudBase 环境中完成资源盘点、确认清理、模型核对、部署、体验版上传与 30 天验证。
+
+## [2026-07-14] cloud-cleanup-deploy | 清理旧云业务并部署首版函数
+
+- Session: local Codex task
+- Target pages: `wiki/index.md`, `wiki/overview.md`, `wiki/timeline.md`, `wiki/entities/WeChatMiniProgram.md`, `wiki/decisions/`, `wiki/sources/2026-07-14-cloud-cleanup-and-deployment.md`
+- Summary: 记录目标环境的在线资源盘点与不可逆清理结果、5 个新集合及权限、标准版计费状态、两个 Node.js 18.15 云函数部署和无写入健康检查；把旧的“云端尚未清理/部署”结论更新为已完成。
+- Sources: CloudBase CLI/API 命令输出、`cloudbaserc.json`、当前 Git 状态和本次用户确认。
+- Sensitive handling: 未保存登录凭据、密钥值、旧业务数据内容、账户余额数值或支付信息；只记录非敏感资源数量、名称和状态。
+- Follow-ups: 用真实微信 OpenID 验证 `dashboard`，确认 CloudBase 模型可调用，完成一次受控文章消化、开发者工具编译、真机预览和体验版上传。
+
+## [2026-07-14] secrets | 保存腾讯云自动化登录凭据
+
+- Session: local Codex task
+- Target pages: `wiki/secrets/index.md`, `wiki/secrets/TencentCloud.md`, `wiki/log.md`
+- Summary: 按用户明确要求，将腾讯云 CloudBase 自动化登录凭据保存到项目 Wiki 的受限敏感区，并记录用途、环境、验证状态和轮换规则。
+- Sources: 本次用户对话和已完成的 CloudBase 登录/部署验证。
+- Sensitive handling: 实际账号和密码只存在于 `wiki/secrets/TencentCloud.md`；普通日志不记录实际值，整个 `wiki/secrets/` 已由 `.gitignore` 排除。
+- Follow-ups: 用户轮换密码后同步更新受限文件；自动化任务仅在项目授权范围内读取。
+
+## [2026-07-15] runtime-fix-e2e | 完成真实微信闭环并记录 AI 降级策略
+
+- Session: local Codex task
+- Target pages: `wiki/index.md`, `wiki/overview.md`, `wiki/timeline.md`, `wiki/entities/WeChatMiniProgram.md`, `wiki/decisions/`, `wiki/sources/2026-07-15-wechat-e2e-and-runtime-fixes.md`, `wiki/log.md`
+- Summary: 记录真实微信身份下的完整业务闭环，写入 `_id`、事务并发和 `ws` 依赖修复，确认 `hunyuan-v3 / hy3-preview` 的 429 额度限制，并接受明确标注的本地临时摘要兜底。验证数据已清除。
+- Sources: 微信开发者工具运行结果、CloudBase 函数日志与 API、当前代码、32 个 Node 测试和静态检查。
+- Sensitive handling: 普通 Wiki 未记录登录凭据、临时令牌或 OpenID；既有实际账号与密码仍只保存在被 Git 忽略且受本机 ACL 限制的 `wiki/secrets/`。
+- Follow-ups: 用户决定是否开通适用的 AI 套餐或配置自有模型；随后预览、上传体验版并开始 30 天验证。
+
+## [2026-07-15] editorial-ui | 采用编辑索引式知识平台方向并完成首轮 UI 落地
+
+- Session: local Codex task
+- Target pages: `wiki/index.md`, `wiki/overview.md`, `wiki/timeline.md`, `wiki/entities/WeChatMiniProgram.md`, `wiki/decisions/2026-07-13-digest-inbox-v1.md`, `wiki/decisions/2026-07-15-editorial-knowledge-platform-ui.md`, `wiki/sources/2026-07-15-editorial-ui-implementation.md`, `wiki/log.md`
+- Summary: 记录用户从个人消化箱转向知识获取平台的产品决策、选定的编辑索引 Moodboard、当前 UI 实现和验证结果；将旧“不做资讯流”边界标记为 superseded，同时保留已验证摘要闭环作为迁移基础。
+- Sources: 本次用户对话、选定 Moodboard、本地代码、微信开发者工具模拟器、35 个 Node 测试和静态检查。
+- Sensitive handling: 未读取或记录账号、密码、令牌、OpenID 或其他敏感值。
+- Follow-ups: 实现官方来源白名单、抓取/订阅、去重、时效排序和内容审核；在此之前不得宣称已提供实时官方资讯。
+
+## [2026-07-15] aihot-feed | 接入 AI HOT 图文资讯并完成云端验证
+
+- Session: local Codex task
+- Target pages: `wiki/index.md`, `wiki/overview.md`, `wiki/timeline.md`, `wiki/entities/WeChatMiniProgram.md`, `wiki/sources/2026-07-15-aihot-feed-integration.md`, `wiki/log.md`
+- Summary: 记录 AI HOT 公开精选 API、AI/科技频道映射、资讯详情页、15 分钟缓存、来源追踪、原文封面安全缓存与分类视觉兜底；新增一个管理端集合和第三个云函数，并完成真实数据、存储、测试及模拟器验证。
+- Sources: AI HOT 公开接口、原文公开元数据、本地代码、CloudBase CLI/API、云函数日志、对象存储清单和微信开发者工具模拟器。
+- Sensitive handling: 未读取或写入账号密码、令牌、OpenID 或个人数据；缓存仅包含公共资讯与云封面 ID。
+- Follow-ups: 分别接入娱乐、社会、游戏和英语来源；补充重点厂商官方直连、跨来源去重、审核和定时封面维护。
+
+## [2026-07-15] public-feed-cleanup | 首页收敛为纯资讯流
+
+- Session: local Codex task
+- Target pages: `wiki/index.md`, `wiki/overview.md`, `wiki/decisions/2026-07-15-editorial-knowledge-platform-ui.md`, `wiki/sources/2026-07-15-aihot-feed-integration.md`, `wiki/log.md`
+- Summary: 按用户截图反馈移除首页总标题说明、英文眉题、设置入口、待处理/导入/关注方向和个人队列；用户界面隐藏聚合平台、API、缓存等接入实现，仅展示具备真实原图的 7 条资讯，不再生成或绘制缺图兜底封面。
+- Sources: 本次用户对话、当前代码、41 个 Node 测试、静态检查、线上云函数调用和微信开发者工具模拟器截图。
+- Sensitive handling: 未读取或记录账号、密码、令牌、OpenID 或个人数据。
+- Follow-ups: 为当前无图条目补抓合规原图，并分别接入娱乐、社会、游戏和英语来源；在没有真实图片前继续隐藏相应条目。

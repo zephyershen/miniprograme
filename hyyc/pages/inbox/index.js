@@ -1,124 +1,88 @@
-const { getDashboard, ingestLink } = require('../../utils/api');
-const { LIMITS } = require('../../config/constants');
-const { formatDate, relevanceMeta } = require('../../utils/format');
+const { getKnowledgeFeed } = require('../../utils/api');
+const { decorateChannels, channelByKey } = require('../../utils/channels');
 
-function decorateDashboard(dashboard) {
-  const queue = (dashboard.queue || []).map((item) => {
-    const meta = relevanceMeta(item.relevanceLevel);
-    return {
+function formatFeedDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '时间待确认';
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hour = String(date.getHours()).padStart(2, '0');
+  const minute = String(date.getMinutes()).padStart(2, '0');
+  return `${month}.${day} ${hour}:${minute}`;
+}
+
+function decorateFeed(raw = { items: [] }, activeChannel = 'all') {
+  const items = (raw.items || [])
+    .filter((item) => Boolean(item.coverFileId))
+    .map((item, index) => ({
       ...item,
-      createdLabel: formatDate(item.createdAt),
-      relevanceLabel: meta.label,
-      relevanceTone: meta.tone
-    };
-  });
+      publishedLabel: formatFeedDate(item.publishedAt),
+      scoreLabel: Number.isFinite(Number(item.score)) ? `热度 ${item.score}` : '编辑精选',
+      sequenceLabel: String(index + 1).padStart(2, '0')
+    }));
+  const visibleItems = activeChannel === 'all'
+    ? items
+    : items.filter((item) => item.channelKey === activeChannel);
+  const channel = channelByKey(activeChannel);
 
   return {
-    ...dashboard,
-    queue,
-    pendingCount: queue.length,
-    cardCount: (dashboard.cards || []).length,
-    preferencesMissing: !(dashboard.preferences && dashboard.preferences.topics && dashboard.preferences.topics.length)
+    items,
+    visibleItems,
+    leadItem: visibleItems[0] || null,
+    remainingItems: visibleItems.slice(1),
+    channels: decorateChannels(items, activeChannel),
+    activeChannel,
+    activeChannelLabel: channel.label
   };
 }
 
 Page({
   data: {
     loading: true,
-    ingesting: false,
-    showAdd: false,
-    url: '',
-    queueLimit: LIMITS.queue,
-    dashboard: {
-      queue: [],
-      cards: [],
-      pendingCount: 0,
-      cardCount: 0,
-      preferencesMissing: true
-    }
+    activeChannel: 'all',
+    feedError: '',
+    feed: decorateFeed()
   },
 
   onShow() {
-    this.loadDashboard();
+    this.loadFeed(false);
   },
 
   onPullDownRefresh() {
-    this.loadDashboard().finally(() => wx.stopPullDownRefresh());
+    this.loadFeed(true).finally(() => wx.stopPullDownRefresh());
   },
 
-  async loadDashboard() {
-    this.setData({ loading: true });
+  async loadFeed(force) {
+    this.setData({ loading: true, feedError: '' });
     try {
-      const dashboard = decorateDashboard(await getDashboard());
-      getApp().globalData.dashboard = dashboard;
-      this.setData({ dashboard });
+      this.rawFeed = await getKnowledgeFeed(force);
+      this.present(this.data.activeChannel);
     } catch (error) {
-      wx.showToast({ title: error.message, icon: 'none' });
+      this.present(this.data.activeChannel, error.message);
     } finally {
       this.setData({ loading: false });
     }
   },
 
-  openSettings() {
-    wx.navigateTo({ url: '/pages/settings/index' });
+  present(activeChannel, feedError = '') {
+    const feed = decorateFeed(this.rawFeed || { items: [] }, activeChannel);
+    getApp().globalData.knowledgeFeed = feed;
+    this.setData({ feed, activeChannel, feedError });
   },
 
-  openAdd() {
-    const { dashboard } = this.data;
-    if (dashboard.preferencesMissing) {
-      wx.showToast({ title: '先选择最多 3 个关注方向', icon: 'none' });
-      this.openSettings();
-      return;
-    }
-    if (dashboard.pendingCount >= LIMITS.queue) {
-      wx.showToast({ title: '先处理一条内容，再添加新的', icon: 'none' });
-      return;
-    }
-    this.setData({ showAdd: true, url: '' });
+  selectChannel(event) {
+    const key = event.currentTarget.dataset.key;
+    if (!key || key === this.data.activeChannel) return;
+    this.present(key);
   },
 
-  closeAdd() {
-    if (!this.data.ingesting) this.setData({ showAdd: false, url: '' });
+  retryFeed() {
+    this.loadFeed(true);
   },
 
-  stopPropagation() {},
-
-  onUrlInput(event) {
-    this.setData({ url: event.detail.value });
-  },
-
-  async pasteFromClipboard() {
-    try {
-      const result = await wx.getClipboardData();
-      this.setData({ url: (result.data || '').trim() });
-    } catch (error) {
-      wx.showToast({ title: '没有读取到剪贴板内容', icon: 'none' });
-    }
-  },
-
-  async submitLink() {
-    const url = this.data.url.trim();
-    if (!url) {
-      wx.showToast({ title: '请粘贴文章链接', icon: 'none' });
-      return;
-    }
-
-    this.setData({ ingesting: true });
-    wx.showLoading({ title: '正在消化', mask: true });
-    try {
-      const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-      const result = await ingestLink(url, requestId);
-      this.setData({ showAdd: false, url: '' });
-      wx.navigateTo({ url: `/pages/digest/index?id=${encodeURIComponent(result.item._id)}` });
-    } catch (error) {
-      wx.showToast({ title: error.message, icon: 'none', duration: 2600 });
-    } finally {
-      wx.hideLoading();
-      this.setData({ ingesting: false });
-    }
-  },
-
-  openItem(event) {
-    wx.navigateTo({ url: `/pages/digest/index?id=${encodeURIComponent(event.currentTarget.dataset.id)}` });
+  openFeedItem(event) {
+    const id = event.currentTarget.dataset.id;
+    if (!id) return;
+    wx.navigateTo({ url: `/pages/feed-detail/index?id=${encodeURIComponent(id)}` });
   }
 });

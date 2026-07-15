@@ -1,73 +1,76 @@
-<view class="page">
-  <view class="page-header">
-    <view>
-      <view class="eyebrow">FINITE INBOX</view>
-      <view class="page-title">别收藏了</view>
-      <view class="page-subtitle">看懂、取舍，只留下真正有用的结论。</view>
-    </view>
-    <button class="ghost-button settings-button" bindtap="openSettings">设置</button>
-  </view>
-
-  <view class="counter-card card">
-    <view>
-      <view class="counter-label">待消化</view>
-      <view class="counter"><text>{{dashboard.pendingCount}}</text><text class="counter-total"> / {{queueLimit}}</text></view>
-    </view>
-    <button class="primary-button add-button" bindtap="openAdd" disabled="{{dashboard.pendingCount >= queueLimit}}">
-      {{dashboard.pendingCount >= queueLimit ? '先处理一条' : '粘贴链接'}}
-    </button>
-  </view>
-
-  <view wx:if="{{dashboard.preferencesMissing && !loading}}" class="preference-card card" bindtap="openSettings">
-    <view class="preference-title">先告诉我你关心什么</view>
-    <view class="preference-copy">选择最多 3 个非敏感方向，AI 才能诚实判断内容与你有没有关系。</view>
-    <view class="preference-link">去选择 →</view>
-  </view>
-
-  <view wx:if="{{loading}}" class="loading-copy">正在读取你的消化箱…</view>
-
-  <view wx:elif="{{!dashboard.queue.length}}" class="empty-state card">
-    <view class="empty-title">箱子是空的</view>
-    <view class="empty-copy">下次看到一篇“以后再看”的文章，先把链接放进来。这里最多只收 5 条。</view>
-  </view>
-
-  <view wx:else class="queue-list">
-    <view
-      wx:for="{{dashboard.queue}}"
-      wx:key="_id"
-      class="queue-item card"
-      data-id="{{item._id}}"
-      bindtap="openItem"
-    >
-      <view class="queue-topline">
-        <text class="source-host">{{item.sourceHost}}</text>
-        <text class="relevance-pill relevance-{{item.relevanceTone}}">{{item.relevanceLabel}}</text>
-      </view>
-      <view class="queue-title">{{item.sourceTitle}}</view>
-      <view class="queue-summary">{{item.summaryZh}}</view>
-      <view class="queue-footer">
-        <text>{{item.createdLabel}}</text>
-        <text>去处理 →</text>
+<view class="editorial-page">
+  <scroll-view scroll-x enhanced show-scrollbar="{{false}}" class="channel-scroll">
+    <view class="channel-track">
+      <view
+        wx:for="{{feed.channels}}"
+        wx:key="key"
+        class="channel-tab {{item.active ? 'channel-tab-active channel-tab-' + item.tone : ''}}"
+        data-key="{{item.key}}"
+        bindtap="selectChannel"
+      >
+        <text>{{item.label}}</text>
+        <text wx:if="{{item.count}}" class="channel-count">{{item.count}}</text>
       </view>
     </view>
-  </view>
-</view>
+  </scroll-view>
 
-<view wx:if="{{showAdd}}" class="modal-mask" bindtap="closeAdd">
-  <view class="modal-panel" catchtap="stopPropagation">
-    <view class="modal-title">放进消化箱</view>
-    <view class="modal-copy">只支持无需登录的中英文 HTTPS 文章。原始正文不会被永久保存。</view>
-    <textarea
-      class="input"
-      maxlength="2048"
-      placeholder="https://example.com/article"
-      value="{{url}}"
-      bindinput="onUrlInput"
-      disabled="{{ingesting}}"
-    />
-    <view class="button-row">
-      <button class="secondary-button" bindtap="pasteFromClipboard" disabled="{{ingesting}}">读取剪贴板</button>
-      <button class="primary-button" bindtap="submitLink" loading="{{ingesting}}" disabled="{{ingesting}}">开始消化</button>
-    </view>
+  <view wx:if="{{loading}}" class="loading-editorial">
+    <view class="loading-media"></view>
+    <view class="loading-line loading-line-strong"></view>
+    <view class="loading-line"></view>
+    <view class="loading-line loading-line-short"></view>
   </view>
+
+  <view wx:elif="{{feedError}}" class="empty-editorial">
+    <view class="empty-title">资讯暂时没有加载成功</view>
+    <view class="empty-copy">{{feedError}}</view>
+    <button class="empty-action" bindtap="retryFeed">重新加载</button>
+  </view>
+
+  <view wx:elif="{{!feed.visibleItems.length}}" class="empty-editorial">
+    <view class="empty-title">{{feed.activeChannelLabel}}暂时没有有图资讯</view>
+    <view class="empty-copy">有新内容后会在这里更新，你也可以切换其他频道查看。</view>
+  </view>
+
+  <block wx:else>
+    <view class="lead-story" data-id="{{feed.leadItem.id}}" bindtap="openFeedItem">
+      <image class="lead-cover" src="{{feed.leadItem.coverFileId}}" mode="aspectFill" lazy-load="{{true}}" />
+      <view class="story-meta">
+        <text class="channel-label channel-text-{{feed.leadItem.coverTone}}">{{feed.leadItem.categoryLabel}}</text>
+        <text>{{feed.leadItem.source}}</text>
+        <text>{{feed.leadItem.publishedLabel}}</text>
+      </view>
+      <view class="lead-title">{{feed.leadItem.title}}</view>
+      <view wx:if="{{feed.leadItem.summary}}" class="lead-summary">{{feed.leadItem.summary}}</view>
+      <view class="lead-footer">
+        <text>{{feed.leadItem.scoreLabel}}</text>
+        <text>查看详情 →</text>
+      </view>
+    </view>
+
+    <view wx:if="{{feed.remainingItems.length}}" class="section-heading">
+      <view class="section-title">更多资讯</view>
+      <view class="section-count">{{feed.remainingItems.length}}</view>
+    </view>
+
+    <view class="story-list">
+      <view
+        wx:for="{{feed.remainingItems}}"
+        wx:key="id"
+        class="story-row"
+        data-id="{{item.id}}"
+        bindtap="openFeedItem"
+      >
+        <view class="story-copy">
+          <view class="story-meta">
+            <text class="channel-label channel-text-{{item.coverTone}}">{{item.categoryLabel}}</text>
+            <text>{{item.publishedLabel}}</text>
+          </view>
+          <view class="story-title">{{item.title}}</view>
+          <view class="story-action">{{item.source}} · {{item.scoreLabel}}</view>
+        </view>
+        <image class="story-thumbnail" src="{{item.coverFileId}}" mode="aspectFill" lazy-load="{{true}}" />
+      </view>
+    </view>
+  </block>
 </view>

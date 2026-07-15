@@ -1,0 +1,44 @@
+<view class="detail-page">
+  <view wx:if="{{loading}}" class="detail-loading">正在读取资讯…</view>
+
+  <view wx:elif="{{error}}" class="detail-error">
+    <view class="error-code">404 / SOURCE INDEX</view>
+    <view class="error-title">这条资讯暂时无法打开</view>
+    <view class="error-copy">{{error}}</view>
+  </view>
+
+  <block wx:elif="{{item}}">
+    <view class="detail-kicker"><text class="detail-rule"></text>{{item.categoryLabel}}</view>
+    <view class="detail-title">{{item.title}}</view>
+    <view wx:if="{{item.titleEn && item.titleEn !== item.title}}" class="detail-title-en">{{item.titleEn}}</view>
+
+    <image wx:if="{{item.coverFileId}}" class="detail-cover" src="{{item.coverFileId}}" mode="aspectFill" />
+
+    <view class="detail-meta">
+      <view class="meta-block">
+        <view class="meta-label">来源</view>
+        <view class="meta-value">{{item.source}}</view>
+      </view>
+      <view class="meta-block">
+        <view class="meta-label">发布时间</view>
+        <view class="meta-value">{{item.publishedLabel}}</view>
+      </view>
+      <view class="meta-block">
+        <view class="meta-label">选题信号</view>
+        <view class="meta-value">{{item.scoreLabel}}</view>
+      </view>
+    </view>
+
+    <view class="summary-section">
+      <view class="section-label">内容摘要</view>
+      <view class="section-title">先看摘要</view>
+      <view class="summary-copy">{{item.summary || '这条动态暂时没有摘要，请通过原文链接查看完整内容。'}}</view>
+    </view>
+
+    <view class="source-section">
+      <view class="section-label">原文说明</view>
+      <view class="source-copy">内容仅作资讯索引，版权归原作者和原发布方所有。小程序不复制原文正文。</view>
+      <button class="primary-action" bindtap="copyOriginal">复制原文链接</button>
+    </view>
+  </block>
+</view>

@@ -20,7 +20,8 @@ async function applyCardMutationInTransaction({
     replacing = true;
   }
 
-  await transaction.collection('conclusion_cards').doc(card._id).set({ data: card });
+  const { _id, ...cardData } = card;
+  await transaction.collection('conclusion_cards').doc(_id).set({ data: cardData });
   return { replacing };
 }
 

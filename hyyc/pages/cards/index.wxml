@@ -1,9 +1,9 @@
 <view class="page">
   <view class="page-header">
     <view>
-      <view class="eyebrow">KEEP ONLY THE USEFUL</view>
-      <view class="page-title">结论卡</view>
-      <view class="page-subtitle">{{cards.length}} / {{cardLimit}}，不是第二个无限收藏夹。</view>
+      <view class="eyebrow">SAVED KNOWLEDGE</view>
+      <view class="page-title">留下来的判断</view>
+      <view class="page-subtitle">{{cards.length}} / {{cardLimit}}，只保留以后真的会用到的结论。</view>
     </view>
     <button class="ghost-button settings-button" bindtap="openSettings">设置</button>
   </view>
@@ -25,7 +25,7 @@
       <view class="card-use">什么时候用：{{item.useWhen}}</view>
       <view class="card-source">{{item.sourceTitle}}</view>
       <view class="card-actions">
-        <button class="mini-action" data-url="{{item.sourceUrl}}" bindtap="copySource">复制来源</button>
+        <button class="mini-action" data-url="{{item.sourceUrl}}" bindtap="copySource">复制来源链接</button>
         <button class="mini-action danger-text" data-id="{{item._id}}" bindtap="deleteCard">删除</button>
       </view>
     </view>

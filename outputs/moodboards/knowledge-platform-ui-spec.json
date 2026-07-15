@@ -1,0 +1,1601 @@
+{
+  "meta": {
+    "title": "知识获取平台 UI 视觉方向",
+    "summary": "24 个非卡片式微信知识平台视觉参考，覆盖编辑索引、实时信号、频道色谱与知识阅读。",
+    "audience": "面向中国泛年轻用户",
+    "market": "中国",
+    "channel": "微信小程序",
+    "stage": "Explore",
+    "itemCount": 24,
+    "createdAt": "2026-07-15"
+  },
+  "signals": {
+    "theme": "官方更新优先、精选媒体补充的年轻化知识获取平台",
+    "goal": "让用户快速发现最新动态，并进一步完成可信、可追溯的知识阅读",
+    "audience": "对 AI、科技、娱乐、社会、游戏和英语感兴趣的中国年轻用户",
+    "brand_inputs": [
+      "当前绿色圆角卡片系统仅作为反例，不延续"
+    ],
+    "palette_direction": "明亮编辑底色；频道色只作细线、边带和状态标识；拒绝大面积渐变",
+    "emotional_register": [
+      "可信",
+      "年轻",
+      "清晰",
+      "有编辑判断",
+      "不过度刺激"
+    ],
+    "must_include": [
+      "底部主导航",
+      "页内横向频道",
+      "连续非卡片信息流",
+      "来源与时间线索"
+    ],
+    "visual_principles": [
+      "留白分层",
+      "细线分隔",
+      "字号层级",
+      "缩进定位",
+      "单一频道色"
+    ],
+    "avoid": [
+      "圆角卡片堆叠",
+      "小红书瀑布流",
+      "传统门户密度",
+      "金融终端",
+      "赛博朋克",
+      "可读假文字",
+      "品牌 Logo"
+    ],
+    "next_outputs": [
+      "小程序页面结构",
+      "设计 tokens",
+      "WXML/WXSS 视觉系统"
+    ],
+    "context_signals": [
+      "官方来源优先",
+      "精选媒体白名单",
+      "微信移动端",
+      "泛年轻用户"
+    ]
+  },
+  "items": [
+    {
+      "id": "editorial-01-lead-index",
+      "family": "编辑索引",
+      "visualTerritory": "编辑索引",
+      "title": "非对称头条索引",
+      "caption": "用字号、留白和细线建立首屏内容主次。",
+      "source": "Generated from the qualified knowledge-platform brief; no external image reference.",
+      "tone": "bright editorial, youthful, trustworthy",
+      "motif": "asymmetrical lead story, thin rules, generous negative space",
+      "palette": [
+        "#F7F3EA",
+        "#171717",
+        "#D8D1C4",
+        "#275DFF",
+        "#FFFFFF"
+      ],
+      "prompt": "A refined off-white mobile editorial feed with one dominant lead-story region, two subordinate text rows, razor-thin black dividers, a narrow cobalt category rail, and strong asymmetrical whitespace. Single vertical 9:16 mobile product-design reference showing one coherent interface state. No collage, no grid of multiple screens, no contact sheet, no split panels, no scrapbook. No readable words, no numbers, no logos, no brand marks, no real user data. Use abstract typographic bars and neutral image placeholders only. No rounded card containers, no floating card stack, no heavy gradient, no cyberpunk neon overload. Young, credible, bright editorial art direction for a Chinese WeChat knowledge product.",
+      "audienceCue": "Chinese young adults who want useful current knowledge without noisy scrolling.",
+      "focusedOutputType": "WeChat mini-program visual system and mobile editorial feed",
+      "remixSuggestions": {
+        "style": [
+          {
+            "label": "Swiss editorial",
+            "description": "Tighten the baseline rhythm and make the asymmetry more deliberate without adding containers.",
+            "promptHint": "Tighten the baseline rhythm and make the asymmetry more deliberate without adding containers."
+          }
+        ],
+        "palette": [
+          {
+            "label": "Ink and cobalt",
+            "description": "Reduce the palette to warm paper, black ink and one precise cobalt thread.",
+            "promptHint": "Reduce the palette to warm paper, black ink and one precise cobalt thread."
+          }
+        ],
+        "scene": [
+          {
+            "label": "Fresh morning edition",
+            "description": "Make the interface feel like a newly issued morning edition with crisp natural light.",
+            "promptHint": "Make the interface feel like a newly issued morning edition with crisp natural light."
+          }
+        ],
+        "props": [
+          {
+            "label": "Hairline rules",
+            "description": "Use only fine rules, tiny status dots and quiet image crops as structural cues.",
+            "promptHint": "Use only fine rules, tiny status dots and quiet image crops as structural cues."
+          }
+        ],
+        "character": [
+          {
+            "label": "No human",
+            "description": "Keep the frame entirely interface-led with no hands or people.",
+            "promptHint": "Keep the frame entirely interface-led with no hands or people."
+          }
+        ],
+        "format": [
+          {
+            "label": "Tall first screen",
+            "description": "Recompose for a tall WeChat first screen with a clear opening hierarchy.",
+            "promptHint": "Recompose for a tall WeChat first screen with a clear opening hierarchy."
+          }
+        ]
+      }
+    },
+    {
+      "id": "editorial-02-section-rail",
+      "family": "编辑索引",
+      "visualTerritory": "编辑索引",
+      "title": "侧边栏目轨道",
+      "caption": "窄色轨与缩进替代卡片边界。",
+      "source": "Generated from the qualified knowledge-platform brief; no external image reference.",
+      "tone": "bright editorial, youthful, trustworthy",
+      "motif": "slim section rail, indentation, editorial list rhythm",
+      "palette": [
+        "#F7F3EA",
+        "#171717",
+        "#D8D1C4",
+        "#275DFF",
+        "#FFFFFF"
+      ],
+      "prompt": "A bright mobile knowledge index organized by a slim vertical section rail at the left edge, staggered indents, black typographic bars, fine horizontal separators, and a restrained cobalt locator mark. Single vertical 9:16 mobile product-design reference showing one coherent interface state. No collage, no grid of multiple screens, no contact sheet, no split panels, no scrapbook. No readable words, no numbers, no logos, no brand marks, no real user data. Use abstract typographic bars and neutral image placeholders only. No rounded card containers, no floating card stack, no heavy gradient, no cyberpunk neon overload. Young, credible, bright editorial art direction for a Chinese WeChat knowledge product.",
+      "audienceCue": "Chinese young adults who want useful current knowledge without noisy scrolling.",
+      "focusedOutputType": "WeChat mini-program visual system and mobile editorial feed",
+      "remixSuggestions": {
+        "style": [
+          {
+            "label": "Index precision",
+            "description": "Push the left rail and indentation system into a sharper editorial index language.",
+            "promptHint": "Push the left rail and indentation system into a sharper editorial index language."
+          }
+        ],
+        "palette": [
+          {
+            "label": "Paper white",
+            "description": "Use warmer paper white with softer gray rules and one saturated blue locator.",
+            "promptHint": "Use warmer paper white with softer gray rules and one saturated blue locator."
+          }
+        ],
+        "scene": [
+          {
+            "label": "Section browsing",
+            "description": "Show a single calm category-browsing state with one active rail position.",
+            "promptHint": "Show a single calm category-browsing state with one active rail position."
+          }
+        ],
+        "props": [
+          {
+            "label": "Locator marks",
+            "description": "Add tiny geometric locators and rule endings, never pills or badges.",
+            "promptHint": "Add tiny geometric locators and rule endings, never pills or badges."
+          }
+        ],
+        "character": [
+          {
+            "label": "Thumb-free",
+            "description": "Keep the interface unobstructed and free of human hands.",
+            "promptHint": "Keep the interface unobstructed and free of human hands."
+          }
+        ],
+        "format": [
+          {
+            "label": "Narrow portrait",
+            "description": "Make the composition feel especially efficient on a narrow phone screen.",
+            "promptHint": "Make the composition feel especially efficient on a narrow phone screen."
+          }
+        ]
+      }
+    },
+    {
+      "id": "editorial-03-image-led-story",
+      "family": "编辑索引",
+      "visualTerritory": "编辑索引",
+      "title": "图像主导头条",
+      "caption": "一条通栏图片与严格文本层级形成杂志感。",
+      "source": "Generated from the qualified knowledge-platform brief; no external image reference.",
+      "tone": "bright editorial, youthful, trustworthy",
+      "motif": "edge-to-edge editorial image strip, strict hierarchy",
+      "palette": [
+        "#F8F3EA",
+        "#181818",
+        "#CFC5B6",
+        "#EC5A45",
+        "#FFFFFF"
+      ],
+      "prompt": "A single mobile editorial story opener with one edge-to-edge documentary image strip, an oversized abstract headline block beneath it, two compact metadata lines, and thin black rules on a warm off-white surface. Single vertical 9:16 mobile product-design reference showing one coherent interface state. No collage, no grid of multiple screens, no contact sheet, no split panels, no scrapbook. No readable words, no numbers, no logos, no brand marks, no real user data. Use abstract typographic bars and neutral image placeholders only. No rounded card containers, no floating card stack, no heavy gradient, no cyberpunk neon overload. Young, credible, bright editorial art direction for a Chinese WeChat knowledge product.",
+      "audienceCue": "Chinese young adults who want useful current knowledge without noisy scrolling.",
+      "focusedOutputType": "WeChat mini-program visual system and mobile editorial feed",
+      "remixSuggestions": {
+        "style": [
+          {
+            "label": "Magazine opener",
+            "description": "Increase the tension between the full-width image strip and the strict text hierarchy.",
+            "promptHint": "Increase the tension between the full-width image strip and the strict text hierarchy."
+          }
+        ],
+        "palette": [
+          {
+            "label": "Warm coral cue",
+            "description": "Replace cobalt with one restrained coral editorial cue on warm paper.",
+            "promptHint": "Replace cobalt with one restrained coral editorial cue on warm paper."
+          }
+        ],
+        "scene": [
+          {
+            "label": "Breaking feature",
+            "description": "Make this feel like a high-priority feature arriving inside a calm publication.",
+            "promptHint": "Make this feel like a high-priority feature arriving inside a calm publication."
+          }
+        ],
+        "props": [
+          {
+            "label": "Crop marks",
+            "description": "Use subtle crop edges and fine registration-like ticks without readable labels.",
+            "promptHint": "Use subtle crop edges and fine registration-like ticks without readable labels."
+          }
+        ],
+        "character": [
+          {
+            "label": "Documentary presence",
+            "description": "If a person appears inside the story image, keep them distant and nonspecific.",
+            "promptHint": "If a person appears inside the story image, keep them distant and nonspecific."
+          }
+        ],
+        "format": [
+          {
+            "label": "Hero portrait",
+            "description": "Give the image strip more vertical presence while retaining the article hierarchy.",
+            "promptHint": "Give the image strip more vertical presence while retaining the article hierarchy."
+          }
+        ]
+      }
+    },
+    {
+      "id": "editorial-04-dense-briefs",
+      "family": "编辑索引",
+      "visualTerritory": "编辑索引",
+      "title": "高密度短讯列表",
+      "caption": "用下划线、缩进和行距承载密集更新。",
+      "source": "Generated from the qualified knowledge-platform brief; no external image reference.",
+      "tone": "bright editorial, youthful, trustworthy",
+      "motif": "dense brief list, underlines, indentation, typographic rhythm",
+      "palette": [
+        "#FAF8F2",
+        "#141414",
+        "#B9B5AC",
+        "#275DFF",
+        "#EFECE4"
+      ],
+      "prompt": "A dense but calm mobile brief list on a light paper background, each update separated by thin underlines, alternating indentation, compact abstract metadata bars, and a single blue active indicator, with no boxed modules. Single vertical 9:16 mobile product-design reference showing one coherent interface state. No collage, no grid of multiple screens, no contact sheet, no split panels, no scrapbook. No readable words, no numbers, no logos, no brand marks, no real user data. Use abstract typographic bars and neutral image placeholders only. No rounded card containers, no floating card stack, no heavy gradient, no cyberpunk neon overload. Young, credible, bright editorial art direction for a Chinese WeChat knowledge product.",
+      "audienceCue": "Chinese young adults who want useful current knowledge without noisy scrolling.",
+      "focusedOutputType": "WeChat mini-program visual system and mobile editorial feed",
+      "remixSuggestions": {
+        "style": [
+          {
+            "label": "Newsroom discipline",
+            "description": "Make the dense list feel edited and breathable rather than dashboard-like.",
+            "promptHint": "Make the dense list feel edited and breathable rather than dashboard-like."
+          }
+        ],
+        "palette": [
+          {
+            "label": "Soft graphite",
+            "description": "Use graphite text, bone white and a muted cobalt active indicator.",
+            "promptHint": "Use graphite text, bone white and a muted cobalt active indicator."
+          }
+        ],
+        "scene": [
+          {
+            "label": "Rapid scan",
+            "description": "Optimize the single screen for scanning many short updates in seconds.",
+            "promptHint": "Optimize the single screen for scanning many short updates in seconds."
+          }
+        ],
+        "props": [
+          {
+            "label": "Underlined rhythm",
+            "description": "Let underlines, baselines and indentation carry all component boundaries.",
+            "promptHint": "Let underlines, baselines and indentation carry all component boundaries."
+          }
+        ],
+        "character": [
+          {
+            "label": "No human",
+            "description": "Keep the visual reference strictly interface-only.",
+            "promptHint": "Keep the visual reference strictly interface-only."
+          }
+        ],
+        "format": [
+          {
+            "label": "Long feed crop",
+            "description": "Extend the list vertically to demonstrate a continuous non-card feed.",
+            "promptHint": "Extend the list vertically to demonstrate a continuous non-card feed."
+          }
+        ]
+      }
+    },
+    {
+      "id": "editorial-05-section-opener",
+      "family": "编辑索引",
+      "visualTerritory": "编辑索引",
+      "title": "专题开场页",
+      "caption": "大留白、色块边带和栏目节奏形成仪式感。",
+      "source": "Generated from the qualified knowledge-platform brief; no external image reference.",
+      "tone": "bright editorial, youthful, trustworthy",
+      "motif": "section opener, edge band, large negative space",
+      "palette": [
+        "#F4EFE5",
+        "#151515",
+        "#E45A47",
+        "#F6C9BE",
+        "#FFFFFF"
+      ],
+      "prompt": "A minimal mobile section opener with a narrow coral edge band, a large blank editorial field, one abstract title block, a compact row of topic markers, and a precise continuation list separated by hairlines. Single vertical 9:16 mobile product-design reference showing one coherent interface state. No collage, no grid of multiple screens, no contact sheet, no split panels, no scrapbook. No readable words, no numbers, no logos, no brand marks, no real user data. Use abstract typographic bars and neutral image placeholders only. No rounded card containers, no floating card stack, no heavy gradient, no cyberpunk neon overload. Young, credible, bright editorial art direction for a Chinese WeChat knowledge product.",
+      "audienceCue": "Chinese young adults who want useful current knowledge without noisy scrolling.",
+      "focusedOutputType": "WeChat mini-program visual system and mobile editorial feed",
+      "remixSuggestions": {
+        "style": [
+          {
+            "label": "Quiet ceremony",
+            "description": "Increase the sense of a deliberate section opening through scale and silence.",
+            "promptHint": "Increase the sense of a deliberate section opening through scale and silence."
+          }
+        ],
+        "palette": [
+          {
+            "label": "Coral margin",
+            "description": "Keep the warm neutral field and concentrate coral only along one edge.",
+            "promptHint": "Keep the warm neutral field and concentrate coral only along one edge."
+          }
+        ],
+        "scene": [
+          {
+            "label": "Topic arrival",
+            "description": "Show the exact moment a reader enters one curated topic section.",
+            "promptHint": "Show the exact moment a reader enters one curated topic section."
+          }
+        ],
+        "props": [
+          {
+            "label": "Edge band",
+            "description": "Use one flat edge band and tiny line markers as the only decorative elements.",
+            "promptHint": "Use one flat edge band and tiny line markers as the only decorative elements."
+          }
+        ],
+        "character": [
+          {
+            "label": "No human",
+            "description": "Let pure editorial composition carry the frame.",
+            "promptHint": "Let pure editorial composition carry the frame."
+          }
+        ],
+        "format": [
+          {
+            "label": "Above-the-fold",
+            "description": "Focus on a strong above-the-fold mobile section entrance.",
+            "promptHint": "Focus on a strong above-the-fold mobile section entrance."
+          }
+        ]
+      }
+    },
+    {
+      "id": "editorial-06-paper-detail",
+      "family": "编辑索引",
+      "visualTerritory": "编辑索引",
+      "title": "纸张与墨线材质",
+      "caption": "把纸感、印刷网点与细线转译为数字界面质感。",
+      "source": "Generated from the qualified knowledge-platform brief; no external image reference.",
+      "tone": "bright editorial, youthful, trustworthy",
+      "motif": "paper grain, ink line, restrained digital texture",
+      "palette": [
+        "#F2EBDD",
+        "#161512",
+        "#BEB4A4",
+        "#315CFF",
+        "#FCFAF5"
+      ],
+      "prompt": "A macro close-up visual study of a single mobile interface surface inspired by fine uncoated paper grain, crisp black ink rules, subtle halftone texture, and one clean cobalt digital accent, still clearly a modern phone screen. Single vertical 9:16 mobile product-design reference showing one coherent interface state. No collage, no grid of multiple screens, no contact sheet, no split panels, no scrapbook. No readable words, no numbers, no logos, no brand marks, no real user data. Use abstract typographic bars and neutral image placeholders only. No rounded card containers, no floating card stack, no heavy gradient, no cyberpunk neon overload. Young, credible, bright editorial art direction for a Chinese WeChat knowledge product.",
+      "audienceCue": "Chinese young adults who want useful current knowledge without noisy scrolling.",
+      "focusedOutputType": "WeChat mini-program visual system and mobile editorial feed",
+      "remixSuggestions": {
+        "style": [
+          {
+            "label": "Tactile digital",
+            "description": "Push the meeting point between paper tactility and precise modern interface rendering.",
+            "promptHint": "Push the meeting point between paper tactility and precise modern interface rendering."
+          }
+        ],
+        "palette": [
+          {
+            "label": "Natural stock",
+            "description": "Warm the neutral stock and keep blue as a tiny digital interruption.",
+            "promptHint": "Warm the neutral stock and keep blue as a tiny digital interruption."
+          }
+        ],
+        "scene": [
+          {
+            "label": "Macro surface",
+            "description": "Move closer to the screen surface so material and rule quality dominate.",
+            "promptHint": "Move closer to the screen surface so material and rule quality dominate."
+          }
+        ],
+        "props": [
+          {
+            "label": "Ink texture",
+            "description": "Add subtle halftone and registration texture without introducing print clutter.",
+            "promptHint": "Add subtle halftone and registration texture without introducing print clutter."
+          }
+        ],
+        "character": [
+          {
+            "label": "No human",
+            "description": "Exclude people and concentrate on material detail.",
+            "promptHint": "Exclude people and concentrate on material detail."
+          }
+        ],
+        "format": [
+          {
+            "label": "Detail crop",
+            "description": "Create a tighter portrait crop of the interface material and thin-rule system.",
+            "promptHint": "Create a tighter portrait crop of the interface material and thin-rule system."
+          }
+        ]
+      }
+    },
+    {
+      "id": "signal-01-channel-track",
+      "family": "实时信号",
+      "visualTerritory": "实时信号",
+      "title": "横向频道轨道",
+      "caption": "页内频道像一条可定位的编辑轨道。",
+      "source": "Generated from the qualified knowledge-platform brief; no external image reference.",
+      "tone": "bright editorial, youthful, trustworthy",
+      "motif": "horizontal channel track, active marker, current position",
+      "palette": [
+        "#F6F7F4",
+        "#111416",
+        "#C9CED1",
+        "#1C64F2",
+        "#FF5A4F"
+      ],
+      "prompt": "A clean mobile news interface with a single horizontal channel track near the top, one clear active marker, compact abstract section labels, a live update dot, and a continuous list below divided only by hairlines. Single vertical 9:16 mobile product-design reference showing one coherent interface state. No collage, no grid of multiple screens, no contact sheet, no split panels, no scrapbook. No readable words, no numbers, no logos, no brand marks, no real user data. Use abstract typographic bars and neutral image placeholders only. No rounded card containers, no floating card stack, no heavy gradient, no cyberpunk neon overload. Young, credible, bright editorial art direction for a Chinese WeChat knowledge product.",
+      "audienceCue": "Chinese young adults who want useful current knowledge without noisy scrolling.",
+      "focusedOutputType": "WeChat mini-program visual system and mobile editorial feed",
+      "remixSuggestions": {
+        "style": [
+          {
+            "label": "Transit clarity",
+            "description": "Make the channel track feel as legible and intentional as a modern transit line.",
+            "promptHint": "Make the channel track feel as legible and intentional as a modern transit line."
+          }
+        ],
+        "palette": [
+          {
+            "label": "Blue signal",
+            "description": "Use cool white, charcoal and one crisp blue signal with a tiny coral alert.",
+            "promptHint": "Use cool white, charcoal and one crisp blue signal with a tiny coral alert."
+          }
+        ],
+        "scene": [
+          {
+            "label": "Channel switch",
+            "description": "Capture the precise interface state just after switching to a new topic.",
+            "promptHint": "Capture the precise interface state just after switching to a new topic."
+          }
+        ],
+        "props": [
+          {
+            "label": "Track markers",
+            "description": "Use small track stops, ticks and a single live dot, never pill tabs.",
+            "promptHint": "Use small track stops, ticks and a single live dot, never pill tabs."
+          }
+        ],
+        "character": [
+          {
+            "label": "No human",
+            "description": "Keep the channel mechanism fully visible without hands.",
+            "promptHint": "Keep the channel mechanism fully visible without hands."
+          }
+        ],
+        "format": [
+          {
+            "label": "Top-heavy portrait",
+            "description": "Emphasize the upper navigation track within a tall phone composition.",
+            "promptHint": "Emphasize the upper navigation track within a tall phone composition."
+          }
+        ]
+      }
+    },
+    {
+      "id": "signal-02-live-timeline",
+      "family": "实时信号",
+      "visualTerritory": "实时信号",
+      "title": "更新垂直时间线",
+      "caption": "时间线与状态点表达持续更新。",
+      "source": "Generated from the qualified knowledge-platform brief; no external image reference.",
+      "tone": "bright editorial, youthful, trustworthy",
+      "motif": "vertical timeline, status points, chronological flow",
+      "palette": [
+        "#F7F7F3",
+        "#121617",
+        "#ADB6BA",
+        "#FF5A4F",
+        "#1C64F2"
+      ],
+      "prompt": "A single mobile live-update timeline with a thin vertical line, spaced status points, alternating left-right content alignment, pale neutral background, and one coral current-event marker, no boxes or cards. Single vertical 9:16 mobile product-design reference showing one coherent interface state. No collage, no grid of multiple screens, no contact sheet, no split panels, no scrapbook. No readable words, no numbers, no logos, no brand marks, no real user data. Use abstract typographic bars and neutral image placeholders only. No rounded card containers, no floating card stack, no heavy gradient, no cyberpunk neon overload. Young, credible, bright editorial art direction for a Chinese WeChat knowledge product.",
+      "audienceCue": "Chinese young adults who want useful current knowledge without noisy scrolling.",
+      "focusedOutputType": "WeChat mini-program visual system and mobile editorial feed",
+      "remixSuggestions": {
+        "style": [
+          {
+            "label": "Chronology first",
+            "description": "Make temporal sequence the dominant visual grammar while keeping the page light.",
+            "promptHint": "Make temporal sequence the dominant visual grammar while keeping the page light."
+          }
+        ],
+        "palette": [
+          {
+            "label": "Coral now",
+            "description": "Reserve coral for the current moment and keep older events in cool gray.",
+            "promptHint": "Reserve coral for the current moment and keep older events in cool gray."
+          }
+        ],
+        "scene": [
+          {
+            "label": "Live unfolding",
+            "description": "Show one active event arriving at the top of a continuous timeline.",
+            "promptHint": "Show one active event arriving at the top of a continuous timeline."
+          }
+        ],
+        "props": [
+          {
+            "label": "Status points",
+            "description": "Use precise dots, line joints and subtle progress ticks only.",
+            "promptHint": "Use precise dots, line joints and subtle progress ticks only."
+          }
+        ],
+        "character": [
+          {
+            "label": "No human",
+            "description": "Keep all attention on the live chronology.",
+            "promptHint": "Keep all attention on the live chronology."
+          }
+        ],
+        "format": [
+          {
+            "label": "Timeline portrait",
+            "description": "Extend the vertical line through most of the tall mobile frame.",
+            "promptHint": "Extend the vertical line through most of the tall mobile frame."
+          }
+        ]
+      }
+    },
+    {
+      "id": "signal-03-pulse-update",
+      "family": "实时信号",
+      "visualTerritory": "实时信号",
+      "title": "脉冲式新动态",
+      "caption": "小范围动势提示新内容，不制造焦虑。",
+      "source": "Generated from the qualified knowledge-platform brief; no external image reference.",
+      "tone": "bright editorial, youthful, trustworthy",
+      "motif": "subtle pulse, new update, calm motion cue",
+      "palette": [
+        "#F5F7F4",
+        "#111615",
+        "#C7D0CB",
+        "#2A67FF",
+        "#7BA0FF"
+      ],
+      "prompt": "A restrained mobile update screen with one subtle blue pulse line crossing a clean content row, a tiny live status point, generous white space, and a structured feed continuing beneath with thin separators. Single vertical 9:16 mobile product-design reference showing one coherent interface state. No collage, no grid of multiple screens, no contact sheet, no split panels, no scrapbook. No readable words, no numbers, no logos, no brand marks, no real user data. Use abstract typographic bars and neutral image placeholders only. No rounded card containers, no floating card stack, no heavy gradient, no cyberpunk neon overload. Young, credible, bright editorial art direction for a Chinese WeChat knowledge product.",
+      "audienceCue": "Chinese young adults who want useful current knowledge without noisy scrolling.",
+      "focusedOutputType": "WeChat mini-program visual system and mobile editorial feed",
+      "remixSuggestions": {
+        "style": [
+          {
+            "label": "Calm kinetic",
+            "description": "Introduce controlled movement without turning the interface into a trading terminal.",
+            "promptHint": "Introduce controlled movement without turning the interface into a trading terminal."
+          }
+        ],
+        "palette": [
+          {
+            "label": "Electric blue pulse",
+            "description": "Keep the screen neutral and concentrate energy in one blue pulse line.",
+            "promptHint": "Keep the screen neutral and concentrate energy in one blue pulse line."
+          }
+        ],
+        "scene": [
+          {
+            "label": "New item arrives",
+            "description": "Capture a single new item entering the feed with quiet visual motion.",
+            "promptHint": "Capture a single new item entering the feed with quiet visual motion."
+          }
+        ],
+        "props": [
+          {
+            "label": "Pulse trace",
+            "description": "Use one pulse trace and one state point, avoiding charts or metrics.",
+            "promptHint": "Use one pulse trace and one state point, avoiding charts or metrics."
+          }
+        ],
+        "character": [
+          {
+            "label": "No human",
+            "description": "Keep the frame focused on the arrival cue.",
+            "promptHint": "Keep the frame focused on the arrival cue."
+          }
+        ],
+        "format": [
+          {
+            "label": "Centered pulse",
+            "description": "Place the pulse moment near the visual center of a tall screen.",
+            "promptHint": "Place the pulse moment near the visual center of a tall screen."
+          }
+        ]
+      }
+    },
+    {
+      "id": "signal-04-refresh-motion",
+      "family": "实时信号",
+      "visualTerritory": "实时信号",
+      "title": "刷新中的连续信息流",
+      "caption": "轻微运动模糊表现滚动和更新节奏。",
+      "source": "Generated from the qualified knowledge-platform brief; no external image reference.",
+      "tone": "bright editorial, youthful, trustworthy",
+      "motif": "controlled motion blur, continuous feed, refresh rhythm",
+      "palette": [
+        "#FAFAF6",
+        "#171A1B",
+        "#C5C8C9",
+        "#2B63E8",
+        "#E8EBEC"
+      ],
+      "prompt": "A single mobile feed during a gentle refresh, with crisp anchored navigation and a few content rows carrying subtle controlled vertical motion blur, thin dividers, and a quiet blue refresh cue. Single vertical 9:16 mobile product-design reference showing one coherent interface state. No collage, no grid of multiple screens, no contact sheet, no split panels, no scrapbook. No readable words, no numbers, no logos, no brand marks, no real user data. Use abstract typographic bars and neutral image placeholders only. No rounded card containers, no floating card stack, no heavy gradient, no cyberpunk neon overload. Young, credible, bright editorial art direction for a Chinese WeChat knowledge product.",
+      "audienceCue": "Chinese young adults who want useful current knowledge without noisy scrolling.",
+      "focusedOutputType": "WeChat mini-program visual system and mobile editorial feed",
+      "remixSuggestions": {
+        "style": [
+          {
+            "label": "Editorial motion",
+            "description": "Balance motion blur with a stable editorial grid and clear hierarchy.",
+            "promptHint": "Balance motion blur with a stable editorial grid and clear hierarchy."
+          }
+        ],
+        "palette": [
+          {
+            "label": "Cool newsroom",
+            "description": "Use cool neutral grays and one desaturated blue refresh cue.",
+            "promptHint": "Use cool neutral grays and one desaturated blue refresh cue."
+          }
+        ],
+        "scene": [
+          {
+            "label": "Mid refresh",
+            "description": "Show the single instant of a feed refreshing without spinners or loading cards.",
+            "promptHint": "Show the single instant of a feed refreshing without spinners or loading cards."
+          }
+        ],
+        "props": [
+          {
+            "label": "Anchor line",
+            "description": "Keep one sharp anchor rule while surrounding rows move softly.",
+            "promptHint": "Keep one sharp anchor rule while surrounding rows move softly."
+          }
+        ],
+        "character": [
+          {
+            "label": "Passing thumb",
+            "description": "Optionally include only the edge of a nonspecific thumb to imply refresh motion.",
+            "promptHint": "Optionally include only the edge of a nonspecific thumb to imply refresh motion."
+          }
+        ],
+        "format": [
+          {
+            "label": "Motion crop",
+            "description": "Use a tall close crop that makes vertical movement obvious.",
+            "promptHint": "Use a tall close crop that makes vertical movement obvious."
+          }
+        ]
+      }
+    },
+    {
+      "id": "signal-05-navigation-system",
+      "family": "实时信号",
+      "visualTerritory": "实时信号",
+      "title": "底栏与页内频道协作",
+      "caption": "展示主导航和频道导航的双层关系。",
+      "source": "Generated from the qualified knowledge-platform brief; no external image reference.",
+      "tone": "bright editorial, youthful, trustworthy",
+      "motif": "bottom navigation, horizontal categories, two-level hierarchy",
+      "palette": [
+        "#F7F8F5",
+        "#121515",
+        "#CBD0CC",
+        "#265DFF",
+        "#FF6758"
+      ],
+      "prompt": "A coherent mobile product screen demonstrating two-level navigation: a slim horizontal topic track inside the page and a minimal bottom navigation rail, with the content list between them separated by lines and whitespace, no rounded containers. Single vertical 9:16 mobile product-design reference showing one coherent interface state. No collage, no grid of multiple screens, no contact sheet, no split panels, no scrapbook. No readable words, no numbers, no logos, no brand marks, no real user data. Use abstract typographic bars and neutral image placeholders only. No rounded card containers, no floating card stack, no heavy gradient, no cyberpunk neon overload. Young, credible, bright editorial art direction for a Chinese WeChat knowledge product.",
+      "audienceCue": "Chinese young adults who want useful current knowledge without noisy scrolling.",
+      "focusedOutputType": "WeChat mini-program visual system and mobile editorial feed",
+      "remixSuggestions": {
+        "style": [
+          {
+            "label": "System clarity",
+            "description": "Make the relationship between global and local navigation immediately understandable.",
+            "promptHint": "Make the relationship between global and local navigation immediately understandable."
+          }
+        ],
+        "palette": [
+          {
+            "label": "Neutral with dual cues",
+            "description": "Use blue for the active topic and coral for one fresh-update indicator.",
+            "promptHint": "Use blue for the active topic and coral for one fresh-update indicator."
+          }
+        ],
+        "scene": [
+          {
+            "label": "Discover home",
+            "description": "Show the default discovery state with one topic selected and one bottom destination active.",
+            "promptHint": "Show the default discovery state with one topic selected and one bottom destination active."
+          }
+        ],
+        "props": [
+          {
+            "label": "Minimal glyphs",
+            "description": "Use abstract line glyphs and tiny markers instead of labeled icons.",
+            "promptHint": "Use abstract line glyphs and tiny markers instead of labeled icons."
+          }
+        ],
+        "character": [
+          {
+            "label": "No human",
+            "description": "Present the navigation architecture without hands or device mockup clutter.",
+            "promptHint": "Present the navigation architecture without hands or device mockup clutter."
+          }
+        ],
+        "format": [
+          {
+            "label": "Full device field",
+            "description": "Show the entire useful vertical field from topic rail to bottom navigation.",
+            "promptHint": "Show the entire useful vertical field from topic rail to bottom navigation."
+          }
+        ]
+      }
+    },
+    {
+      "id": "signal-06-source-radar",
+      "family": "实时信号",
+      "visualTerritory": "实时信号",
+      "title": "来源更新雷达",
+      "caption": "用来源点位而非品牌 Logo 表示多厂商更新。",
+      "source": "Generated from the qualified knowledge-platform brief; no external image reference.",
+      "tone": "bright editorial, youthful, trustworthy",
+      "motif": "source nodes, update status, provenance without logos",
+      "palette": [
+        "#F6F7F3",
+        "#161817",
+        "#AEB7B2",
+        "#285FFF",
+        "#E9ECE8"
+      ],
+      "prompt": "A mobile source-monitoring view with a quiet vertical list of anonymous source nodes, tiny freshness dots, thin connector rules, and a single expanded update row, all on a bright neutral field with no logos or readable labels. Single vertical 9:16 mobile product-design reference showing one coherent interface state. No collage, no grid of multiple screens, no contact sheet, no split panels, no scrapbook. No readable words, no numbers, no logos, no brand marks, no real user data. Use abstract typographic bars and neutral image placeholders only. No rounded card containers, no floating card stack, no heavy gradient, no cyberpunk neon overload. Young, credible, bright editorial art direction for a Chinese WeChat knowledge product.",
+      "audienceCue": "Chinese young adults who want useful current knowledge without noisy scrolling.",
+      "focusedOutputType": "WeChat mini-program visual system and mobile editorial feed",
+      "remixSuggestions": {
+        "style": [
+          {
+            "label": "Source observatory",
+            "description": "Make source freshness visible without resembling an analytics dashboard.",
+            "promptHint": "Make source freshness visible without resembling an analytics dashboard."
+          }
+        ],
+        "palette": [
+          {
+            "label": "Cool provenance",
+            "description": "Use quiet cool neutrals and one blue freshness signal.",
+            "promptHint": "Use quiet cool neutrals and one blue freshness signal."
+          }
+        ],
+        "scene": [
+          {
+            "label": "Official-source check",
+            "description": "Show one anonymous official source receiving a fresh update.",
+            "promptHint": "Show one anonymous official source receiving a fresh update."
+          }
+        ],
+        "props": [
+          {
+            "label": "Node connectors",
+            "description": "Use small source nodes, connector rules and freshness dots only.",
+            "promptHint": "Use small source nodes, connector rules and freshness dots only."
+          }
+        ],
+        "character": [
+          {
+            "label": "No human",
+            "description": "Keep the composition entirely source-system focused.",
+            "promptHint": "Keep the composition entirely source-system focused."
+          }
+        ],
+        "format": [
+          {
+            "label": "Compact source list",
+            "description": "Fit several source rows into one tall but breathable mobile screen.",
+            "promptHint": "Fit several source rows into one tall but breathable mobile screen."
+          }
+        ]
+      }
+    },
+    {
+      "id": "spectrum-01-ai-cobalt",
+      "family": "频道色谱",
+      "visualTerritory": "频道色谱",
+      "title": "AI 科技蓝",
+      "caption": "蓝色只作为栏目标识与关键动作。",
+      "source": "Generated from the qualified knowledge-platform brief; no external image reference.",
+      "tone": "bright editorial, youthful, trustworthy",
+      "motif": "AI technology channel, cobalt accent, analytical clarity",
+      "palette": [
+        "#F7F8F4",
+        "#111111",
+        "#1E5EFF",
+        "#9AB7FF",
+        "#DDE7FF"
+      ],
+      "prompt": "A bright mobile AI and technology channel using a strict black editorial list, one flat cobalt edge stripe, cool pale-blue section markers, thin rules, and one technical illustration crop without logos or text. Single vertical 9:16 mobile product-design reference showing one coherent interface state. No collage, no grid of multiple screens, no contact sheet, no split panels, no scrapbook. No readable words, no numbers, no logos, no brand marks, no real user data. Use abstract typographic bars and neutral image placeholders only. No rounded card containers, no floating card stack, no heavy gradient, no cyberpunk neon overload. Young, credible, bright editorial art direction for a Chinese WeChat knowledge product.",
+      "audienceCue": "Chinese young adults who want useful current knowledge without noisy scrolling.",
+      "focusedOutputType": "WeChat mini-program visual system and mobile editorial feed",
+      "remixSuggestions": {
+        "style": [
+          {
+            "label": "Technical editorial",
+            "description": "Combine analytical precision with magazine-scale hierarchy, avoiding dashboards.",
+            "promptHint": "Combine analytical precision with magazine-scale hierarchy, avoiding dashboards."
+          }
+        ],
+        "palette": [
+          {
+            "label": "Cobalt hierarchy",
+            "description": "Use cobalt only for channel identity and one primary action cue.",
+            "promptHint": "Use cobalt only for channel identity and one primary action cue."
+          }
+        ],
+        "scene": [
+          {
+            "label": "AI update channel",
+            "description": "Show a single current AI update leading a compact knowledge list.",
+            "promptHint": "Show a single current AI update leading a compact knowledge list."
+          }
+        ],
+        "props": [
+          {
+            "label": "Blueprint ticks",
+            "description": "Add subtle blueprint-like ticks and line joints without diagrams or labels.",
+            "promptHint": "Add subtle blueprint-like ticks and line joints without diagrams or labels."
+          }
+        ],
+        "character": [
+          {
+            "label": "No human",
+            "description": "Keep the technology channel abstract and product-focused.",
+            "promptHint": "Keep the technology channel abstract and product-focused."
+          }
+        ],
+        "format": [
+          {
+            "label": "Cobalt edge crop",
+            "description": "Make the cobalt edge stripe visible throughout the portrait frame.",
+            "promptHint": "Make the cobalt edge stripe visible throughout the portrait frame."
+          }
+        ]
+      }
+    },
+    {
+      "id": "spectrum-02-entertainment-coral",
+      "family": "频道色谱",
+      "visualTerritory": "频道色谱",
+      "title": "娱乐珊瑚红",
+      "caption": "更有节奏，但保持编辑可信度。",
+      "source": "Generated from the qualified knowledge-platform brief; no external image reference.",
+      "tone": "bright editorial, youthful, trustworthy",
+      "motif": "entertainment channel, coral rhythm, editorial energy",
+      "palette": [
+        "#FFF8F4",
+        "#1B1718",
+        "#FF5D66",
+        "#FF9A87",
+        "#FFD3C7"
+      ],
+      "prompt": "A youthful mobile entertainment channel with a flat coral section band, one cinematic image crop, energetic but disciplined black type bars, staggered story rows, and thin separators on a warm light field. Single vertical 9:16 mobile product-design reference showing one coherent interface state. No collage, no grid of multiple screens, no contact sheet, no split panels, no scrapbook. No readable words, no numbers, no logos, no brand marks, no real user data. Use abstract typographic bars and neutral image placeholders only. No rounded card containers, no floating card stack, no heavy gradient, no cyberpunk neon overload. Young, credible, bright editorial art direction for a Chinese WeChat knowledge product.",
+      "audienceCue": "Chinese young adults who want useful current knowledge without noisy scrolling.",
+      "focusedOutputType": "WeChat mini-program visual system and mobile editorial feed",
+      "remixSuggestions": {
+        "style": [
+          {
+            "label": "Culture magazine",
+            "description": "Increase cultural energy through crop and rhythm, not decorative cards.",
+            "promptHint": "Increase cultural energy through crop and rhythm, not decorative cards."
+          }
+        ],
+        "palette": [
+          {
+            "label": "Coral spotlight",
+            "description": "Concentrate coral around one lead story and keep supporting content neutral.",
+            "promptHint": "Concentrate coral around one lead story and keep supporting content neutral."
+          }
+        ],
+        "scene": [
+          {
+            "label": "Culture release",
+            "description": "Show one new entertainment release leading a fast editorial scan.",
+            "promptHint": "Show one new entertainment release leading a fast editorial scan."
+          }
+        ],
+        "props": [
+          {
+            "label": "Frame cues",
+            "description": "Use film-frame edges and tiny rhythm marks without recognizable media branding.",
+            "promptHint": "Use film-frame edges and tiny rhythm marks without recognizable media branding."
+          }
+        ],
+        "character": [
+          {
+            "label": "Distant performer",
+            "description": "Allow one nonspecific cropped performer silhouette inside the lead image.",
+            "promptHint": "Allow one nonspecific cropped performer silhouette inside the lead image."
+          }
+        ],
+        "format": [
+          {
+            "label": "Cinematic portrait",
+            "description": "Use one wide image crop within a tall mobile editorial frame.",
+            "promptHint": "Use one wide image crop within a tall mobile editorial frame."
+          }
+        ]
+      }
+    },
+    {
+      "id": "spectrum-03-society-amber",
+      "family": "频道色谱",
+      "visualTerritory": "频道色谱",
+      "title": "社会琥珀色",
+      "caption": "温暖而严肃，避免煽情与警报感。",
+      "source": "Generated from the qualified knowledge-platform brief; no external image reference.",
+      "tone": "bright editorial, youthful, trustworthy",
+      "motif": "society channel, amber accent, civic warmth",
+      "palette": [
+        "#FFF9EC",
+        "#211B13",
+        "#E49A17",
+        "#F2C464",
+        "#F9E8B8"
+      ],
+      "prompt": "A trustworthy mobile society channel using warm amber as a slim contextual band, documentary imagery with anonymous public space, black editorial hierarchy, generous margins, and precise source rows separated by hairlines. Single vertical 9:16 mobile product-design reference showing one coherent interface state. No collage, no grid of multiple screens, no contact sheet, no split panels, no scrapbook. No readable words, no numbers, no logos, no brand marks, no real user data. Use abstract typographic bars and neutral image placeholders only. No rounded card containers, no floating card stack, no heavy gradient, no cyberpunk neon overload. Young, credible, bright editorial art direction for a Chinese WeChat knowledge product.",
+      "audienceCue": "Chinese young adults who want useful current knowledge without noisy scrolling.",
+      "focusedOutputType": "WeChat mini-program visual system and mobile editorial feed",
+      "remixSuggestions": {
+        "style": [
+          {
+            "label": "Civic editorial",
+            "description": "Make the screen humane and serious without looking bureaucratic or alarming.",
+            "promptHint": "Make the screen humane and serious without looking bureaucratic or alarming."
+          }
+        ],
+        "palette": [
+          {
+            "label": "Measured amber",
+            "description": "Use amber as a contextual cue rather than a warning color.",
+            "promptHint": "Use amber as a contextual cue rather than a warning color."
+          }
+        ],
+        "scene": [
+          {
+            "label": "Public life",
+            "description": "Feature one calm documentary public-space story above supporting briefs.",
+            "promptHint": "Feature one calm documentary public-space story above supporting briefs."
+          }
+        ],
+        "props": [
+          {
+            "label": "Source rules",
+            "description": "Strengthen attribution with lines and markers instead of badges.",
+            "promptHint": "Strengthen attribution with lines and markers instead of badges."
+          }
+        ],
+        "character": [
+          {
+            "label": "Anonymous citizens",
+            "description": "If people appear in the image, keep them distant, diverse and non-identifiable.",
+            "promptHint": "If people appear in the image, keep them distant, diverse and non-identifiable."
+          }
+        ],
+        "format": [
+          {
+            "label": "Documentary portrait",
+            "description": "Balance one documentary image with a continuing vertical brief list.",
+            "promptHint": "Balance one documentary image with a continuing vertical brief list."
+          }
+        ]
+      }
+    },
+    {
+      "id": "spectrum-04-gaming-lime",
+      "family": "频道色谱",
+      "visualTerritory": "频道色谱",
+      "title": "游戏荧光绿",
+      "caption": "用荧光绿提供能量，但不做赛博朋克。",
+      "source": "Generated from the qualified knowledge-platform brief; no external image reference.",
+      "tone": "bright editorial, youthful, trustworthy",
+      "motif": "gaming channel, acid-lime accent, structured energy",
+      "palette": [
+        "#F7F8F1",
+        "#111411",
+        "#B6F23B",
+        "#5E7F1D",
+        "#E4F7B8"
+      ],
+      "prompt": "A modern mobile gaming knowledge channel on a pale neutral background with one flat acid-lime edge stripe, black editorial rows, a single abstract game-world image crop, precise status marks, and no neon glow. Single vertical 9:16 mobile product-design reference showing one coherent interface state. No collage, no grid of multiple screens, no contact sheet, no split panels, no scrapbook. No readable words, no numbers, no logos, no brand marks, no real user data. Use abstract typographic bars and neutral image placeholders only. No rounded card containers, no floating card stack, no heavy gradient, no cyberpunk neon overload. Young, credible, bright editorial art direction for a Chinese WeChat knowledge product.",
+      "audienceCue": "Chinese young adults who want useful current knowledge without noisy scrolling.",
+      "focusedOutputType": "WeChat mini-program visual system and mobile editorial feed",
+      "remixSuggestions": {
+        "style": [
+          {
+            "label": "Playful precision",
+            "description": "Add gaming energy through crop and timing while preserving editorial discipline.",
+            "promptHint": "Add gaming energy through crop and timing while preserving editorial discipline."
+          }
+        ],
+        "palette": [
+          {
+            "label": "Flat lime",
+            "description": "Keep lime completely flat and matte against charcoal and warm white.",
+            "promptHint": "Keep lime completely flat and matte against charcoal and warm white."
+          }
+        ],
+        "scene": [
+          {
+            "label": "Game update",
+            "description": "Show one major game update leading a clean sequence of supporting notes.",
+            "promptHint": "Show one major game update leading a clean sequence of supporting notes."
+          }
+        ],
+        "props": [
+          {
+            "label": "Pixel ticks",
+            "description": "Use sparse pixel-like ticks and angular rule endings without controllers or logos.",
+            "promptHint": "Use sparse pixel-like ticks and angular rule endings without controllers or logos."
+          }
+        ],
+        "character": [
+          {
+            "label": "No avatar",
+            "description": "Avoid recognizable characters; keep any imagery atmospheric and anonymous.",
+            "promptHint": "Avoid recognizable characters; keep any imagery atmospheric and anonymous."
+          }
+        ],
+        "format": [
+          {
+            "label": "Energetic tall crop",
+            "description": "Use a dynamic diagonal image crop inside one portrait screen.",
+            "promptHint": "Use a dynamic diagonal image crop inside one portrait screen."
+          }
+        ]
+      }
+    },
+    {
+      "id": "spectrum-05-english-cyan",
+      "family": "频道色谱",
+      "visualTerritory": "频道色谱",
+      "title": "英语天青色",
+      "caption": "双语学习感清爽，不像课程商城。",
+      "source": "Generated from the qualified knowledge-platform brief; no external image reference.",
+      "tone": "bright editorial, youthful, trustworthy",
+      "motif": "English learning channel, cyan accent, bilingual rhythm",
+      "palette": [
+        "#F3FBFD",
+        "#132027",
+        "#30BCE3",
+        "#8EDCEF",
+        "#D6F3F8"
+      ],
+      "prompt": "A clean mobile English knowledge channel with alternating abstract bilingual line lengths, one cyan vertical cue, pronunciation-wave micro marks, thin separators, and airy spacing on a pale cool background. Single vertical 9:16 mobile product-design reference showing one coherent interface state. No collage, no grid of multiple screens, no contact sheet, no split panels, no scrapbook. No readable words, no numbers, no logos, no brand marks, no real user data. Use abstract typographic bars and neutral image placeholders only. No rounded card containers, no floating card stack, no heavy gradient, no cyberpunk neon overload. Young, credible, bright editorial art direction for a Chinese WeChat knowledge product.",
+      "audienceCue": "Chinese young adults who want useful current knowledge without noisy scrolling.",
+      "focusedOutputType": "WeChat mini-program visual system and mobile editorial feed",
+      "remixSuggestions": {
+        "style": [
+          {
+            "label": "Language editorial",
+            "description": "Make the alternating line rhythm feel educational without resembling a course app.",
+            "promptHint": "Make the alternating line rhythm feel educational without resembling a course app."
+          }
+        ],
+        "palette": [
+          {
+            "label": "Clear cyan",
+            "description": "Use cyan for language cues and progress only, keeping the page mostly neutral.",
+            "promptHint": "Use cyan for language cues and progress only, keeping the page mostly neutral."
+          }
+        ],
+        "scene": [
+          {
+            "label": "Daily phrase in context",
+            "description": "Show one bilingual knowledge item expanded above a short learning list.",
+            "promptHint": "Show one bilingual knowledge item expanded above a short learning list."
+          }
+        ],
+        "props": [
+          {
+            "label": "Wave marks",
+            "description": "Add tiny pronunciation-wave marks and underline cues without readable characters.",
+            "promptHint": "Add tiny pronunciation-wave marks and underline cues without readable characters."
+          }
+        ],
+        "character": [
+          {
+            "label": "Quiet learner",
+            "description": "Optionally show a subtle hand at the edge, never a posed classroom figure.",
+            "promptHint": "Optionally show a subtle hand at the edge, never a posed classroom figure."
+          }
+        ],
+        "format": [
+          {
+            "label": "Line-by-line portrait",
+            "description": "Emphasize alternating line lengths down the vertical reading path.",
+            "promptHint": "Emphasize alternating line lengths down the vertical reading path."
+          }
+        ]
+      }
+    },
+    {
+      "id": "spectrum-06-category-thread",
+      "family": "频道色谱",
+      "visualTerritory": "频道色谱",
+      "title": "多频道色线系统",
+      "caption": "五种频道色在同一信息流中保持克制。",
+      "source": "Generated from the qualified knowledge-platform brief; no external image reference.",
+      "tone": "bright editorial, youthful, trustworthy",
+      "motif": "multi-category thread, flat color stripes, unified editorial system",
+      "palette": [
+        "#F8F7F2",
+        "#151515",
+        "#245FFF",
+        "#FF625F",
+        "#E2A11E",
+        "#B4EF3D",
+        "#35BCD9"
+      ],
+      "prompt": "A single unified mobile discovery feed where five flat category colors appear only as very thin edge threads and tiny section markers across one continuous black-on-cream editorial list, with no gradients and no boxed cards. Single vertical 9:16 mobile product-design reference showing one coherent interface state. No collage, no grid of multiple screens, no contact sheet, no split panels, no scrapbook. No readable words, no numbers, no logos, no brand marks, no real user data. Use abstract typographic bars and neutral image placeholders only. No rounded card containers, no floating card stack, no heavy gradient, no cyberpunk neon overload. Young, credible, bright editorial art direction for a Chinese WeChat knowledge product.",
+      "audienceCue": "Chinese young adults who want useful current knowledge without noisy scrolling.",
+      "focusedOutputType": "WeChat mini-program visual system and mobile editorial feed",
+      "remixSuggestions": {
+        "style": [
+          {
+            "label": "Unified spectrum",
+            "description": "Make five categories feel like one publication rather than five separate apps.",
+            "promptHint": "Make five categories feel like one publication rather than five separate apps."
+          }
+        ],
+        "palette": [
+          {
+            "label": "Thin color threads",
+            "description": "Reduce every category color to a narrow thread or tiny marker on a neutral base.",
+            "promptHint": "Reduce every category color to a narrow thread or tiny marker on a neutral base."
+          }
+        ],
+        "scene": [
+          {
+            "label": "Mixed latest feed",
+            "description": "Show a single latest feed containing several categories in a calm sequence.",
+            "promptHint": "Show a single latest feed containing several categories in a calm sequence."
+          }
+        ],
+        "props": [
+          {
+            "label": "Category stitches",
+            "description": "Use tiny colored stitches along rules instead of tags or chips.",
+            "promptHint": "Use tiny colored stitches along rules instead of tags or chips."
+          }
+        ],
+        "character": [
+          {
+            "label": "No human",
+            "description": "Keep the category system fully visible and unobstructed.",
+            "promptHint": "Keep the category system fully visible and unobstructed."
+          }
+        ],
+        "format": [
+          {
+            "label": "Full feed portrait",
+            "description": "Extend the mixed category thread from top channel rail to bottom navigation.",
+            "promptHint": "Extend the mixed category thread from top channel rail to bottom navigation."
+          }
+        ]
+      }
+    },
+    {
+      "id": "reading-01-highlighted-article",
+      "family": "知识阅读",
+      "visualTerritory": "知识阅读",
+      "title": "重点标注阅读",
+      "caption": "以标注、边注和留白支持理解。",
+      "source": "Generated from the qualified knowledge-platform brief; no external image reference.",
+      "tone": "bright editorial, youthful, trustworthy",
+      "motif": "highlighted passage, margin notes, focused reading",
+      "palette": [
+        "#FBF8F1",
+        "#1B1B19",
+        "#DDD4C7",
+        "#E9D54B",
+        "#3C6EF5"
+      ],
+      "prompt": "A focused mobile article-reading screen on warm paper white, with one translucent yellow passage highlight, thin blue margin-note line, generous line spacing, a source strip, and no floating cards or toolbars. Single vertical 9:16 mobile product-design reference showing one coherent interface state. No collage, no grid of multiple screens, no contact sheet, no split panels, no scrapbook. No readable words, no numbers, no logos, no brand marks, no real user data. Use abstract typographic bars and neutral image placeholders only. No rounded card containers, no floating card stack, no heavy gradient, no cyberpunk neon overload. Young, credible, bright editorial art direction for a Chinese WeChat knowledge product.",
+      "audienceCue": "Chinese young adults who want useful current knowledge without noisy scrolling.",
+      "focusedOutputType": "WeChat mini-program visual system and mobile editorial feed",
+      "remixSuggestions": {
+        "style": [
+          {
+            "label": "Scholar editorial",
+            "description": "Make highlights and margin notes feel deliberate, calm and publication-grade.",
+            "promptHint": "Make highlights and margin notes feel deliberate, calm and publication-grade."
+          }
+        ],
+        "palette": [
+          {
+            "label": "Yellow highlight",
+            "description": "Use soft yellow for one key passage and blue only for one margin link.",
+            "promptHint": "Use soft yellow for one key passage and blue only for one margin link."
+          }
+        ],
+        "scene": [
+          {
+            "label": "Deep reading",
+            "description": "Show the reader midway through one article with a single meaningful highlight.",
+            "promptHint": "Show the reader midway through one article with a single meaningful highlight."
+          }
+        ],
+        "props": [
+          {
+            "label": "Margin notation",
+            "description": "Use one margin rule, one annotation tick and a subtle source line.",
+            "promptHint": "Use one margin rule, one annotation tick and a subtle source line."
+          }
+        ],
+        "character": [
+          {
+            "label": "No human",
+            "description": "Keep the article surface unobstructed for close inspection.",
+            "promptHint": "Keep the article surface unobstructed for close inspection."
+          }
+        ],
+        "format": [
+          {
+            "label": "Reading portrait",
+            "description": "Use long vertical text rhythm with comfortable mobile margins.",
+            "promptHint": "Use long vertical text rhythm with comfortable mobile margins."
+          }
+        ]
+      }
+    },
+    {
+      "id": "reading-02-bilingual-lines",
+      "family": "知识阅读",
+      "visualTerritory": "知识阅读",
+      "title": "逐行双语阅读",
+      "caption": "中英文以节奏对应，而不是左右分栏。",
+      "source": "Generated from the qualified knowledge-platform brief; no external image reference.",
+      "tone": "bright editorial, youthful, trustworthy",
+      "motif": "interleaved bilingual lines, paired rhythm, mobile legibility",
+      "palette": [
+        "#F5FBFC",
+        "#182126",
+        "#AFCBD2",
+        "#2FB9D8",
+        "#F2D969"
+      ],
+      "prompt": "A mobile bilingual reading screen with interleaved long and short abstract line groups, subtle cyan connectors between paired lines, one soft yellow learning highlight, and a continuous single-column vertical flow. Single vertical 9:16 mobile product-design reference showing one coherent interface state. No collage, no grid of multiple screens, no contact sheet, no split panels, no scrapbook. No readable words, no numbers, no logos, no brand marks, no real user data. Use abstract typographic bars and neutral image placeholders only. No rounded card containers, no floating card stack, no heavy gradient, no cyberpunk neon overload. Young, credible, bright editorial art direction for a Chinese WeChat knowledge product.",
+      "audienceCue": "Chinese young adults who want useful current knowledge without noisy scrolling.",
+      "focusedOutputType": "WeChat mini-program visual system and mobile editorial feed",
+      "remixSuggestions": {
+        "style": [
+          {
+            "label": "Interleaved translation",
+            "description": "Strengthen the pairwise rhythm without using a desktop-style split column.",
+            "promptHint": "Strengthen the pairwise rhythm without using a desktop-style split column."
+          }
+        ],
+        "palette": [
+          {
+            "label": "Cyan learning link",
+            "description": "Use cyan connectors and one pale yellow learning emphasis on a cool white page.",
+            "promptHint": "Use cyan connectors and one pale yellow learning emphasis on a cool white page."
+          }
+        ],
+        "scene": [
+          {
+            "label": "Translation assist",
+            "description": "Show one sentence pair actively connected within a longer reading flow.",
+            "promptHint": "Show one sentence pair actively connected within a longer reading flow."
+          }
+        ],
+        "props": [
+          {
+            "label": "Pair connectors",
+            "description": "Use short connector rules and underline ticks between corresponding lines.",
+            "promptHint": "Use short connector rules and underline ticks between corresponding lines."
+          }
+        ],
+        "character": [
+          {
+            "label": "No human",
+            "description": "Keep the bilingual rhythm clean and unobstructed.",
+            "promptHint": "Keep the bilingual rhythm clean and unobstructed."
+          }
+        ],
+        "format": [
+          {
+            "label": "Single-column portrait",
+            "description": "Maintain one vertical column optimized for narrow mobile reading.",
+            "promptHint": "Maintain one vertical column optimized for narrow mobile reading."
+          }
+        ]
+      }
+    },
+    {
+      "id": "reading-03-source-provenance",
+      "family": "知识阅读",
+      "visualTerritory": "知识阅读",
+      "title": "来源与可信度追踪",
+      "caption": "来源、时间与事实点在底部形成清晰证据链。",
+      "source": "Generated from the qualified knowledge-platform brief; no external image reference.",
+      "tone": "bright editorial, youthful, trustworthy",
+      "motif": "provenance footer, source trace, evidence hierarchy",
+      "palette": [
+        "#FAF8F2",
+        "#191A18",
+        "#B8B7B0",
+        "#2B61EE",
+        "#E9E5DA"
+      ],
+      "prompt": "A mobile article detail view with a calm reading body and a precise provenance footer made of anonymous source markers, one date-length bar, thin connector lines, and a small verified-source dot, with no badges or logos. Single vertical 9:16 mobile product-design reference showing one coherent interface state. No collage, no grid of multiple screens, no contact sheet, no split panels, no scrapbook. No readable words, no numbers, no logos, no brand marks, no real user data. Use abstract typographic bars and neutral image placeholders only. No rounded card containers, no floating card stack, no heavy gradient, no cyberpunk neon overload. Young, credible, bright editorial art direction for a Chinese WeChat knowledge product.",
+      "audienceCue": "Chinese young adults who want useful current knowledge without noisy scrolling.",
+      "focusedOutputType": "WeChat mini-program visual system and mobile editorial feed",
+      "remixSuggestions": {
+        "style": [
+          {
+            "label": "Evidence first",
+            "description": "Make provenance feel integral to reading rather than a legal footer.",
+            "promptHint": "Make provenance feel integral to reading rather than a legal footer."
+          }
+        ],
+        "palette": [
+          {
+            "label": "Quiet verification blue",
+            "description": "Reserve blue for one verification point and keep evidence rows neutral.",
+            "promptHint": "Reserve blue for one verification point and keep evidence rows neutral."
+          }
+        ],
+        "scene": [
+          {
+            "label": "Source inspection",
+            "description": "Show the moment a reader reaches the evidence section after an article.",
+            "promptHint": "Show the moment a reader reaches the evidence section after an article."
+          }
+        ],
+        "props": [
+          {
+            "label": "Evidence connectors",
+            "description": "Use source dots, fine connectors and aligned metadata bars.",
+            "promptHint": "Use source dots, fine connectors and aligned metadata bars."
+          }
+        ],
+        "character": [
+          {
+            "label": "No human",
+            "description": "Keep the source hierarchy fully visible.",
+            "promptHint": "Keep the source hierarchy fully visible."
+          }
+        ],
+        "format": [
+          {
+            "label": "Lower-half focus",
+            "description": "Crop the portrait screen to emphasize the transition from article to evidence.",
+            "promptHint": "Crop the portrait screen to emphasize the transition from article to evidence."
+          }
+        ]
+      }
+    },
+    {
+      "id": "reading-04-save-annotation",
+      "family": "知识阅读",
+      "visualTerritory": "知识阅读",
+      "title": "收藏与批注动作",
+      "caption": "动作嵌入文字边缘，不使用浮动按钮卡片。",
+      "source": "Generated from the qualified knowledge-platform brief; no external image reference.",
+      "tone": "bright editorial, youthful, trustworthy",
+      "motif": "inline save action, margin annotation, subtle interaction",
+      "palette": [
+        "#F9F6EF",
+        "#181817",
+        "#D0C8BA",
+        "#EECC45",
+        "#345FE8"
+      ],
+      "prompt": "A mobile reading screen showing one inline save action embedded in the article margin, a slim annotation rail, one yellow emphasis mark, and a blue confirmation stroke, with controls integrated into the text rhythm rather than floating buttons. Single vertical 9:16 mobile product-design reference showing one coherent interface state. No collage, no grid of multiple screens, no contact sheet, no split panels, no scrapbook. No readable words, no numbers, no logos, no brand marks, no real user data. Use abstract typographic bars and neutral image placeholders only. No rounded card containers, no floating card stack, no heavy gradient, no cyberpunk neon overload. Young, credible, bright editorial art direction for a Chinese WeChat knowledge product.",
+      "audienceCue": "Chinese young adults who want useful current knowledge without noisy scrolling.",
+      "focusedOutputType": "WeChat mini-program visual system and mobile editorial feed",
+      "remixSuggestions": {
+        "style": [
+          {
+            "label": "Inline interaction",
+            "description": "Make saving and annotation feel native to the reading rhythm.",
+            "promptHint": "Make saving and annotation feel native to the reading rhythm."
+          }
+        ],
+        "palette": [
+          {
+            "label": "Ink, yellow, blue",
+            "description": "Keep the interaction palette to black ink, one yellow highlight and one blue confirmation.",
+            "promptHint": "Keep the interaction palette to black ink, one yellow highlight and one blue confirmation."
+          }
+        ],
+        "scene": [
+          {
+            "label": "Knowledge captured",
+            "description": "Show a single conclusion being saved from inside the article flow.",
+            "promptHint": "Show a single conclusion being saved from inside the article flow."
+          }
+        ],
+        "props": [
+          {
+            "label": "Margin action",
+            "description": "Use a tiny margin glyph, a short rule and one confirmation stroke.",
+            "promptHint": "Use a tiny margin glyph, a short rule and one confirmation stroke."
+          }
+        ],
+        "character": [
+          {
+            "label": "Focused fingertip",
+            "description": "Optionally include one subtle fingertip near the inline action without obscuring content.",
+            "promptHint": "Optionally include one subtle fingertip near the inline action without obscuring content."
+          }
+        ],
+        "format": [
+          {
+            "label": "Interaction close crop",
+            "description": "Crop tightly around the margin action and surrounding reading context.",
+            "promptHint": "Crop tightly around the margin action and surrounding reading context."
+          }
+        ]
+      }
+    },
+    {
+      "id": "reading-05-progress-rhythm",
+      "family": "知识阅读",
+      "visualTerritory": "知识阅读",
+      "title": "阅读进度节奏",
+      "caption": "用细线与段落密度提示进度，不做仪表盘。",
+      "source": "Generated from the qualified knowledge-platform brief; no external image reference.",
+      "tone": "bright editorial, youthful, trustworthy",
+      "motif": "reading progress, paragraph rhythm, thin edge line",
+      "palette": [
+        "#FCFAF5",
+        "#191917",
+        "#D5CEC2",
+        "#D6BD34",
+        "#315DE6"
+      ],
+      "prompt": "A long-form mobile reading view with a hairline progress indicator running down one edge, changing paragraph density, one quiet section break, and a small completion marker, all on a warm bright surface with no charts. Single vertical 9:16 mobile product-design reference showing one coherent interface state. No collage, no grid of multiple screens, no contact sheet, no split panels, no scrapbook. No readable words, no numbers, no logos, no brand marks, no real user data. Use abstract typographic bars and neutral image placeholders only. No rounded card containers, no floating card stack, no heavy gradient, no cyberpunk neon overload. Young, credible, bright editorial art direction for a Chinese WeChat knowledge product.",
+      "audienceCue": "Chinese young adults who want useful current knowledge without noisy scrolling.",
+      "focusedOutputType": "WeChat mini-program visual system and mobile editorial feed",
+      "remixSuggestions": {
+        "style": [
+          {
+            "label": "Measured pacing",
+            "description": "Make reading progress emerge from page rhythm instead of analytics graphics.",
+            "promptHint": "Make reading progress emerge from page rhythm instead of analytics graphics."
+          }
+        ],
+        "palette": [
+          {
+            "label": "Warm progress line",
+            "description": "Use a muted golden progress line with a tiny blue completion cue.",
+            "promptHint": "Use a muted golden progress line with a tiny blue completion cue."
+          }
+        ],
+        "scene": [
+          {
+            "label": "Halfway through",
+            "description": "Show a calm midpoint state in a substantial knowledge article.",
+            "promptHint": "Show a calm midpoint state in a substantial knowledge article."
+          }
+        ],
+        "props": [
+          {
+            "label": "Edge progress",
+            "description": "Use one continuous edge hairline and a single section-break marker.",
+            "promptHint": "Use one continuous edge hairline and a single section-break marker."
+          }
+        ],
+        "character": [
+          {
+            "label": "No human",
+            "description": "Keep the long-form reading system unobstructed.",
+            "promptHint": "Keep the long-form reading system unobstructed."
+          }
+        ],
+        "format": [
+          {
+            "label": "Extended portrait",
+            "description": "Favor a very tall visual flow that communicates reading continuity.",
+            "promptHint": "Favor a very tall visual flow that communicates reading continuity."
+          }
+        ]
+      }
+    },
+    {
+      "id": "reading-06-young-reader",
+      "family": "知识阅读",
+      "visualTerritory": "知识阅读",
+      "title": "年轻用户的真实阅读场景",
+      "caption": "用真实使用情境验证界面气质。",
+      "source": "Generated from the qualified knowledge-platform brief; no external image reference.",
+      "tone": "natural, youthful, trustworthy editorial photography",
+      "motif": "young Chinese reader, commuter setting, editorial mobile interface",
+      "palette": [
+        "#F5F1E9",
+        "#1B1B1A",
+        "#C7BDAF",
+        "#2D62EF",
+        "#E8D34E"
+      ],
+      "prompt": "A single editorial photograph of a young Chinese adult reading a bright knowledge interface on a phone during a quiet urban commute, natural daylight, relaxed focused posture, screen visible with abstract non-readable editorial rows and thin dividers. Single vertical 9:16 mobile product-design reference showing one coherent interface state. No collage, no grid of multiple screens, no contact sheet, no split panels, no scrapbook. No readable words, no numbers, no logos, no brand marks, no real user data. Use abstract typographic bars and neutral image placeholders only. No rounded card containers, no floating card stack, no heavy gradient, no cyberpunk neon overload. Young, credible, bright editorial art direction for a Chinese WeChat knowledge product.",
+      "audienceCue": "Chinese young adults who want useful current knowledge without noisy scrolling.",
+      "focusedOutputType": "WeChat mini-program visual system and mobile editorial feed",
+      "remixSuggestions": {
+        "style": [
+          {
+            "label": "Documentary realism",
+            "description": "Make the reader and commute feel candid, contemporary and unposed.",
+            "promptHint": "Make the reader and commute feel candid, contemporary and unposed."
+          }
+        ],
+        "palette": [
+          {
+            "label": "Natural daylight",
+            "description": "Use soft transit neutrals with a small blue and yellow screen accent.",
+            "promptHint": "Use soft transit neutrals with a small blue and yellow screen accent."
+          }
+        ],
+        "scene": [
+          {
+            "label": "Quiet commute",
+            "description": "Place the reader by a train window during a calm morning journey.",
+            "promptHint": "Place the reader by a train window during a calm morning journey."
+          }
+        ],
+        "props": [
+          {
+            "label": "Everyday carry",
+            "description": "Include only restrained everyday objects such as earphones or a canvas bag.",
+            "promptHint": "Include only restrained everyday objects such as earphones or a canvas bag."
+          }
+        ],
+        "character": [
+          {
+            "label": "Focused young reader",
+            "description": "Keep the reader nonspecific, natural and absorbed in useful content.",
+            "promptHint": "Keep the reader nonspecific, natural and absorbed in useful content."
+          }
+        ],
+        "format": [
+          {
+            "label": "Handheld portrait",
+            "description": "Frame one vertical phone-in-use moment with enough screen detail to judge the system.",
+            "promptHint": "Frame one vertical phone-in-use moment with enough screen detail to judge the system."
+          }
+        ]
+      }
+    }
+  ]
+}

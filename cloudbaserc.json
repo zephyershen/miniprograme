@@ -1,0 +1,43 @@
+{
+  "$schema": "https://static.cloudbase.net/cli/cloudbaserc.schema.json",
+  "envId": "hyyc-1gi3f5sqc5becabf",
+  "functionRoot": "hyyc/cloudfunctions",
+  "functions": [
+    {
+      "name": "digestIngest",
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "timeout": 60,
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ],
+      "description": "Fetches and summarizes one public article for the digest inbox."
+    },
+    {
+      "name": "digestStore",
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "timeout": 20,
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ],
+      "description": "Stores dashboard preferences, queue decisions, and conclusion cards."
+    },
+    {
+      "name": "knowledgeFeed",
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "timeout": 60,
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**"
+      ],
+      "description": "Caches selected updates and original cover images for the knowledge feed."
+    }
+  ]
+}

@@ -13,6 +13,11 @@
     </view>
     <view class="article-title">{{item.sourceTitle}}</view>
 
+    <view wx:if="{{item.processingMode === 'local_fallback'}}" class="fallback-note card">
+      <view class="section-label">临时摘要模式</view>
+      <view class="fallback-copy">当前云端 AI 额度不可用。以下内容由本地规则摘录，未经过 AI 翻译或相关性判断。</view>
+    </view>
+
     <view class="relevance-card card relevance-{{item.relevanceTone}}">
       <view class="section-label">与你的关系 · {{item.relevanceLabel}}</view>
       <view class="relevance-reason">{{item.relevanceReasonZh}}</view>

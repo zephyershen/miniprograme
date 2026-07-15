@@ -1,0 +1,488 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Plus Jakarta Sans", "Outfit", "PingFang SC", "Helvetica Neue", sans-serif;
+  --font-body: "Inter", "PingFang SC", "SF Pro Text", "Helvetica Neue", sans-serif;
+
+  --color-mint-400: #34d399;
+  --color-mint-500: #10b981;
+  --color-mint-600: #059669;
+
+  --color-sky-400: #38bdf8;
+  --color-sky-500: #0ea5e9;
+
+  --color-coral-400: #fb923c;
+  --color-coral-500: #f97316;
+
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+}
+
+/* ── Base Reset ── */
+
+view, text, scroll-view, button, image {
+  box-sizing: border-box;
+}
+
+page {
+  min-height: 100%;
+  background: var(--page-bg);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ── Light Theme (Default) ── */
+
+page {
+  --page-bg: #f8fafc;
+  --surface-default: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-overlay: rgba(255, 255, 255, 0.92);
+  --surface-accent: #f1f5f9;
+  --surface-muted: #f8fafc;
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --text-inverse: #ffffff;
+
+  --border-default: #e2e8f0;
+  --border-light: #f1f5f9;
+
+  --brand-primary: #10b981;
+  --brand-primary-light: #d1fae5;
+  --brand-primary-dark: #059669;
+
+  --brand-secondary: #0ea5e9;
+  --brand-secondary-light: #e0f2fe;
+
+  --brand-accent: #f97316;
+  --brand-accent-light: #ffedd5;
+
+  --shadow-sm: 0 2rpx 8rpx rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 8rpx 24rpx rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 16rpx 48rpx rgba(15, 23, 42, 0.08);
+  --shadow-clay: inset 0 -8rpx 0 rgba(0, 0, 0, 0.04), inset 0 8rpx 0 rgba(255, 255, 255, 0.8), 0 16rpx 32rpx rgba(15, 23, 42, 0.05);
+  --shadow-clay-primary: inset 0 -8rpx 0 rgba(0, 0, 0, 0.12), inset 0 8rpx 0 rgba(255, 255, 255, 0.25), 0 16rpx 32rpx rgba(16, 185, 129, 0.25);
+
+  --radius-sm: 16rpx;
+  --radius-md: 24rpx;
+  --radius-lg: 32rpx;
+  --radius-xl: 48rpx;
+  --radius-full: 9999px;
+}
+
+/* ── Dark Mode ── */
+
+@media (prefers-color-scheme: dark) {
+  page {
+    --page-bg: #0f172a;
+    --surface-default: #1e293b;
+    --surface-raised: #334155;
+    --surface-overlay: rgba(30, 41, 59, 0.92);
+    --surface-accent: #334155;
+    --surface-muted: #1e293b;
+
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-muted: #64748b;
+    --text-inverse: #ffffff;
+
+    --border-default: #334155;
+    --border-light: #1e293b;
+
+    --shadow-sm: 0 2rpx 8rpx rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 8rpx 24rpx rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 16rpx 48rpx rgba(0, 0, 0, 0.4);
+    --shadow-clay: inset 0 -8rpx 0 rgba(0, 0, 0, 0.2), inset 0 8rpx 0 rgba(255, 255, 255, 0.05), 0 16rpx 32rpx rgba(0, 0, 0, 0.3);
+    --shadow-clay-primary: inset 0 -8rpx 0 rgba(0, 0, 0, 0.2), inset 0 8rpx 0 rgba(255, 255, 255, 0.1), 0 16rpx 32rpx rgba(16, 185, 129, 0.15);
+  }
+}
+
+/* ══════════════════════════════════════
+   Typography
+   ══════════════════════════════════════ */
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.heading-xl {
+  font-family: var(--font-display);
+  font-size: 64rpx;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.heading-lg {
+  font-family: var(--font-display);
+  font-size: 48rpx;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+}
+
+.heading-md {
+  font-family: var(--font-display);
+  font-size: 40rpx;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.body-lg {
+  font-size: 32rpx;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.body-md {
+  font-size: 28rpx;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.body-sm {
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* ── NEW: additional typography ── */
+
+.section-kicker {
+  font-family: var(--font-display);
+  font-size: 22rpx;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brand-primary);
+}
+
+.hero-title {
+  font-family: var(--font-display);
+  font-size: 44rpx;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.display-lg {
+  font-size: 52rpx;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: 38rpx;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.body-copy {
+  font-size: 28rpx;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.meta-copy {
+  font-size: 22rpx;
+  line-height: 1.4;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+.counter-number {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* ══════════════════════════════════════
+   Color Utility Classes
+   ══════════════════════════════════════ */
+
+.ui-text-primary {
+  color: var(--text-primary);
+}
+
+.ui-text-secondary {
+  color: var(--text-secondary);
+}
+
+.ui-text-soft {
+  color: var(--text-muted);
+}
+
+.ui-accent {
+  color: var(--brand-primary);
+}
+
+.ui-on-accent {
+  color: #ffffff;
+}
+
+/* ══════════════════════════════════════
+   Component Patterns
+   ══════════════════════════════════════ */
+
+/* ── Cards ── */
+
+.card-clay {
+  background: var(--surface-default);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-clay);
+  padding: 32rpx;
+}
+
+.card-soft {
+  background: var(--surface-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: 32rpx;
+  border: 1rpx solid var(--border-light);
+}
+
+/* ── Glass Panels ── */
+
+.glass-panel {
+  background: var(--surface-default);
+  border-radius: var(--radius-lg);
+  padding: 32rpx;
+  border: 1rpx solid var(--border-light);
+  box-shadow: var(--shadow-md);
+}
+
+.glass-panel-strong {
+  background: var(--surface-default);
+  border-radius: var(--radius-lg);
+  padding: 32rpx;
+  border: 1rpx solid var(--border-default);
+  box-shadow: var(--shadow-lg);
+}
+
+/* ── Surfaces ── */
+
+.surface-soft {
+  background: var(--surface-accent);
+  border-radius: var(--radius-md);
+  padding: 24rpx;
+}
+
+/* ── Chips / Pills ── */
+
+.chip-soft {
+  display: inline-flex;
+  align-items: center;
+  background: var(--surface-accent);
+  border: 1rpx solid var(--border-default);
+  border-radius: var(--radius-full);
+  padding: 8rpx 20rpx;
+  font-size: 24rpx;
+}
+
+/* ── Discover Poster ── */
+
+.discover-poster {
+  min-height: 720rpx;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  position: relative;
+}
+
+/* ── Buttons ── */
+
+.btn-primary {
+  background: var(--brand-primary);
+  color: var(--text-inverse);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 32rpx;
+  padding: 24rpx 48rpx;
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-clay-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-primary:active {
+  transform: translateY(4rpx);
+  box-shadow: inset 0 -4rpx 0 rgba(0, 0, 0, 0.12), inset 0 8rpx 0 rgba(255, 255, 255, 0.25);
+}
+
+.btn-secondary {
+  background: var(--brand-primary-light);
+  color: var(--brand-primary-dark);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 32rpx;
+  padding: 24rpx 48rpx;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-secondary:active {
+  transform: scale(0.97);
+  background: #a7f3d0;
+}
+
+.button-pop {
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.button-pop:active {
+  transform: scale(0.96);
+  box-shadow: none;
+}
+
+.cta-primary {
+  background: var(--brand-primary);
+  color: #ffffff;
+  font-weight: 600;
+  border-radius: var(--radius-lg);
+  padding: 24rpx 40rpx;
+  box-shadow: 0 8rpx 24rpx rgba(16, 185, 129, 0.2);
+}
+
+.cta-primary:active {
+  opacity: 0.9;
+  transform: scale(0.97);
+}
+
+/* ── Press / Hover States ── */
+
+.press-down-soft {
+  transform: scale(0.96);
+  opacity: 0.85;
+}
+
+/* ── Badges ── */
+
+.badge-accent {
+  background: var(--brand-accent-light);
+  color: var(--brand-accent);
+  font-size: 20rpx;
+  font-weight: 700;
+  padding: 8rpx 16rpx;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badge-primary {
+  background: var(--brand-primary-light);
+  color: var(--brand-primary-dark);
+  font-size: 20rpx;
+  font-weight: 700;
+  padding: 8rpx 16rpx;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badge-orbit {
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+/* ── Decorative Elements ── */
+
+.podium-glow {
+  background: linear-gradient(to top, var(--brand-primary-light), transparent);
+  opacity: 0.9;
+}
+
+.empty-spotlight {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 400rpx;
+}
+
+/* ══════════════════════════════════════
+   App Layout
+   ══════════════════════════════════════ */
+
+.app-container {
+  padding: 32rpx;
+  padding-bottom: 240rpx;
+}
+
+/* ── Dock Navigation ── */
+
+.nav-dock {
+  position: fixed;
+  bottom: calc(32rpx + env(safe-area-inset-bottom));
+  left: 32rpx;
+  right: 32rpx;
+  background: var(--surface-overlay);
+  border: 1rpx solid var(--border-default);
+  border-radius: var(--radius-full);
+  padding: 12rpx 24rpx;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  box-shadow: var(--shadow-lg);
+  z-index: 50;
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16rpx;
+  border-radius: var(--radius-full);
+  color: var(--text-muted);
+}
+
+.nav-item-active {
+  color: var(--brand-primary);
+}
+
+.nav-item-active .nav-icon-bg {
+  background: var(--brand-primary-light);
+  border-radius: var(--radius-full);
+  padding: 16rpx 32rpx;
+}
+
+/* ══════════════════════════════════════
+   Animations (simple only)
+   ══════════════════════════════════════ */
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12rpx); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition-duration: 0ms !important;
+  }
+}

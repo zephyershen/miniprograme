@@ -14,7 +14,8 @@ function createFakeTransaction(initialCards) {
               cards.delete(id);
             },
             async set({ data }) {
-              cards.set(id, { ...data });
+              assert.equal(Object.hasOwn(data, '_id'), false);
+              cards.set(id, { _id: id, ...data });
             }
           };
         }

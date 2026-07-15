@@ -1,0 +1,15 @@
+page {
+  --editorial-paper: #f6f3ec;
+  --editorial-surface: #fffefa;
+  --editorial-ink: #111111;
+  --editorial-muted: #77746d;
+  --editorial-faint: #b8b5ad;
+  --editorial-rule: #d8d5cd;
+  --editorial-blue: #2457ff;
+  --editorial-coral: #ff5f52;
+  --editorial-amber: #e2a600;
+  --editorial-lime: #8bd500;
+  --editorial-cyan: #22a9d6;
+  --editorial-danger: #a23f34;
+  --editorial-gutter: 34rpx;
+}

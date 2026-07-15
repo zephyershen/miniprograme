@@ -1,0 +1,177 @@
+{
+  "status": "complete",
+  "total": 24,
+  "complete": 24,
+  "failed": 0,
+  "pending": 0,
+  "results": [
+    {
+      "id": "editorial-01-lead-index",
+      "status": "complete",
+      "image_path": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\generated\\.codex-exec\\a8c0fa79bbfeac03\\eaa31dc97f4d877c2025e1f3d612f085.png",
+      "error": null,
+      "caveats": ""
+    },
+    {
+      "id": "editorial-02-section-rail",
+      "status": "complete",
+      "image_path": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\generated\\.codex-exec\\a8c0fa79bbfeac03\\6653e4ea1f57b1852bd037af3fd0f822.png",
+      "error": null,
+      "caveats": ""
+    },
+    {
+      "id": "editorial-03-image-led-story",
+      "status": "complete",
+      "image_path": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\generated\\.codex-exec\\a8c0fa79bbfeac03\\80fad81a044c3db5b35d48bd4c27dcb6.png",
+      "error": null,
+      "caveats": ""
+    },
+    {
+      "id": "editorial-04-dense-briefs",
+      "status": "complete",
+      "image_path": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\generated\\.codex-exec\\a8c0fa79bbfeac03\\86b8297b44b0dc7ad37b80c0aa8ac907.png",
+      "error": null,
+      "caveats": ""
+    },
+    {
+      "id": "editorial-05-section-opener",
+      "status": "complete",
+      "image_path": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\generated\\.codex-exec\\a8c0fa79bbfeac03\\bd714a5a24c4043c9e1bf7c85a2b1cd6.png",
+      "error": null,
+      "caveats": ""
+    },
+    {
+      "id": "editorial-06-paper-detail",
+      "status": "complete",
+      "image_path": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\generated\\.codex-exec\\a8c0fa79bbfeac03\\5783804fdc7cc66562e28184ac74b80b.png",
+      "error": null,
+      "caveats": ""
+    },
+    {
+      "id": "signal-01-channel-track",
+      "status": "complete",
+      "image_path": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\generated\\.codex-exec\\a8c0fa79bbfeac03\\a4d4aa4c427a105c902c78a8660f201d.png",
+      "error": null,
+      "caveats": ""
+    },
+    {
+      "id": "signal-02-live-timeline",
+      "status": "complete",
+      "image_path": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\generated\\.codex-exec\\a8c0fa79bbfeac03\\f299503dd32a17d78286ecec220673b9.png",
+      "error": null,
+      "caveats": "Recovered from existing worker image because result JSON was invalid: Unexpected UTF-8 BOM (decode using utf-8-sig): line 1 column 1 (char 0)"
+    },
+    {
+      "id": "signal-03-pulse-update",
+      "status": "complete",
+      "image_path": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\generated\\.codex-exec\\a8c0fa79bbfeac03\\d3818f19708cb566ba168ba39d4d2000.png",
+      "error": null,
+      "caveats": ""
+    },
+    {
+      "id": "signal-04-refresh-motion",
+      "status": "complete",
+      "image_path": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\generated\\.codex-exec\\a8c0fa79bbfeac03\\dff4850a484037cd9851c0cff9616ad6.png",
+      "error": null,
+      "caveats": ""
+    },
+    {
+      "id": "signal-05-navigation-system",
+      "status": "complete",
+      "image_path": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\generated\\.codex-exec\\a8c0fa79bbfeac03\\2d76eac8bc0085c7139e3f5f9350734a.png",
+      "error": null,
+      "caveats": ""
+    },
+    {
+      "id": "signal-06-source-radar",
+      "status": "complete",
+      "image_path": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\generated\\.codex-exec\\a8c0fa79bbfeac03\\46a00f19fb67cb8c3da98692ebf236f9.png",
+      "error": null,
+      "caveats": ""
+    },
+    {
+      "id": "spectrum-01-ai-cobalt",
+      "status": "complete",
+      "image_path": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\generated\\.codex-exec\\a8c0fa79bbfeac03\\ca43e3b305033dadfc207995ce6171c5.png",
+      "error": null,
+      "caveats": ""
+    },
+    {
+      "id": "spectrum-02-entertainment-coral",
+      "status": "complete",
+      "image_path": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\generated\\.codex-exec\\a8c0fa79bbfeac03\\deb507a02877cc9a58474eb83e14846a.png",
+      "error": null,
+      "caveats": ""
+    },
+    {
+      "id": "spectrum-03-society-amber",
+      "status": "complete",
+      "image_path": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\generated\\.codex-exec\\a8c0fa79bbfeac03\\bff9d66baef2579512a7483ed683ca31.png",
+      "error": null,
+      "caveats": ""
+    },
+    {
+      "id": "spectrum-04-gaming-lime",
+      "status": "complete",
+      "image_path": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\generated\\.codex-exec\\a8c0fa79bbfeac03\\a7b97567cf749824a531925f6a8ea591.png",
+      "error": null,
+      "caveats": ""
+    },
+    {
+      "id": "spectrum-05-english-cyan",
+      "status": "complete",
+      "image_path": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\generated\\.codex-exec\\a8c0fa79bbfeac03\\19610c1a292a5ce62ed5bd07e43cedc5.png",
+      "error": null,
+      "caveats": ""
+    },
+    {
+      "id": "spectrum-06-category-thread",
+      "status": "complete",
+      "image_path": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\generated\\.codex-exec\\a8c0fa79bbfeac03\\e92180ff9c4230c2e4954eaf645c13fb.png",
+      "error": null,
+      "caveats": ""
+    },
+    {
+      "id": "reading-01-highlighted-article",
+      "status": "complete",
+      "image_path": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\generated\\.codex-exec\\a8c0fa79bbfeac03\\10b17f9bd7179b0e200f98bee4f0d3af.png",
+      "error": null,
+      "caveats": ""
+    },
+    {
+      "id": "reading-02-bilingual-lines",
+      "status": "complete",
+      "image_path": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\generated\\.codex-exec\\a8c0fa79bbfeac03\\ef3fa02442668d5580f561f7c914cee5.png",
+      "error": null,
+      "caveats": ""
+    },
+    {
+      "id": "reading-03-source-provenance",
+      "status": "complete",
+      "image_path": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\generated\\.codex-exec\\a8c0fa79bbfeac03\\60e0a765c1653c8a4d2c6807369a1c5f.png",
+      "error": null,
+      "caveats": ""
+    },
+    {
+      "id": "reading-04-save-annotation",
+      "status": "complete",
+      "image_path": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\generated\\.codex-exec\\a8c0fa79bbfeac03\\76521938b40844d555183f652ddd7ee8.png",
+      "error": null,
+      "caveats": ""
+    },
+    {
+      "id": "reading-05-progress-rhythm",
+      "status": "complete",
+      "image_path": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\generated\\.codex-exec\\a8c0fa79bbfeac03\\42cbcb8eb86e29cd6f0addabc3cc63f9.png",
+      "error": null,
+      "caveats": ""
+    },
+    {
+      "id": "reading-06-young-reader",
+      "status": "complete",
+      "image_path": "D:\\miniprogram\\outputs\\moodboards\\knowledge-platform-ui\\generated\\.codex-exec\\a8c0fa79bbfeac03\\627ce8bc55506588206ff5d43c86840b.png",
+      "error": null,
+      "caveats": ""
+    }
+  ]
+}

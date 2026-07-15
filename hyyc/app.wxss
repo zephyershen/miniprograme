@@ -1,13 +1,15 @@
+@import "./styles/editorial-tokens.wxss";
+
 page {
   min-height: 100%;
-  background: #f7f4ed;
-  color: #20231f;
+  background: var(--editorial-paper);
+  color: var(--editorial-ink);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 28rpx;
 }
 
 button {
-  border-radius: 18rpx;
+  border-radius: 2rpx;
   font-size: 28rpx;
   font-weight: 600;
 }
@@ -19,7 +21,7 @@ button::after {
 .page {
   box-sizing: border-box;
   min-height: 100vh;
-  padding: 32rpx 28rpx 72rpx;
+  padding: 34rpx var(--editorial-gutter) 80rpx;
 }
 
 .page-header {
@@ -30,52 +32,56 @@ button::after {
 }
 
 .eyebrow {
-  color: #887f72;
+  color: var(--editorial-muted);
   font-size: 22rpx;
-  letter-spacing: 2rpx;
+  font-weight: 650;
+  letter-spacing: 3rpx;
 }
 
 .page-title {
   margin-top: 8rpx;
   font-size: 50rpx;
-  font-weight: 750;
+  font-weight: 780;
   letter-spacing: -2rpx;
 }
 
 .page-subtitle {
   margin-top: 12rpx;
-  color: #6e6a62;
+  color: var(--editorial-muted);
   font-size: 26rpx;
   line-height: 1.6;
 }
 
 .card {
   box-sizing: border-box;
-  border: 1rpx solid rgba(64, 58, 49, 0.08);
-  border-radius: 26rpx;
-  background: #fffdf8;
-  box-shadow: 0 12rpx 36rpx rgba(57, 49, 38, 0.06);
+  border-top: 1rpx solid var(--editorial-rule);
+  border-bottom: 1rpx solid var(--editorial-rule);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .primary-button {
-  background: #1f5b45;
+  background: var(--editorial-ink);
   color: #ffffff;
 }
 
 .secondary-button {
-  background: #e9e4d9;
-  color: #283129;
+  border: 1rpx solid var(--editorial-ink);
+  background: transparent;
+  color: var(--editorial-ink);
 }
 
 .danger-button {
-  background: #f6dfda;
-  color: #963f32;
+  border: 1rpx solid #d9a9a2;
+  background: transparent;
+  color: var(--editorial-danger);
 }
 
 .ghost-button {
   padding: 0 22rpx;
   background: transparent;
-  color: #1f5b45;
+  color: var(--editorial-ink);
   line-height: 64rpx;
 }
 
@@ -91,13 +97,13 @@ button::after {
 
 .empty-copy {
   margin-top: 18rpx;
-  color: #777168;
+  color: var(--editorial-muted);
   line-height: 1.7;
 }
 
 .loading-copy {
   padding: 80rpx 0;
-  color: #777168;
+  color: var(--editorial-muted);
   text-align: center;
 }
 
@@ -107,7 +113,7 @@ button::after {
   inset: 0;
   display: flex;
   align-items: flex-end;
-  background: rgba(25, 28, 24, 0.42);
+  background: rgba(17, 17, 17, 0.46);
 }
 
 .modal-panel {
@@ -115,8 +121,9 @@ button::after {
   width: 100%;
   max-height: 88vh;
   padding: 34rpx 28rpx calc(34rpx + env(safe-area-inset-bottom));
-  border-radius: 34rpx 34rpx 0 0;
-  background: #fffdf8;
+  border-top: 8rpx solid var(--editorial-blue);
+  border-radius: 0;
+  background: var(--editorial-surface);
 }
 
 .modal-title {
@@ -126,7 +133,7 @@ button::after {
 
 .modal-copy {
   margin-top: 12rpx;
-  color: #777168;
+  color: var(--editorial-muted);
   line-height: 1.6;
 }
 
@@ -136,9 +143,9 @@ button::after {
   min-height: 180rpx;
   margin-top: 28rpx;
   padding: 24rpx;
-  border: 1rpx solid #ded8cc;
-  border-radius: 20rpx;
-  background: #f8f5ef;
+  border: 1rpx solid var(--editorial-rule);
+  border-radius: 0;
+  background: var(--editorial-paper);
   line-height: 1.55;
 }
 

@@ -1,30 +1,31 @@
 {
   "pages": [
     "pages/inbox/index",
+    "pages/feed-detail/index",
     "pages/digest/index",
     "pages/cards/index",
     "pages/settings/index"
   ],
   "window": {
     "navigationBarTitleText": "别收藏了",
-    "navigationBarBackgroundColor": "#f7f4ed",
+    "navigationBarBackgroundColor": "#f6f3ec",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#f7f4ed",
+    "backgroundColor": "#f6f3ec",
     "backgroundTextStyle": "dark"
   },
   "tabBar": {
-    "color": "#777168",
-    "selectedColor": "#1f5b45",
-    "backgroundColor": "#fffdf8",
+    "color": "#77746d",
+    "selectedColor": "#2457ff",
+    "backgroundColor": "#fffefa",
     "borderStyle": "white",
     "list": [
       {
         "pagePath": "pages/inbox/index",
-        "text": "待消化"
+        "text": "发现"
       },
       {
         "pagePath": "pages/cards/index",
-        "text": "结论卡"
+        "text": "收藏"
       }
     ]
   },

@@ -54,7 +54,6 @@ async function ensureState(ownerKey) {
     loadOwned('conclusion_cards', ownerKey)
   ]);
   const state = {
-    _id: ownerKey,
     ownerKey,
     topics: [],
     pendingCount: queue.length,
@@ -83,6 +82,7 @@ function publicQueueItem(item) {
     sourceTitle: item.sourceTitle,
     sourceHost: item.sourceHost,
     language: item.language,
+    processingMode: item.processingMode || 'ai',
     summaryZh: item.summaryZh,
     relevanceLevel: item.relevanceLevel,
     relevanceReasonZh: item.relevanceReasonZh,
@@ -172,7 +172,6 @@ async function incrementProcessedDay(transaction, ownerKey, now, withinSevenDays
   } else {
     await transaction.collection('daily_stats').doc(id).set({
       data: {
-        _id: id,
         ownerKey,
         day,
         addedCount: 0,

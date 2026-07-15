@@ -1,7 +1,7 @@
 .source-line {
   display: flex;
   justify-content: space-between;
-  color: #827b70;
+  color: var(--editorial-muted);
   font-size: 23rpx;
 }
 
@@ -15,17 +15,38 @@
 .relevance-card,
 .content-card,
 .conclusion-preview {
-  margin-top: 22rpx;
-  padding: 30rpx;
+  margin-top: 26rpx;
+  padding: 30rpx 0;
 }
 
-.relevance-high { background: #e3f0e7; }
-.relevance-medium { background: #fff1cf; }
-.relevance-low { background: #eee9df; }
-.relevance-none { background: #f5e3df; }
+.relevance-card {
+  padding-left: 24rpx;
+  border-left: 7rpx solid var(--editorial-rule);
+  background: transparent;
+}
+
+.relevance-high { border-left-color: var(--editorial-blue); }
+.relevance-medium { border-left-color: var(--editorial-amber); }
+.relevance-low { border-left-color: var(--editorial-faint); }
+.relevance-none { border-left-color: var(--editorial-coral); }
+
+.fallback-note {
+  margin-top: 22rpx;
+  padding: 26rpx 30rpx;
+  border: 1rpx solid var(--editorial-amber);
+  border-left: 7rpx solid var(--editorial-amber);
+  border-radius: 0;
+  background: #fff7e3;
+}
+
+.fallback-copy {
+  margin-top: 12rpx;
+  color: var(--editorial-muted);
+  line-height: 1.65;
+}
 
 .section-label {
-  color: #716b61;
+  color: var(--editorial-muted);
   font-size: 23rpx;
   font-weight: 700;
   letter-spacing: 1rpx;
@@ -40,7 +61,7 @@
 
 .sentence {
   padding: 24rpx 0;
-  border-bottom: 1rpx solid #ede8de;
+  border-bottom: 1rpx solid var(--editorial-rule);
 }
 
 .sentence:last-child {
@@ -55,13 +76,18 @@
 .sentence-translation {
   margin-top: 12rpx;
   padding-left: 20rpx;
-  border-left: 5rpx solid #d8ab55;
-  color: #6e675c;
+  border-left: 5rpx solid var(--editorial-cyan);
+  color: var(--editorial-muted);
   line-height: 1.65;
 }
 
 .conclusion-preview {
-  border: 2rpx solid #1f5b45;
+  padding-right: 18rpx;
+  padding-left: 18rpx;
+  border-top: 3rpx solid var(--editorial-blue);
+  border-right: 0;
+  border-bottom: 1rpx solid var(--editorial-blue);
+  border-left: 0;
 }
 
 .conclusion {
@@ -73,14 +99,16 @@
 
 .use-when {
   margin-top: 18rpx;
-  color: #6e675c;
+  color: var(--editorial-muted);
   line-height: 1.6;
 }
 
 .source-button {
   margin-top: 24rpx;
+  padding: 0;
+  border-bottom: 2rpx solid var(--editorial-ink);
   background: transparent;
-  color: #1f5b45;
+  color: var(--editorial-ink);
   font-weight: 500;
 }
 
@@ -106,7 +134,7 @@
 
 .replacement-item {
   padding: 24rpx 4rpx;
-  border-bottom: 1rpx solid #e5dfd4;
+  border-bottom: 1rpx solid var(--editorial-rule);
 }
 
 .replacement-conclusion {
@@ -116,6 +144,6 @@
 
 .replacement-source {
   margin-top: 10rpx;
-  color: #81796e;
+  color: var(--editorial-muted);
   font-size: 23rpx;
 }

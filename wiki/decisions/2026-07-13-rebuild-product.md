@@ -4,7 +4,7 @@ type: decision
 tags: [decision, rebuild, product]
 sources: [../sources/2026-07-13-code-and-repository-audit.md]
 date: 2026-07-13
-last_updated: 2026-07-13
+last_updated: 2026-07-14
 status: accepted
 confidence: high
 ---
@@ -26,8 +26,8 @@ confidence: high
 - `704a88e` 已保留为重建基线，并创建 `legacy-hyyc-704a88e` 标签。
 - 旧支付、实名、聊天、定位、商品、任务、图片审核以及 Lottie/Babel 依赖不进入新产品。
 - 云环境 ID 可以复用，但旧数据、函数、触发器和业务密钥不得默认继承。
-- 具体产品选题的不确定状态已由 [“别收藏了”首版决策](2026-07-13-digest-inbox-v1.md) 替代。
+- 具体产品方向当前由 [编辑索引式知识平台首页决策](2026-07-15-editorial-knowledge-platform-ui.md) 定义；原 [“别收藏了”首版决策](2026-07-13-digest-inbox-v1.md) 已成为迁移基础。
 
 ## 状态
 
-`accepted`。本地代码清理和重建已经执行；线上云资源清理仍待有权限的环境确认。
+`accepted`。本地代码清理和重建已经执行；2026-07-14 已清理线上旧业务函数、集合、存储对象和旧静态后台，同时保留环境、AppID 关联、标准版套餐与空的环境级存储桶。证据见 [云环境清理与首版部署核验](../sources/2026-07-14-cloud-cleanup-and-deployment.md)。

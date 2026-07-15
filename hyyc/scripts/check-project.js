@@ -39,12 +39,36 @@ for (const forbidden of ['requiredPrivateInfos', 'scope.userLocation', 'getLocat
   if (appJsonText.includes(forbidden)) throw new Error(`Forbidden legacy permission found: ${forbidden}`);
 }
 
+const publicUiFiles = files.filter((file) => {
+  const relative = path.relative(root, file);
+  return relative.startsWith(`pages${path.sep}`) && ['.js', '.wxml'].includes(path.extname(file));
+});
+const forbiddenPublicUiTerms = [
+  'AI HOT',
+  'AIHOT',
+  '公开 API',
+  '缓存内容',
+  'DAILY KNOWLEDGE INDEX',
+  '今天看什么',
+  '导入文章',
+  'cover-fallback',
+  'cover-grid'
+];
+for (const file of publicUiFiles) {
+  const content = fs.readFileSync(file, 'utf8');
+  for (const forbidden of forbiddenPublicUiTerms) {
+    if (content.includes(forbidden)) {
+      throw new Error(`Forbidden public UI term found in ${path.relative(root, file)}: ${forbidden}`);
+    }
+  }
+}
+
 const cloudFunctionRoot = path.join(root, 'cloudfunctions');
 const cloudFunctions = fs.readdirSync(cloudFunctionRoot, { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name)
   .sort();
-const expectedFunctions = ['digestIngest', 'digestStore'];
+const expectedFunctions = ['digestIngest', 'digestStore', 'knowledgeFeed'];
 if (JSON.stringify(cloudFunctions) !== JSON.stringify(expectedFunctions)) {
   throw new Error(`Unexpected cloud functions: ${cloudFunctions.join(', ')}`);
 }

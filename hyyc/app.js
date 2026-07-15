@@ -13,6 +13,7 @@ App({
   },
 
   globalData: {
-    dashboard: null
+    dashboard: null,
+    knowledgeFeed: null
   }
 });

@@ -4,11 +4,13 @@ const { AppError, ok, fail } = require('./lib/errors');
 const { normalizePublicHttpsUrl, fetchPublicPage } = require('./lib/url-security');
 const { extractArticle } = require('./lib/extract');
 const { buildMessages, validateAiOutput } = require('./lib/ai-output');
+const { buildFallbackDigest } = require('./lib/fallback');
 const { monthKey, dateKey, normalizeUsage, estimateCostCny, assertBudget } = require('./lib/cost');
 const { assertQueueCapacity } = require('./lib/limits');
 const { hash, digestIds } = require('./lib/identity');
 
 const ENV_ID = 'hyyc-1gi3f5sqc5becabf';
+const AI_PROVIDER = process.env.AI_PROVIDER || 'hunyuan-v3';
 const MODEL = process.env.AI_MODEL || 'hy3-preview';
 const ALLOWED_TOPICS = new Set(['dev_efficiency', 'daily_life', 'english_reading', 'side_project', 'learning_growth']);
 
@@ -38,7 +40,6 @@ async function ensureState(ownerKey) {
     db.collection('conclusion_cards').where({ ownerKey }).count()
   ]);
   const state = {
-    _id: ownerKey,
     ownerKey,
     topics: [],
     pendingCount: queue.total,
@@ -74,7 +75,6 @@ async function reserveBudget(ownerKey, model) {
     } else {
       await transaction.collection('usage_monthly').doc(id).set({
         data: {
-          _id: id,
           ownerKey,
           month,
           model,
@@ -144,7 +144,6 @@ async function incrementDailyAdded(transaction, ownerKey, now) {
   } else {
     await transaction.collection('daily_stats').doc(id).set({
       data: {
-        _id: id,
         ownerKey,
         day,
         addedCount: 1,
@@ -195,9 +194,11 @@ exports.main = async (event = {}) => {
     }
     const article = extractArticle(page.html, finalUrl);
     const messages = buildMessages({ ...article, topics });
-    const model = aiApp.ai().createModel('cloudbase');
+    const model = aiApp.ai().createModel(AI_PROVIDER);
     const reservation = await reserveBudget(ownerKey, MODEL);
     let result;
+    let digest;
+    let processingMode = 'ai';
     try {
       result = await model.generateText({
         model: MODEL,
@@ -211,16 +212,30 @@ exports.main = async (event = {}) => {
       } catch (releaseError) {
         console.error('Failed to release AI budget reservation', releaseError);
       }
-      console.error('CloudBase AI call failed', error);
-      throw new AppError('TEMPORARY_FAILURE', 'AI 暂时无法处理这篇文章，请稍后重试');
+      console.warn('CloudBase AI unavailable; using local fallback', {
+        code: error && error.code,
+        requestId: error && error.requestId
+      });
+      processingMode = 'local_fallback';
+      digest = buildFallbackDigest(article);
     }
 
-    const usageResult = normalizeUsage(result.usage, {
-      inputTokens: 16000,
-      outputTokens: 1000
-    });
-    await settleBudget(reservation, usageResult);
-    const digest = validateAiOutput(result.text, article.language);
+    if (result) {
+      const usageResult = normalizeUsage(result.usage, {
+        inputTokens: 16000,
+        outputTokens: 1000
+      });
+      await settleBudget(reservation, usageResult);
+      try {
+        digest = validateAiOutput(result.text, article.language);
+      } catch (error) {
+        console.warn('CloudBase AI returned an unusable digest; using local fallback', {
+          code: error && error.code
+        });
+        processingMode = 'local_fallback';
+        digest = buildFallbackDigest(article);
+      }
+    }
     const now = new Date();
     const sourceHost = new URL(finalUrl).hostname.replace(/^www\./, '');
 
@@ -233,22 +248,22 @@ exports.main = async (event = {}) => {
       sourceTitle: article.title,
       sourceHost,
       language: article.language,
+      processingMode,
       ...digest,
       createdAt: now,
       updatedAt: now
     };
 
     await db.runTransaction(async (transaction) => {
-      const [latestState, queueDoc, cardDoc] = await Promise.all([
-        transactionGet(transaction, 'user_state', ownerKey),
-        transactionGet(transaction, 'digest_queue', queueId),
-        transactionGet(transaction, 'conclusion_cards', cardId)
-      ]);
+      const latestState = await transactionGet(transaction, 'user_state', ownerKey);
+      const queueDoc = await transactionGet(transaction, 'digest_queue', queueId);
+      const cardDoc = await transactionGet(transaction, 'conclusion_cards', cardId);
       if (!latestState) throw new AppError('TEMPORARY_FAILURE', '用户状态不存在，请重试');
       if (queueDoc || cardDoc) throw new AppError('DUPLICATE', '这个链接已经处理过了');
       assertQueueCapacity(latestState.pendingCount);
 
-      await transaction.collection('digest_queue').doc(queueId).set({ data: item });
+      const { _id: itemId, ...itemData } = item;
+      await transaction.collection('digest_queue').doc(itemId).set({ data: itemData });
       const stateUpdate = {
         pendingCount: command.inc(1),
         updatedAt: now

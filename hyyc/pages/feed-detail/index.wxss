@@ -1,0 +1,92 @@
+.detail-page {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 40rpx var(--editorial-gutter) 110rpx;
+}
+
+.detail-loading,
+.detail-error {
+  padding: 180rpx 0;
+  color: var(--editorial-muted);
+}
+
+.error-code,
+.detail-kicker,
+.section-label,
+.meta-label {
+  color: var(--editorial-muted);
+  font-size: 18rpx;
+  font-weight: 750;
+  letter-spacing: 2rpx;
+}
+
+.error-title { margin-top: 22rpx; color: var(--editorial-ink); font-size: 42rpx; font-weight: 800; }
+.error-copy { margin-top: 18rpx; line-height: 1.7; }
+.detail-kicker { color: var(--editorial-blue); }
+
+.detail-rule {
+  display: inline-block;
+  width: 32rpx;
+  height: 5rpx;
+  margin-right: 14rpx;
+  background: var(--editorial-blue);
+  vertical-align: middle;
+}
+
+.detail-title {
+  margin-top: 28rpx;
+  font-size: 53rpx;
+  font-weight: 820;
+  line-height: 1.26;
+  letter-spacing: -2rpx;
+}
+
+.detail-title-en {
+  margin-top: 18rpx;
+  color: var(--editorial-muted);
+  font-size: 23rpx;
+  line-height: 1.55;
+}
+
+.detail-cover {
+  display: block;
+  width: 100%;
+  height: 430rpx;
+  margin-top: 34rpx;
+  background: #e1ded7;
+}
+
+.detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  border-bottom: 1rpx solid var(--editorial-rule);
+}
+
+.meta-block {
+  box-sizing: border-box;
+  width: 50%;
+  min-height: 124rpx;
+  padding: 24rpx 20rpx 24rpx 0;
+  border-right: 1rpx solid var(--editorial-rule);
+}
+
+.meta-block:nth-child(2n) { padding-left: 20rpx; border-right: none; }
+.meta-block:nth-child(3) { width: 100%; border-top: 1rpx solid var(--editorial-rule); border-right: none; }
+.meta-value { margin-top: 8rpx; font-size: 22rpx; font-weight: 650; line-height: 1.5; }
+
+.summary-section,
+.source-section { padding: 48rpx 0; border-bottom: 1rpx solid var(--editorial-rule); }
+.section-label { color: var(--editorial-blue); }
+.section-title { margin-top: 10rpx; font-size: 35rpx; font-weight: 800; }
+.summary-copy { margin-top: 24rpx; font-size: 29rpx; line-height: 1.85; }
+.source-copy { margin: 20rpx 0 30rpx; color: var(--editorial-muted); font-size: 23rpx; line-height: 1.7; }
+
+.primary-action {
+  width: 100%;
+  margin: 16rpx 0 0;
+  border-radius: 0;
+  font-size: 25rpx;
+  line-height: 86rpx;
+}
+
+.primary-action { background: var(--editorial-ink); color: #ffffff; }

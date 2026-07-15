@@ -1,9 +1,9 @@
 <view class="page">
   <view class="page-header">
     <view>
-      <view class="eyebrow">MINIMAL PROFILE</view>
+      <view class="eyebrow">YOUR KNOWLEDGE FILTER</view>
       <view class="page-title">设置</view>
-      <view class="page-subtitle">只保存帮助判断相关性的非敏感方向。</view>
+      <view class="page-subtitle">控制关注方向、AI 用量和保留的数据。</view>
     </view>
   </view>
 

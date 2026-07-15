@@ -5,11 +5,12 @@
 .cards-list {
   display: flex;
   flex-direction: column;
-  gap: 22rpx;
+  border-top: 1rpx solid var(--editorial-ink);
 }
 
 .conclusion-card {
-  padding: 30rpx;
+  padding: 34rpx 0;
+  border-top: none;
 }
 
 .card-meta,
@@ -20,49 +21,53 @@
 }
 
 .card-meta {
-  color: #877f73;
-  font-size: 22rpx;
+  color: var(--editorial-muted);
+  font-size: 20rpx;
+  letter-spacing: 1rpx;
 }
 
 .card-conclusion {
   margin-top: 22rpx;
-  font-size: 35rpx;
-  font-weight: 730;
+  font-size: 36rpx;
+  font-weight: 760;
   line-height: 1.5;
 }
 
 .card-use {
   margin-top: 18rpx;
-  padding: 18rpx 20rpx;
-  border-radius: 16rpx;
-  background: #edf3ed;
-  color: #40584b;
+  padding: 4rpx 0 4rpx 20rpx;
+  border-left: 5rpx solid var(--editorial-blue);
+  border-radius: 0;
+  background: transparent;
+  color: var(--editorial-muted);
   line-height: 1.55;
 }
 
 .card-source {
   margin-top: 18rpx;
-  color: #7b746a;
+  color: var(--editorial-muted);
   font-size: 24rpx;
   line-height: 1.5;
 }
 
 .card-actions {
   justify-content: flex-end;
-  gap: 10rpx;
+  gap: 22rpx;
   margin-top: 20rpx;
 }
 
 .mini-action {
   margin: 0;
-  padding: 0 18rpx;
+  padding: 0;
+  border-bottom: 2rpx solid var(--editorial-ink);
   background: transparent;
-  color: #1f5b45;
+  color: var(--editorial-ink);
   font-size: 23rpx;
   font-weight: 550;
   line-height: 56rpx;
 }
 
 .danger-text {
-  color: #963f32;
+  border-bottom-color: var(--editorial-danger);
+  color: var(--editorial-danger);
 }

@@ -19,6 +19,14 @@ function getDashboard() {
   return callCloudFunction('digestStore', { action: 'dashboard' });
 }
 
+function getKnowledgeFeed(force = false) {
+  return callCloudFunction('knowledgeFeed', { action: 'feed', force });
+}
+
+function getKnowledgeItem(id) {
+  return callCloudFunction('knowledgeFeed', { action: 'item', id });
+}
+
 function ingestLink(url, requestId) {
   return callCloudFunction('digestIngest', { url, requestId });
 }
@@ -29,6 +37,8 @@ function storeAction(action, payload = {}) {
 
 module.exports = {
   getDashboard,
+  getKnowledgeFeed,
+  getKnowledgeItem,
   ingestLink,
   storeAction
 };

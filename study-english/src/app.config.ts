@@ -1,0 +1,15 @@
+export default defineAppConfig({
+  pages: [
+    "pages/dashboard/index",
+    "pages/learn/index",
+    "pages/discover/index",
+    "pages/profile/index",
+  ],
+  window: {
+    backgroundTextStyle: "dark",
+    navigationBarBackgroundColor: "#f8fafc",
+    navigationBarTitleText: "Pulse English",
+    navigationBarTextStyle: "black",
+  },
+  darkmode: true,
+});
