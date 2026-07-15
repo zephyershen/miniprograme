@@ -2,6 +2,7 @@
   "pages": [
     "pages/inbox/index",
     "pages/feed-detail/index",
+    "pages/source-view/index",
     "pages/digest/index",
     "pages/cards/index",
     "pages/settings/index"

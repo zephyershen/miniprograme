@@ -71,3 +71,12 @@
 - Sources: 本次用户对话、当前代码、41 个 Node 测试、静态检查、线上云函数调用和微信开发者工具模拟器截图。
 - Sensitive handling: 未读取或记录账号、密码、令牌、OpenID 或个人数据。
 - Follow-ups: 为当前无图条目补抓合规原图，并分别接入娱乐、社会、游戏和英语来源；在没有真实图片前继续隐藏相应条目。
+
+## [2026-07-15] engaging-detail | 详情页改为短读导览和条件式原文入口
+
+- Session: local Codex task
+- Target pages: `wiki/index.md`, `wiki/overview.md`, `wiki/timeline.md`, `wiki/decisions/2026-07-15-engaging-news-detail.md`, `wiki/sources/2026-07-15-aihot-feed-integration.md`, `wiki/log.md`
+- Summary: 把详情页重组为真实封面、30 秒导读、三条关键信息、三条有图相关阅读和原始出处；增加已验证业务域名白名单与复制链接兜底，并清除来源标签中的 RSS、翻译中转等技术后缀，避免空白页、大段转载和采集实现暴露。
+- Sources: 本次用户对话、当前代码、45 个 Node 测试、静态检查、线上云函数详情调用和微信开发者工具模拟器。
+- Sensitive handling: 未读取或记录账号、密码、令牌、OpenID 或个人数据。
+- Follow-ups: 接入新官方来源时同步评估微信业务域名资质；只有完成验证的域名才能加入小程序内直开白名单。

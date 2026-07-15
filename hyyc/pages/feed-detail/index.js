@@ -1,4 +1,6 @@
 const { getKnowledgeItem } = require('../../utils/api');
+const { DIRECT_WEBVIEW_HOSTS } = require('../../config/constants');
+const { buildReadingGuide, buildRelatedItems, getOriginAction } = require('../../utils/editorial-detail');
 
 function formatDate(value) {
   const date = new Date(value);
@@ -11,11 +13,19 @@ function formatDate(value) {
   return `${year}.${month}.${day} ${hour}:${minute}`;
 }
 
-function decorate(item) {
+function decorate(item, feedItems = []) {
+  const related = item.relatedItems && item.relatedItems.length
+    ? item.relatedItems
+    : buildRelatedItems(feedItems, item);
   return {
     ...item,
     publishedLabel: formatDate(item.publishedAt),
-    scoreLabel: Number.isFinite(Number(item.score)) ? `热度 ${item.score}` : '编辑精选'
+    readingGuide: buildReadingGuide(item.summary),
+    originAction: getOriginAction(item.url, DIRECT_WEBVIEW_HOSTS),
+    relatedItems: related.map((entry) => ({
+      ...entry,
+      publishedLabel: formatDate(entry.publishedAt)
+    }))
   };
 }
 
@@ -33,9 +43,10 @@ Page({
 
   async loadItem() {
     const feed = getApp().globalData.knowledgeFeed;
-    const cached = feed && (feed.items || []).find((item) => item.id === this.itemId);
+    const feedItems = (feed && feed.items) || [];
+    const cached = feedItems.find((item) => item.id === this.itemId);
     if (cached) {
-      this.setData({ item: decorate(cached), loading: false });
+      this.setData({ item: decorate(cached, feedItems), loading: false });
       return;
     }
     try {
@@ -46,12 +57,30 @@ Page({
     }
   },
 
+  openOriginal() {
+    const item = this.data.item;
+    if (!item) return;
+    if (!item.originAction.canOpen) {
+      this.copyOriginal();
+      return;
+    }
+    wx.navigateTo({
+      url: `/pages/source-view/index?url=${encodeURIComponent(item.url)}`
+    });
+  },
+
   copyOriginal() {
     if (!this.data.item) return;
     wx.setClipboardData({
       data: this.data.item.url,
-      success: () => wx.showToast({ title: '原文链接已复制', icon: 'success' })
+      success: () => wx.showToast({ title: '已复制，可在浏览器打开', icon: 'none' })
     });
+  },
+
+  openRelated(event) {
+    const id = event.currentTarget.dataset.id;
+    if (!id) return;
+    wx.redirectTo({ url: `/pages/feed-detail/index?id=${encodeURIComponent(id)}` });
   },
 
   onShareAppMessage() {

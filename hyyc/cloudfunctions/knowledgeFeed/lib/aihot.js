@@ -25,6 +25,18 @@ function normalizePublishedAt(value) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+function cleanSourceLabel(value) {
+  const source = cleanText(value, 120);
+  if (!source) return '原发布方';
+  return source
+    .replace(/^(?:X|公众号|微信|网站)\s*[：:]\s*/i, '')
+    .replace(/\s*[：:]\s*AI\s*[（(]\s*RSS\s*[）)]\s*$/i, '')
+    .replace(/\s*[：:]\s*(?:Newsroom|Research|Blog|新闻|研究)\s*[（(][^）)]*[）)]\s*$/i, '')
+    .replace(/\s*[（(]\s*RSS\s*[）)]\s*$/i, '')
+    .replace(/\s*热门\s*[（(][^）)]*翻译[^）)]*[）)]\s*$/i, '')
+    .trim() || '原发布方';
+}
+
 function normalizeAihotItem(input = {}) {
   const id = cleanText(input.id, 80);
   const title = cleanText(input.title, 240);
@@ -45,7 +57,7 @@ function normalizeAihotItem(input = {}) {
     summary: cleanText(input.summary, 1200),
     url,
     permalink,
-    source: cleanText(input.source, 120) || 'AI HOT',
+    source: cleanSourceLabel(input.source),
     publishedAt: normalizePublishedAt(input.publishedAt),
     category,
     categoryLabel: meta.label,
@@ -72,4 +84,4 @@ function normalizeAihotResponse(payload, limit = 20) {
   }, []);
 }
 
-module.exports = { CATEGORY_META, normalizeAihotItem, normalizeAihotResponse };
+module.exports = { CATEGORY_META, cleanSourceLabel, normalizeAihotItem, normalizeAihotResponse };

@@ -1,6 +1,6 @@
 const cloud = require('wx-server-sdk');
 const { AppError, ok, fail } = require('./lib/errors');
-const { normalizeAihotResponse } = require('./lib/aihot');
+const { cleanSourceLabel, normalizeAihotResponse } = require('./lib/aihot');
 const { extractCoverUrl } = require('./lib/image-meta');
 const { fetchPublicBuffer } = require('./lib/network');
 
@@ -57,7 +57,7 @@ function publicItem(item) {
     titleEn: item.titleEn || '',
     summary: item.summary || '',
     url: item.url,
-    source: item.source,
+    source: cleanSourceLabel(item.source),
     publishedAt: item.publishedAt,
     category: item.category,
     categoryLabel: item.categoryLabel,
@@ -75,6 +75,33 @@ function publicFeed(cache, stale = false) {
     stale,
     items: (cache.items || []).filter((item) => item.coverFileId).map(publicItem)
   };
+}
+
+function publicRelatedItem(item) {
+  return {
+    id: item.id,
+    title: item.title,
+    source: cleanSourceLabel(item.source),
+    publishedAt: item.publishedAt,
+    category: item.category,
+    categoryLabel: item.categoryLabel,
+    channelKey: item.channelKey,
+    coverTone: item.coverTone,
+    coverFileId: item.coverFileId || ''
+  };
+}
+
+function relatedItems(cache, current, limit = 3) {
+  return (cache.items || [])
+    .filter((item) => item.id !== current.id && item.coverFileId)
+    .map((item, originalIndex) => ({
+      item,
+      originalIndex,
+      relationRank: item.category === current.category ? 0 : item.channelKey === current.channelKey ? 1 : 2
+    }))
+    .sort((left, right) => left.relationRank - right.relationRank || left.originalIndex - right.originalIndex)
+    .slice(0, limit)
+    .map(({ item }) => publicRelatedItem(item));
 }
 
 async function fetchAihot(etag) {
@@ -180,7 +207,7 @@ async function getItem(id) {
   const cache = await getCache();
   const item = cache && (cache.items || []).find((entry) => entry.id === id);
   if (!item || !item.coverFileId) throw new AppError('ITEM_NOT_FOUND', '这条资讯已更新，请返回首页刷新');
-  return publicItem(item);
+  return { ...publicItem(item), relatedItems: relatedItems(cache, item) };
 }
 
 function assertMaintenanceContext() {

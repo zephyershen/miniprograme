@@ -1,0 +1,8 @@
+<web-view wx:if="{{url && !error}}" src="{{url}}" binderror="onWebError" />
+
+<view wx:else class="source-error">
+  <view class="source-error-kicker">原始出处</view>
+  <view class="source-error-title">暂时不能直接打开</view>
+  <view class="source-error-copy">{{error}}</view>
+  <button class="source-copy-action" bindtap="copyOriginal">复制原文链接</button>
+</view>

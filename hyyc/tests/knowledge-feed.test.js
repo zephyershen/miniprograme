@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { normalizeAihotItem, normalizeAihotResponse } = require('../cloudfunctions/knowledgeFeed/lib/aihot');
+const { cleanSourceLabel, normalizeAihotItem, normalizeAihotResponse } = require('../cloudfunctions/knowledgeFeed/lib/aihot');
 const { extractCoverUrl } = require('../cloudfunctions/knowledgeFeed/lib/image-meta');
 const { isPrivateIp } = require('../cloudfunctions/knowledgeFeed/lib/network');
 
@@ -34,6 +34,14 @@ test('maps industry updates to the technology channel', () => {
   const item = normalizeAihotItem({ ...baseItem, category: 'industry' });
   assert.equal(item.channelKey, 'tech');
   assert.equal(item.categoryLabel, '产业动态');
+});
+
+test('removes feed transport details from public source labels', () => {
+  assert.equal(cleanSourceLabel('TechCrunch：AI（RSS）'), 'TechCrunch');
+  assert.equal(cleanSourceLabel('Hacker News 热门（buzzing.cc 中文翻译）'), 'Hacker News');
+  assert.equal(cleanSourceLabel('X：OpenAI Developers'), 'OpenAI Developers');
+  assert.equal(cleanSourceLabel('公众号：通义实验室（千问）'), '通义实验室（千问）');
+  assert.equal(cleanSourceLabel('Anthropic：Research（发表成果 · 网页）'), 'Anthropic');
 });
 
 test('drops malformed entries and de-duplicates IDs', () => {

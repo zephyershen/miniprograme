@@ -6,6 +6,9 @@ const LIMITS = Object.freeze({
   monthlyAiCny: 10
 });
 
+// 只有已在微信公众平台完成业务域名校验的来源才能加入此清单。
+const DIRECT_WEBVIEW_HOSTS = Object.freeze([]);
+
 const TOPICS = Object.freeze([
   { key: 'dev_efficiency', label: '开发效率' },
   { key: 'daily_life', label: '日常生活' },
@@ -16,6 +19,7 @@ const TOPICS = Object.freeze([
 
 module.exports = {
   CLOUD_ENV_ID,
+  DIRECT_WEBVIEW_HOSTS,
   LIMITS,
   TOPICS
 };
