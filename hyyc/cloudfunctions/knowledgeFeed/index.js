@@ -3,13 +3,17 @@ const { AppError, ok, fail } = require('./lib/errors');
 const { cleanSourceLabel, normalizeAihotResponse } = require('./lib/aihot');
 const { extractCoverUrl } = require('./lib/image-meta');
 const { fetchPublicBuffer } = require('./lib/network');
+const { inferTopicKeys } = require('./lib/topics');
 
-const API_URL = 'https://aihot.virxact.com/api/public/items?mode=selected&take=20';
+const API_ROOT = 'https://aihot.virxact.com/api/public/items';
+const API_PAGE_SIZE = 100;
+const MAX_FEED_ITEMS = 120;
 const CACHE_COLLECTION = 'knowledge_feed_cache';
 const CACHE_ID = 'aihot_selected';
 const CACHE_TTL_MS = 15 * 60 * 1000;
 const FORCE_MIN_AGE_MS = 60 * 1000;
 const MAX_COVER_BYTES = 2.5 * 1024 * 1024;
+const COVER_RETRY_MS = 12 * 60 * 60 * 1000;
 const COVER_FILE_PREFIX = 'cloud://hyyc-1gi3f5sqc5becabf.6879-hyyc-1gi3f5sqc5becabf-1395663220/knowledge-covers/aihot/';
 const IMAGE_TYPES = Object.freeze({
   'image/jpeg': 'jpg',
@@ -65,15 +69,19 @@ function publicItem(item) {
     channelKey: item.channelKey,
     coverTone: item.coverTone,
     coverFileId: item.coverFileId || '',
+    topicKeys: Array.isArray(item.topicKeys) ? item.topicKeys : inferTopicKeys(item),
     score: item.score
   };
 }
 
 function publicFeed(cache, stale = false) {
+  const items = (cache.items || []).filter((item) => item.coverFileId).map(publicItem);
   return {
     updatedAt: toIso(cache.fetchedAt),
     stale,
-    items: (cache.items || []).filter((item) => item.coverFileId).map(publicItem)
+    windowDays: 7,
+    totalAvailable: (cache.items || []).length,
+    items
   };
 }
 
@@ -104,16 +112,18 @@ function relatedItems(cache, current, limit = 3) {
     .map(({ item }) => publicRelatedItem(item));
 }
 
-async function fetchAihot(etag) {
+async function fetchAihot(cursor = '', etag = '') {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
+    const params = new URLSearchParams({ mode: 'selected', take: String(API_PAGE_SIZE) });
+    if (cursor) params.set('cursor', cursor);
     const headers = {
       accept: 'application/json',
       'user-agent': 'KnowledgePlatform/1.0 (+WeChat Mini Program; AI HOT integration)'
     };
     if (etag) headers['if-none-match'] = etag;
-    return await fetch(API_URL, { headers, signal: controller.signal, redirect: 'error' });
+    return await fetch(`${API_ROOT}?${params}`, { headers, signal: controller.signal, redirect: 'error' });
   } finally {
     clearTimeout(timeout);
   }
@@ -124,7 +134,8 @@ async function resolveAndUploadCover(item) {
     const page = await fetchPublicBuffer(item.url, {
       accept: 'text/html,application/xhtml+xml;q=0.9',
       maxBytes: 700 * 1024,
-      timeoutMs: 4500
+      timeoutMs: 2500,
+      maxRedirects: 1
     });
     const contentType = String(page.headers['content-type'] || '').toLowerCase();
     if (!contentType.includes('text/html') && !contentType.includes('application/xhtml+xml')) return '';
@@ -134,7 +145,8 @@ async function resolveAndUploadCover(item) {
     const image = await fetchPublicBuffer(imageUrl, {
       accept: 'image/jpeg,image/png,image/webp;q=0.9',
       maxBytes: MAX_COVER_BYTES,
-      timeoutMs: 4500
+      timeoutMs: 2500,
+      maxRedirects: 1
     });
     const imageType = String(image.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
     const extension = IMAGE_TYPES[imageType];
@@ -154,19 +166,34 @@ function mergeCachedCovers(items, previous) {
   const previousById = new Map(((previous && previous.items) || []).map((item) => [item.id, item]));
   return items.map((item) => {
     const cached = previousById.get(item.id);
-    return { ...item, coverFileId: (cached && cached.coverFileId) || '' };
+    return {
+      ...item,
+      coverFileId: (cached && cached.coverFileId) || '',
+      coverCheckedAt: (cached && cached.coverCheckedAt) || null,
+      coverStatus: (cached && cached.coverStatus) || ''
+    };
   });
 }
 
 async function refreshCache(previous) {
-  const response = await fetchAihot(previous && previous.etag);
+  const response = await fetchAihot('', previous && previous.etag);
   const now = new Date();
   if (response.status === 304 && previous) {
     await db.collection(CACHE_COLLECTION).doc(CACHE_ID).update({ data: { fetchedAt: now, updatedAt: now } });
     return { ...previous, fetchedAt: now, updatedAt: now };
   }
   if (!response.ok) throw new Error(`AI_HOT_${response.status}`);
-  const items = normalizeAihotResponse(await response.json(), 20);
+  const firstPage = await response.json();
+  const rawItems = [...(firstPage.items || [])];
+  let nextCursor = firstPage.hasNext ? firstPage.nextCursor : '';
+  while (nextCursor && rawItems.length < MAX_FEED_ITEMS) {
+    const nextResponse = await fetchAihot(nextCursor);
+    if (!nextResponse.ok) throw new Error(`AI_HOT_${nextResponse.status}`);
+    const nextPage = await nextResponse.json();
+    rawItems.push(...(nextPage.items || []));
+    nextCursor = nextPage.hasNext ? nextPage.nextCursor : '';
+  }
+  const items = normalizeAihotResponse({ items: rawItems }, MAX_FEED_ITEMS);
   if (!items.length) throw new Error('AI_HOT_EMPTY');
 
   const enriched = mergeCachedCovers(items, previous);
@@ -245,9 +272,73 @@ async function hydrateCover(id) {
   if (!item) throw new AppError('ITEM_NOT_FOUND', '这条资讯不存在');
   if (item.coverFileId) return { id, coverFileId: item.coverFileId, cached: true };
   const coverFileId = await resolveAndUploadCover(item);
-  const items = cache.items.map((entry) => entry.id === id ? { ...entry, coverFileId } : entry);
+  const checkedAt = new Date();
+  const items = cache.items.map((entry) => entry.id === id
+    ? { ...entry, coverFileId, coverCheckedAt: checkedAt, coverStatus: coverFileId ? 'ready' : 'missing' }
+    : entry);
   await db.collection(CACHE_COLLECTION).doc(CACHE_ID).update({ data: { items, updatedAt: new Date() } });
   return { id, coverFileId, cached: false };
+}
+
+function coverCheckIsFresh(item) {
+  const checkedAt = toDate(item && item.coverCheckedAt);
+  return checkedAt && Date.now() - checkedAt.getTime() < COVER_RETRY_MS;
+}
+
+async function mapWithConcurrency(items, concurrency, worker) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+  async function run() {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await worker(items[index]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, run));
+  return results;
+}
+
+async function hydrateCovers(limit, force = false) {
+  assertMaintenanceContext();
+  const cache = await getCache();
+  if (!cache || !Array.isArray(cache.items)) throw new AppError('FEED_UNAVAILABLE', '资讯缓存尚未建立');
+  const batchSize = Math.max(1, Math.min(9, Number(limit) || 6));
+  const candidates = cache.items
+    .filter((item) => !item.coverFileId && (force === true || !coverCheckIsFresh(item)))
+    .slice(0, batchSize);
+  if (!candidates.length) {
+    return {
+      attempted: 0,
+      resolved: 0,
+      missing: 0,
+      remaining: 0,
+      totalWithCovers: cache.items.filter((item) => item.coverFileId).length
+    };
+  }
+
+  const checkedAt = new Date();
+  const results = await mapWithConcurrency(candidates, 3, async (item) => ({
+    id: item.id,
+    coverFileId: await resolveAndUploadCover(item)
+  }));
+  const resultById = new Map(results.map((result) => [result.id, result.coverFileId]));
+  const items = cache.items.map((item) => resultById.has(item.id)
+    ? {
+      ...item,
+      coverFileId: resultById.get(item.id),
+      coverCheckedAt: checkedAt,
+      coverStatus: resultById.get(item.id) ? 'ready' : 'missing'
+    }
+    : item);
+  await db.collection(CACHE_COLLECTION).doc(CACHE_ID).update({ data: { items, updatedAt: checkedAt } });
+  return {
+    attempted: results.length,
+    resolved: results.filter((result) => result.coverFileId).length,
+    missing: results.filter((result) => !result.coverFileId).length,
+    remaining: items.filter((item) => !item.coverFileId && !item.coverCheckedAt).length,
+    totalWithCovers: items.filter((item) => item.coverFileId).length
+  };
 }
 
 exports.main = async (event = {}) => {
@@ -261,6 +352,8 @@ exports.main = async (event = {}) => {
         return ok(await registerCovers(event.covers));
       case 'hydrateCover':
         return ok(await hydrateCover(event.id));
+      case 'hydrateCovers':
+        return ok(await hydrateCovers(event.limit, event.force));
       default:
         throw new AppError('TEMPORARY_FAILURE', '不支持的操作');
     }

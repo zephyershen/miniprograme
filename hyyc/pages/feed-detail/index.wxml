@@ -29,8 +29,8 @@
 
     <view wx:if="{{item.readingGuide.keyPoints.length}}" class="key-section">
       <view class="section-heading">
-        <view class="section-title">三条关键信息</view>
-        <view class="section-label">快速扫读</view>
+        <view class="section-title">完整摘要</view>
+        <view class="section-label">其余 {{item.readingGuide.keyPoints.length}} 段</view>
       </view>
       <view wx:for="{{item.readingGuide.keyPoints}}" wx:key="indexLabel" class="key-row">
         <text class="key-index">{{item.indexLabel}}</text>

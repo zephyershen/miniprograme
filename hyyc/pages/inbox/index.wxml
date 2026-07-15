@@ -14,6 +14,17 @@
     </view>
   </scroll-view>
 
+  <view class="filter-bar" bindtap="openFilters">
+    <view class="filter-bar-copy">
+      <text class="filter-bar-title">筛选</text>
+      <text class="filter-bar-summary">{{feed.filterSummary}}</text>
+    </view>
+    <view class="filter-bar-count">
+      <text class="filter-bar-result">{{feed.resultCount}} 条图文 ↘</text>
+      <text wx:if="{{feed.totalAvailable}}" class="filter-bar-total">本周收录 {{feed.totalAvailable}}</text>
+    </view>
+  </view>
+
   <view wx:if="{{loading}}" class="loading-editorial">
     <view class="loading-media"></view>
     <view class="loading-line loading-line-strong"></view>
@@ -28,8 +39,9 @@
   </view>
 
   <view wx:elif="{{!feed.visibleItems.length}}" class="empty-editorial">
-    <view class="empty-title">{{feed.activeChannelLabel}}暂时没有有图资讯</view>
-    <view class="empty-copy">有新内容后会在这里更新，你也可以切换其他频道查看。</view>
+    <view class="empty-title">没有符合当前条件的资讯</view>
+    <view class="empty-copy">可以调整时间或主题，也可以切换其他频道查看。</view>
+    <button class="empty-action" bindtap="openFilters">调整筛选</button>
   </view>
 
   <block wx:else>
@@ -41,7 +53,7 @@
         <text>{{feed.leadItem.publishedLabel}}</text>
       </view>
       <view class="lead-title">{{feed.leadItem.title}}</view>
-      <view wx:if="{{feed.leadItem.summary}}" class="lead-summary">{{feed.leadItem.summary}}</view>
+      <view wx:if="{{feed.leadItem.summaryPreview}}" class="lead-summary">{{feed.leadItem.summaryPreview}}</view>
       <view class="lead-footer">
         <text>{{feed.leadItem.scoreLabel}}</text>
         <text>查看详情 →</text>
@@ -73,4 +85,68 @@
       </view>
     </view>
   </block>
+
+  <view wx:if="{{filterOpen}}" class="feed-filter-mask" bindtap="closeFilters">
+    <view class="feed-filter-panel" catchtap="stopPropagation">
+      <view class="filter-panel-head">
+        <view>
+          <view class="filter-panel-kicker">内容筛选</view>
+          <view class="filter-panel-title">找到你关心的更新</view>
+          <view class="filter-panel-status">本周收录 {{feed.totalAvailable}} 条，当前 {{feed.totalImageCount}} 条带来源配图</view>
+        </view>
+        <view class="filter-panel-close" bindtap="closeFilters">关闭</view>
+      </view>
+
+      <scroll-view scroll-y enhanced show-scrollbar="{{false}}" class="filter-panel-scroll">
+        <view class="filter-group">
+          <view class="filter-group-title">时间范围</view>
+          <view class="filter-choice-list">
+            <view
+              wx:for="{{filterOptions.time}}"
+              wx:key="key"
+              class="filter-choice {{item.active ? 'filter-choice-active' : ''}} {{item.disabled ? 'filter-choice-disabled' : ''}}"
+              data-group="time"
+              data-key="{{item.key}}"
+              bindtap="selectFilter"
+            ><text>{{item.label}}</text><text class="filter-choice-count">{{item.count}}</text></view>
+          </view>
+        </view>
+
+        <view class="filter-group">
+          <view class="filter-group-title">公司与模型</view>
+          <view class="filter-group-note">追踪厂商、模型系列与产品动态</view>
+          <view class="filter-choice-list">
+            <view
+              wx:for="{{filterOptions.company}}"
+              wx:key="key"
+              class="filter-choice {{item.active ? 'filter-choice-active' : ''}} {{item.disabled ? 'filter-choice-disabled' : ''}}"
+              data-group="company"
+              data-key="{{item.key}}"
+              bindtap="selectFilter"
+            ><text>{{item.label}}</text><text class="filter-choice-count">{{item.count}}</text></view>
+          </view>
+        </view>
+
+        <view class="filter-group">
+          <view class="filter-group-title">技术方向</view>
+          <view class="filter-group-note">按能力、工程和研究方向继续缩小范围</view>
+          <view class="filter-choice-list">
+            <view
+              wx:for="{{filterOptions.direction}}"
+              wx:key="key"
+              class="filter-choice {{item.active ? 'filter-choice-active' : ''}} {{item.disabled ? 'filter-choice-disabled' : ''}}"
+              data-group="direction"
+              data-key="{{item.key}}"
+              bindtap="selectFilter"
+            ><text>{{item.label}}</text><text class="filter-choice-count">{{item.count}}</text></view>
+          </view>
+        </view>
+      </scroll-view>
+
+      <view class="filter-panel-actions">
+        <button class="filter-reset" bindtap="resetFilters">重置</button>
+        <button class="filter-apply" bindtap="applyFilters">查看 {{draftCount}} 条</button>
+      </view>
+    </view>
+  </view>
 </view>

@@ -164,14 +164,10 @@
 .related-meta { color: var(--editorial-blue); font-weight: 700; }
 
 .related-title {
-  display: -webkit-box;
-  overflow: hidden;
   margin-top: 10rpx;
   font-size: 25rpx;
   font-weight: 760;
   line-height: 1.42;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
 }
 
 .related-source {

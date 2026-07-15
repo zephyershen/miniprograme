@@ -5,6 +5,7 @@ const CATEGORY_META = Object.freeze({
   paper: { label: '论文研究', marker: 'PAPER', channelKey: 'ai', tone: 'cyan' },
   tip: { label: '方法实践', marker: 'PRACTICE', channelKey: 'ai', tone: 'lime' }
 });
+const { inferTopicKeys } = require('./topics');
 
 function cleanText(value, maxLength) {
   if (typeof value !== 'string') return '';
@@ -50,7 +51,7 @@ function normalizeAihotItem(input = {}) {
   const meta = CATEGORY_META[category];
   const score = Number(input.score);
 
-  return {
+  const normalized = {
     id,
     title,
     titleEn: cleanText(input.title_en, 240),
@@ -70,6 +71,7 @@ function normalizeAihotItem(input = {}) {
       canonical: validHttpsUrl(input.attribution && input.attribution.canonical) || permalink
     }
   };
+  return { ...normalized, topicKeys: inferTopicKeys(normalized) };
 }
 
 function normalizeAihotResponse(payload, limit = 20) {

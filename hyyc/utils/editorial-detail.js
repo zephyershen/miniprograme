@@ -4,12 +4,6 @@ function cleanText(value) {
     : '';
 }
 
-function clipText(value, maxLength) {
-  const text = cleanText(value);
-  if (!text || text.length <= maxLength) return text;
-  return `${text.slice(0, Math.max(1, maxLength - 1)).replace(/[，、；：,.!?。！？\s]+$/g, '')}…`;
-}
-
 function splitSentences(value) {
   const text = cleanText(value);
   if (!text) return [];
@@ -18,15 +12,23 @@ function splitSentences(value) {
     .filter((sentence) => sentence.length >= 8);
 }
 
-function splitClauses(value) {
-  return cleanText(value)
-    .split(/[，,；;：:]/)
-    .map(cleanText)
-    .filter((clause) => clause.length >= 10);
-}
-
-function normalizedKey(value) {
-  return cleanText(value).replace(/[\s，、；：,.!?。！？“”"'（）()\-—]/g, '').slice(0, 48);
+function splitLongUnit(value, maxLength = 88) {
+  const text = cleanText(value);
+  if (!text || text.length <= maxLength) return text ? [text] : [];
+  const clauses = (text.match(/[^，,；;：:]+[，,；;：:]?/g) || []).map(cleanText).filter(Boolean);
+  if (clauses.length < 2) return [text];
+  const groups = [];
+  let current = '';
+  for (const clause of clauses) {
+    if (current && current.length + clause.length > maxLength) {
+      groups.push(current);
+      current = clause;
+    } else {
+      current += clause;
+    }
+  }
+  if (current) groups.push(current);
+  return groups;
 }
 
 function buildReadingGuide(summary) {
@@ -34,19 +36,12 @@ function buildReadingGuide(summary) {
   if (!text) return { brief: '', keyPoints: [] };
 
   const sentences = splitSentences(text);
-  const brief = clipText(sentences[0] || text, 56);
-  const candidates = [...sentences.slice(1), ...splitClauses(text)];
-  const seen = new Set([normalizedKey(brief)]);
-  const keyPoints = [];
-
-  for (const candidate of candidates) {
-    const point = clipText(candidate, 58);
-    const key = normalizedKey(point);
-    if (!key || seen.has(key) || keyPoints.some((entry) => key.includes(normalizedKey(entry.text)))) continue;
-    seen.add(key);
-    keyPoints.push({ indexLabel: String(keyPoints.length + 1).padStart(2, '0'), text: point });
-    if (keyPoints.length === 3) break;
-  }
+  const units = (sentences.length ? sentences : [text]).flatMap((sentence) => splitLongUnit(sentence));
+  const brief = units[0] || text;
+  const keyPoints = units.slice(1).map((unit, index) => ({
+    indexLabel: String(index + 1).padStart(2, '0'),
+    text: unit
+  }));
 
   return { brief, keyPoints };
 }

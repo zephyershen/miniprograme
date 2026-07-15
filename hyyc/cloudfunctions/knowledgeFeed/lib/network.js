@@ -41,20 +41,43 @@ function isPrivateIp(address) {
     /^fe[89ab]/.test(clean) || clean.startsWith('ff') || clean.startsWith('2001:db8:');
 }
 
-async function assertPublicHost(url, resolver = dns.lookup) {
+async function withTimeout(promise, timeoutMs) {
+  let timeout;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((resolve, reject) => {
+        timeout = setTimeout(() => reject(new Error('DNS_TIMEOUT')), timeoutMs);
+      })
+    ]);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function assertPublicHost(url, resolver = dns.lookup, timeoutMs = DEFAULT_TIMEOUT_MS) {
   const parsed = new URL(url);
   const hostname = parsed.hostname.replace(/^\[/, '').replace(/\]$/, '');
   if (net.isIP(hostname)) {
     if (isPrivateIp(hostname)) throw new Error('PRIVATE_ADDRESS');
     return [{ address: hostname, family: net.isIP(hostname) }];
   }
-  const records = await resolver(hostname, { all: true, verbatim: true });
+  const records = await withTimeout(resolver(hostname, { all: true, verbatim: true }), timeoutMs);
   if (!records.length || records.some((record) => isPrivateIp(record.address))) throw new Error('PRIVATE_ADDRESS');
   return records;
 }
 
 function requestPinned(url, addressRecord, options) {
   return new Promise((resolve, reject) => {
+    let settled = false;
+    let absoluteTimeout;
+    const finish = (error, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(absoluteTimeout);
+      if (error) reject(error);
+      else resolve(value);
+    };
     const parsed = new URL(url);
     const originalHost = parsed.hostname.replace(/^\[/, '').replace(/\]$/, '');
     const request = https.request({
@@ -77,7 +100,7 @@ function requestPinned(url, addressRecord, options) {
       const location = response.headers.location;
       if ([301, 302, 303, 307, 308].includes(status)) {
         response.resume();
-        resolve({ status, location, headers: response.headers, buffer: Buffer.alloc(0) });
+        finish(null, { status, location, headers: response.headers, buffer: Buffer.alloc(0) });
         return;
       }
       const encoding = String(response.headers['content-encoding'] || 'identity').toLowerCase();
@@ -100,16 +123,16 @@ function requestPinned(url, addressRecord, options) {
         }
         chunks.push(chunk);
       });
-      response.on('end', () => resolve({
+      response.on('end', () => finish(null, {
         status,
         location,
         headers: response.headers,
         buffer: Buffer.concat(chunks)
       }));
-      response.on('error', reject);
+      response.on('error', (error) => finish(error));
     });
-    request.setTimeout(options.timeoutMs, () => request.destroy(new Error('REQUEST_TIMEOUT')));
-    request.on('error', reject);
+    absoluteTimeout = setTimeout(() => request.destroy(new Error('REQUEST_TIMEOUT')), options.timeoutMs);
+    request.on('error', (error) => finish(error));
     request.end();
   });
 }
@@ -119,13 +142,16 @@ async function fetchPublicBuffer(input, options = {}) {
   const settings = {
     accept: options.accept || '*/*',
     maxBytes: options.maxBytes || 700 * 1024,
-    timeoutMs: options.timeoutMs || DEFAULT_TIMEOUT_MS
+    timeoutMs: options.timeoutMs || DEFAULT_TIMEOUT_MS,
+    maxRedirects: Number.isInteger(options.maxRedirects)
+      ? Math.max(0, Math.min(MAX_REDIRECTS, options.maxRedirects))
+      : MAX_REDIRECTS
   };
-  for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects += 1) {
-    const addresses = await assertPublicHost(currentUrl, options.resolver || dns.lookup);
+  for (let redirects = 0; redirects <= settings.maxRedirects; redirects += 1) {
+    const addresses = await assertPublicHost(currentUrl, options.resolver || dns.lookup, settings.timeoutMs);
     const response = await requestPinned(currentUrl, addresses[0], settings);
     if ([301, 302, 303, 307, 308].includes(response.status)) {
-      if (!response.location || redirects === MAX_REDIRECTS) throw new Error('TOO_MANY_REDIRECTS');
+      if (!response.location || redirects === settings.maxRedirects) throw new Error('TOO_MANY_REDIRECTS');
       currentUrl = normalizeHttpsUrl(new URL(response.location, currentUrl).toString());
       continue;
     }

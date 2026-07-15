@@ -80,3 +80,12 @@
 - Sources: 本次用户对话、当前代码、45 个 Node 测试、静态检查、线上云函数详情调用和微信开发者工具模拟器。
 - Sensitive handling: 未读取或记录账号、密码、令牌、OpenID 或个人数据。
 - Follow-ups: 接入新官方来源时同步评估微信业务域名资质；只有完成验证的域名才能加入小程序内直开白名单。
+
+## [2026-07-15] feed-scale-filter | 扩大内容池、修复摘要缺失并实现主题筛选
+
+- Session: local Codex task
+- Target pages: `wiki/index.md`, `wiki/overview.md`, `wiki/timeline.md`, `wiki/decisions/2026-07-15-engaging-news-detail.md`, `wiki/decisions/2026-07-15-editorial-knowledge-platform-ui.md`, `wiki/sources/2026-07-15-aihot-feed-integration.md`, `wiki/log.md`
+- Summary: 将近 7 天精选内容池从固定 20 条扩为游标分页的 108 条，整池检查后公开 13 条真实图文；取消详情字符裁剪并完整展示上游摘要；新增时间、公司与模型、技术方向组合筛选、选项计数和空项禁用。
+- Sources: 公开 API/Topics 页面、当前代码、CloudBase 云端调用、真实来源封面、51 个 Node 测试、静态检查和微信开发者工具渲染。
+- Sensitive handling: 未读取或记录账号、密码、令牌、OpenID 或个人数据；普通 Wiki 只记录公开资讯和非敏感运行事实。
+- Follow-ups: 继续增加合规图文来源和重点厂商官方直连；若需提高 13 条公开图文数量，应改善真实图片获取，不恢复假封面或缺图条目。
