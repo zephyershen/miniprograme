@@ -152,3 +152,12 @@
 - Sources: 本次用户澄清、当前代码、67 个 Node 测试、项目检查、CloudBase 重新部署与默认参数线上调用、微信开发者工具重新编译后的首页画面。
 - Sensitive handling: 未读取或记录账号、密码、令牌、OpenID 或个人数据；沿用本机现有 CloudBase 登录状态完成部署。
 - Follow-ups: 热度仍使用上游编辑值；后续新增内容源时必须把所有候选先统一归一化，再在完整筛选结果中选择主稿，不能只比较当前分页的局部数据。
+
+## [2026-07-16] pure-feed-sorting | 最新与热度分别使用单一排序规则
+
+- Session: local Codex task
+- Target pages: `README.md`, `wiki/index.md`, `wiki/overview.md`, `wiki/sources/2026-07-15-aihot-feed-integration.md`, `wiki/log.md`
+- Summary: 用户取消“主稿热度优先、其余时间倒序”的混合规则，将 `featured-hot-latest-feed` 标记为 `superseded`。最终规则为：“最新”对包括放大主稿在内的全部资讯按发布时间倒序；“热度”对全部资讯按热度倒序，同热度按发布时间倒序；放大主稿始终是当前排序的第一条。
+- Sources: 本次用户决定、当前代码、67 个 Node 测试、项目检查、CloudBase 重新部署与最新/热度两组线上调用、微信开发者工具重新编译后的首页画面。
+- Sensitive handling: 未读取或记录账号、密码、令牌、OpenID 或个人数据；沿用本机现有 CloudBase 登录状态完成部署。
+- Follow-ups: 后续新增排序方式时继续保持“一个选项对应完整列表的一种明确顺序”，避免再引入隐式主稿例外。

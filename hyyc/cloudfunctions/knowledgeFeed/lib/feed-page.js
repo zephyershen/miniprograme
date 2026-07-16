@@ -66,14 +66,6 @@ function sortFeedItems(items, sort) {
     .map(({ item }) => item);
 }
 
-function orderFeedItems(items, sort) {
-  if (sort === 'hot') return sortFeedItems(items, 'hot');
-  const latestItems = sortFeedItems(items, 'latest');
-  const featuredItem = sortFeedItems(items, 'hot')[0];
-  if (!featuredItem) return latestItems;
-  return [featuredItem, ...latestItems.filter((item) => item !== featuredItem)];
-}
-
 function hasTopic(item, key) {
   return key === 'all' || (Array.isArray(item.topicKeys) && item.topicKeys.includes(key));
 }
@@ -94,7 +86,7 @@ function buildFeedPage(items, input = {}, now = Date.now()) {
   const channelItems = query.channel === 'all'
     ? filtered
     : filtered.filter((item) => item.channelKey === query.channel);
-  const results = orderFeedItems(channelItems, query.sort);
+  const results = sortFeedItems(channelItems, query.sort);
   const pageItems = results.slice(query.offset, query.offset + query.limit);
   const nextOffset = query.offset + pageItems.length;
   return {
@@ -111,6 +103,5 @@ module.exports = {
   MAX_PAGE_SIZE,
   normalizeFeedQuery,
   sortFeedItems,
-  orderFeedItems,
   buildFeedPage
 };

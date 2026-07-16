@@ -42,7 +42,7 @@ const DIRECTION_FILTERS = Object.freeze([
 ]);
 
 const SORT_OPTIONS = Object.freeze([
-  { key: 'latest', label: '最新', hint: '主稿热度优先 · 其余时间从新到旧' },
+  { key: 'latest', label: '最新', hint: '时间从新到旧' },
   { key: 'hot', label: '热度', hint: '热度从高到低' }
 ]);
 
