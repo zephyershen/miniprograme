@@ -59,7 +59,10 @@
       </view>
     </view>
 
-    <view wx:if="{{loadingMore}}" class="feed-page-status">正在加载更多资讯</view>
+    <view wx:if="{{loadingMore}}" class="feed-page-status feed-page-loading">
+      <view class="feed-loading-spinner"></view>
+      <text>正在加载更多资讯</text>
+    </view>
     <view wx:elif="{{loadMoreError}}" class="feed-page-status feed-page-retry" bindtap="loadMoreFeed">
       {{loadMoreError}} · 点击重试
     </view>

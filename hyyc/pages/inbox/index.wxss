@@ -339,6 +339,27 @@
   text-align: center;
 }
 
+.feed-page-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14rpx;
+}
+
+.feed-loading-spinner {
+  box-sizing: border-box;
+  width: 26rpx;
+  height: 26rpx;
+  border: 3rpx solid var(--editorial-rule);
+  border-top-color: var(--editorial-blue);
+  border-radius: 50%;
+  animation: feed-loading-spin 0.75s linear infinite;
+}
+
+@keyframes feed-loading-spin {
+  to { transform: rotate(360deg); }
+}
+
 .feed-page-retry { color: var(--editorial-blue); }
 
 .feed-filter-mask {
