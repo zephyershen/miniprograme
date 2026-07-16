@@ -1,126 +1,19 @@
-const { getKnowledgeFeed } = require('../../utils/api');
-const { decorateChannels, channelByKey } = require('../../utils/channels');
-const { buildReadingGuide } = require('../../utils/editorial-detail');
-const { filterFeedItems, filterSummary, filterOptionsWithCounts } = require('../../utils/feed-filter');
 const {
-  TIME_FILTERS,
-  COMPANY_FILTERS,
-  DIRECTION_FILTERS,
-  DEFAULT_FEED_FILTERS
-} = require('../../config/feed-filters');
-
-const FILTER_OPTIONS = Object.freeze({
-  time: TIME_FILTERS,
-  company: COMPANY_FILTERS,
-  direction: DIRECTION_FILTERS
-});
-const SORT_OPTIONS = Object.freeze([
-  { key: 'latest', label: '最新', hint: '时间从新到旧' },
-  { key: 'hot', label: '热度', hint: '热度从高到低' }
-]);
-const PAGE_SIZE = 8;
-
-function copyFilters(filters = DEFAULT_FEED_FILTERS) {
-  return { time: filters.time, company: filters.company, direction: filters.direction };
-}
-
-function decorateSortOptions(activeSort) {
-  return SORT_OPTIONS.map((option) => ({ ...option, active: option.key === activeSort }));
-}
-
-function sortHint(activeSort) {
-  const option = SORT_OPTIONS.find((entry) => entry.key === activeSort);
-  return option ? option.hint : SORT_OPTIONS[0].hint;
-}
-
-function formatFeedDate(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '时间待确认';
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hour = String(date.getHours()).padStart(2, '0');
-  const minute = String(date.getMinutes()).padStart(2, '0');
-  return `${month}.${day} ${hour}:${minute}`;
-}
-
-function prepareFeedItems(raw = { items: [] }) {
-  return (raw.items || [])
-    .map((item) => ({
-      ...item,
-      publishedLabel: formatFeedDate(item.publishedAt),
-      scoreLabel: Number.isFinite(Number(item.score)) ? `热度 ${item.score}` : '编辑精选',
-      summaryPreview: buildReadingGuide(item.summary).brief
-    }));
-}
-
-function filterByChannel(items, activeChannel) {
-  return activeChannel === 'all'
-    ? items
-    : items.filter((item) => item.channelKey === activeChannel);
-}
-
-function decorateFilterOptions(raw, activeChannel, filters) {
-  return filterOptionsWithCounts(FILTER_OPTIONS, filterByChannel(raw.facets || [], activeChannel), filters);
-}
-
-function countFacetResults(raw, activeChannel, filters) {
-  return filterByChannel(filterFeedItems(raw.facets || [], filters), activeChannel).length;
-}
-
-function mergeUniqueItems(current = [], incoming = []) {
-  const seen = new Set(current.map((item) => item.id));
-  const additions = incoming.filter((item) => {
-    if (!item || seen.has(item.id)) return false;
-    seen.add(item.id);
-    return true;
-  });
-  return current.concat(additions);
-}
-
-function decorateFeed(raw = { items: [], facets: [] }, activeChannel = 'all', filters = DEFAULT_FEED_FILTERS, loadedItems = []) {
-  const filteredFacets = filterFeedItems(raw.facets || [], filters);
-  const visibleItems = prepareFeedItems({ items: loadedItems }).map((item, index) => ({
-    ...item,
-    sequenceLabel: String(index + 1).padStart(2, '0')
-  }));
-  const channel = channelByKey(activeChannel);
-  const facetResultCount = filterByChannel(filteredFacets, activeChannel).length;
-  const resultCount = Number.isFinite(Number(raw.resultCount)) ? Number(raw.resultCount) : facetResultCount;
-
-  return {
-    visibleItems,
-    leadItem: visibleItems[0] || null,
-    remainingItems: visibleItems.slice(1),
-    remainingCount: Math.max(0, resultCount - 1),
-    channels: decorateChannels(filteredFacets, activeChannel),
-    activeChannel,
-    activeChannelLabel: channel.label,
-    resultCount,
-    loadedCount: visibleItems.length,
-    totalAvailable: Number(raw.totalAvailable) || (raw.facets || []).length,
-    hasMore: raw.hasMore === true,
-    filterSummary: filterSummary(filters, FILTER_OPTIONS)
-  };
-}
+  getKnowledgeFeed,
+  PAGE_SIZE,
+  copyFilters,
+  createSortState,
+  isSortKey,
+  decorateFilterOptions,
+  countFacetResults,
+  createFilterDraftState,
+  mergeUniqueItems,
+  decorateFeed,
+  createInitialListState
+} = require('../../features/knowledge-feed/index');
 
 Page({
-  data: {
-    loading: true,
-    loadingMore: false,
-    loadMoreError: '',
-    activeChannel: 'all',
-    sortMode: 'latest',
-    sortOptions: decorateSortOptions('latest'),
-    sortHint: sortHint('latest'),
-    feedError: '',
-    filters: copyFilters(),
-    draftFilters: copyFilters(),
-    filterOptions: decorateFilterOptions({ items: [] }, 'all', DEFAULT_FEED_FILTERS),
-    filterOpen: false,
-    filterScrollTarget: '',
-    draftCount: 0,
-    feed: decorateFeed()
-  },
+  data: createInitialListState(),
 
   onLoad() {
     this.loadFeed(false);
@@ -217,12 +110,8 @@ Page({
 
   selectSort(event) {
     const sortMode = event.currentTarget.dataset.key;
-    if (!SORT_OPTIONS.some((option) => option.key === sortMode) || sortMode === this.data.sortMode) return;
-    this.setData({
-      sortMode,
-      sortOptions: decorateSortOptions(sortMode),
-      sortHint: sortHint(sortMode)
-    }, () => this.loadFeed(false));
+    if (!isSortKey(sortMode) || sortMode === this.data.sortMode) return;
+    this.setData(createSortState(sortMode), () => this.loadFeed(false));
   },
 
   retryFeed() {
@@ -230,10 +119,8 @@ Page({
   },
 
   openFilters() {
-    const draftFilters = copyFilters(this.data.filters);
-    const draftCount = countFacetResults(this.rawFeed || { facets: [] }, this.data.activeChannel, draftFilters);
-    const filterOptions = decorateFilterOptions(this.rawFeed || { facets: [] }, this.data.activeChannel, draftFilters);
-    this.setData({ filterOpen: true, draftFilters, draftCount, filterOptions, filterScrollTarget: '' }, () => {
+    const draft = createFilterDraftState(this.rawFeed || { facets: [] }, this.data.activeChannel, this.data.filters);
+    this.setData({ filterOpen: true, ...draft, filterScrollTarget: '' }, () => {
       this.setData({ filterScrollTarget: 'filter-time-group' });
     });
   },
@@ -257,10 +144,7 @@ Page({
   },
 
   resetFilters() {
-    const draftFilters = copyFilters();
-    const draftCount = countFacetResults(this.rawFeed || { facets: [] }, this.data.activeChannel, draftFilters);
-    const filterOptions = decorateFilterOptions(this.rawFeed || { facets: [] }, this.data.activeChannel, draftFilters);
-    this.setData({ draftFilters, draftCount, filterOptions });
+    this.setData(createFilterDraftState(this.rawFeed || { facets: [] }, this.data.activeChannel, copyFilters()));
   },
 
   applyFilters() {

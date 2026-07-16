@@ -20,6 +20,7 @@ confidence: high
 - [保留项目身份、移除旧业务](decisions/2026-07-13-rebuild-product.md) — 旧项目重建边界
 - [采用编辑索引式知识平台首页](decisions/2026-07-15-editorial-knowledge-platform-ui.md) — 当前产品与 UI 主方向
 - [资讯详情采用短读导览和条件式原文入口](decisions/2026-07-15-engaging-news-detail.md) — 当前详情阅读结构与原文打开边界
+- [知识平台按能力与依赖边界组织代码](decisions/2026-07-16-modular-architecture.md) — 后续页面、内容源、仓储和服务的扩展规则
 - [“别收藏了”首版产品与技术边界](decisions/2026-07-13-digest-inbox-v1.md) — 已被替代，但保留为现有摘要闭环的技术基础
 - [AI 额度不可用时使用透明临时摘要](decisions/2026-07-15-ai-quota-fallback.md) — 当前无模型 Token 时的可用性策略
 
@@ -31,10 +32,12 @@ confidence: high
 - [微信端到端验证与运行时修复](sources/2026-07-15-wechat-e2e-and-runtime-fixes.md) — 真实 OpenID、完整业务闭环、AI 429 与兜底验证
 - [编辑索引式 UI 实现证据](sources/2026-07-15-editorial-ui-implementation.md) — 选定 Moodboard、代码落地、测试和模拟器编译
 - [AI HOT 图文资讯源接入与云端验证](sources/2026-07-15-aihot-feed-integration.md) — 公开资讯、封面缓存、频道映射、部署与模拟器证据
+- [知识资讯主链路模块化重构与回归证据](sources/2026-07-16-modular-refactor.md) — feature、adapter、repository、service、presenter 边界与线上回归
+- [2026-07-16 模块化架构评审](reports/architecture-2026-07-16.md) — 结构评分、已采纳项、延后项和未验证范围
 
 ## 当前模块
 
-- 小程序页面：可筛选的纯资讯首页、完整摘要分段详情、条件式原始出处页，以及暂未从首页开放的个人阅读详情、收藏、设置
+- 小程序页面：可筛选的纯资讯首页、完整摘要分段详情、条件式原始出处页，以及暂未从首页开放的个人阅读详情、收藏、设置；页面逻辑由 `features/knowledge-feed` 和 `features/digest` 承载
 - 云函数：`digestIngest`、`digestStore`、`knowledgeFeed`
 - 数据：待处理队列最多 5 条、结论卡最多 20 张、AI 月度硬上限 10 元
 

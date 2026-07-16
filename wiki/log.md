@@ -116,3 +116,12 @@
 - Sources: 本次用户要求、当前代码、57 个 Node 测试、静态检查、CloudBase 部署以及最新、热度近 7 天、热度近 24 小时三组线上函数调用。
 - Sensitive handling: 未读取、记录或新增账号、密码、令牌、代理地址或个人数据；沿用现有本机 CloudBase 登录状态完成部署。
 - Follow-ups: 当前热度使用上游编辑热度值；若未来需要反映小程序用户行为，应另行设计合规的浏览、停留和收藏统计口径。
+
+## [2026-07-16] modular-refactor | 按能力与依赖边界重构知识资讯主链路
+
+- Session: local Codex task
+- Target pages: `README.md`, `wiki/index.md`, `wiki/overview.md`, `wiki/decisions/2026-07-16-modular-architecture.md`, `wiki/sources/2026-07-16-modular-refactor.md`, `wiki/reports/architecture-2026-07-16.md`, `wiki/log.md`
+- Summary: 按用户指定的 modular-code-architect 规范，将小程序端拆为知识资讯/个人消化 feature 与共享 CloudBase 传输，将 `knowledgeFeed` 拆为外部源 adapter、缓存 repository、用例 service 和公开 presenter；入口只保留编排。删除不可达且依赖缺失的旧社区引导，补齐 `ws` 依赖。
+- Sources: 当前代码审查、66 个 Node 测试、项目检查、CloudBase 两次部署以及最新列表、热度时间筛选、有效详情、无效详情线上回归。
+- Sensitive handling: 未读取或记录账号、密码、令牌、OpenID 或个人数据；沿用本机现有 CloudBase 登录状态部署。
+- Follow-ups: 新内容源通过 adapter 接入并统一条目契约；两个已退出首页的旧摘要函数只在重新启用或新增需求时按相同边界逐片迁移。

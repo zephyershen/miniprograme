@@ -1,15 +1,11 @@
 function cleanText(value) {
-  return typeof value === 'string'
-    ? value.replace(/\s+/g, ' ').trim()
-    : '';
+  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '';
 }
 
 function splitSentences(value) {
   const text = cleanText(value);
   if (!text) return [];
-  return (text.match(/[^。！？!?；;]+[。！？!?；;]?/g) || [])
-    .map(cleanText)
-    .filter((sentence) => sentence.length >= 8);
+  return (text.match(/[^。！？!?；;]+[。！？!?；;]?/g) || []).map(cleanText).filter((sentence) => sentence.length >= 8);
 }
 
 function splitLongUnit(value, maxLength = 88) {
@@ -34,16 +30,12 @@ function splitLongUnit(value, maxLength = 88) {
 function buildReadingGuide(summary) {
   const text = cleanText(summary);
   if (!text) return { brief: '', keyPoints: [] };
-
   const sentences = splitSentences(text);
   const units = (sentences.length ? sentences : [text]).flatMap((sentence) => splitLongUnit(sentence));
-  const brief = units[0] || text;
-  const keyPoints = units.slice(1).map((unit, index) => ({
-    indexLabel: String(index + 1).padStart(2, '0'),
-    text: unit
-  }));
-
-  return { brief, keyPoints };
+  return {
+    brief: units[0] || text,
+    keyPoints: units.slice(1).map((unit, index) => ({ indexLabel: String(index + 1).padStart(2, '0'), text: unit }))
+  };
 }
 
 function buildRelatedItems(items, current, limit = 3) {
@@ -58,9 +50,7 @@ function buildRelatedItems(items, current, limit = 3) {
     .sort((left, right) => {
       if (left.relationRank !== right.relationRank) return left.relationRank - right.relationRank;
       const dateDifference = new Date(right.publishedAt).getTime() - new Date(left.publishedAt).getTime();
-      return Number.isFinite(dateDifference) && dateDifference !== 0
-        ? dateDifference
-        : left.originalIndex - right.originalIndex;
+      return Number.isFinite(dateDifference) && dateDifference !== 0 ? dateDifference : left.originalIndex - right.originalIndex;
     })
     .slice(0, limit)
     .map(({ originalIndex, relationRank, ...item }) => item);
@@ -79,14 +69,8 @@ function getOriginAction(url, directWebviewHosts = []) {
     hostname,
     canOpen,
     label: canOpen ? '打开原始出处' : '复制原文链接',
-    note: canOpen
-      ? '将打开原发布页面，实际加载速度取决于来源网站。'
-      : '复制后可在浏览器查看；部分境外来源可能访问较慢。'
+    note: canOpen ? '将打开原发布页面，实际加载速度取决于来源网站。' : '复制后可在浏览器查看；部分境外来源可能访问较慢。'
   };
 }
 
-module.exports = {
-  buildReadingGuide,
-  buildRelatedItems,
-  getOriginAction
-};
+module.exports = { buildReadingGuide, buildRelatedItems, getOriginAction };

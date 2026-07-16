@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { inferChannel, decorateChannels } = require('../utils/channels');
+const { inferChannel, decorateChannels } = require('../features/knowledge-feed/channels');
 
 test('infers the requested editorial channels from real article metadata', () => {
   assert.equal(inferChannel({ sourceTitle: 'OpenAI releases a new GPT model' }).key, 'ai');

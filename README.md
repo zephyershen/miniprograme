@@ -10,6 +10,15 @@
 4. 先按 `docs/cloud-cleanup.md` 核对云端资源，再通过根目录 `cloudbaserc.json` 部署三个云函数。
 5. 在 `hyyc` 目录执行 `npm test` 运行本地测试。
 
+## 模块边界
+
+- `hyyc/pages/` 只负责微信页面生命周期、用户事件和 `setData` 编排，不承载可复用业务规则。
+- `hyyc/features/knowledge-feed/` 集中资讯频道、筛选、排序、列表/详情展示模型和资讯 API；新增首页能力优先放在这里。
+- `hyyc/features/digest/` 保留个人消化功能的 API 和展示转换；它不是当前首页主链路。
+- `hyyc/services/cloud-functions.js` 是小程序端统一云函数传输层，业务模块不直接重复处理 CloudBase 响应和错误。
+- `hyyc/cloudfunctions/knowledgeFeed/adapters/` 隔离外部资讯源，`repositories/` 隔离数据库，`services/` 编排缓存、查询和封面用例，`presenters/` 定义对小程序公开的数据字段。
+- 接入新资讯源时新增 adapter 并保持统一条目结构，避免把供应商字段、请求方式或品牌判断写进页面、查询服务和数据库仓储。
+
 ## 当前产品边界
 
 - 待消化队列最多 5 条，结论卡最多 20 张。

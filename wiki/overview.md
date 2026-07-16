@@ -2,7 +2,7 @@
 title: "知识获取平台小程序项目总览"
 type: overview
 tags: [overview, miniprogram, wechat, knowledge-platform, editorial-index]
-sources: [sources/2026-07-13-digest-inbox-implementation.md, sources/2026-07-14-cloud-cleanup-and-deployment.md, sources/2026-07-15-wechat-e2e-and-runtime-fixes.md, sources/2026-07-15-editorial-ui-implementation.md, sources/2026-07-15-aihot-feed-integration.md, decisions/2026-07-15-engaging-news-detail.md]
+sources: [sources/2026-07-13-digest-inbox-implementation.md, sources/2026-07-14-cloud-cleanup-and-deployment.md, sources/2026-07-15-wechat-e2e-and-runtime-fixes.md, sources/2026-07-15-editorial-ui-implementation.md, sources/2026-07-15-aihot-feed-integration.md, sources/2026-07-16-modular-refactor.md, decisions/2026-07-15-engaging-news-detail.md, decisions/2026-07-16-modular-architecture.md]
 last_updated: 2026-07-16
 status: confirmed
 confidence: high
@@ -20,12 +20,13 @@ confidence: high
 | --- | --- | --- |
 | AppID、云环境 ID、Git 历史和远程地址已保留 | confirmed | 项目配置、应用入口、Git 命令 |
 | 旧社区、商品、任务、聊天、实名、定位、钱包、支付和图片审核代码已从活跃树移除 | confirmed | 当前文件树与重建历史 |
-| 6 个页面、3 个云函数及本地测试已实现 | confirmed | 当前代码、57 个 Node 测试 |
+| 6 个页面、3 个云函数及本地测试已实现 | confirmed | 当前代码、66 个 Node 测试 |
 | 旧云资源清空及 5 个新集合创建 | confirmed | 2026-07-14 CloudBase 清单与复核 |
 | `digestIngest`、`digestStore` 已部署 | confirmed | 两函数部署结果与云端日志 |
 | 真实 OpenID、数据库闭环和开发者工具编译 | confirmed | 2026-07-15 微信开发者工具端到端验证 |
 | 编辑索引式首页与频道视觉系统 | confirmed | 2026-07-15 Moodboard 选择、当前代码和模拟器编译 |
 | AI/科技精选聚合、最新/热度排序、服务端分页、筛选、缓存和原始来源追踪 | confirmed | 2026-07-16 线上验证最新倒序、热度倒序及热度与时间筛选组合通过 |
+| 知识资讯主链路按 feature/adapter/repository/service/presenter 分层 | confirmed | 2026-07-16 模块化重构、边界测试与 CloudBase 接口回归 |
 | 完整摘要分段和相关阅读 | confirmed | 无图详情实机打开、云端摘要无人工省略、3 条相关阅读 |
 | 多来源去重、独立官方源与其他四个频道 | needs-review | 尚未实现，不得宣称为全频道实时新闻服务 |
 | 真正 AI 摘要 | needs-review | 当前套餐模型调用返回 429；应用已透明使用本地临时摘要 |
@@ -58,6 +59,8 @@ confidence: high
 ## 代码与数据
 
 - 页面：`pages/inbox/index`（纯资讯首页）、`pages/feed-detail/index`（短读公共资讯详情）、`pages/source-view/index`（仅承载已验证域名）；`pages/digest/index`、`pages/cards/index`、`pages/settings/index` 仍在代码中，但首页不再提供个人导入/待处理入口。
+- 小程序模块：`features/knowledge-feed/` 拥有资讯配置、频道、筛选、阅读、列表/详情模型和 API；`features/digest/` 拥有保留的个人消化 API/展示转换；`services/cloud-functions.js` 是两个能力共享的唯一 CloudBase 传输层。
+- 资讯云函数模块：`adapters/` 隔离外部资讯源，`repositories/` 隔离缓存集合，`services/` 编排查询/缓存降级和封面维护，`presenters/` 约束公开 DTO；`knowledgeFeed/index.js` 只装配依赖和路由 action。
 - 首页频道：精选、AI 前沿、科技、娱乐、社会、游戏、英语；当前聚合源覆盖前两类，其他频道保留真实空状态。
 - 首页筛选：24 小时、近 3 天、近 7 天；15 个公司与模型主题；14 个技术方向。三个维度可组合，选项显示当前资讯数，零结果项不可选；弹层内容独立滚动，底部操作区不覆盖主题。
 - 首页排序：默认“最新”，显式按发布时间从新到旧；切换“热度”后先应用频道、时间、公司/模型和技术方向筛选，再按上游热度值从高到低排列，同热度按发布时间从新到旧。排序切换会从第一页重新加载。
@@ -88,8 +91,8 @@ confidence: high
 
 ## 本地验证
 
-- `npm test`：57/57 通过。
-- `npm run check`：20 个 JSON、52 个 JavaScript、6 个页面通过结构与语法检查。
+- `npm test`：66/66 通过。
+- `npm run check`：19 个 JSON、64 个 JavaScript、6 个页面通过结构与语法检查。
 - `git diff --check`：通过。
 - 微信开发者工具已打开当前项目并加载资讯首页；本轮分页的结构、语法、云端返回和页面状态由静态检查、线上函数调用及模拟器画面共同核验。
 
@@ -98,7 +101,7 @@ confidence: high
 - 旧业务的 41 个函数、24 个集合、2,456 条文档、217 个存储对象和 `adminportal/` 已清理。
 - 环境级空存储桶、平台认证文件、AppID 关联和标准版套餐被保留。
 - 6 个当前集合均为 `ADMINONLY`；其中 5 个个人业务集合无测试记录，`knowledge_feed_cache` 保存公共资讯缓存。
-- 三个 Node.js 18.15 云函数已部署；`knowledgeFeed` 当前使用服务端排序与分页。2026-07-16 线上验证：内容池 106 条，第一页 8 条并返回 `nextOffset=8`，第二页再返回 8 条；“AI 前沿 + 24 小时 + OpenAI”返回 5 条且正确结束；“最新”首屏发布时间严格倒序，“热度 + 近 7 天”首屏热度为 86、85、84、84、83、82、80、79，“热度 + 24 小时”先将结果收窄为 20 条再按热度倒序。无图条目和无图相关阅读仍能打开详情；公开响应已移除聚合平台页面、归因和平台标识字段。
+- 三个 Node.js 18.15 云函数已部署；`knowledgeFeed` 当前使用服务端排序与分页，并已部署模块化版本。2026-07-16 重构后线上回归：内容池随上游更新为 105 条，“最新”前 3 条按时间倒序；“热度 + 24 小时”先筛为 19 条，前 3 条热度为 82、78、78；有效详情返回 3 条相关阅读，无效 ID 返回稳定 `ITEM_NOT_FOUND`。无图条目和无图相关阅读仍能打开详情；公开响应已移除聚合平台页面、归因和平台标识字段。
 - 真实微信上下文已验证：保存偏好 → 导入文章 → 生成临时摘要 → 保留结论卡 → 统计更新 → 清除个人数据。
 - 环境“超限按量”关闭；未自动开启新的 AI 付费方案。
 

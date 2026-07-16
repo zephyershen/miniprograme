@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { buildReadingGuide, buildRelatedItems, getOriginAction } = require('../utils/editorial-detail');
+const { buildReadingGuide, buildRelatedItems, getOriginAction } = require('../features/knowledge-feed/reading');
 
 test('turns a summary into complete scan-friendly units without adding ellipses', () => {
   const guide = buildReadingGuide('产品发布了新模型，支持离线运行。模型体积缩小到 4GB。它支持视觉任务和工具调用。团队同时开放了模型权重。');

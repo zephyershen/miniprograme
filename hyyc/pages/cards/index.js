@@ -1,6 +1,6 @@
-const { getDashboard, storeAction } = require('../../utils/api');
+const { getDashboard, storeAction } = require('../../features/digest/api');
 const { LIMITS } = require('../../config/constants');
-const { formatDate } = require('../../utils/format');
+const { formatDate } = require('../../features/digest/presentation');
 
 Page({
   data: {

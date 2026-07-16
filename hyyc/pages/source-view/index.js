@@ -1,5 +1,5 @@
 const { DIRECT_WEBVIEW_HOSTS } = require('../../config/constants');
-const { getOriginAction } = require('../../utils/editorial-detail');
+const { getOriginAction } = require('../../features/knowledge-feed/index');
 
 Page({
   data: {

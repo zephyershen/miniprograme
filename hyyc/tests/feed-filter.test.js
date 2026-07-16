@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { filterFeedItems, filterSummary, filterOptionsWithCounts } = require('../utils/feed-filter');
-const { TIME_FILTERS, COMPANY_FILTERS, DIRECTION_FILTERS } = require('../config/feed-filters');
+const { filterFeedItems, filterSummary, filterOptionsWithCounts } = require('../features/knowledge-feed/filters');
+const { TIME_FILTERS, COMPANY_FILTERS, DIRECTION_FILTERS } = require('../features/knowledge-feed/config');
 
 const NOW = Date.parse('2026-07-15T06:00:00.000Z');
 const items = [

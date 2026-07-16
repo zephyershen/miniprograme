@@ -1,9 +1,9 @@
-const RELEVANCE = {
+const RELEVANCE = Object.freeze({
   high: { label: '很相关', tone: 'high' },
   medium: { label: '可能有用', tone: 'medium' },
   low: { label: '关系较弱', tone: 'low' },
   none: { label: '目前无关', tone: 'none' }
-};
+});
 
 function formatDate(value) {
   if (!value) return '';
@@ -21,8 +21,4 @@ function formatMoney(value) {
   return number.toFixed(number >= 1 ? 2 : 3);
 }
 
-module.exports = {
-  formatDate,
-  relevanceMeta,
-  formatMoney
-};
+module.exports = { formatDate, relevanceMeta, formatMoney };

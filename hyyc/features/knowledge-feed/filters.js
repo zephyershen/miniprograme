@@ -14,9 +14,7 @@ function filterFeedItems(items, filters, now = Date.now()) {
   return (items || []).filter((item) => {
     const publishedAt = new Date(item.publishedAt).getTime();
     const withinTime = filters.time === '7d' || (Number.isFinite(publishedAt) && publishedAt >= threshold);
-    return withinTime
-      && hasTopic(item, filters.company)
-      && hasTopic(item, filters.direction);
+    return withinTime && hasTopic(item, filters.company) && hasTopic(item, filters.direction);
   });
 }
 
@@ -39,12 +37,7 @@ function filterOptionsWithCounts(options, items, filters, now = Date.now()) {
     entries.map((entry) => {
       const candidate = { ...filters, [group]: entry.key };
       const count = filterFeedItems(items, candidate, now).length;
-      return {
-        ...entry,
-        count,
-        active: filters[group] === entry.key,
-        disabled: count === 0 && filters[group] !== entry.key
-      };
+      return { ...entry, count, active: filters[group] === entry.key, disabled: count === 0 && filters[group] !== entry.key };
     })
   ]));
 }
