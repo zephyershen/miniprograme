@@ -32,7 +32,7 @@ function normalizeFeedQuery(input = {}) {
     offset: boundedInteger(input.offset, 0, 0, 10000),
     limit: boundedInteger(input.limit, DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE),
     channel: allowedValue(input.channel, CHANNEL_KEYS, 'all'),
-    sort: allowedValue(input.sort, SORT_KEYS, 'hot'),
+    sort: allowedValue(input.sort, SORT_KEYS, 'latest'),
     filters: {
       time: allowedValue(filters.time, new Set(Object.keys(TIME_WINDOWS)), '7d'),
       company: allowedValue(filters.company, COMPANY_KEYS, 'all'),
@@ -66,6 +66,14 @@ function sortFeedItems(items, sort) {
     .map(({ item }) => item);
 }
 
+function orderFeedItems(items, sort) {
+  if (sort === 'hot') return sortFeedItems(items, 'hot');
+  const latestItems = sortFeedItems(items, 'latest');
+  const featuredItem = sortFeedItems(items, 'hot')[0];
+  if (!featuredItem) return latestItems;
+  return [featuredItem, ...latestItems.filter((item) => item !== featuredItem)];
+}
+
 function hasTopic(item, key) {
   return key === 'all' || (Array.isArray(item.topicKeys) && item.topicKeys.includes(key));
 }
@@ -86,7 +94,7 @@ function buildFeedPage(items, input = {}, now = Date.now()) {
   const channelItems = query.channel === 'all'
     ? filtered
     : filtered.filter((item) => item.channelKey === query.channel);
-  const results = sortFeedItems(channelItems, query.sort);
+  const results = orderFeedItems(channelItems, query.sort);
   const pageItems = results.slice(query.offset, query.offset + query.limit);
   const nextOffset = query.offset + pageItems.length;
   return {
@@ -103,5 +111,6 @@ module.exports = {
   MAX_PAGE_SIZE,
   normalizeFeedQuery,
   sortFeedItems,
+  orderFeedItems,
   buildFeedPage
 };

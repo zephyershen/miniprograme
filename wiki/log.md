@@ -143,3 +143,12 @@
 - Sources: 本次用户要求、当前代码、67 个 Node 测试、项目检查、CloudBase 部署与默认参数线上调用、微信开发者工具重新编译后的首页画面。
 - Sensitive handling: 未读取或记录账号、密码、令牌、OpenID 或个人数据；沿用本机现有 CloudBase 登录状态完成部署。
 - Follow-ups: 当前热度仍使用上游编辑热度值；未来如引入小程序内行为热度，需要另行定义合规的浏览、停留、收藏权重和防刷机制。
+
+## [2026-07-16] featured-hot-latest-feed | 主稿热度优先、普通资讯默认时间倒序
+
+- Session: local Codex task
+- Target pages: `README.md`, `wiki/index.md`, `wiki/overview.md`, `wiki/sources/2026-07-15-aihot-feed-integration.md`, `wiki/log.md`
+- Summary: 用户澄清首页不是默认整列热度排序；将上一条 `default-hot-feed` 结论标记为 `superseded`。当前规则是先在频道与筛选结果中选出热度最高的一条作为放大主稿，再把其余资讯按发布时间从新到旧排列且不重复主稿；只有用户主动切换“热度”时整列才按热度排序。
+- Sources: 本次用户澄清、当前代码、67 个 Node 测试、项目检查、CloudBase 重新部署与默认参数线上调用、微信开发者工具重新编译后的首页画面。
+- Sensitive handling: 未读取或记录账号、密码、令牌、OpenID 或个人数据；沿用本机现有 CloudBase 登录状态完成部署。
+- Follow-ups: 热度仍使用上游编辑值；后续新增内容源时必须把所有候选先统一归一化，再在完整筛选结果中选择主稿，不能只比较当前分页的局部数据。

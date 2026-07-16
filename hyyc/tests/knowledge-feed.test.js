@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { cleanSourceLabel, normalizeAihotItem, normalizeAihotResponse } = require('../cloudfunctions/knowledgeFeed/lib/aihot');
 const { extractCoverUrl } = require('../cloudfunctions/knowledgeFeed/lib/image-meta');
 const { isPrivateIp } = require('../cloudfunctions/knowledgeFeed/lib/network');
-const { buildFeedPage, normalizeFeedQuery } = require('../cloudfunctions/knowledgeFeed/lib/feed-page');
+const { buildFeedPage, normalizeFeedQuery, sortFeedItems } = require('../cloudfunctions/knowledgeFeed/lib/feed-page');
 
 const baseItem = {
   id: 'cmrl9plh50014bi2b56tar61d',
@@ -110,25 +110,24 @@ test('paginates after applying channel and topic filters', () => {
   assert.equal(page.resultCount, 1);
 });
 
-test('sorts latest items explicitly instead of trusting upstream order', () => {
+test('sorts ordinary latest items explicitly instead of trusting upstream order', () => {
   const items = [
     { id: 'older', publishedAt: '2026-07-14T01:00:00.000Z', channelKey: 'ai', topicKeys: [], score: 99 },
     { id: 'newest', publishedAt: '2026-07-16T01:00:00.000Z', channelKey: 'ai', topicKeys: [], score: 60 },
     { id: 'middle', publishedAt: '2026-07-15T01:00:00.000Z', channelKey: 'ai', topicKeys: [], score: 80 }
   ];
-  const page = buildFeedPage(items, { sort: 'latest', filters: { time: '7d' } });
-  assert.deepEqual(page.items.map((item) => item.id), ['newest', 'middle', 'older']);
+  assert.deepEqual(sortFeedItems(items, 'latest').map((item) => item.id), ['newest', 'middle', 'older']);
 });
 
-test('uses heat as the default feed order and time as the tie-breaker', () => {
+test('features the hottest item then orders the remaining default feed by time', () => {
   const items = [
     { id: 'newest-warm', publishedAt: '2026-07-16T01:00:00.000Z', channelKey: 'ai', topicKeys: [], score: 70 },
     { id: 'hot-older', publishedAt: '2026-07-15T01:00:00.000Z', channelKey: 'ai', topicKeys: [], score: 90 },
     { id: 'hot-newer', publishedAt: '2026-07-15T02:00:00.000Z', channelKey: 'ai', topicKeys: [], score: 90 }
   ];
   const page = buildFeedPage(items, { filters: { time: '7d' } });
-  assert.equal(page.query.sort, 'hot');
-  assert.deepEqual(page.items.map((item) => item.id), ['hot-newer', 'hot-older', 'newest-warm']);
+  assert.equal(page.query.sort, 'latest');
+  assert.deepEqual(page.items.map((item) => item.id), ['hot-newer', 'newest-warm', 'hot-older']);
 });
 
 test('applies the time filter before sorting by heat', () => {
@@ -158,7 +157,7 @@ test('normalizes malformed pagination input to safe defaults', () => {
     offset: 0,
     limit: 20,
     channel: 'all',
-    sort: 'hot',
+    sort: 'latest',
     filters: { time: '7d', company: 'all', direction: 'all' }
   });
 });
