@@ -17,6 +17,7 @@ const {
 const { assertRenderableResponse } = require('../cloudrun/source-preview-renderer/src/page-policy');
 const { createCloudFileDeleter } = require('../cloudfunctions/knowledgeFeed/services/cloud-file-deleter');
 const { createFeedCacheRepository } = require('../cloudfunctions/knowledgeFeed/repositories/feed-cache');
+const { visualVersion } = require('../cloudfunctions/knowledgeFeed/lib/visual-version');
 
 const FILE_ID_PREFIX = 'cloud://env.bucket/knowledge-previews/source/';
 
@@ -80,35 +81,64 @@ test('rejects error pages before storing a source screenshot', () => {
   assert.throws(() => assertRenderableResponse(null), /NO_DOCUMENT_RESPONSE/);
 });
 
-test('acknowledges cloud file cleanup only when every file deletion succeeds', async () => {
+test('classifies cloud file deletion outcomes per file and keeps uncertain files retryable', async () => {
   const fileIds = [`${FILE_ID_PREFIX}old-1.jpg`, `${FILE_ID_PREFIX}old-2.jpg`];
   const successful = createCloudFileDeleter({
-    deleteFile: async ({ fileList }) => ({ fileList: fileList.map((fileID) => ({ fileID, status: 0 })) })
+    deleteFile: async ({ fileList }) => ({ fileList: fileList.map((fileID) => ({ fileID, code: 'SUCCESS' })) })
   });
-  await successful(fileIds);
+  assert.deepEqual(await successful(fileIds), {
+    deletedFileIds: fileIds,
+    retryFileIds: [],
+    uncertain: false
+  });
 
   const partial = createCloudFileDeleter({
     deleteFile: async () => ({
-      fileList: [{ fileID: fileIds[0], status: 0 }, { fileID: fileIds[1], status: -1 }]
+      fileList: [{ fileID: fileIds[0], status: 0 }, { fileID: fileIds[1], code: 'TEMPORARY_FAILURE' }]
     })
   });
-  await assert.rejects(() => partial(fileIds), /CLOUD_FILE_DELETE_FAILED/);
+  assert.deepEqual(await partial(fileIds), {
+    deletedFileIds: [fileIds[0]],
+    retryFileIds: [fileIds[1]],
+    uncertain: true
+  });
+
+  const unavailable = createCloudFileDeleter({
+    deleteFile: async () => { throw new Error('network unavailable'); }
+  });
+  assert.deepEqual(await unavailable(fileIds), {
+    deletedFileIds: [],
+    retryFileIds: fileIds,
+    uncertain: true
+  });
 });
 
 test('renders, stores and safely replaces source preview screenshots behind the maintenance boundary', async () => {
   const cache = {
-    items: [{ id: 'item0001', url: 'https://public.example/article', coverFileId: '', previewFileIds: [] }]
+    items: [{
+      id: 'item0001',
+      url: 'https://public.example/article',
+      coverFileId: '',
+      coverStatus: 'missing',
+      previewFileIds: []
+    }]
   };
   let updatedItems = null;
   let queuedVisualDeletes = [];
   const repository = {
     get: async () => cache,
     patchItems: async (patches, updatedAt, visualDeletes) => {
-      const patchById = new Map(patches.map((entry) => [entry.id, entry.fields]));
-      updatedItems = cache.items.map((item) => ({ ...item, ...(patchById.get(item.id) || {}) }));
+      const patchById = new Map(patches.map((entry) => [entry.id, entry]));
+      const appliedIds = [];
+      updatedItems = cache.items.map((item) => {
+        const patch = patchById.get(item.id);
+        if (!patch || (patch.expectedUrl && patch.expectedUrl !== item.url)) return item;
+        appliedIds.push(item.id);
+        return { ...item, ...patch.fields };
+      });
       cache.items = updatedItems;
       queuedVisualDeletes = visualDeletes || [];
-      return updatedItems;
+      return { items: updatedItems, appliedIds, pendingVisualDeletes: queuedVisualDeletes };
     }
   };
   const jpeg = Buffer.from('ffd8ffe000104a4649460001ffd9', 'hex');
@@ -156,16 +186,18 @@ test('renders, stores and safely replaces source preview screenshots behind the 
   assert.equal(updatedItems[0].previewStatus, 'ready');
   assert.equal(updatedItems[0].previewFileIds.length, 1);
 
-  const activeFileId = `${FILE_ID_PREFIX}item0001-1.jpg`;
+  const activeFileId = updatedItems[0].previewFileIds[0];
+  assert.match(activeFileId, new RegExp(`item0001-${visualVersion(cache.items[0].url)}-[a-f0-9]{12}-1\\.jpg$`));
   const staleFileIds = [
-    `${FILE_ID_PREFIX}item0001-2.jpg`,
-    `${FILE_ID_PREFIX}item0001-3.jpg`
+    `${FILE_ID_PREFIX}item0001-${visualVersion(cache.items[0].url)}-legacy-2.jpg`,
+    `${FILE_ID_PREFIX}item0001-${visualVersion(cache.items[0].url)}-legacy-3.jpg`
   ];
   cache.items[0].previewFileIds = [activeFileId, ...staleFileIds];
   const rebuilt = await service.hydratePreview('item0001', true, 'm'.repeat(40));
   assert.equal(rebuilt.status, 'ready');
-  assert.deepEqual(rebuilt.previewFileIds, [activeFileId]);
-  assert.deepEqual(queuedVisualDeletes, staleFileIds);
+  assert.equal(rebuilt.previewFileIds.length, 1);
+  assert.notEqual(rebuilt.previewFileIds[0], activeFileId);
+  assert.deepEqual(queuedVisualDeletes, [activeFileId, ...staleFileIds]);
 
   let stored = {
     items: [{ id: 'item0001', previewFileIds: [activeFileId] }],
@@ -188,6 +220,147 @@ test('renders, stores and safely replaces source preview screenshots behind the 
     `${FILE_ID_PREFIX}already-pending.jpg`,
     staleFileIds[0]
   ]);
+
+  const staleUpload = `${FILE_ID_PREFIX}item0001-${visualVersion('https://old.example/article')}-1.jpg`;
+  stored = {
+    items: [{
+      id: 'item0001',
+      url: 'https://new.example/article',
+      previewFileIds: []
+    }],
+    pendingVisualDeletes: []
+  };
+  const stalePatch = await persistentRepository.patchItems([{
+    id: 'item0001',
+    expectedUrl: 'https://old.example/article',
+    discardFileIds: [staleUpload],
+    fields: { previewFileIds: [staleUpload], previewStatus: 'ready' }
+  }], new Date('2026-07-16T06:02:00.000Z'));
+  assert.deepEqual(stalePatch.appliedIds, []);
+  assert.deepEqual(stored.items[0].previewFileIds, []);
+  assert.deepEqual(stored.pendingVisualDeletes, [staleUpload]);
+
+  const sameUrl = 'https://public.example/concurrent';
+  const visualA = `${FILE_ID_PREFIX}concurrent-a.jpg`;
+  const visualB = `${FILE_ID_PREFIX}concurrent-b.jpg`;
+  const visualC = `${FILE_ID_PREFIX}concurrent-c.jpg`;
+  stored = {
+    items: [{
+      id: 'item0001',
+      url: sameUrl,
+      previewFileIds: [visualA]
+    }],
+    pendingVisualDeletes: [],
+    visualDeleteClaims: []
+  };
+  await persistentRepository.patchItems([{
+    id: 'item0001',
+    expectedUrl: sameUrl,
+    discardFileIds: [visualB],
+    fields: { previewFileIds: [visualB], previewStatus: 'ready' }
+  }], new Date('2026-07-16T06:03:00.000Z'));
+  await persistentRepository.patchItems([{
+    id: 'item0001',
+    expectedUrl: sameUrl,
+    discardFileIds: [visualC],
+    fields: { previewFileIds: [visualC], previewStatus: 'ready' }
+  }], new Date('2026-07-16T06:04:00.000Z'));
+  assert.deepEqual(stored.items[0].previewFileIds, [visualC]);
+  assert.deepEqual(stored.pendingVisualDeletes.sort(), [visualA, visualB].sort());
+
+  const claimed = await persistentRepository.claimVisualDeletes(
+    [visualB],
+    new Date('2026-07-16T06:05:00.000Z')
+  );
+  assert.deepEqual(claimed, [visualB]);
+  assert.equal(stored.pendingVisualDeletes.includes(visualB), false);
+  assert.deepEqual(stored.visualDeleteClaims, [visualB]);
+  const reactivation = await persistentRepository.patchItems([{
+    id: 'item0001',
+    expectedUrl: sameUrl,
+    fields: { previewFileIds: [visualB], previewStatus: 'ready' }
+  }], new Date('2026-07-16T06:06:00.000Z'));
+  assert.deepEqual(reactivation.appliedIds, []);
+  assert.deepEqual(stored.items[0].previewFileIds, [visualC]);
+  await persistentRepository.acknowledgeVisualDeletes(
+    [visualB],
+    new Date('2026-07-16T06:07:00.000Z')
+  );
+  assert.deepEqual(stored.visualDeleteClaims, []);
+});
+
+test('prioritizes an untried preview over an expired failed item', async () => {
+  const token = 'm'.repeat(40);
+  const freshFailure = {
+    id: 'failed001',
+    url: 'https://failed.example/article',
+    coverFileId: '',
+    coverStatus: 'missing',
+    previewFileIds: [],
+    previewStatus: 'failed',
+    previewCheckedAt: new Date('2026-07-16T05:00:00.000Z')
+  };
+  const untried = {
+    id: 'untried01',
+    url: 'https://public.example/new-article',
+    coverFileId: '',
+    coverStatus: 'missing',
+    previewFileIds: []
+  };
+  const cache = { items: [freshFailure, untried] };
+  let uploadedPath = '';
+  const repository = {
+    get: async () => cache,
+    patchItems: async (patches) => {
+      const patch = patches[0];
+      cache.items = cache.items.map((item) => item.id === patch.id
+        ? { ...item, ...patch.fields }
+        : item);
+      return { items: cache.items, appliedIds: [patch.id], pendingVisualDeletes: [] };
+    }
+  };
+  const jpeg = Buffer.from('ffd8ffe000104a4649460001ffd9', 'hex');
+  const service = createPreviewService({
+    cloud: {
+      uploadFile: async ({ cloudPath }) => {
+        uploadedPath = cloudPath;
+        return { fileID: `${FILE_ID_PREFIX}${cloudPath.split('/').pop()}` };
+      },
+      deleteFile: async () => ({ fileList: [] })
+    },
+    repository,
+    config: {
+      rendererUrl: 'https://renderer.example',
+      rendererToken: 's'.repeat(40),
+      maintenanceToken: token,
+      rendererTimeoutMs: 1000,
+      retryMs: 30 * 60 * 1000,
+      maxResponseBytes: 10000,
+      maxImageBytes: 1000,
+      maxSegments: 3,
+      cloudPathPrefix: 'knowledge-previews/source/',
+      fileIdPrefix: FILE_ID_PREFIX
+    },
+    fetchImpl: async () => {
+      const body = Buffer.from(JSON.stringify({
+        ok: true,
+        data: { screenshots: [{ data: jpeg.toString('base64') }] }
+      }));
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => String(body.length) },
+        arrayBuffer: async () => body
+      };
+    },
+    now: () => new Date('2026-07-16T06:00:00.000Z')
+  });
+
+  const result = await service.hydratePreviews(1, false, token);
+  assert.equal(result.resolved, 1);
+  assert.match(uploadedPath, /untried01-/);
+  assert.equal(cache.items[0].previewStatus, 'failed');
+  assert.equal(cache.items[1].previewStatus, 'ready');
 });
 
 test('does not expose preview maintenance without its independent secret', async () => {
@@ -257,7 +430,9 @@ test('reports visual and cleanup coverage without exposing the maintenance endpo
   const status = await service.maintenanceStatus(token);
   assert.equal(status.totalItems, 2);
   assert.equal(status.totalWithVisuals, 2);
+  assert.equal(status.pendingPublication, 0);
   assert.equal(status.totalWithOriginalCovers, 1);
   assert.equal(status.totalWithSourcePreviews, 1);
   assert.equal(status.pendingVisualDeletes, 1);
+  assert.equal(status.claimedVisualDeletes, 0);
 });

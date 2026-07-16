@@ -33,9 +33,16 @@
       "name": "knowledgeFeed",
       "runtime": "Nodejs18.15",
       "handler": "index.main",
-      "timeout": 60,
+      "timeout": 180,
       "memorySize": 256,
       "installDependency": true,
+      "triggers": [
+        {
+          "name": "knowledge-feed-visual-sync",
+          "type": "timer",
+          "config": "0 */5 * * * * *"
+        }
+      ],
       "ignore": [
         "node_modules/**",
         "config.local.js"

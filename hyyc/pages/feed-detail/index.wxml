@@ -45,6 +45,35 @@
       </view>
     </view>
 
+    <view class="source-section">
+      <view class="section-heading source-heading">
+        <view class="section-title">来源与原文</view>
+        <view class="section-label">原始出处</view>
+      </view>
+      <view class="source-line">
+        <view class="source-copy">
+          <view class="source-name">{{item.source}}</view>
+          <view class="source-url-row {{sourceUrlExpanded ? 'source-url-row-expanded' : ''}}">
+            <view
+              class="source-url {{sourceUrlExpanded ? 'source-url-expanded' : ''}}"
+              bindtap="openOriginal"
+            >{{item.url}}</view>
+            <view
+              wx:if="{{sourceUrlCanExpand}}"
+              class="source-url-toggle"
+              catchtap="toggleSourceUrl"
+            >{{sourceUrlExpanded ? '收起' : '展开'}}</view>
+          </view>
+          <view class="source-open-hint" bindtap="openOriginal">
+            {{item.originAction.canOpen ? '打开原始页面' : '复制后在浏览器打开'}} ↗
+          </view>
+        </view>
+        <button class="source-copy-action" bindtap="copyOriginal">复制</button>
+      </view>
+      <view class="source-note">{{item.originAction.note}}</view>
+      <view class="copyright-note">站内仅整理公开资讯要点，不复制原文正文。</view>
+    </view>
+
     <view wx:if="{{item.relatedItems.length}}" class="related-section">
       <view class="section-heading">
         <view class="section-title">接着看</view>
@@ -64,24 +93,6 @@
         </view>
         <image wx:if="{{item.visualFileId}}" class="related-image" src="{{item.visualFileId}}" mode="aspectFill" lazy-load="{{true}}" />
       </view>
-    </view>
-
-    <view class="source-section">
-      <view class="section-heading source-heading">
-        <view class="section-title">来源与延伸阅读</view>
-        <view class="section-label">原始出处</view>
-      </view>
-      <view class="source-line">
-        <view>
-          <view class="source-name">{{item.source}}</view>
-          <view wx:if="{{item.originAction.hostname}}" class="source-host">{{item.originAction.hostname}}</view>
-        </view>
-        <view class="source-mark">↗</view>
-      </view>
-      <button class="primary-action" bindtap="openOriginal">{{item.originAction.label}}</button>
-      <button wx:if="{{item.originAction.canOpen}}" class="copy-action" bindtap="copyOriginal">复制链接</button>
-      <view class="source-note">{{item.originAction.note}}</view>
-      <view class="copyright-note">站内仅整理公开资讯要点，不复制原文正文。</view>
     </view>
   </block>
 </view>

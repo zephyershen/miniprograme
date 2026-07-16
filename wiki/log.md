@@ -170,3 +170,12 @@
 - Sources: 当前代码、服务器 systemd/Nginx/Mihomo 状态、CloudBase 部署和强制重建、云存储 220 张截图、82 个 Node 测试、项目检查、渲染器依赖审计、微信开发者工具详情及 `1/3 → 2/3` 多图预览。
 - Sensitive handling: 按用户授权将原 `docs/txserverinfo.txt` 移入被 Git 忽略的 `wiki/secrets/` 原始凭据区，并新增服务器与截图令牌元数据页；普通 Wiki 和 Git 不包含实际服务器密码或令牌，云函数部署包已验证不包含 `config.local.js`。
 - Follow-ups: 单独评估 `wx-server-sdk 4.0.2` 的传递依赖升级路径；服务器仍有系统更新并提示需要重启，后续应在维护窗口处理；迁移截图服务时必须保留代理后的私网出口阻断。
+
+## [2026-07-16] visual-publication-gate | 新资讯先准备视觉再公开
+
+- Session: local Codex task
+- Target pages: `README.md`, `wiki/index.md`, `wiki/overview.md`, `wiki/timeline.md`, `wiki/entities/WeChatMiniProgram.md`, `wiki/decisions/2026-07-15-editorial-knowledge-platform-ui.md`, `wiki/decisions/2026-07-15-engaging-news-detail.md`, `wiki/decisions/2026-07-16-modular-architecture.md`, `wiki/decisions/2026-07-16-source-preview-renderer.md`, `wiki/sources/2026-07-15-aihot-feed-integration.md`, `wiki/sources/2026-07-16-modular-refactor.md`, `wiki/sources/2026-07-16-source-preview-deployment.md`, `wiki/log.md`
+- Summary: 为资讯缓存增加视觉发布门禁和 5 分钟定时维护；新资讯先尝试真实封面，再生成原文截图，视觉就绪后才进入首页、详情、筛选计数和相关阅读。补充 URL 版本、随机上传代际、`expectedUrl` 事务条件、删除 claim、逐文件确认、失败防饥饿与 30 分钟重试，避免旧图误写、并发重放和长期阻塞。定时入口改用腾讯云 `TRIGGER_SRC=timer`，所有维护 action 从小程序公开路由移除。详情页将来源 URL 与紧凑复制按钮移到“接着看”之前，并明确微信不能直接唤起任意系统浏览器。
+- Sources: 本次用户要求、当前代码、90 个 Node 测试、项目检查、CloudBase 部署信息、2026-07-16 18:00 真实定时触发日志和微信开发者工具验证。
+- Sensitive handling: 未把云函数环境变量、服务器密码、令牌或其他凭据写入普通 Wiki 或 Git；沿用现有受限配置完成部署。
+- Follow-ups: 若后续要在微信内直接打开某个来源，必须先在微信公众平台完成对应业务域名验证；持续观察登录墙、地区限制和反爬导致的截图失败率。

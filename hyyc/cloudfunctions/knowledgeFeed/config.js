@@ -39,7 +39,7 @@ const PREVIEW_CONFIG = Object.freeze({
   rendererToken: process.env.SOURCE_PREVIEW_RENDERER_TOKEN || runtime.sourcePreviewRendererToken || '',
   maintenanceToken: process.env.KNOWLEDGE_FEED_MAINTENANCE_TOKEN || runtime.knowledgeFeedMaintenanceToken || '',
   rendererTimeoutMs: 28 * 1000,
-  retryMs: 24 * 60 * 60 * 1000,
+  retryMs: 30 * 60 * 1000,
   maxResponseBytes: 6 * 1024 * 1024,
   maxImageBytes: 1.5 * 1024 * 1024,
   maxSegments: 3,
@@ -47,4 +47,16 @@ const PREVIEW_CONFIG = Object.freeze({
   fileIdPrefix: 'cloud://hyyc-1gi3f5sqc5becabf.6879-hyyc-1gi3f5sqc5becabf-1395663220/knowledge-previews/source/'
 });
 
-module.exports = { SOURCE_CONFIG, CACHE_CONFIG, COVER_CONFIG, PREVIEW_CONFIG };
+const VISUAL_MAINTENANCE_CONFIG = Object.freeze({
+  triggerName: 'knowledge-feed-visual-sync',
+  coverBatchSize: 9,
+  previewBatchSize: 2
+});
+
+module.exports = {
+  SOURCE_CONFIG,
+  CACHE_CONFIG,
+  COVER_CONFIG,
+  PREVIEW_CONFIG,
+  VISUAL_MAINTENANCE_CONFIG
+};

@@ -1,11 +1,15 @@
 const { getKnowledgeItem } = require('../../features/knowledge-feed/api.js');
 const { decorateKnowledgeItem } = require('../../features/knowledge-feed/detail-model.js');
 
+const SOURCE_URL_EXPAND_THRESHOLD = 42;
+
 Page({
   data: {
     loading: true,
     error: '',
-    item: null
+    item: null,
+    sourceUrlCanExpand: false,
+    sourceUrlExpanded: false
   },
 
   onLoad(options) {
@@ -18,15 +22,31 @@ Page({
     const feedItems = (feed && feed.items) || [];
     const cached = feedItems.find((item) => item.id === this.itemId);
     if (cached) {
-      this.setData({ item: decorateKnowledgeItem(cached, feedItems), loading: false });
+      this.showItem(cached, feedItems);
       return;
     }
     try {
       const item = await getKnowledgeItem(this.itemId);
-      this.setData({ item: decorateKnowledgeItem(item), loading: false });
+      this.showItem(item);
     } catch (error) {
       this.setData({ error: error.message, loading: false });
     }
+  },
+
+  showItem(item, feedItems = []) {
+    const decoratedItem = decorateKnowledgeItem(item, feedItems);
+    const sourceUrl = typeof decoratedItem.url === 'string' ? decoratedItem.url : '';
+    this.setData({
+      item: decoratedItem,
+      loading: false,
+      sourceUrlCanExpand: sourceUrl.length > SOURCE_URL_EXPAND_THRESHOLD,
+      sourceUrlExpanded: false
+    });
+  },
+
+  toggleSourceUrl() {
+    if (!this.data.sourceUrlCanExpand) return;
+    this.setData({ sourceUrlExpanded: !this.data.sourceUrlExpanded });
   },
 
   openOriginal() {

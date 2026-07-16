@@ -1,6 +1,12 @@
 const cloud = require('wx-server-sdk');
 const { createAihotSource } = require('./adapters/aihot-source');
-const { SOURCE_CONFIG, CACHE_CONFIG, COVER_CONFIG, PREVIEW_CONFIG } = require('./config');
+const {
+  SOURCE_CONFIG,
+  CACHE_CONFIG,
+  COVER_CONFIG,
+  PREVIEW_CONFIG,
+  VISUAL_MAINTENANCE_CONFIG
+} = require('./config');
 const { AppError, ok, fail } = require('./lib/errors');
 const { extractCoverUrl } = require('./lib/image-meta');
 const { fetchPublicBuffer } = require('./lib/network');
@@ -9,6 +15,10 @@ const { createCoverService } = require('./services/cover-service');
 const { createCloudFileDeleter } = require('./services/cloud-file-deleter');
 const { createFeedService } = require('./services/feed-service');
 const { createPreviewService } = require('./services/preview-service');
+const {
+  createVisualMaintenanceService,
+  isVisualMaintenanceEvent
+} = require('./services/visual-maintenance-service');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
@@ -29,21 +39,25 @@ const coverService = createCoverService({
   config: COVER_CONFIG
 });
 const previewService = createPreviewService({ cloud, repository, config: PREVIEW_CONFIG });
+const visualMaintenanceService = createVisualMaintenanceService({
+  cloud,
+  feedService,
+  coverService,
+  previewService,
+  previewMaintenanceToken: PREVIEW_CONFIG.maintenanceToken,
+  config: VISUAL_MAINTENANCE_CONFIG
+});
 
 const ACTION_HANDLERS = Object.freeze({
   feed: (event) => feedService.getFeed(event),
-  item: (event) => feedService.getItem(event.id),
-  registerCovers: (event) => coverService.registerCovers(event.covers),
-  hydrateCover: (event) => coverService.hydrateCover(event.id),
-  hydrateCovers: (event) => coverService.hydrateCovers(event.limit, event.force),
-  hydratePreview: (event) => previewService.hydratePreview(event.id, event.force, event.maintenanceToken),
-  hydratePreviews: (event) => previewService.hydratePreviews(event.limit, event.force, event.maintenanceToken),
-  previewFailures: (event) => previewService.listPreviewFailures(event.maintenanceToken),
-  previewStatus: (event) => previewService.maintenanceStatus(event.maintenanceToken)
+  item: (event) => feedService.getItem(event.id)
 });
 
 async function main(event = {}) {
   try {
+    if (isVisualMaintenanceEvent(event, VISUAL_MAINTENANCE_CONFIG.triggerName)) {
+      return ok(await visualMaintenanceService.run(event));
+    }
     const handler = ACTION_HANDLERS[event.action || 'feed'];
     if (!handler) throw new AppError('TEMPORARY_FAILURE', '不支持的操作');
     return ok(await handler(event));

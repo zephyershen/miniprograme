@@ -37,11 +37,16 @@ confidence: high
 ## CloudBase 回填和一致性
 
 - `knowledgeFeed` 已部署最新版；部署配置明确排除 `config.local.js`，下载线上代码包复核结果为 `ConfigLocalPackaged=False`、`PreviewServicePackaged=True`。
-- 上游动态池在最终部署后从 108 更新为 106，维护状态先发现 1 条待回填，随后成功生成截图。最终状态为：`totalItems=106`、`totalWithVisuals=106`、`totalWithOriginalCovers=13`、`totalWithSourcePreviews=93`、`pending=0`、`totalFailed=0`、`pendingVisualDeletes=0`。
+- 云函数超时为 180 秒，绑定启用中的 `knowledge-feed-visual-sync` 定时触发器，Cron 为每 5 分钟一次。2026-07-16 18:00:00 的最新部署版本真实自动触发耗时 706ms、返回成功；并非只做过手工调用。
+- 上游动态池在最终部署后从 108 更新为 106，维护状态先发现 1 条待回填，随后成功生成截图。最终状态为：`totalItems=106`、`totalWithVisuals=106`、`totalWithOriginalCovers=13`、`totalWithSourcePreviews=93`、`pendingPublication=0`、`totalFailed=0`、`pendingVisualDeletes=0`、`claimedVisualDeletes=0`。
 - 云存储 `knowledge-previews/source/` 最终为 220 张 JPEG、约 25.3 MiB；一条资讯可有 1–3 张，93 条缺封面资讯均有至少一张截图。上游移除条目的孤儿截图已通过受限前缀清理。
 - 最终全链路强制重建一条资讯耗时约 10.9 秒，路径为 CloudBase → HTTPS/Nginx → Playwright/Mihomo → CloudBase 云存储 → 事务缓存，返回 3 个 `previewFileIds` 且状态为 `ready`。
 - 强制资讯刷新后首条返回 `visualKind=source-preview`；事务刷新没有覆盖既有截图字段，并能在上游池变化后发现新缺口。
-- 事务 patch、最新快照合并、受限前缀孤儿清理和失败重试队列均有自动化测试；单条强制重建生成更少截图时，旧尾图会排入持久化清理队列，同时排除仍在引用的文件。重新部署后维护状态仍显示当前没有待清理文件。
+- 事务 patch、最新快照合并、受限前缀孤儿清理和失败重试队列均有自动化测试。清理会先在事务中把非活跃文件从 pending 移入 claim，云存储批量删除再按文件 ID 分别确认；部分成功、网络结果不确定或数据库确认失败时，未确认项保持 claim 并在后续刷新重试，普通视觉 patch 不能重新激活已认领对象。
+- 发布 presenter 统一过滤没有 `coverFileId` 且没有 `previewFileIds` 的暂存条目，因此首页、筛选总数、单条详情和相关阅读不会先出现纯文字再补图。定时任务先尝试真实封面，再为明确缺封面的条目截图。
+- 封面和截图路径都包含来源 URL 哈希与每次上传独立的 12 位随机代际。缓存事务校验生成时的 `expectedUrl`，URL 改变或条目被移除时不写回，未应用上传进入持久化清理队列；旧的手工封面登记 action 已移除，避免重放已删除文件 ID。
+- 定时入口要求事件结构、触发器名称和腾讯云运行时 `TRIGGER_SRC=timer` 同时匹配；小程序公开 action 只保留 `feed` 与 `item`。封面服务还要求内部调度标志，截图服务继续使用独立恒定时间令牌校验。
+- 截图失败冷却为 30 分钟，候选优先处理从未尝试的条目，避免失败来源长期占据每轮 2 条的截图批次。
 
 ## 微信端验证
 
@@ -49,11 +54,12 @@ confidence: high
 - 从首页进入详情后显示“原文页面预览 / 点击查看 3 张”。
 - 点击进入 `wx.previewImage` 后顶部显示 `1 / 3`；左滑成功切换到 `2 / 3`，证明多图预览有效。
 - 控制台只保留开发者工具自身的黄色兼容/性能提示。
+- 详情来源区已移动到“接着看”之前：左侧显示可展开/收起的原文 URL，右侧为紧凑复制按钮。当前业务域名白名单为空，点击外部来源会复制链接并提示到手机浏览器打开。
 
 ## 本地回归
 
-- `npm test`：82/82 通过。
-- `npm run check`：21 个 JSON、73 个 JavaScript、6 个页面通过。
+- `npm test`：90/90 通过。
+- `npm run check`：21 个 JSON、77 个 JavaScript、6 个页面通过。
 - `git diff --check`：通过。
 - 渲染器 `npm audit --omit=dev --package-lock-only`：0 个漏洞。
 
@@ -61,7 +67,7 @@ confidence: high
 
 - `knowledgeFeed` 现有 `wx-server-sdk 4.0.2` 依赖树包含 6 个已知传递依赖问题（其中 5 个 high）；它们不是本次渲染器引入。不要按 npm 的破坏性建议盲目降级，应单独评估腾讯 SDK 的兼容升级路径。
 - SSRF 的最终防线包含服务器 Mihomo/出口规则；迁移到其他服务器或容器时必须复制同等隔离。
-- 登录墙、地区限制和强反爬页面仍可能无法生成有效截图；维护 action 会保留失败状态供后续重试。
+- 登录墙、地区限制和强反爬页面仍可能无法生成有效截图；内部服务会保留失败状态，由定时维护在冷却期后重试，公开小程序 action 不提供维护入口。
 
 ## 敏感信息处理
 

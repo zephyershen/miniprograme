@@ -30,8 +30,8 @@ confidence: high
 ## 行为保持
 
 - 页面路由、WXML/WXSS、首页频道、筛选、最新/热度排序、8 条分页、详情、原文动作和保留的个人消化接口均未改变。
-- `knowledgeFeed` action 继续为 `feed`、`item`、`registerCovers`、`hydrateCover`、`hydrateCovers`；公开成功/失败包仍为 `{ ok, data }` 或 `{ ok, error }`。
-- 公开 presenter 继续剔除 `permalink`、attribution、封面检查状态等内部字段；维护 action 继续拒绝带微信 OpenID 的用户上下文。
+- superseded 2026-07-16：本次重构完成时 `knowledgeFeed` action 曾包含 `feed`、`item`、`registerCovers`、`hydrateCover`、`hydrateCovers`；视觉发布门禁上线后，手工封面登记及所有维护 action 已从公开路由移除，当前只保留 `feed` 与 `item`。公开成功/失败包仍为 `{ ok, data }` 或 `{ ok, error }`。
+- 公开 presenter 继续剔除 `permalink`、attribution、封面检查状态等内部字段。superseded 2026-07-16：重构当时针对微信 OpenID 的维护 action 防护已被更严格的接口收敛取代；当前维护 action 不在公开路由中，定时入口改验 `TRIGGER_SRC=timer` 与触发器名称。
 
 ## 验证结果
 

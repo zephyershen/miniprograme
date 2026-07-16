@@ -186,7 +186,6 @@
 
 .related-meta,
 .related-source,
-.source-host,
 .source-note,
 .copyright-note {
   color: var(--editorial-muted);
@@ -222,33 +221,79 @@
 
 .source-line {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 116rpx;
+  align-items: flex-start;
+  gap: 24rpx;
+  padding: 28rpx 0 24rpx;
   border-bottom: 1rpx solid var(--editorial-rule);
 }
 
-.source-name { font-size: 24rpx; font-weight: 750; }
-.source-host { margin-top: 5rpx; }
-.source-mark { color: var(--editorial-blue); font-size: 35rpx; }
-
-.primary-action,
-.copy-action {
-  width: 100%;
-  margin: 24rpx 0 0;
-  border-radius: 0;
-  font-size: 25rpx;
-  line-height: 86rpx;
+.source-copy {
+  flex: 1;
+  min-width: 0;
 }
 
-.primary-action { background: var(--editorial-ink); color: #ffffff; }
+.source-name { font-size: 24rpx; font-weight: 750; }
 
-.copy-action {
-  margin-top: 14rpx;
+.source-url-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  min-width: 0;
+  margin-top: 8rpx;
+}
+
+.source-url-row-expanded { align-items: flex-start; }
+
+.source-url {
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+  color: var(--editorial-muted);
+  font-size: 19rpx;
+  line-height: 1.55;
+  text-decoration: underline;
+  text-decoration-color: var(--editorial-rule);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-url-expanded {
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
+  word-break: break-all;
+}
+
+.source-url-toggle {
+  flex: none;
+  color: var(--editorial-blue);
+  font-size: 19rpx;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.source-open-hint {
+  display: inline-block;
+  margin-top: 13rpx;
+  color: var(--editorial-blue);
+  font-size: 20rpx;
+  font-weight: 720;
+}
+
+.source-copy-action {
+  flex: 0 0 108rpx;
+  width: 108rpx;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
   border: 1rpx solid var(--editorial-ink);
+  border-radius: 0;
   background: transparent;
   color: var(--editorial-ink);
+  font-size: 20rpx;
+  line-height: 52rpx;
 }
 
 .source-note { margin-top: 18rpx; }
-.copyright-note { margin-top: 8rpx; padding-bottom: 46rpx; border-bottom: 1rpx solid var(--editorial-rule); }
+.copyright-note { margin-top: 8rpx; }

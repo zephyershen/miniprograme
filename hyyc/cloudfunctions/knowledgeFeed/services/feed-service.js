@@ -1,19 +1,21 @@
 const { AppError } = require('../lib/errors');
 const { toDate } = require('../lib/dates');
+const { hasReadyVisual } = require('../policies/visual-publication');
 const { presentFeed, presentItem } = require('../presenters/public-feed');
 
 function mergeCachedVisuals(items, previous) {
   const previousById = new Map(((previous && previous.items) || []).map((item) => [item.id, item]));
   return items.map((item) => {
     const cached = previousById.get(item.id);
+    const reusable = cached && cached.url === item.url ? cached : null;
     return {
       ...item,
-      coverFileId: (cached && cached.coverFileId) || '',
-      coverCheckedAt: (cached && cached.coverCheckedAt) || null,
-      coverStatus: (cached && cached.coverStatus) || '',
-      previewFileIds: (cached && Array.isArray(cached.previewFileIds) && cached.previewFileIds) || [],
-      previewCheckedAt: (cached && cached.previewCheckedAt) || null,
-      previewStatus: (cached && cached.previewStatus) || ''
+      coverFileId: (reusable && reusable.coverFileId) || '',
+      coverCheckedAt: (reusable && reusable.coverCheckedAt) || null,
+      coverStatus: (reusable && reusable.coverStatus) || '',
+      previewFileIds: (reusable && Array.isArray(reusable.previewFileIds) && reusable.previewFileIds) || [],
+      previewCheckedAt: (reusable && reusable.previewCheckedAt) || null,
+      previewStatus: (reusable && reusable.previewStatus) || ''
     };
   });
 }
@@ -49,9 +51,14 @@ function prepareRefreshedDocument(next, previous, ownedPrefixes) {
     ((previous && previous.pendingVisualDeletes) || [])
       .filter((fileId) => typeof fileId === 'string' && owned.some((prefix) => fileId.startsWith(prefix)))
   );
+  const claims = new Set(
+    ((previous && previous.visualDeleteClaims) || [])
+      .filter((fileId) => typeof fileId === 'string' && owned.some((prefix) => fileId.startsWith(prefix)))
+  );
   for (const fileId of orphanedVisualFileIds(previous, current, ownedPrefixes)) pending.add(fileId);
   for (const fileId of active) pending.delete(fileId);
-  return { ...current, pendingVisualDeletes: [...pending] };
+  for (const fileId of claims) pending.delete(fileId);
+  return { ...current, pendingVisualDeletes: [...pending], visualDeleteClaims: [...claims] };
 }
 
 function createFeedService({
@@ -73,14 +80,28 @@ function createFeedService({
   async function drainPendingVisualDeletes(current) {
     const owned = (Array.isArray(ownedVisualPrefixes) ? ownedVisualPrefixes : [])
       .filter((prefix) => typeof prefix === 'string' && prefix.startsWith('cloud://'));
-    const pendingVisualDeletes = (Array.isArray(current.pendingVisualDeletes) ? current.pendingVisualDeletes : [])
-      .filter((fileId) => typeof fileId === 'string' && owned.some((prefix) => fileId.startsWith(prefix)));
+    const cleanupCandidates = [...new Set([
+      ...(Array.isArray(current.pendingVisualDeletes) ? current.pendingVisualDeletes : []),
+      ...(Array.isArray(current.visualDeleteClaims) ? current.visualDeleteClaims : [])
+    ])].filter((fileId) => typeof fileId === 'string'
+      && owned.some((prefix) => fileId.startsWith(prefix)));
     if (typeof deleteFiles !== 'function') return current;
-    for (let offset = 0; offset < pendingVisualDeletes.length; offset += 50) {
-      const batch = pendingVisualDeletes.slice(offset, offset + 50);
+    for (let offset = 0; offset < cleanupCandidates.length; offset += 50) {
+      const batch = cleanupCandidates.slice(offset, offset + 50);
       try {
-        await deleteFiles(batch);
-        await repository.acknowledgeVisualDeletes(batch, new Date(now()));
+        const claimed = await repository.claimVisualDeletes(batch, new Date(now()));
+        if (!claimed.length) continue;
+        const outcome = await deleteFiles(claimed);
+        const deletedFileIds = Array.isArray(outcome && outcome.deletedFileIds)
+          ? outcome.deletedFileIds.filter((fileId) => claimed.includes(fileId))
+          : [];
+        if (deletedFileIds.length) {
+          await repository.acknowledgeVisualDeletes(deletedFileIds, new Date(now()));
+        }
+        const retryCount = claimed.length - deletedFileIds.length;
+        if (retryCount > 0) {
+          logger.warn('Some unused feed visuals remain claimed for retry', { retryCount });
+        }
       } catch (error) {
         logger.warn('Unused feed visuals could not be deleted', { message: error && error.message });
         break;
@@ -138,7 +159,9 @@ function createFeedService({
     }
     const cache = await repository.get();
     const item = cache && (cache.items || []).find((entry) => entry.id === id);
-    if (!item) throw new AppError('ITEM_NOT_FOUND', '这条资讯已更新，请返回首页刷新');
+    if (!item || !hasReadyVisual(item)) {
+      throw new AppError('ITEM_NOT_FOUND', '这条资讯已更新，请返回首页刷新');
+    }
     return presentItem(cache, item);
   }
 

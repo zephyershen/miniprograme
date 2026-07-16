@@ -4,7 +4,7 @@ type: decision
 tags: [decision, detail-page, reading, source-access]
 sources: [../sources/2026-07-15-aihot-feed-integration.md]
 date: 2026-07-15
-last_updated: 2026-07-15
+last_updated: 2026-07-16
 status: accepted
 confidence: high
 ---
@@ -24,15 +24,17 @@ confidence: high
 ## 最终决定
 
 - 接受选项 3。
-- 详情页按“标题与来源 → 真实封面 → 30 秒导读 → 完整摘要分段 → 三条相关阅读 → 原始出处”组织。
+- 详情页按“标题与来源 → 真实封面/原文截图 → 30 秒导读 → 完整摘要分段 → 来源与原文 → 三条相关阅读”组织。
 - 30 秒导读取上游摘要的第一个完整语义单元；其余摘要按句号和长句中的自然分句拆成可扫描段落，全部保留，不再按字符数截断，也不添加人工省略号。
 - “完整内容”指完整展示上游提供的摘要，不等同于原发布方全文；应用不补写上游没有提供的事实，也不复制原文正文。
-- 相关阅读优先同分类、其次同频道，最后才从其他频道补足；只返回具有真实封面的条目。
+- 相关阅读优先同分类、其次同频道，最后才从其他频道补足；只返回具有真实封面或原文截图的视觉就绪条目。
 - 继续使用米白底、黑色排版、细线和缩进建立层级，不使用圆角卡片堆叠。
 - 不在小程序内复制原文全文。来源区只展示原发布方、简短说明和原文操作。
 - 来源名称会移除 RSS、翻译中转等采集方式后缀，只向用户显示原发布方。
 - 只有已经在微信公众平台完成业务域名验证的主机，才可加入 `DIRECT_WEBVIEW_HOSTS` 并通过 `web-view` 直接打开；其他链接统一复制，提示用户到浏览器打开。
 - 当前 `DIRECT_WEBVIEW_HOSTS` 为空，因此现有外部资讯均使用复制链接兜底。后续不能因为某个网址技术上可访问就绕过微信业务域名验证。
+- 来源区左侧直接显示原文 URL，默认单行省略；长链接可展开/收起，点击 URL 执行当前来源策略。右侧只保留紧凑的“复制链接”按钮，不再使用占整行的大按钮。
+- 微信小程序没有打开任意系统浏览器的通用能力；未验证来源只能复制链接并提示用户到手机浏览器粘贴，不能用中转页规避业务域名规则。
 
 ## 为什么这样定
 
@@ -43,10 +45,10 @@ confidence: high
 ## 影响
 
 - `knowledgeFeed` 的单条详情响应提供完整上游摘要和 3 条有图相关阅读。
-- 新增 `utils/editorial-detail.js`，集中处理短读导览、相关阅读排序和来源打开策略。
+- `features/knowledge-feed/reading.js` 和 `detail-model.js` 集中处理短读导览、相关阅读排序和来源打开策略。
 - 新增 `pages/source-view/` 作为已验证业务域名的承载页；当前仍由复制链接路径兜底。
-- 页面数为 6，Node 测试增至 51 个。
-- 相关代码：`hyyc/pages/feed-detail/`、`hyyc/pages/source-view/`、`hyyc/utils/editorial-detail.js`、`hyyc/cloudfunctions/knowledgeFeed/index.js`。
+- 页面数为 6；当前完整回归为 90 个 Node 测试。
+- 相关代码：`hyyc/pages/feed-detail/`、`hyyc/pages/source-view/`、`hyyc/features/knowledge-feed/reading.js`、`hyyc/features/knowledge-feed/detail-model.js`。
 
 ## 状态
 

@@ -36,6 +36,6 @@ The supplied Dockerfile runs as Playwright's unprivileged `pwuser`. In a contain
 
 ## CloudBase integration
 
-`knowledgeFeed` reads the public renderer URL and tokens from environment variables. The maintenance-only `hydratePreview`, `hydratePreviews` and `previewFailures` actions are protected by an independent maintenance token. Generated files are stored under `knowledge-previews/source/`; feed refreshes transactionally preserve active visuals and delete only orphaned files under the owned cover/preview prefixes.
+`knowledgeFeed` reads the public renderer URL and tokens from environment variables. Visual maintenance runs only when the Cloud Function runtime reports `TRIGGER_SRC=timer`; the mini-program action router exposes only `feed` and `item`. Preview service calls still require an independent maintenance token. Generated files are stored under `knowledge-previews/source/`; feed refreshes transactionally preserve active visuals and delete only orphaned files under the owned cover/preview prefixes.
 
 Never commit tokens, server credentials or `config.local.js`. Local copies belong under the ignored `wiki/secrets/` directory.

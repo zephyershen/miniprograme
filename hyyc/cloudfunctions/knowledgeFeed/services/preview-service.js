@@ -1,6 +1,7 @@
+const crypto = require('node:crypto');
 const { AppError } = require('../lib/errors');
 const { toDate } = require('../lib/dates');
-const crypto = require('node:crypto');
+const { visualRevisionStem } = require('../lib/visual-version');
 
 function maintenanceAuthorized(provided, expected) {
   if (typeof provided !== 'string' || typeof expected !== 'string' || expected.length < 32) return false;
@@ -75,9 +76,10 @@ function createPreviewService({ cloud, repository, config, fetchImpl = fetch, no
 
   async function uploadPreviews(item, images) {
     const fileIds = [];
+    const pathStem = visualRevisionStem(item);
     try {
       for (let index = 0; index < images.length; index += 1) {
-        const cloudPath = `${config.cloudPathPrefix}${item.id}-${index + 1}.jpg`;
+        const cloudPath = `${config.cloudPathPrefix}${pathStem}-${index + 1}.jpg`;
         const result = await cloud.uploadFile({ cloudPath, fileContent: images[index] });
         if (!result || typeof result.fileID !== 'string' || !result.fileID.startsWith(config.fileIdPrefix)) {
           throw new Error('PREVIEW_UPLOAD_FAILED');
@@ -104,6 +106,8 @@ function createPreviewService({ cloud, repository, config, fetchImpl = fetch, no
   async function persistResults(resultById, checkedAt, visualDeletes = []) {
     const patches = [...resultById].map(([id, result]) => ({
       id,
+      expectedUrl: result.expectedUrl,
+      discardFileIds: result.status === 'ready' ? result.fileIds : [],
       fields: {
         previewFileIds: result.fileIds,
         previewCheckedAt: checkedAt,
@@ -140,8 +144,17 @@ function createPreviewService({ cloud, repository, config, fetchImpl = fetch, no
         && fileId.startsWith(config.fileIdPrefix)
         && !previewFileIds.includes(fileId))
       : [];
-    await persistResults(new Map([[id, { fileIds: previewFileIds, status }]]), checkedAt, visualDeletes);
-    return { id, cached: false, previewFileIds, status };
+    const patchResult = await persistResults(new Map([[
+      id,
+      { fileIds: previewFileIds, status, expectedUrl: item.url }
+    ]]), checkedAt, visualDeletes);
+    const applied = patchResult.appliedIds.includes(id);
+    return {
+      id,
+      cached: false,
+      previewFileIds: applied ? previewFileIds : [],
+      status: applied ? status : 'stale'
+    };
   }
 
   async function hydratePreviews(limit = 1, force = false, maintenanceToken = '') {
@@ -153,7 +166,9 @@ function createPreviewService({ cloud, repository, config, fetchImpl = fetch, no
     const candidates = cache.items
       .filter((item) => !item.coverFileId
         && !(Array.isArray(item.previewFileIds) && item.previewFileIds.length)
+        && item.coverStatus === 'missing'
         && (force === true || !previewCheckIsFresh(item)))
+      .sort((left, right) => Number(Boolean(left.previewCheckedAt)) - Number(Boolean(right.previewCheckedAt)))
       .slice(0, batchSize);
     if (!candidates.length) {
       return previewSummary(cache.items, 0, 0, 0);
@@ -163,15 +178,26 @@ function createPreviewService({ cloud, repository, config, fetchImpl = fetch, no
     const resultById = new Map();
     for (const item of candidates) {
       try {
-        resultById.set(item.id, { fileIds: await resolveAndUploadPreviews(item), status: 'ready' });
+        resultById.set(item.id, {
+          fileIds: await resolveAndUploadPreviews(item),
+          status: 'ready',
+          expectedUrl: item.url
+        });
       } catch (error) {
         logger.warn('Source preview unavailable', { itemId: item.id, message: error && error.message });
-        resultById.set(item.id, { fileIds: [], status: 'failed' });
+        resultById.set(item.id, { fileIds: [], status: 'failed', expectedUrl: item.url });
       }
     }
-    const items = await persistResults(resultById, checkedAt);
-    const succeeded = [...resultById.values()].filter((entry) => entry.status === 'ready').length;
-    return previewSummary(items, candidates.length, succeeded, candidates.length - succeeded);
+    const patchResult = await persistResults(resultById, checkedAt);
+    const appliedIds = new Set(patchResult.appliedIds);
+    const succeeded = [...resultById]
+      .filter(([id, entry]) => appliedIds.has(id) && entry.status === 'ready')
+      .length;
+    const failed = [...resultById]
+      .filter(([id, entry]) => appliedIds.has(id) && entry.status === 'failed')
+      .length;
+    const summary = previewSummary(patchResult.items, candidates.length, succeeded, failed);
+    return { ...summary, stale: candidates.length - appliedIds.size };
   }
 
   function previewSummary(items, attempted, resolved, failed) {
@@ -203,12 +229,17 @@ function createPreviewService({ cloud, repository, config, fetchImpl = fetch, no
     assertMaintenanceContext(maintenanceToken);
     const cache = await repository.get();
     const items = ((cache && cache.items) || []);
+    const totalWithVisuals = items
+      .filter((item) => item.coverFileId || (Array.isArray(item.previewFileIds) && item.previewFileIds.length))
+      .length;
     return {
       ...previewSummary(items, 0, 0, 0),
       totalItems: items.length,
+      pendingPublication: Math.max(0, items.length - totalWithVisuals),
       totalWithOriginalCovers: items.filter((item) => item.coverFileId).length,
       totalWithSourcePreviews: items.filter((item) => Array.isArray(item.previewFileIds) && item.previewFileIds.length).length,
-      pendingVisualDeletes: Array.isArray(cache && cache.pendingVisualDeletes) ? cache.pendingVisualDeletes.length : 0
+      pendingVisualDeletes: Array.isArray(cache && cache.pendingVisualDeletes) ? cache.pendingVisualDeletes.length : 0,
+      claimedVisualDeletes: Array.isArray(cache && cache.visualDeleteClaims) ? cache.visualDeleteClaims.length : 0
     };
   }
 

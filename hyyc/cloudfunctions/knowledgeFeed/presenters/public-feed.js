@@ -2,6 +2,7 @@ const { cleanSourceLabel } = require('../lib/aihot');
 const { toIso } = require('../lib/dates');
 const { buildFeedPage } = require('../lib/feed-page');
 const { inferTopicKeys } = require('../lib/topics');
+const { publishableItems } = require('../policies/visual-publication');
 
 function publicItem(item) {
   const previewFileIds = Array.isArray(item.previewFileIds) ? item.previewFileIds.slice(0, 3) : [];
@@ -38,7 +39,7 @@ function publicFacet(item) {
 }
 
 function presentFeed(cache, { stale = false, query = {}, now = Date.now() } = {}) {
-  const allItems = cache.items || [];
+  const allItems = publishableItems(cache.items);
   const page = buildFeedPage(allItems, query, now);
   return {
     updatedAt: toIso(cache.fetchedAt),
@@ -76,7 +77,7 @@ function publicRelatedItem(item) {
 }
 
 function relatedItems(cache, current, limit = 3) {
-  return (cache.items || [])
+  return publishableItems(cache.items)
     .filter((item) => item.id !== current.id)
     .map((item, originalIndex) => ({
       item,
