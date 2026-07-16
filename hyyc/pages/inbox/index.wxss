@@ -1,7 +1,17 @@
 .editorial-page {
   box-sizing: border-box;
   min-height: 100vh;
-  padding: 8rpx var(--editorial-gutter) 110rpx;
+  padding: 240rpx var(--editorial-gutter) 110rpx;
+}
+
+.feed-controls-fixed {
+  position: fixed;
+  z-index: 20;
+  top: 0;
+  right: var(--editorial-gutter);
+  left: var(--editorial-gutter);
+  background: var(--editorial-paper);
+  pointer-events: auto;
 }
 
 .channel-scroll {
@@ -199,14 +209,6 @@
   padding: 34rpx 0 44rpx;
   border-bottom: 1rpx solid var(--editorial-rule);
 }
-
-.lead-story-text {
-  margin-top: 30rpx;
-  padding-top: 28rpx;
-  border-top: 7rpx solid var(--editorial-blue);
-}
-
-.lead-story-text .story-meta { margin-top: 0; }
 
 .lead-cover {
   display: block;

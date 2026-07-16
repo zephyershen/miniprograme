@@ -1,44 +1,4 @@
 <view class="editorial-page">
-  <scroll-view scroll-x enhanced show-scrollbar="{{false}}" class="channel-scroll">
-    <view class="channel-track">
-      <view
-        wx:for="{{feed.channels}}"
-        wx:key="key"
-        class="channel-tab {{item.active ? 'channel-tab-active channel-tab-' + item.tone : ''}}"
-        data-key="{{item.key}}"
-        bindtap="selectChannel"
-      >
-        <text>{{item.label}}</text>
-        <text wx:if="{{item.count}}" class="channel-count">{{item.count}}</text>
-      </view>
-    </view>
-  </scroll-view>
-
-  <view class="filter-bar" bindtap="openFilters">
-    <view class="filter-bar-copy">
-      <text class="filter-bar-title">筛选</text>
-      <text class="filter-bar-summary">{{feed.filterSummary}}</text>
-    </view>
-    <view class="filter-bar-count">
-      <text class="filter-bar-result">{{feed.resultCount}} 条资讯 ↘</text>
-      <text wx:if="{{feed.totalAvailable}}" class="filter-bar-total">本周收录 {{feed.totalAvailable}}</text>
-    </view>
-  </view>
-
-  <view class="sort-bar">
-    <text class="sort-bar-label">排序</text>
-    <view class="sort-choice-track">
-      <view
-        wx:for="{{sortOptions}}"
-        wx:key="key"
-        class="sort-choice {{item.active ? 'sort-choice-active' : ''}}"
-        data-key="{{item.key}}"
-        bindtap="selectSort"
-      >{{item.label}}</view>
-    </view>
-    <text class="sort-bar-hint">{{sortHint}}</text>
-  </view>
-
   <view wx:if="{{loading}}" class="loading-editorial">
     <view class="loading-media"></view>
     <view class="loading-line loading-line-strong"></view>
@@ -59,7 +19,7 @@
   </view>
 
   <block wx:else>
-    <view class="lead-story {{feed.leadItem.coverFileId ? '' : 'lead-story-text'}}" data-id="{{feed.leadItem.id}}" bindtap="openFeedItem">
+    <view class="lead-story" data-id="{{feed.leadItem.id}}" bindtap="openFeedItem">
       <image wx:if="{{feed.leadItem.coverFileId}}" class="lead-cover" src="{{feed.leadItem.coverFileId}}" mode="aspectFill" lazy-load="{{true}}" />
       <view class="story-meta">
         <text class="channel-label channel-text-{{feed.leadItem.coverTone}}">{{feed.leadItem.categoryLabel}}</text>
@@ -107,6 +67,48 @@
       已显示全部 {{feed.resultCount}} 条
     </view>
   </block>
+
+  <view class="feed-controls-fixed" catchtap="stopPropagation">
+    <scroll-view scroll-x enhanced show-scrollbar="{{false}}" class="channel-scroll">
+      <view class="channel-track">
+        <view
+          wx:for="{{feed.channels}}"
+          wx:key="key"
+          class="channel-tab {{item.active ? 'channel-tab-active channel-tab-' + item.tone : ''}}"
+          data-key="{{item.key}}"
+          bindtap="selectChannel"
+        >
+          <text>{{item.label}}</text>
+          <text wx:if="{{item.count}}" class="channel-count">{{item.count}}</text>
+        </view>
+      </view>
+    </scroll-view>
+
+    <view class="filter-bar" bindtap="openFilters">
+      <view class="filter-bar-copy">
+        <text class="filter-bar-title">筛选</text>
+        <text class="filter-bar-summary">{{feed.filterSummary}}</text>
+      </view>
+      <view class="filter-bar-count">
+        <text class="filter-bar-result">{{feed.resultCount}} 条资讯 ↘</text>
+        <text wx:if="{{feed.totalAvailable}}" class="filter-bar-total">本周收录 {{feed.totalAvailable}}</text>
+      </view>
+    </view>
+
+    <view class="sort-bar">
+      <text class="sort-bar-label">排序</text>
+      <view class="sort-choice-track">
+        <view
+          wx:for="{{sortOptions}}"
+          wx:key="key"
+          class="sort-choice {{item.active ? 'sort-choice-active' : ''}}"
+          data-key="{{item.key}}"
+          bindtap="selectSort"
+        >{{item.label}}</view>
+      </view>
+      <text class="sort-bar-hint">{{sortHint}}</text>
+    </view>
+  </view>
 
   <view wx:if="{{filterOpen}}" class="feed-filter-mask" bindtap="closeFilters">
     <view class="feed-filter-panel" catchtap="stopPropagation">
