@@ -98,3 +98,12 @@
 - Sources: 本次用户对话、当前代码、CloudBase 线上 108/108 调用、微信开发者工具首页/筛选/无图详情验证、52 个 Node 测试和静态检查。
 - Sensitive handling: 未读取或记录账号、密码、令牌、OpenID 或个人数据；网络说明不包含凭据或内部地址。
 - Follow-ups: 继续提高真实封面命中率和接入其他频道来源，但不得再次以缺图为由隐藏已收录资讯。
+
+## [2026-07-16] feed-lazy-pagination | 首页改为服务端分页和触底增量加载
+
+- Session: local Codex task
+- Target pages: `wiki/index.md`, `wiki/overview.md`, `wiki/sources/2026-07-15-aihot-feed-integration.md`, `wiki/log.md`, `README.md`
+- Summary: 将旧的“全部资讯一次下发和渲染”标记为 superseded；`knowledgeFeed` 先完成频道与主题筛选，再按 8 条一页返回，首页触底追加并在频道/筛选变化时重置。云函数已部署，线上第一页、第二页和组合筛选均验证通过。
+- Sources: 本次用户要求、当前代码、55 个 Node 测试、静态检查、CloudBase 部署与三次线上函数调用、微信开发者工具模拟器画面。
+- Sensitive handling: 未读取、记录或新增账号、密码、令牌、代理地址或个人数据；沿用现有本机 CloudBase 登录状态完成部署。
+- Follow-ups: 暂不建设公网代理；后续按具体来源做可用性监控，只有官方接口与公开源确实无法稳定访问时再单独评估合规采集节点。

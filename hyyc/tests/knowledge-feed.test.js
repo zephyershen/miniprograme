@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const { cleanSourceLabel, normalizeAihotItem, normalizeAihotResponse } = require('../cloudfunctions/knowledgeFeed/lib/aihot');
 const { extractCoverUrl } = require('../cloudfunctions/knowledgeFeed/lib/image-meta');
 const { isPrivateIp } = require('../cloudfunctions/knowledgeFeed/lib/network');
+const { buildFeedPage, normalizeFeedQuery } = require('../cloudfunctions/knowledgeFeed/lib/feed-page');
 
 const baseItem = {
   id: 'cmrl9plh50014bi2b56tar61d',
@@ -74,4 +75,52 @@ test('recognizes private and public addresses for cover SSRF protection', () => 
   assert.equal(isPrivateIp('8.8.8.8'), false);
   assert.equal(isPrivateIp('::1'), true);
   assert.equal(isPrivateIp('2001:4860:4860::8888'), false);
+});
+
+test('returns a bounded first page and a stable next offset', () => {
+  const items = Array.from({ length: 18 }, (_, index) => ({
+    id: String(index),
+    publishedAt: '2026-07-15T01:00:00.000Z',
+    channelKey: index % 2 === 0 ? 'ai' : 'tech',
+    topicKeys: index % 3 === 0 ? ['company:openai'] : []
+  }));
+  const page = buildFeedPage(items, { offset: 0, limit: 8, channel: 'all', filters: { time: '7d' } });
+  assert.equal(page.items.length, 8);
+  assert.equal(page.resultCount, 18);
+  assert.equal(page.nextOffset, 8);
+  assert.equal(page.hasMore, true);
+
+  const lastPage = buildFeedPage(items, { offset: 16, limit: 8, channel: 'all', filters: { time: '7d' } });
+  assert.equal(lastPage.items.length, 2);
+  assert.equal(lastPage.nextOffset, 18);
+  assert.equal(lastPage.hasMore, false);
+});
+
+test('paginates after applying channel and topic filters', () => {
+  const items = [
+    { id: '1', publishedAt: '2026-07-15T01:00:00.000Z', channelKey: 'ai', topicKeys: ['company:openai'] },
+    { id: '2', publishedAt: '2026-07-15T01:00:00.000Z', channelKey: 'tech', topicKeys: ['company:openai'] },
+    { id: '3', publishedAt: '2026-07-15T01:00:00.000Z', channelKey: 'ai', topicKeys: ['company:anthropic'] }
+  ];
+  const page = buildFeedPage(items, {
+    channel: 'ai',
+    filters: { time: '7d', company: 'company:openai', direction: 'all' }
+  });
+  assert.deepEqual(page.items.map((item) => item.id), ['1']);
+  assert.equal(page.resultCount, 1);
+});
+
+test('normalizes malformed pagination input to safe defaults', () => {
+  const query = normalizeFeedQuery({
+    offset: -10,
+    limit: 999,
+    channel: 'unknown',
+    filters: { time: 'forever', company: 'company:unknown', direction: 'direction:unknown' }
+  });
+  assert.deepEqual(query, {
+    offset: 0,
+    limit: 20,
+    channel: 'all',
+    filters: { time: '7d', company: 'all', direction: 'all' }
+  });
 });

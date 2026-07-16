@@ -19,8 +19,9 @@ function getDashboard() {
   return callCloudFunction('digestStore', { action: 'dashboard' });
 }
 
-function getKnowledgeFeed(force = false) {
-  return callCloudFunction('knowledgeFeed', { action: 'feed', force });
+function getKnowledgeFeed(options = {}) {
+  const query = typeof options === 'boolean' ? { force: options } : options;
+  return callCloudFunction('knowledgeFeed', { action: 'feed', ...query });
 }
 
 function getKnowledgeItem(id) {

@@ -288,6 +288,16 @@
   background: #e1ded7;
 }
 
+.feed-page-status {
+  padding: 36rpx 0 16rpx;
+  color: var(--editorial-faint);
+  font-size: 20rpx;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.feed-page-retry { color: var(--editorial-blue); }
+
 .feed-filter-mask {
   position: fixed;
   z-index: 30;

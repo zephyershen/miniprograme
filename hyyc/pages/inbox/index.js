@@ -14,6 +14,7 @@ const FILTER_OPTIONS = Object.freeze({
   company: COMPANY_FILTERS,
   direction: DIRECTION_FILTERS
 });
+const PAGE_SIZE = 8;
 
 function copyFilters(filters = DEFAULT_FEED_FILTERS) {
   return { time: filters.time, company: filters.company, direction: filters.direction };
@@ -46,27 +47,45 @@ function filterByChannel(items, activeChannel) {
 }
 
 function decorateFilterOptions(raw, activeChannel, filters) {
-  return filterOptionsWithCounts(FILTER_OPTIONS, filterByChannel(prepareFeedItems(raw), activeChannel), filters);
+  return filterOptionsWithCounts(FILTER_OPTIONS, filterByChannel(raw.facets || [], activeChannel), filters);
 }
 
-function decorateFeed(raw = { items: [] }, activeChannel = 'all', filters = DEFAULT_FEED_FILTERS) {
-  const allItems = prepareFeedItems(raw);
-  const filteredItems = filterFeedItems(allItems, filters);
-  const visibleItems = filterByChannel(filteredItems, activeChannel).map((item, index) => ({
+function countFacetResults(raw, activeChannel, filters) {
+  return filterByChannel(filterFeedItems(raw.facets || [], filters), activeChannel).length;
+}
+
+function mergeUniqueItems(current = [], incoming = []) {
+  const seen = new Set(current.map((item) => item.id));
+  const additions = incoming.filter((item) => {
+    if (!item || seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  });
+  return current.concat(additions);
+}
+
+function decorateFeed(raw = { items: [], facets: [] }, activeChannel = 'all', filters = DEFAULT_FEED_FILTERS, loadedItems = []) {
+  const filteredFacets = filterFeedItems(raw.facets || [], filters);
+  const visibleItems = prepareFeedItems({ items: loadedItems }).map((item, index) => ({
     ...item,
     sequenceLabel: String(index + 1).padStart(2, '0')
   }));
   const channel = channelByKey(activeChannel);
+  const facetResultCount = filterByChannel(filteredFacets, activeChannel).length;
+  const resultCount = Number.isFinite(Number(raw.resultCount)) ? Number(raw.resultCount) : facetResultCount;
 
   return {
     visibleItems,
     leadItem: visibleItems[0] || null,
     remainingItems: visibleItems.slice(1),
-    channels: decorateChannels(filteredItems, activeChannel),
+    remainingCount: Math.max(0, resultCount - 1),
+    channels: decorateChannels(filteredFacets, activeChannel),
     activeChannel,
     activeChannelLabel: channel.label,
-    resultCount: visibleItems.length,
-    totalAvailable: Number(raw.totalAvailable) || allItems.length,
+    resultCount,
+    loadedCount: visibleItems.length,
+    totalAvailable: Number(raw.totalAvailable) || (raw.facets || []).length,
+    hasMore: raw.hasMore === true,
     filterSummary: filterSummary(filters, FILTER_OPTIONS)
   };
 }
@@ -74,6 +93,8 @@ function decorateFeed(raw = { items: [] }, activeChannel = 'all', filters = DEFA
 Page({
   data: {
     loading: true,
+    loadingMore: false,
+    loadMoreError: '',
     activeChannel: 'all',
     feedError: '',
     filters: copyFilters(),
@@ -85,8 +106,12 @@ Page({
     feed: decorateFeed()
   },
 
-  onShow() {
+  onLoad() {
     this.loadFeed(false);
+  },
+
+  onReachBottom() {
+    this.loadMoreFeed();
   },
 
   onPullDownRefresh() {
@@ -94,22 +119,72 @@ Page({
   },
 
   async loadFeed(force) {
-    this.setData({ loading: true, feedError: '' });
+    const requestId = (this.feedRequestId || 0) + 1;
+    this.feedRequestId = requestId;
+    const activeChannel = this.data.activeChannel;
+    const filters = copyFilters(this.data.filters);
+    this.loadedItems = [];
+    this.setData({ loading: true, loadingMore: false, loadMoreError: '', feedError: '' });
     try {
-      this.rawFeed = await getKnowledgeFeed(force);
-      this.present(this.data.activeChannel);
+      const rawFeed = await getKnowledgeFeed({
+        force,
+        offset: 0,
+        limit: PAGE_SIZE,
+        channel: activeChannel,
+        filters
+      });
+      if (requestId !== this.feedRequestId) return;
+      this.rawFeed = rawFeed;
+      this.loadedItems = rawFeed.items || [];
+      this.present();
     } catch (error) {
-      this.present(this.data.activeChannel, error.message);
+      if (requestId !== this.feedRequestId) return;
+      this.rawFeed = { items: [], facets: [] };
+      this.loadedItems = [];
+      this.present(error.message);
     } finally {
-      this.setData({ loading: false });
+      if (requestId === this.feedRequestId) this.setData({ loading: false });
     }
   },
 
-  present(activeChannel, feedError = '', filters = this.data.filters) {
-    const feed = decorateFeed(this.rawFeed || { items: [] }, activeChannel, filters);
+  async loadMoreFeed() {
+    if (this.data.loading || this.data.loadingMore || this.data.filterOpen || !this.data.feed.hasMore) return;
+    const requestId = this.feedRequestId;
+    const activeChannel = this.data.activeChannel;
+    const filters = copyFilters(this.data.filters);
+    const offset = Number(this.rawFeed && this.rawFeed.nextOffset) || this.loadedItems.length;
+    this.setData({ loadingMore: true, loadMoreError: '' });
+    try {
+      const page = await getKnowledgeFeed({
+        offset,
+        limit: PAGE_SIZE,
+        channel: activeChannel,
+        filters
+      });
+      if (requestId !== this.feedRequestId) return;
+      this.loadedItems = mergeUniqueItems(this.loadedItems, page.items || []);
+      this.rawFeed = {
+        ...this.rawFeed,
+        ...page,
+        facets: this.rawFeed.facets || page.facets || [],
+        items: this.loadedItems
+      };
+      this.present();
+    } catch (error) {
+      if (requestId !== this.feedRequestId) return;
+      this.setData({ loadMoreError: error.message || '加载失败，请重试' });
+    } finally {
+      if (requestId === this.feedRequestId) this.setData({ loadingMore: false });
+    }
+  },
+
+  present(feedError = '') {
+    const activeChannel = this.data.activeChannel;
+    const filters = this.data.filters;
+    const feed = decorateFeed(this.rawFeed || { items: [], facets: [] }, activeChannel, filters, this.loadedItems || []);
     getApp().globalData.knowledgeFeed = {
       ...(this.rawFeed || {}),
-      items: (this.rawFeed && this.rawFeed.items) || []
+      items: this.loadedItems || []
     };
     this.setData({ feed, activeChannel, feedError });
   },
@@ -117,7 +192,7 @@ Page({
   selectChannel(event) {
     const key = event.currentTarget.dataset.key;
     if (!key || key === this.data.activeChannel) return;
-    this.present(key);
+    this.setData({ activeChannel: key }, () => this.loadFeed(false));
   },
 
   retryFeed() {
@@ -126,8 +201,8 @@ Page({
 
   openFilters() {
     const draftFilters = copyFilters(this.data.filters);
-    const draftCount = decorateFeed(this.rawFeed || { items: [] }, this.data.activeChannel, draftFilters).resultCount;
-    const filterOptions = decorateFilterOptions(this.rawFeed || { items: [] }, this.data.activeChannel, draftFilters);
+    const draftCount = countFacetResults(this.rawFeed || { facets: [] }, this.data.activeChannel, draftFilters);
+    const filterOptions = decorateFilterOptions(this.rawFeed || { facets: [] }, this.data.activeChannel, draftFilters);
     this.setData({ filterOpen: true, draftFilters, draftCount, filterOptions, filterScrollTarget: '' }, () => {
       this.setData({ filterScrollTarget: 'filter-time-group' });
     });
@@ -146,22 +221,21 @@ Page({
     const option = (this.data.filterOptions[group] || []).find((entry) => entry.key === key);
     if (!option || option.disabled) return;
     const draftFilters = { ...this.data.draftFilters, [group]: key };
-    const draftCount = decorateFeed(this.rawFeed || { items: [] }, this.data.activeChannel, draftFilters).resultCount;
-    const filterOptions = decorateFilterOptions(this.rawFeed || { items: [] }, this.data.activeChannel, draftFilters);
+    const draftCount = countFacetResults(this.rawFeed || { facets: [] }, this.data.activeChannel, draftFilters);
+    const filterOptions = decorateFilterOptions(this.rawFeed || { facets: [] }, this.data.activeChannel, draftFilters);
     this.setData({ draftFilters, draftCount, filterOptions });
   },
 
   resetFilters() {
     const draftFilters = copyFilters();
-    const draftCount = decorateFeed(this.rawFeed || { items: [] }, this.data.activeChannel, draftFilters).resultCount;
-    const filterOptions = decorateFilterOptions(this.rawFeed || { items: [] }, this.data.activeChannel, draftFilters);
+    const draftCount = countFacetResults(this.rawFeed || { facets: [] }, this.data.activeChannel, draftFilters);
+    const filterOptions = decorateFilterOptions(this.rawFeed || { facets: [] }, this.data.activeChannel, draftFilters);
     this.setData({ draftFilters, draftCount, filterOptions });
   },
 
   applyFilters() {
     const filters = copyFilters(this.data.draftFilters);
-    this.setData({ filters, filterOpen: false });
-    this.present(this.data.activeChannel, '', filters);
+    this.setData({ filters, filterOpen: false }, () => this.loadFeed(false));
   },
 
   openFeedItem(event) {

@@ -3,7 +3,7 @@ title: "知识获取平台小程序项目总览"
 type: overview
 tags: [overview, miniprogram, wechat, knowledge-platform, editorial-index]
 sources: [sources/2026-07-13-digest-inbox-implementation.md, sources/2026-07-14-cloud-cleanup-and-deployment.md, sources/2026-07-15-wechat-e2e-and-runtime-fixes.md, sources/2026-07-15-editorial-ui-implementation.md, sources/2026-07-15-aihot-feed-integration.md, decisions/2026-07-15-engaging-news-detail.md]
-last_updated: 2026-07-15
+last_updated: 2026-07-16
 status: confirmed
 confidence: high
 ---
@@ -12,7 +12,7 @@ confidence: high
 
 ## 一句话说明
 
-这是一个从个人文章消化箱迁移为编辑型知识获取平台的微信小程序：当前首页以非卡片式结构展示全部 108 条 AI/科技资讯，可按时间、公司与模型、技术方向筛选；有图时显示真实原图，无图时使用纯文字编辑行。详情用可选图片、30 秒导读、完整上游摘要分段和相关阅读降低阅读负担。个人导入/待处理流程已从首页撤下，娱乐、社会、游戏和英语仍待各自内容源。
+这是一个从个人文章消化箱迁移为编辑型知识获取平台的微信小程序：当前后台保留近 7 天 AI/科技资讯池，首页以非卡片式结构首屏加载 8 条、触底再追加 8 条，并可按时间、公司与模型、技术方向筛选；有图时显示真实原图，无图时使用纯文字编辑行。详情用可选图片、30 秒导读、完整上游摘要分段和相关阅读降低阅读负担。个人导入/待处理流程已从首页撤下，娱乐、社会、游戏和英语仍待各自内容源。
 
 ## 事实健康表
 
@@ -20,12 +20,12 @@ confidence: high
 | --- | --- | --- |
 | AppID、云环境 ID、Git 历史和远程地址已保留 | confirmed | 项目配置、应用入口、Git 命令 |
 | 旧社区、商品、任务、聊天、实名、定位、钱包、支付和图片审核代码已从活跃树移除 | confirmed | 当前文件树与重建历史 |
-| 6 个页面、3 个云函数及本地测试已实现 | confirmed | 当前代码、52 个 Node 测试 |
+| 6 个页面、3 个云函数及本地测试已实现 | confirmed | 当前代码、55 个 Node 测试 |
 | 旧云资源清空及 5 个新集合创建 | confirmed | 2026-07-14 CloudBase 清单与复核 |
 | `digestIngest`、`digestStore` 已部署 | confirmed | 两函数部署结果与云端日志 |
 | 真实 OpenID、数据库闭环和开发者工具编译 | confirmed | 2026-07-15 微信开发者工具端到端验证 |
 | 编辑索引式首页与频道视觉系统 | confirmed | 2026-07-15 Moodboard 选择、当前代码和模拟器编译 |
-| AI/科技精选聚合、筛选、缓存和原始来源追踪 | confirmed | 线上返回 108/108，13 条有图、95 条纯文字，模拟器渲染 |
+| AI/科技精选聚合、服务端分页、筛选、缓存和原始来源追踪 | confirmed | 2026-07-16 线上首屏与第二页各返回 8 条，组合筛选计数通过 |
 | 完整摘要分段和相关阅读 | confirmed | 无图详情实机打开、云端摘要无人工省略、3 条相关阅读 |
 | 多来源去重、独立官方源与其他四个频道 | needs-review | 尚未实现，不得宣称为全频道实时新闻服务 |
 | 真正 AI 摘要 | needs-review | 当前套餐模型调用返回 429；应用已透明使用本地临时摘要 |
@@ -60,10 +60,11 @@ confidence: high
 - 页面：`pages/inbox/index`（纯资讯首页）、`pages/feed-detail/index`（短读公共资讯详情）、`pages/source-view/index`（仅承载已验证域名）；`pages/digest/index`、`pages/cards/index`、`pages/settings/index` 仍在代码中，但首页不再提供个人导入/待处理入口。
 - 首页频道：精选、AI 前沿、科技、娱乐、社会、游戏、英语；当前聚合源覆盖前两类，其他频道保留真实空状态。
 - 首页筛选：24 小时、近 3 天、近 7 天；15 个公司与模型主题；14 个技术方向。三个维度可组合，选项显示当前资讯数，零结果项不可选；弹层内容独立滚动，底部操作区不覆盖主题。
+- 首页资讯分页：云函数先按频道和筛选条件过滤，再下发当前 8 条完整资讯；第一页同时携带轻量筛选索引，触底后用 `nextOffset` 每次追加 8 条。切换频道、应用筛选和下拉刷新都会从第一页重新开始，重复触底请求会被前端状态锁阻止。
 - 视觉基线：`styles/editorial-tokens.wxss`，以米白纸张、黑色排版、细线和单一频道色建立层级。
 - 云函数：`hyyc/cloudfunctions/digestIngest`、`hyyc/cloudfunctions/digestStore`、`hyyc/cloudfunctions/knowledgeFeed`
 - 集合：`digest_queue`、`conclusion_cards`、`user_state`、`daily_stats`、`usage_monthly`、`knowledge_feed_cache`
-- 公共资讯缓存 15 分钟并使用 ETag；当前近 7 天缓存并公开 108 条。原文封面经安全校验后写入 `knowledge-covers/aihot/`，当前 13 个可用对象；其余 95 条以纯文字展示，不生成几何替代图或空白占位。
+- 公共资讯缓存 15 分钟并使用 ETag；近 7 天内容池随上游更新，2026-07-16 线上验证时为 106 条。原文封面经安全校验后写入 `knowledge-covers/aihot/`；缺图条目以纯文字展示，不生成几何替代图或空白占位。
 - 生产资讯同步和外站封面请求由腾讯云 CloudBase 云函数发起，不使用开发者或小程序用户的本地网络；用户主动在浏览器打开原文时才使用自己的网络。
 - 用户界面不显示 AI HOT、API、缓存、规范链接等接入实现，只显示资讯的原始发布方和原文链接。
 - 来源标签会清除 RSS、翻译中转等采集方式后缀，不把技术管道暴露给用户。
@@ -86,17 +87,17 @@ confidence: high
 
 ## 本地验证
 
-- `npm test`：52/52 通过。
-- `npm run check`：20 个 JSON、51 个 JavaScript、6 个页面通过结构与语法检查。
+- `npm test`：55/55 通过。
+- `npm run check`：20 个 JSON、52 个 JavaScript、6 个页面通过结构与语法检查。
 - `git diff --check`：通过。
-- 微信开发者工具已编译并成功渲染纯资讯首页：精选 108、AI 前沿 82、科技 26；有图和纯文字资讯混排，筛选弹层滚动与底部操作区均已验证。
+- 微信开发者工具已打开当前项目并加载资讯首页；本轮分页的结构、语法、云端返回和页面状态由静态检查、线上函数调用及模拟器画面共同核验。
 
 ## 云端与端到端状态
 
 - 旧业务的 41 个函数、24 个集合、2,456 条文档、217 个存储对象和 `adminportal/` 已清理。
 - 环境级空存储桶、平台认证文件、AppID 关联和标准版套餐被保留。
 - 6 个当前集合均为 `ADMINONLY`；其中 5 个个人业务集合无测试记录，`knowledge_feed_cache` 保存公共资讯缓存。
-- 三个 Node.js 18.15 云函数已部署；`knowledgeFeed` 线上返回全部 108 条，其中 13 条有真实封面、95 条封面为空。无图条目和无图相关阅读都能打开详情；公开响应已移除聚合平台页面、归因和平台标识字段。
+- 三个 Node.js 18.15 云函数已部署；`knowledgeFeed` 当前使用服务端分页。2026-07-16 线上验证：内容池 106 条，第一页 8 条并返回 `nextOffset=8`，第二页再返回 8 条；“AI 前沿 + 24 小时 + OpenAI”返回 5 条且正确结束。无图条目和无图相关阅读仍能打开详情；公开响应已移除聚合平台页面、归因和平台标识字段。
 - 真实微信上下文已验证：保存偏好 → 导入文章 → 生成临时摘要 → 保留结论卡 → 统计更新 → 清除个人数据。
 - 环境“超限按量”关闭；未自动开启新的 AI 付费方案。
 

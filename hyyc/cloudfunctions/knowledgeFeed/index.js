@@ -4,6 +4,7 @@ const { cleanSourceLabel, normalizeAihotResponse } = require('./lib/aihot');
 const { extractCoverUrl } = require('./lib/image-meta');
 const { fetchPublicBuffer } = require('./lib/network');
 const { inferTopicKeys } = require('./lib/topics');
+const { buildFeedPage } = require('./lib/feed-page');
 
 const API_ROOT = 'https://aihot.virxact.com/api/public/items';
 const API_PAGE_SIZE = 100;
@@ -74,14 +75,30 @@ function publicItem(item) {
   };
 }
 
-function publicFeed(cache, stale = false) {
-  const items = (cache.items || []).map(publicItem);
+function publicFacet(item) {
+  return {
+    id: item.id,
+    publishedAt: item.publishedAt,
+    channelKey: item.channelKey,
+    topicKeys: Array.isArray(item.topicKeys) ? item.topicKeys : inferTopicKeys(item)
+  };
+}
+
+function publicFeed(cache, stale = false, query = {}) {
+  const allItems = cache.items || [];
+  const page = buildFeedPage(allItems, query);
   return {
     updatedAt: toIso(cache.fetchedAt),
     stale,
     windowDays: 7,
-    totalAvailable: (cache.items || []).length,
-    items
+    totalAvailable: allItems.length,
+    resultCount: page.resultCount,
+    offset: page.query.offset,
+    nextOffset: page.nextOffset,
+    limit: page.query.limit,
+    hasMore: page.hasMore,
+    items: page.items.map(publicItem),
+    facets: page.query.offset === 0 ? allItems.map(publicFacet) : undefined
   };
 }
 
@@ -209,20 +226,20 @@ async function refreshCache(previous) {
   return document;
 }
 
-async function getFeed(force) {
+async function getFeed(query = {}) {
   const cached = await getCache();
   const age = cacheAge(cached);
-  const shouldRefresh = !cached || age >= CACHE_TTL_MS || (force === true && age >= FORCE_MIN_AGE_MS);
-  if (!shouldRefresh) return publicFeed(cached);
+  const shouldRefresh = !cached || age >= CACHE_TTL_MS || (query.force === true && age >= FORCE_MIN_AGE_MS);
+  if (!shouldRefresh) return publicFeed(cached, false, query);
 
   if (!refreshPromise) {
     refreshPromise = refreshCache(cached).finally(() => { refreshPromise = null; });
   }
   try {
-    return publicFeed(await refreshPromise);
+    return publicFeed(await refreshPromise, false, query);
   } catch (error) {
     console.error('AI HOT refresh failed', error);
-    if (cached && Array.isArray(cached.items) && cached.items.length) return publicFeed(cached, true);
+    if (cached && Array.isArray(cached.items) && cached.items.length) return publicFeed(cached, true, query);
     throw new AppError('FEED_UNAVAILABLE', '暂时无法读取资讯，请稍后下拉刷新');
   }
 }
@@ -345,7 +362,7 @@ exports.main = async (event = {}) => {
   try {
     switch (event.action || 'feed') {
       case 'feed':
-        return ok(await getFeed(event.force));
+        return ok(await getFeed(event));
       case 'item':
         return ok(await getItem(event.id));
       case 'registerCovers':

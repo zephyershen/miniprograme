@@ -1,4 +1,5 @@
 {
   "navigationBarTitleText": "知识更新",
-  "enablePullDownRefresh": true
+  "enablePullDownRefresh": true,
+  "onReachBottomDistance": 160
 }

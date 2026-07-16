@@ -62,7 +62,7 @@
 
     <view wx:if="{{feed.remainingItems.length}}" class="section-heading">
       <view class="section-title">更多资讯</view>
-      <view class="section-count">{{feed.remainingItems.length}}</view>
+      <view class="section-count">{{feed.remainingCount}}</view>
     </view>
 
     <view class="story-list">
@@ -83,6 +83,14 @@
         </view>
         <image wx:if="{{item.coverFileId}}" class="story-thumbnail" src="{{item.coverFileId}}" mode="aspectFill" lazy-load="{{true}}" />
       </view>
+    </view>
+
+    <view wx:if="{{loadingMore}}" class="feed-page-status">正在加载更多资讯</view>
+    <view wx:elif="{{loadMoreError}}" class="feed-page-status feed-page-retry" bindtap="loadMoreFeed">
+      {{loadMoreError}} · 点击重试
+    </view>
+    <view wx:elif="{{!feed.hasMore && feed.loadedCount > 1}}" class="feed-page-status">
+      已显示全部 {{feed.resultCount}} 条
     </view>
   </block>
 
