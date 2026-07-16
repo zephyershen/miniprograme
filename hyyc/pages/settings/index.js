@@ -1,6 +1,6 @@
-const { getDashboard, storeAction } = require('../../features/digest/api');
-const { TOPICS, LIMITS } = require('../../config/constants');
-const { formatMoney } = require('../../features/digest/presentation');
+const { getDashboard, storeAction } = require('../../features/digest/api.js');
+const { TOPICS, LIMITS } = require('../../config/constants.js');
+const { formatMoney } = require('../../features/digest/presentation.js');
 
 function decorateTopics(selected) {
   return TOPICS.map((topic) => ({ ...topic, selected: selected.includes(topic.key) }));

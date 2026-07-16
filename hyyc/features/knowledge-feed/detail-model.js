@@ -1,5 +1,5 @@
-const { DIRECT_WEBVIEW_HOSTS } = require('../../config/constants');
-const { buildReadingGuide, buildRelatedItems, getOriginAction } = require('./reading');
+const { DIRECT_WEBVIEW_HOSTS } = require('../../config/constants.js');
+const { buildReadingGuide, buildRelatedItems, getOriginAction } = require('./reading.js');
 
 function formatDetailDate(value) {
   const date = new Date(value);

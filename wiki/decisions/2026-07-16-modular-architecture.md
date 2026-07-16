@@ -29,6 +29,7 @@ confidence: high
 - 小程序端公共 CloudBase 传输只放在 `services/cloud-functions.js`。
 - `knowledgeFeed/adapters/` 只认识外部内容源；`repositories/` 只认识缓存集合；`services/` 组织用例与降级；`presenters/` 定义公开 DTO；入口只做依赖装配和 action 路由。
 - 新来源先适配成统一资讯条目，再进入缓存和查询服务；页面、筛选、分页和公开 DTO 不感知供应商请求协议。
+- 微信小程序运行时代码的相对 `require` 必须显式包含 `.js` 扩展名；页面直接引用具体 feature 模块，不使用 `...require(...)` 形式的聚合导出。Node 页面入口测试继续保留，但不能替代微信开发者工具编译验证。
 
 ## 为什么这样定
 
@@ -43,6 +44,7 @@ confidence: high
 - `knowledgeFeed/index.js` 从 381 行降为约 40 行，首页脚本从 276 行降为约 160 行。
 - 未注册且依赖已删除旧用户模块的社区实名引导页被移除；它不属于当前 6 个正式页面，也没有可达入口。
 - `digestIngest` 和 `digestStore` 是已退出首页的保留闭环，本轮不做高风险大拆；未来只有在重新启用或新增需求时按相同方式逐片迁移。
+- `npm run check` 增加微信运行时模块引用规则，防止无扩展名相对引用或 `...require(...)` 聚合再次进入客户端代码。
 
 ## 状态
 

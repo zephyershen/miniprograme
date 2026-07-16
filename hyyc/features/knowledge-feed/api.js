@@ -1,4 +1,4 @@
-const { callCloudFunction } = require('../../services/cloud-functions');
+const { callCloudFunction } = require('../../services/cloud-functions.js');
 
 function getKnowledgeFeed(options = {}) {
   const query = typeof options === 'boolean' ? { force: options } : options;

@@ -16,6 +16,7 @@
 - `hyyc/features/knowledge-feed/` 集中资讯频道、筛选、排序、列表/详情展示模型和资讯 API；新增首页能力优先放在这里。
 - `hyyc/features/digest/` 保留个人消化功能的 API 和展示转换；它不是当前首页主链路。
 - `hyyc/services/cloud-functions.js` 是小程序端统一云函数传输层，业务模块不直接重复处理 CloudBase 响应和错误。
+- 小程序运行时代码的相对 `require` 必须显式写出 `.js` 扩展名，页面不得通过 `...require(...)` 聚合导出；`npm run check` 会阻止这两类微信打包器不兼容写法。
 - `hyyc/cloudfunctions/knowledgeFeed/adapters/` 隔离外部资讯源，`repositories/` 隔离数据库，`services/` 编排缓存、查询和封面用例，`presenters/` 定义对小程序公开的数据字段。
 - 接入新资讯源时新增 adapter 并保持统一条目结构，避免把供应商字段、请求方式或品牌判断写进页面、查询服务和数据库仓储。
 

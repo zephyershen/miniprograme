@@ -125,3 +125,12 @@
 - Sources: 当前代码审查、66 个 Node 测试、项目检查、CloudBase 两次部署以及最新列表、热度时间筛选、有效详情、无效详情线上回归。
 - Sensitive handling: 未读取或记录账号、密码、令牌、OpenID 或个人数据；沿用本机现有 CloudBase 登录状态部署。
 - Follow-ups: 新内容源通过 adapter 接入并统一条目契约；两个已退出首页的旧摘要函数只在重新启用或新增需求时按相同边界逐片迁移。
+
+## [2026-07-16] wechat-module-resolution-fix | 修复微信打包器模块未定义错误
+
+- Session: local Codex task
+- Target pages: `README.md`, `wiki/overview.md`, `wiki/decisions/2026-07-16-modular-architecture.md`, `wiki/sources/2026-07-16-modular-refactor.md`, `wiki/reports/architecture-2026-07-16.md`, `wiki/log.md`
+- Summary: 真实微信编译发现模块化重构中的 `...require(...)` 聚合和无扩展名页面引用未被打包器稳定收包；改为具体模块直引并统一补齐 `.js`，新增项目检查规则。首页加载 106 条资讯、详情打开且控制台项目红色错误清空。
+- Sources: 用户截图、当前代码、66 个 Node 测试、项目检查、微信开发者工具首页和详情实机模拟器验证。
+- Sensitive handling: 未读取或记录账号、密码、令牌、OpenID 或个人数据；未访问 `wiki/secrets/`。
+- Follow-ups: 后续客户端模块重构必须同时通过 Node 测试、`npm run check` 与微信开发者工具普通编译；Node smoke test 不再单独作为运行时兼容证据。

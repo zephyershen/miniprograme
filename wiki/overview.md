@@ -60,6 +60,7 @@ confidence: high
 
 - 页面：`pages/inbox/index`（纯资讯首页）、`pages/feed-detail/index`（短读公共资讯详情）、`pages/source-view/index`（仅承载已验证域名）；`pages/digest/index`、`pages/cards/index`、`pages/settings/index` 仍在代码中，但首页不再提供个人导入/待处理入口。
 - 小程序模块：`features/knowledge-feed/` 拥有资讯配置、频道、筛选、阅读、列表/详情模型和 API；`features/digest/` 拥有保留的个人消化 API/展示转换；`services/cloud-functions.js` 是两个能力共享的唯一 CloudBase 传输层。
+- 微信运行时模块引用统一使用带 `.js` 扩展名的相对 `require`，页面直接引用具体 feature 文件，不再使用 `...require(...)` 聚合入口；项目检查会阻止这两类已验证不兼容写法。
 - 资讯云函数模块：`adapters/` 隔离外部资讯源，`repositories/` 隔离缓存集合，`services/` 编排查询/缓存降级和封面维护，`presenters/` 约束公开 DTO；`knowledgeFeed/index.js` 只装配依赖和路由 action。
 - 首页频道：精选、AI 前沿、科技、娱乐、社会、游戏、英语；当前聚合源覆盖前两类，其他频道保留真实空状态。
 - 首页筛选：24 小时、近 3 天、近 7 天；15 个公司与模型主题；14 个技术方向。三个维度可组合，选项显示当前资讯数，零结果项不可选；弹层内容独立滚动，底部操作区不覆盖主题。
@@ -92,9 +93,9 @@ confidence: high
 ## 本地验证
 
 - `npm test`：66/66 通过。
-- `npm run check`：19 个 JSON、64 个 JavaScript、6 个页面通过结构与语法检查。
+- `npm run check`：19 个 JSON、63 个 JavaScript、6 个页面通过结构、语法与微信模块引用兼容性检查。
 - `git diff --check`：通过。
-- 微信开发者工具已打开当前项目并加载资讯首页；本轮分页的结构、语法、云端返回和页面状态由静态检查、线上函数调用及模拟器画面共同核验。
+- 微信开发者工具已重新编译当前项目并实际打开资讯首页与资讯详情；模块加载红色错误已清空，首页返回 106 条资讯，仅剩基础库和 SharedArrayBuffer 的开发者工具提示。
 
 ## 云端与端到端状态
 

@@ -1,4 +1,4 @@
-const { CLOUD_ENV_ID } = require('./config/constants');
+const { CLOUD_ENV_ID } = require('./config/constants.js');
 
 App({
   onLaunch() {

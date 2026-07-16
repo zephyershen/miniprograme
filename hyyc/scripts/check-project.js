@@ -16,14 +16,32 @@ function walk(directory) {
 const files = walk(root);
 const jsonFiles = files.filter((file) => file.endsWith('.json'));
 const jsFiles = files.filter((file) => file.endsWith('.js'));
+const runtimeClientFiles = jsFiles.filter((file) => {
+  const relative = path.relative(root, file);
+  return !relative.startsWith(`cloudfunctions${path.sep}`)
+    && !relative.startsWith(`scripts${path.sep}`)
+    && !relative.startsWith(`tests${path.sep}`);
+});
 
 for (const file of jsonFiles) {
   JSON.parse(fs.readFileSync(file, 'utf8'));
 }
 
 for (const file of jsFiles) {
+  const content = fs.readFileSync(file, 'utf8');
+  if (/\.\.\.\s*require\s*\(/.test(content)) {
+    throw new Error(`Unsupported mini-program require spread found: ${path.relative(root, file)}`);
+  }
   const result = spawnSync(process.execPath, ['--check', file], { encoding: 'utf8' });
   if (result.status !== 0) throw new Error(`${path.relative(root, file)}\n${result.stderr}`);
+}
+
+for (const file of runtimeClientFiles) {
+  const content = fs.readFileSync(file, 'utf8');
+  const extensionlessRequire = /require\(\s*['"](\.\.?\/[^'"]+)(?<!\.js)(?<!\.json)['"]\s*\)/.exec(content);
+  if (extensionlessRequire) {
+    throw new Error(`Mini-program relative require must include an extension: ${path.relative(root, file)} -> ${extensionlessRequire[1]}`);
+  }
 }
 
 const appConfig = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8'));

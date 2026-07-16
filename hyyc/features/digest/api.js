@@ -1,4 +1,4 @@
-const { callCloudFunction } = require('../../services/cloud-functions');
+const { callCloudFunction } = require('../../services/cloud-functions.js');
 
 function getDashboard() {
   return callCloudFunction('digestStore', { action: 'dashboard' });

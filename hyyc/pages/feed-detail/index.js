@@ -1,4 +1,5 @@
-const { getKnowledgeItem, decorateKnowledgeItem } = require('../../features/knowledge-feed/index');
+const { getKnowledgeItem } = require('../../features/knowledge-feed/api.js');
+const { decorateKnowledgeItem } = require('../../features/knowledge-feed/detail-model.js');
 
 Page({
   data: {

@@ -1,5 +1,4 @@
 const {
-  getKnowledgeFeed,
   PAGE_SIZE,
   copyFilters,
   createSortState,
@@ -10,7 +9,8 @@ const {
   mergeUniqueItems,
   decorateFeed,
   createInitialListState
-} = require('../../features/knowledge-feed/index');
+} = require('../../features/knowledge-feed/list-model.js');
+const { getKnowledgeFeed } = require('../../features/knowledge-feed/api.js');
 
 Page({
   data: createInitialListState(),

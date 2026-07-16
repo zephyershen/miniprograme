@@ -1,6 +1,6 @@
-const { getDashboard, storeAction } = require('../../features/digest/api');
-const { LIMITS } = require('../../config/constants');
-const { formatDate } = require('../../features/digest/presentation');
+const { getDashboard, storeAction } = require('../../features/digest/api.js');
+const { LIMITS } = require('../../config/constants.js');
+const { formatDate } = require('../../features/digest/presentation.js');
 
 Page({
   data: {

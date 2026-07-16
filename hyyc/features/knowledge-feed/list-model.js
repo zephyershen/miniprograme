@@ -1,6 +1,6 @@
-const { channelByKey, decorateChannels } = require('./channels');
-const { filterFeedItems, filterSummary, filterOptionsWithCounts } = require('./filters');
-const { buildReadingGuide } = require('./reading');
+const { channelByKey, decorateChannels } = require('./channels.js');
+const { filterFeedItems, filterSummary, filterOptionsWithCounts } = require('./filters.js');
+const { buildReadingGuide } = require('./reading.js');
 const {
   TIME_FILTERS,
   COMPANY_FILTERS,
@@ -9,7 +9,7 @@ const {
   DEFAULT_FEED_FILTERS,
   DEFAULT_SORT,
   PAGE_SIZE
-} = require('./config');
+} = require('./config.js');
 
 const FILTER_OPTIONS = Object.freeze({ time: TIME_FILTERS, company: COMPANY_FILTERS, direction: DIRECTION_FILTERS });
 
