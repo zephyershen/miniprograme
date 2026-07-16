@@ -11,7 +11,8 @@
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
-        "node_modules/**"
+        "node_modules/**",
+        "config.local.js"
       ],
       "description": "Fetches and summarizes one public article for the digest inbox."
     },
@@ -23,7 +24,8 @@
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
-        "node_modules/**"
+        "node_modules/**",
+        "config.local.js"
       ],
       "description": "Stores dashboard preferences, queue decisions, and conclusion cards."
     },
@@ -35,9 +37,10 @@
       "memorySize": 256,
       "installDependency": true,
       "ignore": [
-        "node_modules/**"
+        "node_modules/**",
+        "config.local.js"
       ],
-      "description": "Caches selected updates and original cover images for the knowledge feed."
+      "description": "Caches selected updates, original covers and source preview screenshots for the knowledge feed."
     }
   ]
 }

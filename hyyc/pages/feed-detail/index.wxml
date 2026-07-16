@@ -18,6 +18,13 @@
     </view>
 
     <image wx:if="{{item.coverFileId}}" class="detail-cover" src="{{item.coverFileId}}" mode="aspectFill" />
+    <view wx:elif="{{item.previewFileIds.length}}" class="source-preview" bindtap="previewSourceScreenshots">
+      <image class="source-preview-image" src="{{item.previewFileIds[0]}}" mode="widthFix" />
+      <view class="source-preview-action">
+        <text>原文页面预览</text>
+        <text>点击查看 {{item.previewFileIds.length}} 张 →</text>
+      </view>
+    </view>
 
     <view wx:if="{{item.readingGuide.brief}}" class="quick-read">
       <view class="quick-read-head">
@@ -46,7 +53,7 @@
       <view
         wx:for="{{item.relatedItems}}"
         wx:key="id"
-        class="related-row {{item.coverFileId ? '' : 'related-row-no-image'}}"
+        class="related-row {{item.visualFileId ? '' : 'related-row-no-image'}}"
         data-id="{{item.id}}"
         bindtap="openRelated"
       >
@@ -55,7 +62,7 @@
           <view class="related-title">{{item.title}}</view>
           <view class="related-source">{{item.source}} →</view>
         </view>
-        <image wx:if="{{item.coverFileId}}" class="related-image" src="{{item.coverFileId}}" mode="aspectFill" lazy-load="{{true}}" />
+        <image wx:if="{{item.visualFileId}}" class="related-image" src="{{item.visualFileId}}" mode="aspectFill" lazy-load="{{true}}" />
       </view>
     </view>
 

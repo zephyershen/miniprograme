@@ -49,6 +49,20 @@ Page({
     });
   },
 
+  async previewSourceScreenshots() {
+    const item = this.data.item;
+    const fileIds = item && item.previewFileIds;
+    if (!Array.isArray(fileIds) || !fileIds.length) return;
+    try {
+      const result = await wx.cloud.getTempFileURL({ fileList: fileIds });
+      const urls = (result.fileList || []).map((entry) => entry.tempFileURL).filter(Boolean);
+      if (!urls.length) throw new Error('PREVIEW_UNAVAILABLE');
+      wx.previewImage({ current: urls[0], urls });
+    } catch (error) {
+      wx.showToast({ title: '原文预览暂时无法打开', icon: 'none' });
+    }
+  },
+
   openRelated(event) {
     const id = event.currentTarget.dataset.id;
     if (!id) return;

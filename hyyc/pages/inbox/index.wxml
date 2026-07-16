@@ -20,7 +20,7 @@
 
   <block wx:else>
     <view class="lead-story" data-id="{{feed.leadItem.id}}" bindtap="openFeedItem">
-      <image wx:if="{{feed.leadItem.coverFileId}}" class="lead-cover" src="{{feed.leadItem.coverFileId}}" mode="aspectFill" lazy-load="{{true}}" />
+      <image wx:if="{{feed.leadItem.visualFileId}}" class="lead-cover" src="{{feed.leadItem.visualFileId}}" mode="aspectFill" lazy-load="{{true}}" />
       <view class="story-meta">
         <text class="channel-label channel-text-{{feed.leadItem.coverTone}}">{{feed.leadItem.categoryLabel}}</text>
         <text>{{feed.leadItem.source}}</text>
@@ -43,7 +43,7 @@
       <view
         wx:for="{{feed.remainingItems}}"
         wx:key="id"
-        class="story-row {{item.coverFileId ? '' : 'story-row-no-image'}}"
+        class="story-row {{item.visualFileId ? '' : 'story-row-no-image'}}"
         data-id="{{item.id}}"
         bindtap="openFeedItem"
       >
@@ -55,7 +55,7 @@
           <view class="story-title">{{item.title}}</view>
           <view class="story-action">{{item.source}} · {{item.scoreLabel}}</view>
         </view>
-        <image wx:if="{{item.coverFileId}}" class="story-thumbnail" src="{{item.coverFileId}}" mode="aspectFill" lazy-load="{{true}}" />
+        <image wx:if="{{item.visualFileId}}" class="story-thumbnail" src="{{item.visualFileId}}" mode="aspectFill" lazy-load="{{true}}" />
       </view>
     </view>
 

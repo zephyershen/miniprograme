@@ -4,6 +4,8 @@ const { buildFeedPage } = require('../lib/feed-page');
 const { inferTopicKeys } = require('../lib/topics');
 
 function publicItem(item) {
+  const previewFileIds = Array.isArray(item.previewFileIds) ? item.previewFileIds.slice(0, 3) : [];
+  const visualFileId = item.coverFileId || previewFileIds[0] || '';
   return {
     id: item.id,
     title: item.title,
@@ -18,6 +20,9 @@ function publicItem(item) {
     channelKey: item.channelKey,
     coverTone: item.coverTone,
     coverFileId: item.coverFileId || '',
+    previewFileIds,
+    visualFileId,
+    visualKind: item.coverFileId ? 'cover' : previewFileIds.length ? 'source-preview' : '',
     topicKeys: Array.isArray(item.topicKeys) ? item.topicKeys : inferTopicKeys(item),
     score: item.score
   };
@@ -52,6 +57,8 @@ function presentFeed(cache, { stale = false, query = {}, now = Date.now() } = {}
 }
 
 function publicRelatedItem(item) {
+  const previewFileIds = Array.isArray(item.previewFileIds) ? item.previewFileIds.slice(0, 3) : [];
+  const visualFileId = item.coverFileId || previewFileIds[0] || '';
   return {
     id: item.id,
     title: item.title,
@@ -61,7 +68,10 @@ function publicRelatedItem(item) {
     categoryLabel: item.categoryLabel,
     channelKey: item.channelKey,
     coverTone: item.coverTone,
-    coverFileId: item.coverFileId || ''
+    coverFileId: item.coverFileId || '',
+    previewFileIds,
+    visualFileId,
+    visualKind: item.coverFileId ? 'cover' : previewFileIds.length ? 'source-preview' : ''
   };
 }
 

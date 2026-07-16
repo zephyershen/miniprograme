@@ -161,3 +161,12 @@
 - Sources: 本次用户决定、当前代码、67 个 Node 测试、项目检查、CloudBase 重新部署与最新/热度两组线上调用、微信开发者工具重新编译后的首页画面。
 - Sensitive handling: 未读取或记录账号、密码、令牌、OpenID 或个人数据；沿用本机现有 CloudBase 登录状态完成部署。
 - Follow-ups: 后续新增排序方式时继续保持“一个选项对应完整列表的一种明确顺序”，避免再引入隐式主稿例外。
+
+## [2026-07-16] source-preview-renderer | 缺图资讯原文截图服务上线
+
+- Session: local Codex task
+- Target pages: `wiki/index.md`, `wiki/overview.md`, `wiki/timeline.md`, `wiki/decisions/2026-07-16-source-preview-renderer.md`, `wiki/sources/2026-07-16-source-preview-deployment.md`, `wiki/secrets/index.md`, `wiki/log.md`
+- Summary: 使用用户已有公网服务器部署非 root Playwright 截图服务，经回环 Mihomo 和 Nginx 鉴权路由为无封面资讯生成最多 3 张原文页面截图；CloudBase 新增维护 action、事务合并和孤儿清理队列，小程序首页使用截图视觉，详情支持 `wx.previewImage` 多图预览。上游动态池从 108 更新为 106 后自动发现并补齐 1 条新缺口，最终 106/106 有视觉素材，其中 13 条真实封面、93 条原文截图。
+- Sources: 当前代码、服务器 systemd/Nginx/Mihomo 状态、CloudBase 部署和强制重建、云存储 220 张截图、82 个 Node 测试、项目检查、渲染器依赖审计、微信开发者工具详情及 `1/3 → 2/3` 多图预览。
+- Sensitive handling: 按用户授权将原 `docs/txserverinfo.txt` 移入被 Git 忽略的 `wiki/secrets/` 原始凭据区，并新增服务器与截图令牌元数据页；普通 Wiki 和 Git 不包含实际服务器密码或令牌，云函数部署包已验证不包含 `config.local.js`。
+- Follow-ups: 单独评估 `wx-server-sdk 4.0.2` 的传递依赖升级路径；服务器仍有系统更新并提示需要重启，后续应在维护窗口处理；迁移截图服务时必须保留代理后的私网出口阻断。

@@ -56,8 +56,11 @@ function createCoverService({ cloud, repository, fetchPublicBuffer, extractCover
       if (typeof fileID === 'string' && expected.test(fileID)) mapping.set(id, fileID);
     }
     if (!mapping.size) throw new AppError('TEMPORARY_FAILURE', '没有可登记的封面');
-    const items = cache.items.map((item) => mapping.has(item.id) ? { ...item, coverFileId: mapping.get(item.id) } : item);
-    await repository.updateItems(items, now());
+    const updatedAt = now();
+    await repository.patchItems([...mapping].map(([id, coverFileId]) => ({
+      id,
+      fields: { coverFileId }
+    })), updatedAt);
     return { registered: [...mapping.keys()] };
   }
 
@@ -69,10 +72,10 @@ function createCoverService({ cloud, repository, fetchPublicBuffer, extractCover
     if (item.coverFileId) return { id, coverFileId: item.coverFileId, cached: true };
     const coverFileId = await resolveAndUploadCover(item);
     const checkedAt = now();
-    const items = cache.items.map((entry) => entry.id === id
-      ? { ...entry, coverFileId, coverCheckedAt: checkedAt, coverStatus: coverFileId ? 'ready' : 'missing' }
-      : entry);
-    await repository.updateItems(items, checkedAt);
+    await repository.patchItems([{
+      id,
+      fields: { coverFileId, coverCheckedAt: checkedAt, coverStatus: coverFileId ? 'ready' : 'missing' }
+    }], checkedAt);
     return { id, coverFileId, cached: false };
   }
 
@@ -118,16 +121,14 @@ function createCoverService({ cloud, repository, fetchPublicBuffer, extractCover
       id: item.id,
       coverFileId: await resolveAndUploadCover(item)
     }));
-    const resultById = new Map(results.map((result) => [result.id, result.coverFileId]));
-    const items = cache.items.map((item) => resultById.has(item.id)
-      ? {
-        ...item,
-        coverFileId: resultById.get(item.id),
+    const items = await repository.patchItems(results.map((result) => ({
+      id: result.id,
+      fields: {
+        coverFileId: result.coverFileId,
         coverCheckedAt: checkedAt,
-        coverStatus: resultById.get(item.id) ? 'ready' : 'missing'
+        coverStatus: result.coverFileId ? 'ready' : 'missing'
       }
-      : item);
-    await repository.updateItems(items, checkedAt);
+    })), checkedAt);
     return {
       attempted: results.length,
       resolved: results.filter((result) => result.coverFileId).length,

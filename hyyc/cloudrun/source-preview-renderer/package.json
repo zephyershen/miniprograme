@@ -1,0 +1,15 @@
+{
+  "name": "source-preview-renderer",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "playwright": "1.61.1"
+  }
+}

@@ -2,7 +2,7 @@ const { AppError } = require('../lib/errors');
 const { toDate } = require('../lib/dates');
 const { presentFeed, presentItem } = require('../presenters/public-feed');
 
-function mergeCachedCovers(items, previous) {
+function mergeCachedVisuals(items, previous) {
   const previousById = new Map(((previous && previous.items) || []).map((item) => [item.id, item]));
   return items.map((item) => {
     const cached = previousById.get(item.id);
@@ -10,12 +10,59 @@ function mergeCachedCovers(items, previous) {
       ...item,
       coverFileId: (cached && cached.coverFileId) || '',
       coverCheckedAt: (cached && cached.coverCheckedAt) || null,
-      coverStatus: (cached && cached.coverStatus) || ''
+      coverStatus: (cached && cached.coverStatus) || '',
+      previewFileIds: (cached && Array.isArray(cached.previewFileIds) && cached.previewFileIds) || [],
+      previewCheckedAt: (cached && cached.previewCheckedAt) || null,
+      previewStatus: (cached && cached.previewStatus) || ''
     };
   });
 }
 
-function createFeedService({ repository, source, cacheConfig, now = () => Date.now(), logger = console }) {
+function visualFileIds(document, ownedPrefixes) {
+  const fileIds = new Set();
+  const owned = (Array.isArray(ownedPrefixes) ? ownedPrefixes : [])
+    .filter((prefix) => typeof prefix === 'string' && prefix.startsWith('cloud://'));
+  const addOwned = (fileId) => {
+    if (typeof fileId === 'string' && owned.some((prefix) => fileId.startsWith(prefix))) fileIds.add(fileId);
+  };
+  for (const item of ((document && document.items) || [])) {
+    addOwned(item.coverFileId);
+    for (const fileId of (Array.isArray(item.previewFileIds) ? item.previewFileIds : [])) addOwned(fileId);
+  }
+  return fileIds;
+}
+
+function orphanedVisualFileIds(previous, current, ownedPrefixes) {
+  const active = visualFileIds(current, ownedPrefixes);
+  return [...visualFileIds(previous, ownedPrefixes)].filter((fileId) => !active.has(fileId));
+}
+
+function prepareRefreshedDocument(next, previous, ownedPrefixes) {
+  const current = {
+    ...next,
+    items: mergeCachedVisuals(next.items || [], previous)
+  };
+  const active = visualFileIds(current, ownedPrefixes);
+  const owned = (Array.isArray(ownedPrefixes) ? ownedPrefixes : [])
+    .filter((prefix) => typeof prefix === 'string' && prefix.startsWith('cloud://'));
+  const pending = new Set(
+    ((previous && previous.pendingVisualDeletes) || [])
+      .filter((fileId) => typeof fileId === 'string' && owned.some((prefix) => fileId.startsWith(prefix)))
+  );
+  for (const fileId of orphanedVisualFileIds(previous, current, ownedPrefixes)) pending.add(fileId);
+  for (const fileId of active) pending.delete(fileId);
+  return { ...current, pendingVisualDeletes: [...pending] };
+}
+
+function createFeedService({
+  repository,
+  source,
+  cacheConfig,
+  ownedVisualPrefixes = [],
+  deleteFiles = null,
+  now = () => Date.now(),
+  logger = console
+}) {
   let refreshPromise = null;
 
   function cacheAge(cache, currentTime) {
@@ -23,22 +70,45 @@ function createFeedService({ repository, source, cacheConfig, now = () => Date.n
     return fetchedAt ? currentTime - fetchedAt.getTime() : Number.POSITIVE_INFINITY;
   }
 
+  async function drainPendingVisualDeletes(current) {
+    const owned = (Array.isArray(ownedVisualPrefixes) ? ownedVisualPrefixes : [])
+      .filter((prefix) => typeof prefix === 'string' && prefix.startsWith('cloud://'));
+    const pendingVisualDeletes = (Array.isArray(current.pendingVisualDeletes) ? current.pendingVisualDeletes : [])
+      .filter((fileId) => typeof fileId === 'string' && owned.some((prefix) => fileId.startsWith(prefix)));
+    if (typeof deleteFiles !== 'function') return current;
+    for (let offset = 0; offset < pendingVisualDeletes.length; offset += 50) {
+      const batch = pendingVisualDeletes.slice(offset, offset + 50);
+      try {
+        await deleteFiles(batch);
+        await repository.acknowledgeVisualDeletes(batch, new Date(now()));
+      } catch (error) {
+        logger.warn('Unused feed visuals could not be deleted', { message: error && error.message });
+        break;
+      }
+    }
+    return current;
+  }
+
   async function refreshCache(previous) {
     const response = await source.loadSelected(previous && previous.etag);
     const refreshedAt = new Date(now());
     if (response.notModified && previous) {
       await repository.touch(refreshedAt);
-      return { ...previous, fetchedAt: refreshedAt, updatedAt: refreshedAt };
+      return drainPendingVisualDeletes({ ...previous, fetchedAt: refreshedAt, updatedAt: refreshedAt });
     }
     const document = {
       provider: source.provider,
       etag: response.etag,
       fetchedAt: refreshedAt,
-      items: mergeCachedCovers(response.items, previous),
+      items: response.items,
       updatedAt: refreshedAt
     };
-    await repository.set(document);
-    return document;
+    const persisted = await repository.replace(
+      document,
+      (next, latest) => prepareRefreshedDocument(next, latest, ownedVisualPrefixes)
+    );
+    const current = persisted.document || persisted;
+    return drainPendingVisualDeletes(current);
   }
 
   async function getFeed(query = {}) {
@@ -75,4 +145,9 @@ function createFeedService({ repository, source, cacheConfig, now = () => Date.n
   return { getFeed, getItem };
 }
 
-module.exports = { createFeedService, mergeCachedCovers };
+module.exports = {
+  createFeedService,
+  mergeCachedVisuals,
+  orphanedVisualFileIds,
+  prepareRefreshedDocument
+};

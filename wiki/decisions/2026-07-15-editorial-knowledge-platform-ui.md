@@ -2,9 +2,9 @@
 title: "采用编辑索引式知识平台首页"
 type: decision
 tags: [decision, product, ui, editorial-index, knowledge-platform]
-sources: [../sources/2026-07-15-editorial-ui-implementation.md, ../sources/2026-07-15-aihot-feed-integration.md]
+sources: [../sources/2026-07-15-editorial-ui-implementation.md, ../sources/2026-07-15-aihot-feed-integration.md, 2026-07-16-source-preview-renderer.md]
 date: 2026-07-15
-last_updated: 2026-07-15
+last_updated: 2026-07-16
 status: accepted
 confidence: high
 ---
@@ -32,7 +32,7 @@ confidence: high
 - 频道包括精选、AI 前沿、科技、娱乐、社会、游戏和英语；频道色只用于识别。
 - 首页直接从频道导航和公共资讯流开始，不显示总标题说明、设置入口、待处理数量、导入按钮、关注方向提示或个人队列。
 - 用户界面保持来源中立，不显示聚合平台名称、接口、缓存或规范链接等实现信息；只显示资讯原发布方和原文链接。
-- 所有已缓存资讯都进入公开列表：有真实原文图片时显示图片，没有图片时使用纯文字编辑行，不生成或绘制分类几何封面，也不保留空白图片占位。
+- 所有已缓存资讯都进入公开列表：真实原文图片优先；没有封面时使用受控原文页面截图。不得生成与原文无关的分类几何封面或 AI 配图，也不保留空白图片占位。
 - 频道导航下提供非卡片式筛选入口，支持 24 小时、近 3 天、近 7 天，以及公司与模型、技术方向的组合筛选；每个选项显示当前资讯数量，没有结果的选项弱化且不可选。
 - 默认“近 7 天”代表完整上游精选池，不因单条时间格式或封面状态再次排除内容。
 - 首条内容作为大图主稿，其余内容使用左文右图的细线列表；收藏、阅读详情和设置页共享同一编辑视觉系统。
@@ -57,4 +57,5 @@ confidence: high
 
 ## 已被替代的细节
 
-- “无真实图片的条目暂不展示”已于 2026-07-15 被用户明确 `superseded`。当前规则是不生成假图，但无图资讯必须以纯文字形式继续展示。
+- “无真实图片的条目暂不展示”已于 2026-07-15 被用户明确 `superseded`。
+- “无图资讯固定使用纯文字编辑行”已于 2026-07-16 被 [缺图资讯使用受控原文页面截图](2026-07-16-source-preview-renderer.md) `superseded`；截图临时失败时仍可降级为文字，不能再次隐藏资讯。

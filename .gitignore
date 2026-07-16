@@ -15,3 +15,6 @@ hyyc/cloudfunctions/**/*.key
 
 # Wiki secrets are intentionally local-only.
 wiki/secrets/
+
+# Local infrastructure handoff files may contain credentials.
+docs/txserverinfo.txt

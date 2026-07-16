@@ -67,6 +67,29 @@
   background: #e1ded7;
 }
 
+.source-preview {
+  overflow: hidden;
+  margin-top: 30rpx;
+  border: 1rpx solid var(--editorial-rule);
+  background: #ffffff;
+}
+
+.source-preview-image {
+  display: block;
+  width: 100%;
+}
+
+.source-preview-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 22rpx;
+  border-top: 1rpx solid var(--editorial-rule);
+  color: var(--editorial-blue);
+  font-size: 20rpx;
+  font-weight: 750;
+}
+
 .quick-read {
   margin-top: 28rpx;
   padding: 30rpx 28rpx 34rpx;

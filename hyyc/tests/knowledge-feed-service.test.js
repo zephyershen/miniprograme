@@ -34,9 +34,13 @@ function feedItem(overrides = {}) {
 function repositoryWith(cache) {
   return {
     get: async () => cache,
-    set: async () => {},
+    replace: async (data, prepareDocument) => ({
+      document: prepareDocument(data, cache),
+      previous: cache
+    }),
     touch: async () => {},
-    updateItems: async () => {}
+    patchItems: async () => (cache && cache.items) || [],
+    acknowledgeVisualDeletes: async () => []
   };
 }
 
@@ -59,6 +63,25 @@ test('serves the existing public feed contract through the feed service boundary
   assert.equal(result.items[0].coverStatus, undefined);
 });
 
+test('uses a source preview as the public visual without pretending it is an original cover', async () => {
+  const previewFileId = 'cloud://env.bucket/knowledge-previews/source/item0001-1.jpg';
+  const cache = {
+    fetchedAt: new Date(NOW - 1000),
+    items: [feedItem({ previewFileIds: [previewFileId], previewStatus: 'ready' })]
+  };
+  const service = createFeedService({
+    repository: repositoryWith(cache),
+    source: { provider: 'test', loadSelected: async () => { throw new Error('should not refresh'); } },
+    cacheConfig: CACHE_CONFIG,
+    now: () => NOW
+  });
+  const result = await service.getFeed({ filters: { time: '7d' } });
+  assert.equal(result.items[0].coverFileId, '');
+  assert.equal(result.items[0].visualFileId, previewFileId);
+  assert.equal(result.items[0].visualKind, 'source-preview');
+  assert.equal(result.items[0].previewStatus, undefined);
+});
+
 test('returns stale cached content when source refresh fails', async () => {
   const cache = { fetchedAt: new Date(NOW - 60 * 60 * 1000), items: [feedItem()] };
   const service = createFeedService({
@@ -71,6 +94,105 @@ test('returns stale cached content when source refresh fails', async () => {
   const result = await service.getFeed({ filters: { time: '7d' } });
   assert.equal(result.stale, true);
   assert.equal(result.items.length, 1);
+});
+
+test('merges visual fields from the latest transaction snapshot during a feed refresh', async () => {
+  const staleCache = {
+    fetchedAt: new Date(NOW - 60 * 60 * 1000),
+    items: [feedItem({ previewFileIds: [] })]
+  };
+  const previewFileId = 'cloud://env.bucket/knowledge-previews/source/item0001-1.jpg';
+  const latestCache = {
+    ...staleCache,
+    items: [feedItem({ previewFileIds: [previewFileId], previewStatus: 'ready' })]
+  };
+  const repository = {
+    get: async () => staleCache,
+    touch: async () => {},
+    replace: async (data, prepareDocument) => ({
+      document: prepareDocument(data, latestCache),
+      previous: latestCache
+    }),
+    acknowledgeVisualDeletes: async () => []
+  };
+  const service = createFeedService({
+    repository,
+    source: {
+      provider: 'test',
+      loadSelected: async () => ({ etag: 'new', items: [feedItem({ title: '刷新后的标题' })] })
+    },
+    cacheConfig: CACHE_CONFIG,
+    now: () => NOW
+  });
+  const result = await service.getFeed({ filters: { time: '7d' } });
+  assert.equal(result.items[0].title, '刷新后的标题');
+  assert.equal(result.items[0].visualFileId, previewFileId);
+});
+
+test('deletes only orphaned visuals owned by the knowledge feed after refresh', async () => {
+  const coverPrefix = 'cloud://env.bucket/knowledge-covers/';
+  const previewPrefix = 'cloud://env.bucket/knowledge-previews/source/';
+  const retainedPreview = `${previewPrefix}item0001-1.jpg`;
+  const orphanedCover = `${coverPrefix}removed01.jpg`;
+  const orphanedPreview = `${previewPrefix}removed01-1.jpg`;
+  const foreignFile = 'cloud://env.bucket/user-uploads/avatar.jpg';
+  const cache = {
+    fetchedAt: new Date(NOW - 60 * 60 * 1000),
+    items: [
+      feedItem({ previewFileIds: [retainedPreview] }),
+      feedItem({
+        id: 'removed01',
+        coverFileId: orphanedCover,
+        previewFileIds: [orphanedPreview, foreignFile]
+      })
+    ]
+  };
+  const deleted = [];
+  const acknowledged = [];
+  const repository = repositoryWith(cache);
+  repository.acknowledgeVisualDeletes = async (fileIds) => acknowledged.push(...fileIds);
+  const service = createFeedService({
+    repository,
+    source: {
+      provider: 'test',
+      loadSelected: async () => ({ etag: 'new', items: [feedItem()] })
+    },
+    cacheConfig: CACHE_CONFIG,
+    ownedVisualPrefixes: [coverPrefix, previewPrefix],
+    deleteFiles: async (fileIds) => deleted.push(...fileIds),
+    now: () => NOW
+  });
+  await service.getFeed({ filters: { time: '7d' } });
+  assert.deepEqual(deleted.sort(), [orphanedCover, orphanedPreview].sort());
+  assert.equal(deleted.includes(retainedPreview), false);
+  assert.equal(deleted.includes(foreignFile), false);
+  assert.deepEqual(acknowledged.sort(), deleted.sort());
+});
+
+test('retries the persisted visual cleanup queue on a not-modified refresh', async () => {
+  const previewPrefix = 'cloud://env.bucket/knowledge-previews/source/';
+  const pending = `${previewPrefix}old-item-1.jpg`;
+  const foreign = 'cloud://env.bucket/user-uploads/avatar.jpg';
+  const cache = {
+    fetchedAt: new Date(NOW - 60 * 60 * 1000),
+    items: [feedItem()],
+    pendingVisualDeletes: [pending, foreign]
+  };
+  const deleted = [];
+  const acknowledged = [];
+  const repository = repositoryWith(cache);
+  repository.acknowledgeVisualDeletes = async (fileIds) => acknowledged.push(...fileIds);
+  const service = createFeedService({
+    repository,
+    source: { provider: 'test', loadSelected: async () => ({ notModified: true }) },
+    cacheConfig: CACHE_CONFIG,
+    ownedVisualPrefixes: [previewPrefix],
+    deleteFiles: async (fileIds) => deleted.push(...fileIds),
+    now: () => NOW
+  });
+  await service.getFeed({ filters: { time: '7d' } });
+  assert.deepEqual(deleted, [pending]);
+  assert.deepEqual(acknowledged, [pending]);
 });
 
 test('fails with the stable public error when no cache or source is available', async () => {
