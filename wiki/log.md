@@ -107,3 +107,12 @@
 - Sources: 本次用户要求、当前代码、55 个 Node 测试、静态检查、CloudBase 部署与三次线上函数调用、微信开发者工具模拟器画面。
 - Sensitive handling: 未读取、记录或新增账号、密码、令牌、代理地址或个人数据；沿用现有本机 CloudBase 登录状态完成部署。
 - Follow-ups: 暂不建设公网代理；后续按具体来源做可用性监控，只有官方接口与公开源确实无法稳定访问时再单独评估合规采集节点。
+
+## [2026-07-16] feed-sort | 新增最新与热度排序并保持筛选分页
+
+- Session: local Codex task
+- Target pages: `wiki/index.md`, `wiki/overview.md`, `wiki/sources/2026-07-15-aihot-feed-integration.md`, `wiki/log.md`, `README.md`
+- Summary: 将默认资讯顺序明确为发布时间从新到旧，新增热度从高到低排序；两种顺序都在频道和时间、公司/模型、技术方向筛选之后执行，再按 8 条一页下发。切换排序时从第一页重载，同热度按发布时间倒序。
+- Sources: 本次用户要求、当前代码、57 个 Node 测试、静态检查、CloudBase 部署以及最新、热度近 7 天、热度近 24 小时三组线上函数调用。
+- Sensitive handling: 未读取、记录或新增账号、密码、令牌、代理地址或个人数据；沿用现有本机 CloudBase 登录状态完成部署。
+- Follow-ups: 当前热度使用上游编辑热度值；若未来需要反映小程序用户行为，应另行设计合规的浏览、停留和收藏统计口径。

@@ -96,6 +96,7 @@ function publicFeed(cache, stale = false, query = {}) {
     offset: page.query.offset,
     nextOffset: page.nextOffset,
     limit: page.query.limit,
+    sort: page.query.sort,
     hasMore: page.hasMore,
     items: page.items.map(publicItem),
     facets: page.query.offset === 0 ? allItems.map(publicFacet) : undefined

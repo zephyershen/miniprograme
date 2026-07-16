@@ -14,10 +14,23 @@ const FILTER_OPTIONS = Object.freeze({
   company: COMPANY_FILTERS,
   direction: DIRECTION_FILTERS
 });
+const SORT_OPTIONS = Object.freeze([
+  { key: 'latest', label: '最新', hint: '时间从新到旧' },
+  { key: 'hot', label: '热度', hint: '热度从高到低' }
+]);
 const PAGE_SIZE = 8;
 
 function copyFilters(filters = DEFAULT_FEED_FILTERS) {
   return { time: filters.time, company: filters.company, direction: filters.direction };
+}
+
+function decorateSortOptions(activeSort) {
+  return SORT_OPTIONS.map((option) => ({ ...option, active: option.key === activeSort }));
+}
+
+function sortHint(activeSort) {
+  const option = SORT_OPTIONS.find((entry) => entry.key === activeSort);
+  return option ? option.hint : SORT_OPTIONS[0].hint;
 }
 
 function formatFeedDate(value) {
@@ -96,6 +109,9 @@ Page({
     loadingMore: false,
     loadMoreError: '',
     activeChannel: 'all',
+    sortMode: 'latest',
+    sortOptions: decorateSortOptions('latest'),
+    sortHint: sortHint('latest'),
     feedError: '',
     filters: copyFilters(),
     draftFilters: copyFilters(),
@@ -122,6 +138,7 @@ Page({
     const requestId = (this.feedRequestId || 0) + 1;
     this.feedRequestId = requestId;
     const activeChannel = this.data.activeChannel;
+    const sort = this.data.sortMode;
     const filters = copyFilters(this.data.filters);
     this.loadedItems = [];
     this.setData({ loading: true, loadingMore: false, loadMoreError: '', feedError: '' });
@@ -131,6 +148,7 @@ Page({
         offset: 0,
         limit: PAGE_SIZE,
         channel: activeChannel,
+        sort,
         filters
       });
       if (requestId !== this.feedRequestId) return;
@@ -151,6 +169,7 @@ Page({
     if (this.data.loading || this.data.loadingMore || this.data.filterOpen || !this.data.feed.hasMore) return;
     const requestId = this.feedRequestId;
     const activeChannel = this.data.activeChannel;
+    const sort = this.data.sortMode;
     const filters = copyFilters(this.data.filters);
     const offset = Number(this.rawFeed && this.rawFeed.nextOffset) || this.loadedItems.length;
     this.setData({ loadingMore: true, loadMoreError: '' });
@@ -159,6 +178,7 @@ Page({
         offset,
         limit: PAGE_SIZE,
         channel: activeChannel,
+        sort,
         filters
       });
       if (requestId !== this.feedRequestId) return;
@@ -193,6 +213,16 @@ Page({
     const key = event.currentTarget.dataset.key;
     if (!key || key === this.data.activeChannel) return;
     this.setData({ activeChannel: key }, () => this.loadFeed(false));
+  },
+
+  selectSort(event) {
+    const sortMode = event.currentTarget.dataset.key;
+    if (!SORT_OPTIONS.some((option) => option.key === sortMode) || sortMode === this.data.sortMode) return;
+    this.setData({
+      sortMode,
+      sortOptions: decorateSortOptions(sortMode),
+      sortHint: sortHint(sortMode)
+    }, () => this.loadFeed(false));
   },
 
   retryFeed() {

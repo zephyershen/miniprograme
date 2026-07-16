@@ -8,6 +8,7 @@ const TIME_WINDOWS = Object.freeze({
   '7d': 7 * 24 * 60 * 60 * 1000
 });
 const CHANNEL_KEYS = new Set(['all', 'ai', 'tech', 'entertainment', 'society', 'games', 'english']);
+const SORT_KEYS = new Set(['latest', 'hot']);
 const COMPANY_KEYS = new Set(['all', ...TOPIC_RULES
   .map((rule) => rule.key)
   .filter((key) => key.startsWith('company:'))]);
@@ -31,12 +32,38 @@ function normalizeFeedQuery(input = {}) {
     offset: boundedInteger(input.offset, 0, 0, 10000),
     limit: boundedInteger(input.limit, DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE),
     channel: allowedValue(input.channel, CHANNEL_KEYS, 'all'),
+    sort: allowedValue(input.sort, SORT_KEYS, 'latest'),
     filters: {
       time: allowedValue(filters.time, new Set(Object.keys(TIME_WINDOWS)), '7d'),
       company: allowedValue(filters.company, COMPANY_KEYS, 'all'),
       direction: allowedValue(filters.direction, DIRECTION_KEYS, 'all')
     }
   };
+}
+
+function timestamp(value) {
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
+}
+
+function score(value) {
+  if (value === null || value === undefined || value === '') return Number.NEGATIVE_INFINITY;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
+}
+
+function sortFeedItems(items, sort) {
+  return items
+    .map((item, originalIndex) => ({ item, originalIndex }))
+    .sort((left, right) => {
+      if (sort === 'hot') {
+        const scoreDifference = score(right.item.score) - score(left.item.score);
+        if (scoreDifference) return scoreDifference;
+      }
+      const timeDifference = timestamp(right.item.publishedAt) - timestamp(left.item.publishedAt);
+      return timeDifference || left.originalIndex - right.originalIndex;
+    })
+    .map(({ item }) => item);
 }
 
 function hasTopic(item, key) {
@@ -56,9 +83,10 @@ function matchesFilters(item, filters, now) {
 function buildFeedPage(items, input = {}, now = Date.now()) {
   const query = normalizeFeedQuery(input);
   const filtered = (items || []).filter((item) => matchesFilters(item, query.filters, now));
-  const results = query.channel === 'all'
+  const channelItems = query.channel === 'all'
     ? filtered
     : filtered.filter((item) => item.channelKey === query.channel);
+  const results = sortFeedItems(channelItems, query.sort);
   const pageItems = results.slice(query.offset, query.offset + query.limit);
   const nextOffset = query.offset + pageItems.length;
   return {
@@ -74,5 +102,6 @@ module.exports = {
   DEFAULT_PAGE_SIZE,
   MAX_PAGE_SIZE,
   normalizeFeedQuery,
+  sortFeedItems,
   buildFeedPage
 };

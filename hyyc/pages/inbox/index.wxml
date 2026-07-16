@@ -25,6 +25,20 @@
     </view>
   </view>
 
+  <view class="sort-bar">
+    <text class="sort-bar-label">排序</text>
+    <view class="sort-choice-track">
+      <view
+        wx:for="{{sortOptions}}"
+        wx:key="key"
+        class="sort-choice {{item.active ? 'sort-choice-active' : ''}}"
+        data-key="{{item.key}}"
+        bindtap="selectSort"
+      >{{item.label}}</view>
+    </view>
+    <text class="sort-bar-hint">{{sortHint}}</text>
+  </view>
+
   <view wx:if="{{loading}}" class="loading-editorial">
     <view class="loading-media"></view>
     <view class="loading-line loading-line-strong"></view>

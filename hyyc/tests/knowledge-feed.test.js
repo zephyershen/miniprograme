@@ -110,17 +110,44 @@ test('paginates after applying channel and topic filters', () => {
   assert.equal(page.resultCount, 1);
 });
 
+test('sorts latest items explicitly instead of trusting upstream order', () => {
+  const items = [
+    { id: 'older', publishedAt: '2026-07-14T01:00:00.000Z', channelKey: 'ai', topicKeys: [], score: 99 },
+    { id: 'newest', publishedAt: '2026-07-16T01:00:00.000Z', channelKey: 'ai', topicKeys: [], score: 60 },
+    { id: 'middle', publishedAt: '2026-07-15T01:00:00.000Z', channelKey: 'ai', topicKeys: [], score: 80 }
+  ];
+  const page = buildFeedPage(items, { sort: 'latest', filters: { time: '7d' } });
+  assert.deepEqual(page.items.map((item) => item.id), ['newest', 'middle', 'older']);
+});
+
+test('applies the time filter before sorting by heat', () => {
+  const items = [
+    { id: 'expired-hot', publishedAt: '2026-07-14T01:00:00.000Z', channelKey: 'ai', topicKeys: [], score: 100 },
+    { id: 'recent-warm', publishedAt: '2026-07-15T23:00:00.000Z', channelKey: 'ai', topicKeys: [], score: 70 },
+    { id: 'recent-hot-old', publishedAt: '2026-07-15T21:00:00.000Z', channelKey: 'ai', topicKeys: [], score: 90 },
+    { id: 'recent-hot-new', publishedAt: '2026-07-15T22:00:00.000Z', channelKey: 'ai', topicKeys: [], score: 90 }
+  ];
+  const page = buildFeedPage(items, {
+    sort: 'hot',
+    filters: { time: '1d', company: 'all', direction: 'all' }
+  }, Date.parse('2026-07-16T01:00:00.000Z'));
+  assert.deepEqual(page.items.map((item) => item.id), ['recent-hot-new', 'recent-hot-old', 'recent-warm']);
+  assert.equal(page.resultCount, 3);
+});
+
 test('normalizes malformed pagination input to safe defaults', () => {
   const query = normalizeFeedQuery({
     offset: -10,
     limit: 999,
     channel: 'unknown',
+    sort: 'unknown',
     filters: { time: 'forever', company: 'company:unknown', direction: 'direction:unknown' }
   });
   assert.deepEqual(query, {
     offset: 0,
     limit: 20,
     channel: 'all',
+    sort: 'latest',
     filters: { time: '7d', company: 'all', direction: 'all' }
   });
 });
