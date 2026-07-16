@@ -11,7 +11,10 @@ const {
 test('creates one stable initial state for the knowledge feed page', () => {
   const state = createInitialListState();
   assert.equal(state.activeChannel, 'all');
-  assert.equal(state.sortMode, 'latest');
+  assert.equal(state.sortMode, 'hot');
+  assert.equal(state.sortHint, '热度从高到低');
+  assert.equal(state.sortOptions[0].key, 'hot');
+  assert.equal(state.sortOptions[0].active, true);
   assert.deepEqual(state.filters, { time: '7d', company: 'all', direction: 'all' });
   assert.equal(state.feed.visibleItems.length, 0);
 });

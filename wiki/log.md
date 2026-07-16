@@ -134,3 +134,12 @@
 - Sources: 用户截图、当前代码、66 个 Node 测试、项目检查、微信开发者工具首页和详情实机模拟器验证。
 - Sensitive handling: 未读取或记录账号、密码、令牌、OpenID 或个人数据；未访问 `wiki/secrets/`。
 - Follow-ups: 后续客户端模块重构必须同时通过 Node 测试、`npm run check` 与微信开发者工具普通编译；Node smoke test 不再单独作为运行时兼容证据。
+
+## [2026-07-16] default-hot-feed | 首页默认优先展示高热度资讯
+
+- Session: local Codex task
+- Target pages: `README.md`, `wiki/overview.md`, `wiki/sources/2026-07-15-aihot-feed-integration.md`, `wiki/log.md`
+- Summary: 按用户对首屏吸引力的要求，将首页默认排序从“最新”改为“热度”，并把热度入口置于排序选项首位；频道与时间、公司/模型、技术方向筛选仍先于排序执行，同热度继续按发布时间倒序，用户仍可手动切换“最新”。
+- Sources: 本次用户要求、当前代码、67 个 Node 测试、项目检查、CloudBase 部署与默认参数线上调用、微信开发者工具重新编译后的首页画面。
+- Sensitive handling: 未读取或记录账号、密码、令牌、OpenID 或个人数据；沿用本机现有 CloudBase 登录状态完成部署。
+- Follow-ups: 当前热度仍使用上游编辑热度值；未来如引入小程序内行为热度，需要另行定义合规的浏览、停留、收藏权重和防刷机制。

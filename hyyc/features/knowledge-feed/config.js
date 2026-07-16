@@ -42,12 +42,12 @@ const DIRECTION_FILTERS = Object.freeze([
 ]);
 
 const SORT_OPTIONS = Object.freeze([
-  { key: 'latest', label: '最新', hint: '时间从新到旧' },
-  { key: 'hot', label: '热度', hint: '热度从高到低' }
+  { key: 'hot', label: '热度', hint: '热度从高到低' },
+  { key: 'latest', label: '最新', hint: '时间从新到旧' }
 ]);
 
 const DEFAULT_FEED_FILTERS = Object.freeze({ time: '7d', company: 'all', direction: 'all' });
-const DEFAULT_SORT = 'latest';
+const DEFAULT_SORT = 'hot';
 const PAGE_SIZE = 8;
 
 module.exports = {

@@ -120,6 +120,17 @@ test('sorts latest items explicitly instead of trusting upstream order', () => {
   assert.deepEqual(page.items.map((item) => item.id), ['newest', 'middle', 'older']);
 });
 
+test('uses heat as the default feed order and time as the tie-breaker', () => {
+  const items = [
+    { id: 'newest-warm', publishedAt: '2026-07-16T01:00:00.000Z', channelKey: 'ai', topicKeys: [], score: 70 },
+    { id: 'hot-older', publishedAt: '2026-07-15T01:00:00.000Z', channelKey: 'ai', topicKeys: [], score: 90 },
+    { id: 'hot-newer', publishedAt: '2026-07-15T02:00:00.000Z', channelKey: 'ai', topicKeys: [], score: 90 }
+  ];
+  const page = buildFeedPage(items, { filters: { time: '7d' } });
+  assert.equal(page.query.sort, 'hot');
+  assert.deepEqual(page.items.map((item) => item.id), ['hot-newer', 'hot-older', 'newest-warm']);
+});
+
 test('applies the time filter before sorting by heat', () => {
   const items = [
     { id: 'expired-hot', publishedAt: '2026-07-14T01:00:00.000Z', channelKey: 'ai', topicKeys: [], score: 100 },
@@ -147,7 +158,7 @@ test('normalizes malformed pagination input to safe defaults', () => {
     offset: 0,
     limit: 20,
     channel: 'all',
-    sort: 'latest',
+    sort: 'hot',
     filters: { time: '7d', company: 'all', direction: 'all' }
   });
 });

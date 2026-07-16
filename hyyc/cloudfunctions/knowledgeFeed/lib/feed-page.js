@@ -32,7 +32,7 @@ function normalizeFeedQuery(input = {}) {
     offset: boundedInteger(input.offset, 0, 0, 10000),
     limit: boundedInteger(input.limit, DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE),
     channel: allowedValue(input.channel, CHANNEL_KEYS, 'all'),
-    sort: allowedValue(input.sort, SORT_KEYS, 'latest'),
+    sort: allowedValue(input.sort, SORT_KEYS, 'hot'),
     filters: {
       time: allowedValue(filters.time, new Set(Object.keys(TIME_WINDOWS)), '7d'),
       company: allowedValue(filters.company, COMPANY_KEYS, 'all'),
