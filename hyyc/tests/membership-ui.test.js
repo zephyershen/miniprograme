@@ -6,6 +6,7 @@ const {
   normalizeMembershipAccess,
   canUseFeature
 } = require('../features/membership/access');
+const { membershipPresentation } = require('../features/membership/presentation');
 const { createFilterDraftState, decorateFeed } = require('../features/knowledge-feed/list-model');
 const { normalizeBriefing, filterBriefing } = require('../features/briefing/model');
 const { BRIEFING_SAMPLE } = require('../features/briefing/sample');
@@ -33,6 +34,28 @@ test('normalizes the free, Pro and administrator capability matrix', () => {
   assert.deepEqual(admin.entitlements.history, { mode: 'all' });
   assert.equal(admin.access.defaultTimeKey, 'all');
   assert.equal(canUseFeature(admin, 'digest_24h'), true);
+});
+
+test('keeps administrator role-preview controls visible while rendering effective free or Pro access', () => {
+  const freePreview = membershipPresentation(normalizeMembershipAccess({
+    viewer: {
+      role: 'free', actualRole: 'admin', canPreviewRoles: true,
+      previewRole: 'free', isRolePreview: true
+    }
+  }));
+  assert.equal(freePreview.roleLabel, '普通用户');
+  assert.equal(freePreview.canPreviewRoles, true);
+  assert.equal(freePreview.isRolePreview, true);
+  assert.equal(freePreview.roleOptions.find((item) => item.key === 'free').active, true);
+
+  const memberPreview = membershipPresentation(normalizeMembershipAccess({
+    viewer: {
+      role: 'member', actualRole: 'admin', canPreviewRoles: true,
+      previewRole: 'member', isRolePreview: true
+    }
+  }));
+  assert.equal(memberPreview.isPrivileged, true);
+  assert.equal(memberPreview.roleOptions.find((item) => item.key === 'member').active, true);
 });
 
 test('shows a locked 30-day choice to free users without exposing a count', () => {
@@ -75,6 +98,8 @@ test('renders four native tabs and never shows price or a payment button during 
   assert.deepEqual(app.tabBar.list.map((item) => item.text), ['资讯', '精选', '简报', '我的']);
   const profile = fs.readFileSync(path.resolve(__dirname, '../pages/profile/index.wxml'), 'utf8');
   assert.match(profile, /会员能力内测中/);
+  assert.match(profile, /管理员测试工具/);
+  assert.match(profile, /bindtap="selectRolePreview"/);
   assert.doesNotMatch(profile, /立即支付|购买会员|¥|￥/);
 });
 

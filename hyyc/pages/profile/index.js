@@ -1,4 +1,7 @@
-const { refreshMembershipAccess } = require('../../features/membership/session.js');
+const {
+  refreshMembershipAccess,
+  changeMembershipRolePreview
+} = require('../../features/membership/session.js');
 const { membershipPresentation } = require('../../features/membership/presentation.js');
 
 function coveragePresentation(access) {
@@ -16,6 +19,8 @@ function coveragePresentation(access) {
 Page({
   data: {
     loading: true,
+    roleSwitching: false,
+    switchingRole: '',
     error: '',
     membership: membershipPresentation(null),
     coverage: coveragePresentation(null)
@@ -40,6 +45,26 @@ Page({
       });
     } catch (error) {
       this.setData({ loading: false, error: error.message || '身份状态暂时无法加载' });
+    }
+  },
+
+  async selectRolePreview(event) {
+    const role = event.currentTarget.dataset.role;
+    if (this.data.roleSwitching || !this.data.membership.canPreviewRoles
+      || !this.data.membership.roleOptions.some((item) => item.key === role)
+      || role === this.data.membership.role) return;
+    this.setData({ roleSwitching: true, switchingRole: role });
+    try {
+      const access = await changeMembershipRolePreview(role);
+      this.setData({
+        membership: membershipPresentation(access),
+        coverage: coveragePresentation(access)
+      });
+      wx.showToast({ title: '预览身份已切换', icon: 'success' });
+    } catch (error) {
+      wx.showToast({ title: error.message || '切换失败', icon: 'none' });
+    } finally {
+      this.setData({ roleSwitching: false, switchingRole: '' });
     }
   },
 

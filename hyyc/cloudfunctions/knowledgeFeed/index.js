@@ -51,6 +51,7 @@ const { createDigestGenerationService } = require('./services/digest-generation-
 const { createFeedAnalysisWorkerService } = require('./services/feed-analysis-worker-service');
 const { createAllFeedSyncService } = require('./services/all-feed-sync-service');
 const { createFeedVisualWorkerService } = require('./services/feed-visual-worker-service');
+const { createRolePreviewService } = require('./services/role-preview-service');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
@@ -136,6 +137,7 @@ const entitlementService = createFeedEntitlementService({
   config: ITEM_STORE_CONFIG,
   featureFlags: MEMBERSHIP_FEATURE_FLAGS
 });
+const rolePreviewService = createRolePreviewService({ accessRepository });
 const itemFeedQueryService = createItemFeedQueryService({
   itemRepository,
   dayIndexRepository,
@@ -211,14 +213,19 @@ async function coverageFor(entitlement) {
   }
 }
 
-async function resolveEntitlement() {
-  const entitlement = await entitlementService.resolve(actorService.resolve());
+async function resolveEntitlement(actor = null) {
+  const entitlement = await entitlementService.resolve(actor || actorService.resolve());
   const coverage = await coverageFor(entitlement);
   return { ...entitlement, coverage };
 }
 
 const ACTION_HANDLERS = Object.freeze({
   entitlements: async () => resolveEntitlement(),
+  setRolePreview: async (event) => {
+    const actor = actorService.resolve();
+    await rolePreviewService.set(actor, event.role);
+    return resolveEntitlement(actor);
+  },
   feed: async (event) => {
     const entitlement = await resolveEntitlement();
     return event.mode === 'curated'

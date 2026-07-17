@@ -1,9 +1,10 @@
-const { getMembershipStatus } = require('./api.js');
+const { getMembershipStatus, setMembershipRolePreview } = require('./api.js');
 const { normalizeMembershipAccess } = require('./access.js');
 
 const CACHE_MS = 10 * 1000;
 let pending = null;
 let cachedAt = 0;
+let revision = 0;
 
 function appInstance() {
   try {
@@ -25,28 +26,49 @@ async function refreshMembershipAccess({ force = false } = {}) {
   if (!force && cached && Date.now() - cachedAt < CACHE_MS) return cached;
   if (pending) return pending;
   pending = getMembershipStatus()
-    .then((raw) => {
-      const normalized = normalizeMembershipAccess(raw);
-      const app = appInstance();
-      if (app && app.globalData) {
-        const previous = app.globalData.membership
-          ? normalizeMembershipAccess(app.globalData.membership)
-          : null;
-        app.globalData.membership = normalized;
-        if (previous && previous.entitlements.curatedFeed && !normalized.entitlements.curatedFeed) {
-          app.globalData.curatedFeed = null;
-        }
-        if (previous && previous.entitlements.digests.length && !normalized.entitlements.digests.length) {
-          app.globalData.briefing = null;
-        }
-      }
-      cachedAt = Date.now();
-      return normalized;
-    })
+    .then((raw) => storeMembershipAccess(raw))
     .finally(() => {
       pending = null;
     });
   return pending;
+}
+
+function storeMembershipAccess(raw) {
+  const normalized = normalizeMembershipAccess(raw);
+  const app = appInstance();
+  if (app && app.globalData) {
+    const previous = app.globalData.membership
+      ? normalizeMembershipAccess(app.globalData.membership)
+      : null;
+    const roleChanged = previous && previous.viewer.role !== normalized.viewer.role;
+    app.globalData.membership = normalized;
+    if (roleChanged) {
+      revision += 1;
+      app.globalData.knowledgeFeed = null;
+      app.globalData.curatedFeed = null;
+      app.globalData.briefing = null;
+    } else {
+      if (previous && previous.entitlements.curatedFeed && !normalized.entitlements.curatedFeed) {
+        app.globalData.curatedFeed = null;
+      }
+      if (previous && previous.entitlements.digests.length && !normalized.entitlements.digests.length) {
+        app.globalData.briefing = null;
+      }
+    }
+  }
+  cachedAt = Date.now();
+  return normalized;
+}
+
+async function changeMembershipRolePreview(role) {
+  if (pending) {
+    try { await pending; } catch (error) {}
+  }
+  return storeMembershipAccess(await setMembershipRolePreview(role));
+}
+
+function membershipRevision() {
+  return revision;
 }
 
 function clearProtectedSession() {
@@ -61,5 +83,7 @@ function clearProtectedSession() {
 module.exports = {
   cachedMembershipAccess,
   refreshMembershipAccess,
+  changeMembershipRolePreview,
+  membershipRevision,
   clearProtectedSession
 };

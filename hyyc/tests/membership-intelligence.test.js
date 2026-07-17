@@ -9,6 +9,9 @@ const {
   createFeedEntitlementService
 } = require('../cloudfunctions/knowledgeFeed/services/feed-entitlement-service');
 const {
+  createRolePreviewService
+} = require('../cloudfunctions/knowledgeFeed/services/role-preview-service');
+const {
   normalizeMembership,
   membershipActive
 } = require('../cloudfunctions/knowledgeFeed/services/membership-service');
@@ -69,6 +72,53 @@ test('returns capability entitlements for free, member and all-retained admin ro
   assert.deepEqual(admin.entitlements.history, { mode: 'all' });
   assert.equal(admin.access.defaultTimeKey, 'all');
   assert.deepEqual(admin.entitlements.allowedTimeRanges, ['1d', '3d', '7d', '30d', 'all']);
+});
+
+test('lets a real administrator preview free and member entitlements without losing admin authority', async () => {
+  const grants = new Map([
+    ['a'.repeat(64), { role: 'admin', status: 'active', previewRole: 'free' }]
+  ]);
+  const updates = [];
+  const accessRepository = {
+    get: async (ownerKey) => grants.get(ownerKey) || null,
+    setPreviewRole: async (ownerKey, previewRole, updatedAt) => {
+      updates.push({ ownerKey, previewRole, updatedAt });
+      grants.set(ownerKey, { ...grants.get(ownerKey), previewRole });
+    }
+  };
+  const entitlementService = createFeedEntitlementService({
+    accessRepository,
+    membershipRepository: { get: async () => null },
+    config: CONFIG,
+    now: () => NOW
+  });
+  const previewService = createRolePreviewService({ accessRepository, now: () => NOW });
+  const actor = { ownerKey: 'a'.repeat(64) };
+
+  const free = await entitlementService.resolve(actor);
+  assert.equal(free.viewer.role, 'free');
+  assert.equal(free.viewer.actualRole, 'admin');
+  assert.equal(free.viewer.canPreviewRoles, true);
+  assert.equal(free.viewer.isRolePreview, true);
+  assert.deepEqual(free.entitlements.history, { mode: 'rolling', days: 7 });
+
+  await previewService.set(actor, 'member');
+  const member = await entitlementService.resolve(actor);
+  assert.equal(member.viewer.role, 'member');
+  assert.equal(member.viewer.membershipStatus, 'active');
+  assert.deepEqual(member.entitlements.history, { mode: 'rolling', days: 30 });
+  assert.equal(updates.length, 1);
+
+  await assert.rejects(
+    () => previewService.set(actor, 'owner'),
+    (error) => error.code === 'INVALID_REQUEST'
+  );
+  await assert.rejects(
+    () => createRolePreviewService({
+      accessRepository: { get: async () => null }, now: () => NOW
+    }).set({ ownerKey: 'b'.repeat(64) }, 'admin'),
+    (error) => error.code === 'ADMIN_REQUIRED'
+  );
 });
 
 test('expires stale memberships while retaining cancel-at-period-end access until period end', () => {
@@ -186,5 +236,6 @@ test('keeps maintenance actions outside the public knowledge feed router', () =>
   ), 'utf8');
   assert.doesNotMatch(source, /grantAdmin:\s|maintenance:\s|seedVisuals:\s|runVisuals:\s/);
   assert.match(source, /entitlements:\s*async/);
+  assert.match(source, /setRolePreview:\s*async/);
   assert.match(source, /event\.mode === 'curated'/);
 });

@@ -26,7 +26,15 @@ function createFeedAccessRepository(db, config) {
     return data;
   }
 
-  return { ensureCollection, get, grant };
+  async function setPreviewRole(ownerKey, previewRole, updatedAt = new Date()) {
+    await ensureCollection();
+    await collection().doc(assertOwnerKey(ownerKey)).update({
+      data: { previewRole, previewUpdatedAt: updatedAt }
+    });
+    return { previewRole, previewUpdatedAt: updatedAt };
+  }
+
+  return { ensureCollection, get, grant, setPreviewRole };
 }
 
 module.exports = { createFeedAccessRepository, assertOwnerKey };

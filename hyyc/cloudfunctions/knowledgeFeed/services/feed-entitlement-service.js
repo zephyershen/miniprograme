@@ -1,5 +1,9 @@
 const { AppError } = require('../lib/errors');
 const { normalizeMembership, membershipActive } = require('./membership-service');
+const {
+  activeAdminGrant,
+  previewRoleForGrant
+} = require('../policies/role-preview');
 
 const FREE_TIME_KEYS = Object.freeze(['1d', '3d', '7d']);
 const MEMBER_TIME_KEYS = Object.freeze(['1d', '3d', '7d', '30d']);
@@ -9,19 +13,6 @@ const DIGEST_FEATURES = Object.freeze({
   '7d': 'digest_7d',
   '30d': 'digest_30d'
 });
-
-function timestamp(value) {
-  if (!value) return Number.NaN;
-  if (value instanceof Date) return value.getTime();
-  if (typeof value.toDate === 'function') return value.toDate().getTime();
-  return new Date(value).getTime();
-}
-
-function activeAdminGrant(grant, now) {
-  if (!grant || grant.status !== 'active' || grant.role !== 'admin') return false;
-  const expiresAt = timestamp(grant.expiresAt);
-  return !Number.isFinite(expiresAt) || expiresAt > now;
-}
 
 function roleAccess(role, config) {
   if (role === 'admin') {
@@ -121,10 +112,35 @@ function createFeedEntitlementService({
       accessRepository.get(actor.ownerKey),
       membershipRepository ? membershipRepository.get(actor.ownerKey) : null
     ]);
-    const role = activeAdminGrant(grant, currentTime)
+    const actualRole = activeAdminGrant(grant, currentTime)
       ? 'admin'
       : (membershipActive(membershipDocument, currentTime) ? 'member' : 'free');
-    return entitlementView(role, config, membershipDocument, null, currentTime, featureFlags);
+    const previewRole = actualRole === 'admin'
+      ? previewRoleForGrant(grant, currentTime)
+      : null;
+    const role = previewRole || actualRole;
+    const entitlement = entitlementView(
+      role,
+      config,
+      membershipDocument,
+      null,
+      currentTime,
+      featureFlags
+    );
+    return {
+      ...entitlement,
+      viewer: {
+        ...entitlement.viewer,
+        membershipStatus: actualRole === 'admin' && role === 'member'
+          ? 'active'
+          : entitlement.viewer.membershipStatus,
+        actualRole,
+        isActualAdmin: actualRole === 'admin',
+        canPreviewRoles: actualRole === 'admin',
+        previewRole: actualRole === 'admin' ? role : null,
+        isRolePreview: actualRole === 'admin' && role !== 'admin'
+      }
+    };
   }
 
   return { resolve };

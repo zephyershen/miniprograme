@@ -32,10 +32,13 @@ confidence: high
 - 精选对普通用户只展示固定完整示例；会员页默认按重要度，支持时间、频道、公司/模型和技术方向筛选。
 - 简报使用 24 小时、7 天、30 天滚动窗口，必须包含结论、必须知道、影响、趋势、雷达、继续阅读和来源索引。
 - 我的展示身份、到期时间、数据覆盖与权益。支付关闭期间只显示“会员能力内测中”，不出现价格或虚假购买按钮；收藏与旧结论卡作为二级入口。
+- 真实管理员的“我的”页额外显示普通用户、Pro 会员、管理员三个身份预览按钮。预览状态由服务端验证真实管理员授权后写入同一授权记录；页面参数不能授予权限，预览普通用户后仍以真实管理员身份允许切回。
 
 ## 服务端边界
 
 服务端统一返回 `viewer / entitlements / coverage / features`。所有列表、详情、精选、简报引用和历史回看均重新鉴权；越权返回 `ENTITLEMENT_REQUIRED` 及白名单 `featureKey`。
+
+管理员身份预览是内测工具，不改变真实角色优先级：`viewer.actualRole` 仍为 `admin`，`viewer.role` 只表达本次有效预览角色。公开 `setRolePreview` action 必须先读取并验证有效管理员授权，普通用户、会员或客户端伪造请求统一拒绝；预览不会写入 `knowledge_memberships`。
 
 模块边界：
 
@@ -72,4 +75,3 @@ generateDigest(window, analyzedItems, previousDigest) => DigestResult
 - “只有 free/admin，管理员默认近 90 天”被 `free/member/admin` 能力权益与管理员全部归档替代。
 - “上游 selected 就是精选”被本地版本化分析与质量硬门槛替代。
 - “offset 足够支撑会员历史”被稳定数据库游标替代。
-

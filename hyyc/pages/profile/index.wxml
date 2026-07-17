@@ -17,6 +17,24 @@
       <view class="coverage-line"><text>{{coverage.stateLabel}}</text><text wx:if="{{coverage.dateLabel}}">完整起点 {{coverage.dateLabel}}</text></view>
     </view>
 
+    <view wx:if="{{membership.canPreviewRoles}}" class="role-preview-block">
+      <view class="role-preview-kicker">管理员测试工具</view>
+      <view class="role-preview-title">切换当前账号看到的身份</view>
+      <view class="role-preview-copy">只改变这个管理员账号的服务端权限预览，不会创建真实付费记录，也不会影响其他用户。</view>
+      <view class="role-preview-options">
+        <button
+          wx:for="{{membership.roleOptions}}"
+          wx:key="key"
+          class="role-preview-button {{item.active ? 'is-active' : ''}}"
+          data-role="{{item.key}}"
+          bindtap="selectRolePreview"
+          disabled="{{roleSwitching}}"
+          loading="{{roleSwitching && switchingRole === item.key}}"
+        >{{item.label}}</button>
+      </view>
+      <view wx:if="{{membership.isRolePreview}}" class="role-preview-status">正在以 {{membership.roleLabel}} 查看小程序；回到资讯、精选或简报 Tab 即可检查对应体验。</view>
+    </view>
+
     <view wx:if="{{!membership.isPrivileged}}" class="internal-block">
       <view class="internal-status">会员能力内测中</view>
       <view class="internal-title">把时间花在值得读的内容上</view>

@@ -4,4 +4,8 @@ function getMembershipStatus() {
   return callCloudFunction('knowledgeFeed', { action: 'entitlements' });
 }
 
-module.exports = { getMembershipStatus };
+function setMembershipRolePreview(role) {
+  return callCloudFunction('knowledgeFeed', { action: 'setRolePreview', role });
+}
+
+module.exports = { getMembershipStatus, setMembershipRolePreview };

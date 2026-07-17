@@ -235,3 +235,12 @@
 - Sources: 本次用户确认方案、当前代码、168 个 Node 测试、项目检查、CloudBase 函数详情、运维状态、集合 ACL、索引清单和分钟触发日志。
 - Sensitive handling: 维护令牌只从本机受限配置读取并写入云函数环境变量；普通 Wiki、Git 和用户可见输出不记录令牌、OpenID、派生 ownerKey、账号或密码。
 - Follow-ups: 用户提供 AI API 后在测试环境回填最近 30 天，覆盖至少 95% 且人工抽检通过后再开启真实精选/简报；使用第二个微信账号人工测试 Pro；支付最后接入并单独验证汇付签约、验签、查询、退款和沙箱流程。
+
+## [2026-07-17] admin-role-preview | 当前管理员三身份预览上线
+
+- Session: local Codex task
+- Target pages: `README.md`, `wiki/overview.md`, `wiki/timeline.md`, `wiki/decisions/2026-07-17-pro-membership-and-intelligence.md`, `wiki/sources/2026-07-17-pro-membership-implementation.md`, `wiki/log.md`
+- Summary: 在“我的”页增加普通用户、Pro 会员、管理员三个身份预览按钮；服务端验证真实管理员授权后只更新原授权记录的 `previewRole`，权益响应区分真实角色和有效角色，非管理员不能切换。资讯 Tab 在会话角色变化后重载，精选和简报继续在显示时重新鉴权。
+- Online evidence: `knowledgeFeed` 重新部署成功；身份预览的 free/member、非法角色和非管理员拒绝路径均有测试覆盖。回归为 170/170，项目检查覆盖 27 JSON、143 JavaScript、9 页面。
+- Sensitive handling: 未读取、记录或提交 OpenID、ownerKey、账号、密码、维护令牌或其他实际凭据；预览状态不创建真实会员记录。
+- Follow-ups: 在微信开发者工具或真机点击三种按钮核对视觉；真实会员到期、宽限、撤销和续费状态仍用第二个微信账号验收。

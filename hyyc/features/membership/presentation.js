@@ -3,6 +3,11 @@ const MEMBERSHIP_BENEFITS = Object.freeze([
   { key: 'briefing', title: '24 小时 / 7 天 / 30 天简报', copy: '先看结论与影响，再决定是否继续阅读来源。' },
   { key: 'history', title: '30 天完整历史', copy: '简报里的重要引用可以继续回看，不止停留在摘要。' }
 ]);
+const ROLE_PREVIEW_OPTIONS = Object.freeze([
+  { key: 'free', label: '普通用户' },
+  { key: 'member', label: 'Pro 会员' },
+  { key: 'admin', label: '管理员' }
+]);
 
 function formatPeriodEnd(value) {
   const date = new Date(value);
@@ -25,6 +30,10 @@ function membershipPresentation(access) {
     roleCopy,
     isPrivileged: role === 'member' || role === 'admin',
     isAdmin: role === 'admin',
+    canPreviewRoles: viewer.canPreviewRoles === true,
+    isRolePreview: viewer.isRolePreview === true,
+    previewRole: viewer.previewRole || role,
+    roleOptions: ROLE_PREVIEW_OPTIONS.map((item) => ({ ...item, active: item.key === role })),
     periodEndLabel: formatPeriodEnd(viewer.currentPeriodEnd),
     renewalLabel: viewer.renewalState === 'cancel_at_period_end'
       ? '已停止续费，到期前仍可使用'
@@ -33,4 +42,9 @@ function membershipPresentation(access) {
   };
 }
 
-module.exports = { MEMBERSHIP_BENEFITS, membershipPresentation, formatPeriodEnd };
+module.exports = {
+  MEMBERSHIP_BENEFITS,
+  ROLE_PREVIEW_OPTIONS,
+  membershipPresentation,
+  formatPeriodEnd
+};

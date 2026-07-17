@@ -16,12 +16,40 @@ const {
   createInitialListState
 } = require('../../features/knowledge-feed/list-model.js');
 const { getKnowledgeFeed } = require('../../features/knowledge-feed/api.js');
+const {
+  refreshMembershipAccess,
+  membershipRevision
+} = require('../../features/membership/session.js');
 
 Page({
   data: createInitialListState(),
 
   onLoad() {
+    this.skipNextMembershipRefresh = true;
+    this.seenMembershipRevision = membershipRevision();
     this.loadFeed(false);
+  },
+
+  onShow() {
+    if (this.skipNextMembershipRefresh) {
+      this.skipNextMembershipRefresh = false;
+      return;
+    }
+    this.refreshMembershipAndFeed();
+  },
+
+  async refreshMembershipAndFeed() {
+    try {
+      await refreshMembershipAccess({ force: true });
+      const nextRevision = membershipRevision();
+      if (nextRevision === this.seenMembershipRevision) return;
+      this.seenMembershipRevision = nextRevision;
+      this.feedAccessResolved = false;
+      this.historyBoundarySeen = false;
+      await this.loadFeed(false);
+    } catch (error) {
+      console.warn('资讯权限暂时未刷新', error && error.code ? error.code : error);
+    }
   },
 
   onReachBottom() {
