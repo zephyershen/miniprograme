@@ -1,0 +1,37 @@
+<view class="profile-page">
+  <view class="profile-header">
+    <view class="profile-kicker"><text></text>MY KNOWLEDGE</view>
+    <view class="profile-title">我的</view>
+    <view class="profile-deck">查看身份、内容权限和个人保存的阅读线索。</view>
+  </view>
+
+  <view wx:if="{{loading}}" class="profile-loading">正在确认当前身份…</view>
+  <view wx:elif="{{error}}" class="profile-error"><view>{{error}}</view><view class="text-action" bindtap="loadMembership">重新加载 →</view></view>
+  <block wx:else>
+    <view class="identity-block">
+      <view class="identity-label">当前身份</view>
+      <view class="identity-title">{{membership.roleLabel}}</view>
+      <view class="identity-copy">{{membership.roleCopy}}</view>
+      <view wx:if="{{membership.periodEndLabel}}" class="identity-meta">有效期至 {{membership.periodEndLabel}}</view>
+      <view wx:if="{{membership.renewalLabel}}" class="identity-meta">{{membership.renewalLabel}}</view>
+      <view class="coverage-line"><text>{{coverage.stateLabel}}</text><text wx:if="{{coverage.dateLabel}}">完整起点 {{coverage.dateLabel}}</text></view>
+    </view>
+
+    <view wx:if="{{!membership.isPrivileged}}" class="internal-block">
+      <view class="internal-status">会员能力内测中</view>
+      <view class="internal-title">把时间花在值得读的内容上</view>
+      <view class="internal-copy">支付入口尚未开放。本阶段仅通过后台人工授权测试 Pro 权益，不展示价格，也不会产生扣款。</view>
+      <view class="benefit-list">
+        <view wx:for="{{membership.benefits}}" wx:key="key" class="benefit-row"><text class="benefit-index">0{{index + 1}}</text><view><view class="benefit-title">{{item.title}}</view><view class="benefit-copy">{{item.copy}}</view></view></view>
+      </view>
+    </view>
+
+    <view class="profile-section">
+      <view class="section-title">个人内容</view>
+      <view class="profile-link" bindtap="openCards"><view><view class="link-title">收藏与结论卡</view><view class="link-copy">收藏中的旧资讯仍会按当前权限重新校验。</view></view><text>→</text></view>
+      <view class="profile-link" bindtap="openSettings"><view><view class="link-title">阅读设置</view><view class="link-copy">调整关注方向和本地使用偏好。</view></view><text>→</text></view>
+    </view>
+
+    <view wx:if="{{membership.isAdmin}}" class="admin-note">管理员可以查看项目实际已归档的全部资讯；“全部”不代表平台之外未收录的数据。</view>
+  </block>
+</view>

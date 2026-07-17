@@ -33,21 +33,34 @@
       "name": "knowledgeFeed",
       "runtime": "Nodejs18.15",
       "handler": "index.main",
-      "timeout": 180,
-      "memorySize": 256,
+      "timeout": 300,
+      "memorySize": 512,
       "installDependency": true,
       "triggers": [
         {
-          "name": "knowledge-feed-visual-sync",
+          "name": "knowledge-feed-source-sync",
           "type": "timer",
-          "config": "0 */5 * * * * *"
+          "config": "0 * * * * * *"
         }
       ],
       "ignore": [
         "node_modules/**",
         "config.local.js"
       ],
-      "description": "Caches selected updates, original covers and source preview screenshots for the knowledge feed."
+      "description": "Checks updates every minute, stores the complete feed, and enriches missing visuals asynchronously."
+    },
+    {
+      "name": "knowledgeOps",
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "timeout": 60,
+      "memorySize": 256,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**",
+        "config.local.js"
+      ],
+      "description": "Private token-protected membership grants and knowledge operations status."
     }
   ]
 }

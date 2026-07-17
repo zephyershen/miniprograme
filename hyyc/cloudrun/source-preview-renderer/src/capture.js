@@ -2,11 +2,19 @@ const { chromium } = require('playwright');
 const { createPublicUrlGuard } = require('./network-security.js');
 const { assertRenderableResponse } = require('./page-policy.js');
 const { browserLaunchOptions } = require('./proxy.js');
-
-const VIEWPORT = Object.freeze({ width: 1080, height: 1350 });
-const DEFAULT_MAX_SEGMENTS = 3;
+const {
+  VIEWPORT,
+  DEFAULT_MAX_SEGMENTS,
+  HARD_MAX_SEGMENTS,
+  CAPTURE_VERSION,
+  createCapturePlan
+} = require('./capture-plan.js');
+const { pageMetrics, capturePageSegments } = require('./capture-segments.js');
+const {
+  LIST_THUMBNAIL_VERSION,
+  renderListThumbnail
+} = require('./list-thumbnail.js');
 const NAVIGATION_TIMEOUT_MS = 16000;
-const MAX_IMAGE_BYTES = 1.5 * 1024 * 1024;
 
 function createCaptureService({
   launch = (options) => chromium.launch(options),
@@ -82,38 +90,30 @@ function createCaptureService({
         }
       }).catch(() => {});
 
-      const metrics = await page.evaluate(() => ({
-        height: Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0),
-        title: document.title || ''
-      }));
-      const maxSegments = Math.max(1, Math.min(DEFAULT_MAX_SEGMENTS, Number(requestedSegments) || DEFAULT_MAX_SEGMENTS));
-      const segmentCount = Math.max(1, Math.min(maxSegments, Math.ceil(metrics.height / VIEWPORT.height)));
-      const maxScroll = Math.max(0, metrics.height - VIEWPORT.height);
-      const screenshots = [];
-
-      for (let index = 0; index < segmentCount; index += 1) {
-        const scrollY = segmentCount === 1 ? 0 : Math.round(maxScroll * index / Math.max(1, segmentCount - 1));
-        await page.evaluate((y) => window.scrollTo(0, y), scrollY);
-        await page.waitForTimeout(300);
-        const buffer = await page.screenshot({ type: 'jpeg', quality: 72, animations: 'disabled', caret: 'hide' });
-        if (buffer.length > MAX_IMAGE_BYTES) throw new Error('SCREENSHOT_TOO_LARGE');
-        screenshots.push({
-          mimeType: 'image/jpeg',
-          width: VIEWPORT.width,
-          height: VIEWPORT.height,
-          data: buffer.toString('base64')
-        });
-      }
+      const initialMetrics = await pageMetrics(page);
+      const capture = await capturePageSegments(page, requestedSegments);
 
       return {
         finalUrl: page.url(),
-        title: String(metrics.title).slice(0, 240),
-        screenshots
+        title: String(initialMetrics.title).slice(0, 240),
+        captureVersion: CAPTURE_VERSION,
+        pageHeight: capture.pageHeight,
+        segmentCount: capture.segmentCount,
+        truncated: capture.truncated,
+        screenshots: capture.screenshots
       };
     } finally {
       if (signal) signal.removeEventListener('abort', abortCapture);
       if (context) await context.close().catch(() => {});
     }
+  }
+
+  async function thumbnail(payload = {}, signal) {
+    if (Number(payload.version || 0) !== LIST_THUMBNAIL_VERSION) {
+      throw new Error('THUMBNAIL_VERSION_UNSUPPORTED');
+    }
+    const sourceUrl = await guard.assertPublicUrl(payload.url);
+    return renderListThumbnail(await getBrowser(), sourceUrl, guard, signal);
   }
 
   async function close() {
@@ -123,7 +123,14 @@ function createCaptureService({
     if (browser) await browser.close();
   }
 
-  return { capture, close };
+  return { capture, thumbnail, close };
 }
 
-module.exports = { VIEWPORT, createCaptureService };
+module.exports = {
+  VIEWPORT,
+  DEFAULT_MAX_SEGMENTS,
+  HARD_MAX_SEGMENTS,
+  CAPTURE_VERSION,
+  createCapturePlan,
+  createCaptureService
+};

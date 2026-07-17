@@ -1,11 +1,11 @@
 # Source preview renderer
 
-This service opens a public HTTPS article with Playwright and returns up to three JPEG viewport screenshots. It is intentionally separate from the CloudBase function because Chromium is not suitable for a normal serverless function runtime.
+This service opens a public HTTPS article with Playwright and returns consecutive JPEG viewport screenshots based on the page height, with a twelve-segment safety ceiling. It is intentionally separate from the CloudBase function because Chromium is not suitable for a normal serverless function runtime.
 
 ## Runtime contract
 
 - `GET /health` returns readiness without exposing credentials.
-- `POST /capture` requires `Authorization: Bearer <CAPTURE_TOKEN>` and accepts `{ "url": "https://...", "maxSegments": 3 }`.
+- `POST /capture` requires `Authorization: Bearer <CAPTURE_TOKEN>` and accepts `{ "url": "https://...", "maxSegments": 12, "captureVersion": 2 }`.
 - Only one capture runs at a time. Requests are bounded by body, response, image, navigation and total time limits.
 - The service accepts only public HTTPS targets and blocks service workers and private/reserved addresses.
 

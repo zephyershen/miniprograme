@@ -8,6 +8,8 @@ const {
 } = require('../cloudrun/source-preview-renderer/src/network-security');
 const {
   maintenanceAuthorized,
+  previewRetryDelay,
+  previewAttemptIsDue,
   createPreviewService
 } = require('../cloudfunctions/knowledgeFeed/services/preview-service');
 const {
@@ -18,8 +20,96 @@ const { assertRenderableResponse } = require('../cloudrun/source-preview-rendere
 const { createCloudFileDeleter } = require('../cloudfunctions/knowledgeFeed/services/cloud-file-deleter');
 const { createFeedCacheRepository } = require('../cloudfunctions/knowledgeFeed/repositories/feed-cache');
 const { visualVersion } = require('../cloudfunctions/knowledgeFeed/lib/visual-version');
+const {
+  VIEWPORT,
+  createCapturePlan
+} = require('../cloudrun/source-preview-renderer/src/capture-plan');
+const {
+  capturePageSegments
+} = require('../cloudrun/source-preview-renderer/src/capture-segments');
+const {
+  LIST_THUMBNAIL_WIDTH,
+  LIST_THUMBNAIL_HEIGHT,
+  renderListThumbnail
+} = require('../cloudrun/source-preview-renderer/src/list-thumbnail');
+const {
+  createListThumbnailService
+} = require('../cloudfunctions/knowledgeFeed/services/list-thumbnail-service');
 
 const FILE_ID_PREFIX = 'cloud://env.bucket/knowledge-previews/source/';
+
+test('renders a fixed low-memory list thumbnail through guarded browser requests', async () => {
+  const jpeg = Buffer.from('ffd8ffe000104a4649460001ffd9', 'hex');
+  let routed = null;
+  let assignedUrl = '';
+  const context = {
+    newPage: async () => ({
+      setDefaultTimeout() {},
+      route: async (pattern, handler) => { routed = handler; },
+      setContent: async () => {},
+      evaluate: async (operation, value) => { assignedUrl = value; },
+      waitForFunction: async () => {},
+      screenshot: async () => jpeg
+    }),
+    close: async () => {}
+  };
+  const result = await renderListThumbnail(
+    { newContext: async (options) => {
+      assert.deepEqual(options.viewport, { width: LIST_THUMBNAIL_WIDTH, height: LIST_THUMBNAIL_HEIGHT });
+      return context;
+    } },
+    'https://storage.example/signed.jpg?token=private',
+    { allowBrowserRequest: async () => true }
+  );
+  assert.equal(typeof routed, 'function');
+  assert.equal(assignedUrl, 'https://storage.example/signed.jpg?token=private');
+  assert.equal(result.width, 360);
+  assert.equal(result.height, 253);
+});
+
+test('derives and uploads a list thumbnail from a short-lived CloudBase URL', async () => {
+  const sourceFileId = 'cloud://env.bucket/knowledge-previews/source/full.jpg';
+  const thumbnailPrefix = 'cloud://env.bucket/knowledge-thumbnails/list/';
+  const jpeg = Buffer.from('ffd8ffe000104a4649460001ffd9', 'hex');
+  let requestBody = null;
+  const service = createListThumbnailService({
+    cloud: {
+      getTempFileURL: async () => ({
+        fileList: [{ fileID: sourceFileId, code: 'SUCCESS', tempFileURL: 'https://storage.example/full.jpg?sign=short' }]
+      }),
+      uploadFile: async ({ cloudPath }) => ({ fileID: `${thumbnailPrefix}${cloudPath.split('/').pop()}` })
+    },
+    config: {
+      rendererUrl: 'https://renderer.example',
+      rendererToken: 'r'.repeat(40),
+      rendererTimeoutMs: 1000,
+      maxResponseBytes: 10000,
+      maxImageBytes: 1000,
+      version: 1,
+      width: 360,
+      height: 253,
+      cloudPathPrefix: 'knowledge-thumbnails/list/',
+      fileIdPrefix: thumbnailPrefix
+    },
+    fetchImpl: async (url, options) => {
+      requestBody = JSON.parse(options.body);
+      const body = Buffer.from(JSON.stringify({
+        ok: true,
+        data: { version: 1, mimeType: 'image/jpeg', width: 360, height: 253, data: jpeg.toString('base64') }
+      }));
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => String(body.length) },
+        arrayBuffer: async () => body
+      };
+    }
+  });
+  const result = await service.resolveAndUploadFromFile({ id: 'thumb001', url: 'https://example.com/a' }, sourceFileId);
+  assert.equal(requestBody.data, undefined);
+  assert.equal(requestBody.url, 'https://storage.example/full.jpg?sign=short');
+  assert.equal(result.startsWith(thumbnailPrefix), true);
+});
 
 test('requires a constant-time bearer token for source preview capture', () => {
   const token = 'a'.repeat(40);
@@ -27,6 +117,46 @@ test('requires a constant-time bearer token for source preview capture', () => {
   assert.equal(authorized(`Bearer ${'b'.repeat(40)}`, token), false);
   assert.equal(authorized('', token), false);
   assert.equal(authorized(`Bearer ${token}`, 'short'), false);
+});
+
+test('captures consecutive page segments beyond three while enforcing the safety ceiling', () => {
+  const fiveScreens = createCapturePlan(VIEWPORT.height * 5, 12);
+  assert.equal(fiveScreens.segmentCount, 5);
+  assert.equal(fiveScreens.truncated, false);
+  assert.deepEqual(fiveScreens.scrollPositions, [0, 1350, 2700, 4050, 5400]);
+
+  const twentyScreens = createCapturePlan(VIEWPORT.height * 20, 99);
+  assert.equal(twentyScreens.requiredSegments, 20);
+  assert.equal(twentyScreens.segmentCount, 12);
+  assert.equal(twentyScreens.truncated, true);
+  assert.equal(twentyScreens.scrollPositions[11], 14850);
+});
+
+test('remeasures a lazy-loading page while capturing consecutive segments', async () => {
+  const jpeg = Buffer.from('ffd8ffe000104a4649460001ffd9', 'hex');
+  let metricReads = 0;
+  const scrollPositions = [];
+  const page = {
+    evaluate: async (operation, value) => {
+      if (typeof value === 'number') {
+        scrollPositions.push(value);
+        return undefined;
+      }
+      metricReads += 1;
+      return {
+        height: metricReads <= 2 ? VIEWPORT.height * 2 : VIEWPORT.height * 5,
+        title: 'Lazy article'
+      };
+    },
+    waitForTimeout: async () => {},
+    screenshot: async () => jpeg
+  };
+
+  const result = await capturePageSegments(page, 12);
+  assert.equal(result.segmentCount, 5);
+  assert.equal(result.pageHeight, VIEWPORT.height * 5);
+  assert.equal(result.truncated, false);
+  assert.deepEqual(scrollPositions, [0, 1350, 2700, 4050, 5400]);
 });
 
 test('allows only public HTTPS targets for the browser renderer', async () => {
@@ -168,7 +298,11 @@ test('renders, stores and safely replaces source preview screenshots behind the 
       assert.equal(options.headers.authorization, `Bearer ${'s'.repeat(40)}`);
       const body = Buffer.from(JSON.stringify({
         ok: true,
-        data: { screenshots: [{ mimeType: 'image/jpeg', data: jpeg.toString('base64') }] }
+        data: {
+          captureVersion: 1,
+          segmentCount: 1,
+          screenshots: [{ mimeType: 'image/jpeg', data: jpeg.toString('base64') }]
+        }
       }));
       return {
         ok: true,
@@ -289,6 +423,198 @@ test('renders, stores and safely replaces source preview screenshots behind the 
   assert.deepEqual(stored.visualDeleteClaims, []);
 });
 
+test('stores every renderer segment when a long source returns more than three screenshots', async () => {
+  const item = {
+    id: 'longpage1',
+    url: 'https://public.example/long-article',
+    coverFileId: '',
+    coverStatus: 'missing',
+    previewFileIds: []
+  };
+  const cache = { items: [item] };
+  const jpeg = Buffer.from('ffd8ffe000104a4649460001ffd9', 'hex');
+  let requestBody = null;
+  const service = createPreviewService({
+    cloud: {
+      uploadFile: async ({ cloudPath }) => ({
+        fileID: `${FILE_ID_PREFIX}${cloudPath.split('/').pop()}`
+      })
+    },
+    repository: {
+      get: async () => cache,
+      patchItems: async (patches) => {
+        cache.items = cache.items.map((entry) => entry.id === patches[0].id
+          ? { ...entry, ...patches[0].fields }
+          : entry);
+        return { items: cache.items, appliedIds: [patches[0].id] };
+      }
+    },
+    config: {
+      rendererUrl: 'https://renderer.example',
+      rendererToken: 'r'.repeat(40),
+      maintenanceToken: 'm'.repeat(40),
+      rendererTimeoutMs: 1000,
+      retryMs: 1000,
+      maxResponseBytes: 100000,
+      maxImageBytes: 1000,
+      maxSegments: 12,
+      captureVersion: 2,
+      cloudPathPrefix: 'knowledge-previews/source/',
+      fileIdPrefix: FILE_ID_PREFIX
+    },
+    fetchImpl: async (url, options) => {
+      requestBody = JSON.parse(options.body);
+      const body = Buffer.from(JSON.stringify({
+        ok: true,
+        data: {
+          captureVersion: 2,
+          segmentCount: 5,
+          screenshots: Array.from({ length: 5 }, () => ({ data: jpeg.toString('base64') }))
+        }
+      }));
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => String(body.length) },
+        arrayBuffer: async () => body
+      };
+    }
+  });
+
+  const result = await service.hydratePreviews(1, false, 'm'.repeat(40));
+  assert.equal(result.resolved, 1);
+  assert.equal(cache.items[0].previewFileIds.length, 5);
+  assert.equal(cache.items[0].previewCaptureVersion, 2);
+  assert.equal(requestBody.maxSegments, 12);
+});
+
+test('rejects an old renderer contract without replacing existing screenshots', async () => {
+  const oldFileId = `${FILE_ID_PREFIX}existing-v1.jpg`;
+  const cache = {
+    items: [{
+      id: 'contract1',
+      url: 'https://public.example/article',
+      coverFileId: '',
+      coverStatus: 'missing',
+      previewFileIds: [oldFileId],
+      previewCaptureVersion: 1
+    }]
+  };
+  const jpeg = Buffer.from('ffd8ffe000104a4649460001ffd9', 'hex');
+  const service = createPreviewService({
+    cloud: {
+      uploadFile: async () => { throw new Error('old renderer output must not upload'); }
+    },
+    repository: {
+      get: async () => cache,
+      patchItems: async (patches) => {
+        cache.items = cache.items.map((entry) => ({ ...entry, ...patches[0].fields }));
+        return { items: cache.items, appliedIds: ['contract1'] };
+      }
+    },
+    config: {
+      rendererUrl: 'https://renderer.example',
+      rendererToken: 'r'.repeat(40),
+      maintenanceToken: 'm'.repeat(40),
+      rendererTimeoutMs: 1000,
+      retryMs: 1000,
+      maxResponseBytes: 10000,
+      maxImageBytes: 1000,
+      maxSegments: 12,
+      captureVersion: 2,
+      cloudPathPrefix: 'knowledge-previews/source/',
+      fileIdPrefix: FILE_ID_PREFIX
+    },
+    fetchImpl: async () => {
+      const body = Buffer.from(JSON.stringify({
+        ok: true,
+        data: {
+          captureVersion: 1,
+          segmentCount: 1,
+          screenshots: [{ data: jpeg.toString('base64') }]
+        }
+      }));
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => String(body.length) },
+        arrayBuffer: async () => body
+      };
+    },
+    logger: { warn() {} }
+  });
+
+  const result = await service.hydratePreview('contract1', true, 'm'.repeat(40));
+  assert.equal(result.status, 'stale');
+  assert.deepEqual(result.previewFileIds, [oldFileId]);
+  assert.equal(cache.items[0].previewCaptureVersion, 1);
+});
+
+test('journals uploaded screenshots before the database publication transaction', async () => {
+  const cache = {
+    items: [{
+      id: 'journal01',
+      url: 'https://public.example/article',
+      coverFileId: '',
+      coverStatus: 'missing',
+      previewFileIds: []
+    }]
+  };
+  const jpeg = Buffer.from('ffd8ffe000104a4649460001ffd9', 'hex');
+  const journal = [];
+  const deleted = [];
+  const service = createPreviewService({
+    cloud: {
+      uploadFile: async ({ cloudPath }) => ({
+        fileID: `${FILE_ID_PREFIX}${cloudPath.split('/').pop()}`
+      }),
+      deleteFile: async ({ fileList }) => { deleted.push(...fileList); }
+    },
+    repository: {
+      get: async () => cache,
+      queueVisualDeletes: async (fileIds) => { journal.push(...fileIds); },
+      patchItems: async () => { throw new Error('DB_PUBLICATION_FAILED'); }
+    },
+    config: {
+      rendererUrl: 'https://renderer.example',
+      rendererToken: 'r'.repeat(40),
+      maintenanceToken: 'm'.repeat(40),
+      rendererTimeoutMs: 1000,
+      retryMs: 1000,
+      maxResponseBytes: 10000,
+      maxImageBytes: 1000,
+      maxSegments: 12,
+      captureVersion: 2,
+      cloudPathPrefix: 'knowledge-previews/source/',
+      fileIdPrefix: FILE_ID_PREFIX
+    },
+    fetchImpl: async () => {
+      const body = Buffer.from(JSON.stringify({
+        ok: true,
+        data: {
+          captureVersion: 2,
+          segmentCount: 1,
+          screenshots: [{ data: jpeg.toString('base64') }]
+        }
+      }));
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => String(body.length) },
+        arrayBuffer: async () => body
+      };
+    }
+  });
+
+  await assert.rejects(
+    () => service.hydratePreviews(1, false, 'm'.repeat(40)),
+    /DB_PUBLICATION_FAILED/
+  );
+  assert.equal(journal.length, 1);
+  assert.equal(journal[0].startsWith(FILE_ID_PREFIX), true);
+  assert.deepEqual(deleted, []);
+});
+
 test('prioritizes an untried preview over an expired failed item', async () => {
   const token = 'm'.repeat(40);
   const freshFailure = {
@@ -344,7 +670,11 @@ test('prioritizes an untried preview over an expired failed item', async () => {
     fetchImpl: async () => {
       const body = Buffer.from(JSON.stringify({
         ok: true,
-        data: { screenshots: [{ data: jpeg.toString('base64') }] }
+        data: {
+          captureVersion: 1,
+          segmentCount: 1,
+          screenshots: [{ data: jpeg.toString('base64') }]
+        }
       }));
       return {
         ok: true,
@@ -361,6 +691,200 @@ test('prioritizes an untried preview over an expired failed item', async () => {
   assert.match(uploadedPath, /untried01-/);
   assert.equal(cache.items[0].previewStatus, 'failed');
   assert.equal(cache.items[1].previewStatus, 'ready');
+});
+
+test('backs failed previews off exponentially and clears retry state after success', async () => {
+  const token = 'm'.repeat(40);
+  let clock = new Date('2026-07-16T06:00:00.000Z');
+  let rendererCalls = 0;
+  const cache = {
+    items: [{
+      id: 'retry001',
+      url: 'https://public.example/retry',
+      coverFileId: '',
+      coverStatus: 'missing',
+      previewFileIds: []
+    }]
+  };
+  const repository = {
+    get: async () => cache,
+    patchItems: async (patches) => {
+      const patch = patches[0];
+      cache.items = cache.items.map((item) => item.id === patch.id
+        ? { ...item, ...patch.fields }
+        : item);
+      return { items: cache.items, appliedIds: [patch.id], pendingVisualDeletes: [] };
+    }
+  };
+  const jpeg = Buffer.from('ffd8ffe000104a4649460001ffd9', 'hex');
+  const service = createPreviewService({
+    cloud: {
+      uploadFile: async ({ cloudPath }) => ({
+        fileID: `${FILE_ID_PREFIX}${cloudPath.split('/').pop()}`
+      }),
+      deleteFile: async () => ({ fileList: [] })
+    },
+    repository,
+    config: {
+      rendererUrl: 'https://renderer.example',
+      rendererToken: 'r'.repeat(40),
+      maintenanceToken: token,
+      rendererTimeoutMs: 1000,
+      retryMs: 5 * 60 * 1000,
+      maxResponseBytes: 10000,
+      maxImageBytes: 1000,
+      maxSegments: 12,
+      captureVersion: 2,
+      cloudPathPrefix: 'knowledge-previews/source/',
+      fileIdPrefix: FILE_ID_PREFIX
+    },
+    fetchImpl: async () => {
+      rendererCalls += 1;
+      if (rendererCalls <= 2) {
+        return { ok: false, status: 503, headers: { get: () => null } };
+      }
+      const body = Buffer.from(JSON.stringify({
+        ok: true,
+        data: {
+          captureVersion: 2,
+          segmentCount: 1,
+          screenshots: [{ data: jpeg.toString('base64') }]
+        }
+      }));
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => String(body.length) },
+        arrayBuffer: async () => body
+      };
+    },
+    now: () => new Date(clock),
+    logger: { warn() {} }
+  });
+
+  assert.equal(previewRetryDelay(1, 5 * 60 * 1000), 5 * 60 * 1000);
+  assert.equal(previewRetryDelay(2, 5 * 60 * 1000), 15 * 60 * 1000);
+
+  const first = await service.hydratePreviews(1, false, token);
+  assert.equal(first.failed, 1);
+  assert.equal(cache.items[0].previewAttempts, 1);
+  assert.equal(cache.items[0].previewLastErrorCode, 'PREVIEW_HTTP_503');
+  assert.equal(cache.items[0].previewNextAttemptAt.toISOString(), '2026-07-16T06:05:00.000Z');
+  assert.equal(previewAttemptIsDue(cache.items[0], clock, 5 * 60 * 1000, 2), false);
+
+  const deferred = await service.hydratePreviews(1, false, token);
+  assert.equal(deferred.attempted, 0);
+  assert.equal(rendererCalls, 1);
+
+  clock = new Date('2026-07-16T06:05:00.000Z');
+  await service.hydratePreviews(1, false, token);
+  assert.equal(cache.items[0].previewAttempts, 2);
+  assert.equal(cache.items[0].previewNextAttemptAt.toISOString(), '2026-07-16T06:20:00.000Z');
+  assert.equal(rendererCalls, 2);
+
+  clock = new Date('2026-07-16T06:20:00.000Z');
+  const recovered = await service.hydratePreviews(1, false, token);
+  assert.equal(recovered.resolved, 1);
+  assert.equal(rendererCalls, 3);
+  assert.equal(cache.items[0].previewStatus, 'ready');
+  assert.equal(cache.items[0].previewAttempts, 0);
+  assert.equal(cache.items[0].previewNextAttemptAt, null);
+  assert.equal(cache.items[0].previewLastErrorCode, '');
+});
+
+test('retry-only maintenance ignores untried and legacy-ready previews', async () => {
+  const token = 'm'.repeat(40);
+  const cache = {
+    items: [
+      {
+        id: 'untried01',
+        url: 'https://public.example/untried',
+        coverFileId: '',
+        coverStatus: 'missing',
+        previewFileIds: []
+      },
+      {
+        id: 'legacy001',
+        url: 'https://public.example/legacy',
+        coverFileId: '',
+        coverStatus: 'missing',
+        previewFileIds: [`${FILE_ID_PREFIX}legacy-v1.jpg`],
+        previewCaptureVersion: 1,
+        previewStatus: 'ready',
+        previewCheckedAt: new Date('2026-07-16T04:00:00.000Z')
+      },
+      {
+        id: 'failed001',
+        url: 'https://public.example/failed',
+        coverFileId: '',
+        coverStatus: 'missing',
+        previewFileIds: [],
+        previewStatus: 'failed',
+        previewAttempts: 2,
+        previewCheckedAt: new Date('2026-07-16T05:00:00.000Z'),
+        previewNextAttemptAt: new Date('2026-07-16T05:15:00.000Z')
+      }
+    ]
+  };
+  let uploadedPath = '';
+  const repository = {
+    get: async () => cache,
+    patchItems: async (patches) => {
+      const patch = patches[0];
+      cache.items = cache.items.map((item) => item.id === patch.id
+        ? { ...item, ...patch.fields }
+        : item);
+      return { items: cache.items, appliedIds: [patch.id], pendingVisualDeletes: [] };
+    }
+  };
+  const jpeg = Buffer.from('ffd8ffe000104a4649460001ffd9', 'hex');
+  const service = createPreviewService({
+    cloud: {
+      uploadFile: async ({ cloudPath }) => {
+        uploadedPath = cloudPath;
+        return { fileID: `${FILE_ID_PREFIX}${cloudPath.split('/').pop()}` };
+      },
+      deleteFile: async () => ({ fileList: [] })
+    },
+    repository,
+    config: {
+      rendererUrl: 'https://renderer.example',
+      rendererToken: 'r'.repeat(40),
+      maintenanceToken: token,
+      rendererTimeoutMs: 1000,
+      retryMs: 5 * 60 * 1000,
+      maxResponseBytes: 10000,
+      maxImageBytes: 1000,
+      maxSegments: 12,
+      captureVersion: 2,
+      cloudPathPrefix: 'knowledge-previews/source/',
+      fileIdPrefix: FILE_ID_PREFIX
+    },
+    fetchImpl: async () => {
+      const body = Buffer.from(JSON.stringify({
+        ok: true,
+        data: {
+          captureVersion: 2,
+          segmentCount: 1,
+          screenshots: [{ data: jpeg.toString('base64') }]
+        }
+      }));
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => String(body.length) },
+        arrayBuffer: async () => body
+      };
+    },
+    now: () => new Date('2026-07-16T06:00:00.000Z')
+  });
+
+  const result = await service.hydratePreviews(1, false, token, { retryOnly: true });
+  assert.equal(result.resolved, 1);
+  assert.match(uploadedPath, /failed001-/);
+  assert.equal(cache.items[0].previewCheckedAt, undefined);
+  assert.equal(cache.items[1].previewCaptureVersion, 1);
+  assert.equal(cache.items[2].previewStatus, 'ready');
 });
 
 test('does not expose preview maintenance without its independent secret', async () => {
@@ -407,7 +931,10 @@ test('lists failed previews only behind the maintenance token', async () => {
     id: 'failed001',
     title: 'Failed',
     url: 'https://failed.example',
-    previewCheckedAt: undefined
+    previewCheckedAt: undefined,
+    previewAttempts: 0,
+    previewNextAttemptAt: null,
+    previewLastErrorCode: ''
   }]);
 });
 

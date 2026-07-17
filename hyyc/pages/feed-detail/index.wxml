@@ -5,6 +5,7 @@
     <view class="error-code">内容暂不可用</view>
     <view class="error-title">这条资讯暂时无法打开</view>
     <view class="error-copy">{{error}}</view>
+    <view wx:if="{{entitlementRequired}}" class="error-action" bindtap="openMembership">查看会员权益 →</view>
   </view>
 
   <block wx:elif="{{item}}">
@@ -18,11 +19,39 @@
     </view>
 
     <image wx:if="{{item.coverFileId}}" class="detail-cover" src="{{item.coverFileId}}" mode="aspectFill" />
-    <view wx:elif="{{item.previewFileIds.length}}" class="source-preview" bindtap="previewSourceScreenshots">
-      <image class="source-preview-image" src="{{item.previewFileIds[0]}}" mode="widthFix" />
-      <view class="source-preview-action">
-        <text>原文页面预览</text>
-        <text>点击查看 {{item.previewFileIds.length}} 张 →</text>
+    <view wx:elif="{{item.previewFileIds.length}}" class="source-preview">
+      <swiper
+        class="source-preview-swiper"
+          autoplay="{{previewAutoplay && item.previewFileIds.length > 1}}"
+        circular="{{item.previewFileIds.length > 1}}"
+        interval="4000"
+        duration="450"
+        bindchange="onPreviewChange"
+      >
+        <swiper-item
+            wx:for="{{item.previewSlides}}"
+            wx:for-item="previewSlide"
+          wx:for-index="previewImageIndex"
+            wx:key="fileId"
+        >
+          <image
+            wx:if="{{previewSlide.shouldLoad}}"
+            class="source-preview-image"
+            src="{{previewSlide.fileId}}"
+            mode="aspectFit"
+            lazy-load="{{true}}"
+            data-index="{{previewImageIndex}}"
+            bindtap="previewSourceScreenshots"
+          />
+          <view wx:else class="source-preview-image source-preview-placeholder"></view>
+        </swiper-item>
+      </swiper>
+      <view wx:if="{{item.previewFileIds.length > 1}}" class="source-preview-dots">
+        <view
+          wx:for="{{item.previewFileIds}}"
+          wx:key="*this"
+          class="source-preview-dot {{previewIndex === index ? 'source-preview-dot-active' : ''}}"
+        ></view>
       </view>
     </view>
 
@@ -82,7 +111,7 @@
       <view
         wx:for="{{item.relatedItems}}"
         wx:key="id"
-        class="related-row {{item.visualFileId ? '' : 'related-row-no-image'}}"
+        class="related-row {{item.listVisualFileId ? '' : 'related-row-no-image'}}"
         data-id="{{item.id}}"
         bindtap="openRelated"
       >
@@ -91,7 +120,7 @@
           <view class="related-title">{{item.title}}</view>
           <view class="related-source">{{item.source}} →</view>
         </view>
-        <image wx:if="{{item.visualFileId}}" class="related-image" src="{{item.visualFileId}}" mode="aspectFill" lazy-load="{{true}}" />
+        <image wx:if="{{item.listVisualFileId}}" class="related-image" src="{{item.listVisualFileId}}" mode="aspectFill" lazy-load="{{true}}" />
       </view>
     </view>
   </block>

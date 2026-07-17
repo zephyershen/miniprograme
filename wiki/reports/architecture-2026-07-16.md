@@ -3,11 +3,13 @@ title: "2026-07-16 模块化架构评审"
 type: report
 tags: [architecture, review, modularity]
 generated_at: 2026-07-16
-status: generated
+status: superseded
 confidence: high
 ---
 
 # 2026-07-16 模块化架构评审
+
+> `superseded`：当前结构和分数以 [2026-07-17 模块化架构评审](architecture-2026-07-17.md) 为准。本页只保留当时阶段证据。
 
 > 本页是结构评审产物，不是事实优先级来源；当前事实以 overview、decision 和 source 为准。
 

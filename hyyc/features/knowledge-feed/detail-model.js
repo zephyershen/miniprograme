@@ -12,15 +12,32 @@ function formatDetailDate(value) {
   return `${year}.${month}.${day} ${hour}:${minute}`;
 }
 
+function previewSlides(fileIds, currentIndex = 0) {
+  const values = Array.isArray(fileIds) ? fileIds : [];
+  const total = values.length;
+  const active = Math.max(0, Math.min(total - 1, Number(currentIndex) || 0));
+  return values.map((fileId, index) => {
+    const distance = Math.abs(index - active);
+    const circularDistance = total > 1 ? Math.min(distance, total - distance) : distance;
+    return { fileId, shouldLoad: circularDistance <= 1 };
+  });
+}
+
 function decorateKnowledgeItem(item, feedItems = []) {
-  const related = item.relatedItems && item.relatedItems.length ? item.relatedItems : buildRelatedItems(feedItems, item);
+  const source = item && typeof item === 'object' ? item : {};
+  const previewFileIds = Array.isArray(source.previewFileIds) ? source.previewFileIds : [];
+  const related = source.relatedItems && source.relatedItems.length
+    ? source.relatedItems
+    : buildRelatedItems(feedItems, source);
   return {
-    ...item,
-    publishedLabel: formatDetailDate(item.publishedAt),
-    readingGuide: buildReadingGuide(item.summary),
-    originAction: getOriginAction(item.url, DIRECT_WEBVIEW_HOSTS),
+    ...source,
+    previewFileIds,
+    previewSlides: previewSlides(previewFileIds, 0),
+    publishedLabel: formatDetailDate(source.publishedAt),
+    readingGuide: buildReadingGuide(source.summary),
+    originAction: getOriginAction(source.url, DIRECT_WEBVIEW_HOSTS),
     relatedItems: related.map((entry) => ({ ...entry, publishedLabel: formatDetailDate(entry.publishedAt) }))
   };
 }
 
-module.exports = { decorateKnowledgeItem };
+module.exports = { decorateKnowledgeItem, previewSlides };

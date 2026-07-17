@@ -3,10 +3,17 @@ const { toIso } = require('../lib/dates');
 const { buildFeedPage } = require('../lib/feed-page');
 const { inferTopicKeys } = require('../lib/topics');
 const { publishableItems } = require('../policies/visual-publication');
+const { FREE_WINDOW_DAYS, freeItemVisible } = require('../policies/feed-access');
+const { qualityTier } = require('../policies/feed-quality');
+const { buildFacetMatrix } = require('../lib/facet-matrix');
 
-function publicItem(item) {
-  const previewFileIds = Array.isArray(item.previewFileIds) ? item.previewFileIds.slice(0, 3) : [];
+function publicItem(item, { includeAllPreviews = false } = {}) {
+  const allPreviewFileIds = Array.isArray(item.previewFileIds)
+    ? item.previewFileIds.filter((fileId) => typeof fileId === 'string' && fileId)
+    : [];
+  const previewFileIds = includeAllPreviews ? allPreviewFileIds : allPreviewFileIds.slice(0, 1);
   const visualFileId = item.coverFileId || previewFileIds[0] || '';
+  const listThumbnailFileId = item.listThumbnailFileId || '';
   return {
     id: item.id,
     title: item.title,
@@ -22,10 +29,17 @@ function publicItem(item) {
     coverTone: item.coverTone,
     coverFileId: item.coverFileId || '',
     previewFileIds,
+    previewCount: allPreviewFileIds.length,
     visualFileId,
+    listThumbnailFileId,
+    listVisualFileId: listThumbnailFileId || visualFileId,
     visualKind: item.coverFileId ? 'cover' : previewFileIds.length ? 'source-preview' : '',
     topicKeys: Array.isArray(item.topicKeys) ? item.topicKeys : inferTopicKeys(item),
-    score: item.score
+    score: item.score,
+    qualityTier: qualityTier(item),
+    curationReason: qualityTier(item) === 'curated' && typeof item.curationReason === 'string'
+      ? item.curationReason
+      : ''
   };
 }
 
@@ -39,12 +53,12 @@ function publicFacet(item) {
 }
 
 function presentFeed(cache, { stale = false, query = {}, now = Date.now() } = {}) {
-  const allItems = publishableItems(cache.items);
+  const allItems = publishableItems(cache.items).filter((item) => freeItemVisible(item, now));
   const page = buildFeedPage(allItems, query, now);
   return {
     updatedAt: toIso(cache.fetchedAt),
     stale,
-    windowDays: 7,
+    windowDays: FREE_WINDOW_DAYS,
     totalAvailable: allItems.length,
     resultCount: page.resultCount,
     offset: page.query.offset,
@@ -53,13 +67,16 @@ function presentFeed(cache, { stale = false, query = {}, now = Date.now() } = {}
     sort: page.query.sort,
     hasMore: page.hasMore,
     items: page.items.map(publicItem),
-    facets: page.query.offset === 0 ? allItems.map(publicFacet) : undefined
+    facetMatrix: page.query.offset === 0
+      ? buildFacetMatrix(allItems, { timeKeys: ['1d', '3d', '7d'], now })
+      : undefined
   };
 }
 
 function publicRelatedItem(item) {
-  const previewFileIds = Array.isArray(item.previewFileIds) ? item.previewFileIds.slice(0, 3) : [];
+  const previewFileIds = Array.isArray(item.previewFileIds) ? item.previewFileIds.slice(0, 1) : [];
   const visualFileId = item.coverFileId || previewFileIds[0] || '';
+  const listThumbnailFileId = item.listThumbnailFileId || '';
   return {
     id: item.id,
     title: item.title,
@@ -72,13 +89,15 @@ function publicRelatedItem(item) {
     coverFileId: item.coverFileId || '',
     previewFileIds,
     visualFileId,
+    listThumbnailFileId,
+    listVisualFileId: listThumbnailFileId || visualFileId,
     visualKind: item.coverFileId ? 'cover' : previewFileIds.length ? 'source-preview' : ''
   };
 }
 
-function relatedItems(cache, current, limit = 3) {
+function relatedItems(cache, current, limit = 3, now = Date.now()) {
   return publishableItems(cache.items)
-    .filter((item) => item.id !== current.id)
+    .filter((item) => item.id !== current.id && freeItemVisible(item, now))
     .map((item, originalIndex) => ({
       item,
       originalIndex,
@@ -89,8 +108,11 @@ function relatedItems(cache, current, limit = 3) {
     .map(({ item }) => publicRelatedItem(item));
 }
 
-function presentItem(cache, item) {
-  return { ...publicItem(item), relatedItems: relatedItems(cache, item) };
+function presentItem(cache, item, { now = Date.now() } = {}) {
+  return {
+    ...publicItem(item, { includeAllPreviews: true }),
+    relatedItems: relatedItems(cache, item, 3, now)
+  };
 }
 
 module.exports = { publicItem, presentFeed, presentItem };

@@ -12,7 +12,7 @@
     <button class="empty-action" bindtap="retryFeed">重新加载</button>
   </view>
 
-  <view wx:elif="{{!feed.visibleItems.length}}" class="empty-editorial">
+  <view wx:elif="{{!feed.leadItem}}" class="empty-editorial">
     <view class="empty-title">没有符合当前条件的资讯</view>
     <view class="empty-copy">可以调整时间或主题，也可以切换其他频道查看。</view>
     <button class="empty-action" bindtap="openFilters">调整筛选</button>
@@ -20,7 +20,7 @@
 
   <block wx:else>
     <view class="lead-story" data-id="{{feed.leadItem.id}}" bindtap="openFeedItem">
-      <image wx:if="{{feed.leadItem.visualFileId}}" class="lead-cover" src="{{feed.leadItem.visualFileId}}" mode="aspectFill" lazy-load="{{true}}" />
+      <image wx:if="{{feed.leadItem.listVisualFileId}}" class="lead-cover" src="{{feed.leadItem.listVisualFileId}}" mode="aspectFill" lazy-load="{{true}}" />
       <view class="story-meta">
         <text class="channel-label channel-text-{{feed.leadItem.coverTone}}">{{feed.leadItem.categoryLabel}}</text>
         <text>{{feed.leadItem.source}}</text>
@@ -43,7 +43,7 @@
       <view
         wx:for="{{feed.remainingItems}}"
         wx:key="id"
-        class="story-row {{item.visualFileId ? '' : 'story-row-no-image'}}"
+        class="story-row {{item.listVisualFileId ? '' : 'story-row-no-image'}}"
         data-id="{{item.id}}"
         bindtap="openFeedItem"
       >
@@ -55,7 +55,7 @@
           <view class="story-title">{{item.title}}</view>
           <view class="story-action">{{item.source}} · {{item.scoreLabel}}</view>
         </view>
-        <image wx:if="{{item.visualFileId}}" class="story-thumbnail" src="{{item.visualFileId}}" mode="aspectFill" lazy-load="{{true}}" />
+        <image wx:if="{{item.listVisualFileId}}" class="story-thumbnail" src="{{item.listVisualFileId}}" mode="aspectFill" lazy-load="{{true}}" />
       </view>
     </view>
 
@@ -65,6 +65,9 @@
     </view>
     <view wx:elif="{{loadMoreError}}" class="feed-page-status feed-page-retry" bindtap="loadMoreFeed">
       {{loadMoreError}} · 点击重试
+    </view>
+    <view wx:if="{{historyBoundaryVisible}}" class="history-boundary" bindtap="openMembership">
+      <view><view class="history-boundary-title">已到普通用户的 7 天边界</view><view class="history-boundary-copy">Pro 可继续查看近 30 天完整历史</view></view><text>→</text>
     </view>
     <view wx:elif="{{!feed.hasMore && feed.loadedCount > 1}}" class="feed-page-status">
       已显示全部 {{feed.resultCount}} 条
@@ -94,7 +97,7 @@
       </view>
       <view class="filter-bar-count">
         <text class="filter-bar-result">{{feed.resultCount}} 条资讯 ↘</text>
-        <text wx:if="{{feed.totalAvailable}}" class="filter-bar-total">本周收录 {{feed.totalAvailable}}</text>
+        <text wx:if="{{feed.accessSummary}}" class="filter-bar-total">{{feed.accessSummary}}</text>
       </view>
     </view>
 
@@ -119,7 +122,7 @@
         <view>
           <view class="filter-panel-kicker">内容筛选</view>
           <view class="filter-panel-title">找到你关心的更新</view>
-          <view class="filter-panel-status">共收录 {{feed.totalAvailable}} 条，筛选结果按当前频道实时计算</view>
+          <view class="filter-panel-status">{{feed.accessSummary}}，筛选结果按当前频道实时计算</view>
         </view>
         <view class="filter-panel-close" bindtap="closeFilters">关闭</view>
       </view>
@@ -136,7 +139,7 @@
               data-group="time"
               data-key="{{item.key}}"
               bindtap="selectFilter"
-            ><text>{{item.label}}</text><text class="filter-choice-count">{{item.count}}</text></view>
+            ><text>{{item.label}}<text wx:if="{{item.locked}}" class="filter-choice-lock"> 🔒</text></text><text class="filter-choice-count">{{item.count}}</text></view>
           </view>
         </view>
 

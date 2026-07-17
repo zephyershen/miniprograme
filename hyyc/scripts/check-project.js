@@ -86,7 +86,7 @@ const cloudFunctions = fs.readdirSync(cloudFunctionRoot, { withFileTypes: true }
   .filter((entry) => entry.isDirectory())
   .map((entry) => entry.name)
   .sort();
-const expectedFunctions = ['digestIngest', 'digestStore', 'knowledgeFeed'];
+const expectedFunctions = ['digestIngest', 'digestStore', 'knowledgeFeed', 'knowledgeOps'];
 if (JSON.stringify(cloudFunctions) !== JSON.stringify(expectedFunctions)) {
   throw new Error(`Unexpected cloud functions: ${cloudFunctions.join(', ')}`);
 }

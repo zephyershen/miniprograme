@@ -17,6 +17,32 @@ function patchVisualFileIds(fields) {
   return visualFileIds([fields || {}]);
 }
 
+function toMillis(value) {
+  if (!value) return Number.NaN;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value.toDate === 'function') return value.toDate().getTime();
+  return new Date(value).getTime();
+}
+
+function sourceLeaseLost() {
+  const error = new Error('SOURCE_SYNC_LEASE_LOST');
+  error.code = 'SOURCE_SYNC_LEASE_LOST';
+  return error;
+}
+
+function assertSourceLease(current, lease) {
+  if (!lease) return;
+  const currentTime = toMillis(lease.now);
+  const expiresAt = toMillis(current && current.sourceSyncLeaseUntil);
+  if (!current
+    || current.sourceSyncLeaseOwner !== lease.owner
+    || !Number.isFinite(currentTime)
+    || !Number.isFinite(expiresAt)
+    || expiresAt <= currentTime) {
+    throw sourceLeaseLost();
+  }
+}
+
 function createFeedCacheRepository(db, config) {
   const document = () => db.collection(config.collectionName).doc(config.documentId);
 
@@ -29,7 +55,7 @@ function createFeedCacheRepository(db, config) {
     }
   }
 
-  async function replace(data, prepareDocument = (next) => next) {
+  async function replace(data, prepareDocument = (next) => next, lease = null) {
     return db.runTransaction(async (transaction) => {
       const reference = transaction.collection(config.collectionName).doc(config.documentId);
       let current = null;
@@ -38,14 +64,107 @@ function createFeedCacheRepository(db, config) {
       } catch (error) {
         if (!isNotFound(error)) throw error;
       }
-      const next = prepareDocument(data, current);
+      assertSourceLease(current, lease);
+      const prepared = prepareDocument(data, current);
+      const next = lease ? {
+        ...prepared,
+        sourceSyncLeaseOwner: current.sourceSyncLeaseOwner,
+        sourceSyncLeaseUntil: current.sourceSyncLeaseUntil,
+        sourceSyncLeaseAcquiredAt: current.sourceSyncLeaseAcquiredAt
+      } : prepared;
       await reference.set({ data: next });
       return { document: next, previous: current };
     });
   }
 
-  async function touch(at) {
-    await document().update({ data: { fetchedAt: at, updatedAt: at } });
+  async function acquireSourceSyncLease(owner, acquiredAt, expiresAt) {
+    return db.runTransaction(async (transaction) => {
+      const reference = transaction.collection(config.collectionName).doc(config.documentId);
+      let current = null;
+      try {
+        current = (await reference.get()).data;
+      } catch (error) {
+        if (!isNotFound(error)) throw error;
+      }
+      const activeUntil = toMillis(current && current.sourceSyncLeaseUntil);
+      if (current && current.sourceSyncLeaseOwner && activeUntil > toMillis(acquiredAt)) {
+        return { acquired: false, document: current };
+      }
+      const fields = {
+        sourceSyncLeaseOwner: owner,
+        sourceSyncLeaseAcquiredAt: acquiredAt,
+        sourceSyncLeaseUntil: expiresAt
+      };
+      if (current) await reference.update({ data: fields });
+      else await reference.set({ data: fields });
+      return { acquired: true, document: { ...(current || {}), ...fields } };
+    });
+  }
+
+  async function releaseSourceSyncLease(owner) {
+    return db.runTransaction(async (transaction) => {
+      const reference = transaction.collection(config.collectionName).doc(config.documentId);
+      let current = null;
+      try {
+        current = (await reference.get()).data;
+      } catch (error) {
+        if (isNotFound(error)) return false;
+        throw error;
+      }
+      if (current.sourceSyncLeaseOwner !== owner) return false;
+      await reference.update({
+        data: {
+          sourceSyncLeaseOwner: '',
+          sourceSyncLeaseAcquiredAt: null,
+          sourceSyncLeaseUntil: null
+        }
+      });
+      return true;
+    });
+  }
+
+  async function patchSourceState(fields, lease = null) {
+    return db.runTransaction(async (transaction) => {
+      const reference = transaction.collection(config.collectionName).doc(config.documentId);
+      const current = (await reference.get()).data;
+      assertSourceLease(current, lease);
+      await reference.update({ data: fields });
+      return { ...current, ...fields };
+    });
+  }
+
+  async function acquireVisualLease(owner, acquiredAt, expiresAt) {
+    return db.runTransaction(async (transaction) => {
+      const reference = transaction.collection(config.collectionName).doc(config.documentId);
+      const current = (await reference.get()).data;
+      const activeUntil = toMillis(current && current.visualLeaseUntil);
+      if (current.visualLeaseOwner && activeUntil > toMillis(acquiredAt)) {
+        return { acquired: false, document: current };
+      }
+      const fields = {
+        visualLeaseOwner: owner,
+        visualLeaseAcquiredAt: acquiredAt,
+        visualLeaseUntil: expiresAt
+      };
+      await reference.update({ data: fields });
+      return { acquired: true, document: { ...current, ...fields } };
+    });
+  }
+
+  async function releaseVisualLease(owner) {
+    return db.runTransaction(async (transaction) => {
+      const reference = transaction.collection(config.collectionName).doc(config.documentId);
+      const current = (await reference.get()).data;
+      if (current.visualLeaseOwner !== owner) return false;
+      await reference.update({
+        data: {
+          visualLeaseOwner: '',
+          visualLeaseAcquiredAt: null,
+          visualLeaseUntil: null
+        }
+      });
+      return true;
+    });
   }
 
   async function patchItems(patches, updatedAt, visualDeletes = []) {
@@ -80,6 +199,23 @@ function createFeedCacheRepository(db, config) {
       const visualDeleteClaims = [...claimedDeletes];
       await reference.update({ data: { items, pendingVisualDeletes, visualDeleteClaims, updatedAt } });
       return { items, appliedIds: [...appliedIds], pendingVisualDeletes, visualDeleteClaims };
+    });
+  }
+
+  async function queueVisualDeletes(fileIds, updatedAt) {
+    const requested = new Set((Array.isArray(fileIds) ? fileIds : [])
+      .filter((fileId) => typeof fileId === 'string' && fileId));
+    return db.runTransaction(async (transaction) => {
+      const reference = transaction.collection(config.collectionName).doc(config.documentId);
+      const current = (await reference.get()).data;
+      const activeVisuals = visualFileIds(current.items);
+      const claims = new Set(Array.isArray(current.visualDeleteClaims) ? current.visualDeleteClaims : []);
+      const pendingVisualDeletes = [...new Set([
+        ...(Array.isArray(current.pendingVisualDeletes) ? current.pendingVisualDeletes : []),
+        ...requested
+      ])].filter((fileId) => !activeVisuals.has(fileId) && !claims.has(fileId));
+      await reference.update({ data: { pendingVisualDeletes, updatedAt } });
+      return pendingVisualDeletes;
     });
   }
 
@@ -125,11 +261,20 @@ function createFeedCacheRepository(db, config) {
   return {
     get,
     replace,
-    touch,
+    acquireSourceSyncLease,
+    releaseSourceSyncLease,
+    patchSourceState,
+    acquireVisualLease,
+    releaseVisualLease,
     patchItems,
+    queueVisualDeletes,
     claimVisualDeletes,
     acknowledgeVisualDeletes
   };
 }
 
-module.exports = { visualFileIds, createFeedCacheRepository };
+module.exports = {
+  visualFileIds,
+  createFeedCacheRepository,
+  assertSourceLease
+};

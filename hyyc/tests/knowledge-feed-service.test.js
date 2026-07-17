@@ -5,12 +5,32 @@ const { createFeedService } = require('../cloudfunctions/knowledgeFeed/services/
 const { createCoverService } = require('../cloudfunctions/knowledgeFeed/services/cover-service');
 const { visualPathStem } = require('../cloudfunctions/knowledgeFeed/lib/visual-version');
 const {
-  createVisualMaintenanceService,
-  isVisualMaintenanceEvent
+  createSourceSyncService,
+  prepareRefreshedDocument
+} = require('../cloudfunctions/knowledgeFeed/services/source-sync-service');
+const {
+  createVisualMaintenanceService
 } = require('../cloudfunctions/knowledgeFeed/services/visual-maintenance-service');
+const {
+  createSyncCycleService,
+  isVisualMaintenanceDue,
+  isVisualCleanupTick
+} = require('../cloudfunctions/knowledgeFeed/services/sync-cycle-service');
+const {
+  createVisualCleanupService
+} = require('../cloudfunctions/knowledgeFeed/services/visual-cleanup-service');
 
 const NOW = Date.parse('2026-07-16T01:00:00.000Z');
-const CACHE_CONFIG = { ttlMs: 15 * 60 * 1000, forceMinAgeMs: 60 * 1000 };
+const SOURCE_SYNC_CONFIG = {
+  triggerName: 'knowledge-feed-source-sync',
+  leaseMs: 2 * 60 * 1000,
+  itemsRevalidateMs: 15 * 60 * 1000,
+  fullRefreshMs: 6 * 60 * 60 * 1000,
+  rateLimitBackoffMs: 60 * 1000,
+  serverErrorBaseBackoffMs: 60 * 1000,
+  defaultBackoffMs: 5 * 60 * 1000,
+  maxBackoffMs: 15 * 60 * 1000
+};
 
 function feedItem(overrides = {}) {
   return {
@@ -51,7 +71,7 @@ function repositoryWith(cache) {
       document: prepareDocument(data, cache),
       previous: cache
     }),
-    touch: async () => {},
+    patchSourceState: async () => {},
     patchItems: async () => ({
       items: (cache && cache.items) || [],
       appliedIds: [],
@@ -60,6 +80,89 @@ function repositoryWith(cache) {
     claimVisualDeletes: async (fileIds) => fileIds,
     acknowledgeVisualDeletes: async () => []
   };
+}
+
+function memoryRepository(initial) {
+  let cache = initial;
+  function assertLease(lease) {
+    if (!lease) return;
+    if (!cache
+      || cache.sourceSyncLeaseOwner !== lease.owner
+      || cache.sourceSyncLeaseUntil.getTime() <= lease.now.getTime()) {
+      const error = new Error('SOURCE_SYNC_LEASE_LOST');
+      error.code = 'SOURCE_SYNC_LEASE_LOST';
+      throw error;
+    }
+  }
+  const repository = {
+    get: async () => cache,
+    acquireSourceSyncLease: async (owner, acquiredAt, expiresAt) => {
+      if (cache && cache.sourceSyncLeaseOwner
+        && cache.sourceSyncLeaseUntil.getTime() > acquiredAt.getTime()) {
+        return { acquired: false, document: cache };
+      }
+      cache = {
+        ...(cache || {}),
+        sourceSyncLeaseOwner: owner,
+        sourceSyncLeaseAcquiredAt: acquiredAt,
+        sourceSyncLeaseUntil: expiresAt
+      };
+      return { acquired: true, document: cache };
+    },
+    releaseSourceSyncLease: async (owner) => {
+      if (!cache || cache.sourceSyncLeaseOwner !== owner) return false;
+      cache = {
+        ...cache,
+        sourceSyncLeaseOwner: '',
+        sourceSyncLeaseAcquiredAt: null,
+        sourceSyncLeaseUntil: null
+      };
+      return true;
+    },
+    replace: async (data, prepareDocument, lease) => {
+      assertLease(lease);
+      const previous = cache;
+      cache = {
+        ...prepareDocument(data, cache),
+        sourceSyncLeaseOwner: cache.sourceSyncLeaseOwner,
+        sourceSyncLeaseAcquiredAt: cache.sourceSyncLeaseAcquiredAt,
+        sourceSyncLeaseUntil: cache.sourceSyncLeaseUntil
+      };
+      return { document: cache, previous };
+    },
+    patchSourceState: async (fields, lease) => {
+      assertLease(lease);
+      cache = { ...cache, ...fields };
+      return cache;
+    },
+    claimVisualDeletes: async (fileIds) => {
+      const active = new Set(((cache && cache.items) || []).flatMap((item) => [
+        item.coverFileId,
+        ...(Array.isArray(item.previewFileIds) ? item.previewFileIds : [])
+      ]).filter(Boolean));
+      const pending = new Set((cache && cache.pendingVisualDeletes) || []);
+      const claims = new Set((cache && cache.visualDeleteClaims) || []);
+      const claimed = fileIds.filter((fileId) => !active.has(fileId)
+        && (pending.has(fileId) || claims.has(fileId)));
+      claimed.forEach((fileId) => {
+        pending.delete(fileId);
+        claims.add(fileId);
+      });
+      cache = { ...cache, pendingVisualDeletes: [...pending], visualDeleteClaims: [...claims] };
+      return claimed;
+    },
+    acknowledgeVisualDeletes: async (fileIds) => {
+      const acknowledged = new Set(fileIds);
+      cache = {
+        ...cache,
+        pendingVisualDeletes: (cache.pendingVisualDeletes || [])
+          .filter((fileId) => !acknowledged.has(fileId)),
+        visualDeleteClaims: (cache.visualDeleteClaims || [])
+          .filter((fileId) => !acknowledged.has(fileId))
+      };
+    }
+  };
+  return { repository, read: () => cache };
 }
 
 test('serves the existing public feed contract through the feed service boundary', async () => {
@@ -73,7 +176,6 @@ test('serves the existing public feed contract through the feed service boundary
   const service = createFeedService({
     repository: repositoryWith(cache),
     source: { provider: 'test', loadSelected: async () => { throw new Error('should not refresh'); } },
-    cacheConfig: CACHE_CONFIG,
     now: () => NOW
   });
   const result = await service.getFeed({ sort: 'hot', limit: 1, filters: { time: '7d' } });
@@ -86,29 +188,38 @@ test('serves the existing public feed contract through the feed service boundary
 
 test('uses a source preview as the public visual without pretending it is an original cover', async () => {
   const previewFileId = 'cloud://env.bucket/knowledge-previews/source/item0001-1.jpg';
+  const thumbnailFileId = 'cloud://env.bucket/knowledge-thumbnails/list/item0001.jpg';
   const cache = {
     fetchedAt: new Date(NOW - 1000),
-    items: [feedItem({ previewFileIds: [previewFileId], previewStatus: 'ready' })]
+    items: [feedItem({
+      previewFileIds: [previewFileId],
+      previewStatus: 'ready',
+      listThumbnailFileId: thumbnailFileId,
+      listThumbnailVersion: 1
+    })]
   };
   const service = createFeedService({
     repository: repositoryWith(cache),
     source: { provider: 'test', loadSelected: async () => { throw new Error('should not refresh'); } },
-    cacheConfig: CACHE_CONFIG,
     now: () => NOW
   });
   const result = await service.getFeed({ filters: { time: '7d' } });
   assert.equal(result.items[0].coverFileId, '');
   assert.equal(result.items[0].visualFileId, previewFileId);
+  assert.equal(result.items[0].listVisualFileId, thumbnailFileId);
   assert.equal(result.items[0].visualKind, 'source-preview');
   assert.equal(result.items[0].previewStatus, undefined);
 });
 
-test('returns stale cached content when source refresh fails', async () => {
-  const cache = { fetchedAt: new Date(NOW - 60 * 60 * 1000), items: [readyFeedItem()] };
+test('returns cached content as stale after the source synchronizer records a failure', async () => {
+  const cache = {
+    fetchedAt: new Date(NOW - 60 * 60 * 1000),
+    sourceLastErrorCode: 'FEED_SOURCE_503',
+    items: [readyFeedItem()]
+  };
   const service = createFeedService({
     repository: repositoryWith(cache),
     source: { provider: 'test', loadSelected: async () => { throw new Error('offline'); } },
-    cacheConfig: CACHE_CONFIG,
     now: () => NOW,
     logger: { error() {} }
   });
@@ -141,16 +252,49 @@ test('stages refreshed items until a cover or source preview is ready', async ()
   const service = createFeedService({
     repository,
     source: { provider: 'test', loadSelected: async () => ({ etag: 'new', items: [pending, ready] }) },
-    cacheConfig: CACHE_CONFIG,
     now: () => NOW
   });
 
+  stored = prepareRefreshedDocument({
+    fetchedAt: new Date(NOW),
+    items: [pending, ready]
+  }, stored, []);
   const result = await service.getFeed({ filters: { time: '7d' } });
   assert.deepEqual(stored.items.map((item) => item.id), ['pending01', 'item0001']);
   assert.deepEqual(result.items.map((item) => item.id), ['item0001']);
   assert.equal(result.totalAvailable, 1);
-  assert.equal(result.facets.length, 1);
+  assert.equal(result.facetMatrix.version, 1);
   await assert.rejects(() => service.getItem('pending01'), { code: 'ITEM_NOT_FOUND' });
+});
+
+test('keeps archived items out of the free seven-day feed and returns all screenshots only in detail', async () => {
+  const previewFileIds = Array.from({ length: 5 }, (_, index) => (
+    `cloud://env.bucket/knowledge-previews/source/current-${index + 1}.jpg`
+  ));
+  const current = feedItem({
+    id: 'current01',
+    coverFileId: '',
+    previewFileIds,
+    previewStatus: 'ready',
+    publishedAt: new Date(NOW - 60 * 60 * 1000).toISOString()
+  });
+  const archived = readyFeedItem({
+    id: 'archive01',
+    publishedAt: new Date(NOW - (8 * 24 * 60 * 60 * 1000)).toISOString()
+  });
+  const service = createFeedService({
+    repository: repositoryWith({ fetchedAt: new Date(NOW), items: [current, archived] }),
+    now: () => NOW
+  });
+
+  const feed = await service.getFeed({ filters: { time: '7d' } });
+  assert.deepEqual(feed.items.map((item) => item.id), ['current01']);
+  assert.equal(feed.items[0].previewFileIds.length, 1);
+  assert.equal(feed.items[0].previewCount, 5);
+  const detail = await service.getItem('current01');
+  assert.equal(detail.previewFileIds.length, 5);
+  assert.equal(detail.relatedItems.length, 0);
+  await assert.rejects(() => service.getItem('archive01'), { code: 'ITEM_NOT_FOUND' });
 });
 
 test('does not reuse a visual when an upstream item keeps its id but changes URL', async () => {
@@ -161,7 +305,7 @@ test('does not reuse a visual when an upstream item keeps its id but changes URL
   };
   let stored = previous;
   const repository = {
-    get: async () => previous,
+    get: async () => stored,
     replace: async (data, prepareDocument) => {
       stored = prepareDocument(data, previous);
       return { document: stored, previous };
@@ -177,10 +321,13 @@ test('does not reuse a visual when an upstream item keeps its id but changes URL
         items: [feedItem({ url: 'https://example.com/replaced-article' })]
       })
     },
-    cacheConfig: CACHE_CONFIG,
     now: () => NOW
   });
 
+  stored = prepareRefreshedDocument({
+    fetchedAt: new Date(NOW),
+    items: [feedItem({ url: 'https://example.com/replaced-article' })]
+  }, previous, []);
   const result = await service.getFeed({ filters: { time: '7d' } });
   assert.equal(result.items.length, 0);
   assert.deepEqual(stored.items[0].previewFileIds, []);
@@ -196,8 +343,12 @@ test('merges visual fields from the latest transaction snapshot during a feed re
     ...staleCache,
     items: [feedItem({ previewFileIds: [previewFileId], previewStatus: 'ready' })]
   };
+  const mergedCache = prepareRefreshedDocument({
+    fetchedAt: new Date(NOW),
+    items: [feedItem({ title: '刷新后的标题' })]
+  }, latestCache, []);
   const repository = {
-    get: async () => staleCache,
+    get: async () => mergedCache,
     touch: async () => {},
     replace: async (data, prepareDocument) => ({
       document: prepareDocument(data, latestCache),
@@ -211,7 +362,6 @@ test('merges visual fields from the latest transaction snapshot during a feed re
       provider: 'test',
       loadSelected: async () => ({ etag: 'new', items: [feedItem({ title: '刷新后的标题' })] })
     },
-    cacheConfig: CACHE_CONFIG,
     now: () => NOW
   });
   const result = await service.getFeed({ filters: { time: '7d' } });
@@ -239,23 +389,35 @@ test('deletes only orphaned visuals owned by the knowledge feed after refresh', 
   };
   const deleted = [];
   const acknowledged = [];
-  const repository = repositoryWith(cache);
-  repository.acknowledgeVisualDeletes = async (fileIds) => acknowledged.push(...fileIds);
-  const service = createFeedService({
+  const memory = memoryRepository(cache);
+  const repository = memory.repository;
+  const acknowledgeVisualDeletes = repository.acknowledgeVisualDeletes;
+  repository.acknowledgeVisualDeletes = async (fileIds) => {
+    acknowledged.push(...fileIds);
+    await acknowledgeVisualDeletes(fileIds);
+  };
+  const service = createSourceSyncService({
     repository,
     source: {
       provider: 'test',
+      loadFingerprint: async () => ({ selected: 'new', all: 'all', etag: 'fingerprint-new' }),
       loadSelected: async () => ({ etag: 'new', items: [feedItem()] })
     },
-    cacheConfig: CACHE_CONFIG,
+    config: SOURCE_SYNC_CONFIG,
+    ownedVisualPrefixes: [coverPrefix, previewPrefix],
+    now: () => NOW
+  });
+  const cleanup = createVisualCleanupService({
+    repository,
     ownedVisualPrefixes: [coverPrefix, previewPrefix],
     deleteFiles: async (fileIds) => {
       deleted.push(...fileIds);
       return { deletedFileIds: fileIds, retryFileIds: [], uncertain: false };
     },
-    now: () => NOW
+    now: () => new Date(NOW)
   });
-  await service.getFeed({ filters: { time: '7d' } });
+  await service.poll();
+  await cleanup.run();
   assert.deepEqual(deleted.sort(), [orphanedCover, orphanedPreview].sort());
   assert.equal(deleted.includes(retainedPreview), false);
   assert.equal(deleted.includes(foreignFile), false);
@@ -269,6 +431,9 @@ test('keeps partial and unacknowledged visual deletes claimed until a later retr
   const foreign = 'cloud://env.bucket/user-uploads/avatar.jpg';
   let cache = {
     fetchedAt: new Date(NOW - 60 * 60 * 1000),
+    sourceFullSyncedAt: new Date(NOW),
+    sourceAppliedFingerprint: 'same',
+    sourceObservedFingerprint: 'same',
     items: [feedItem()],
     pendingVisualDeletes: [deletedBeforeAck, retryAfterPartial, foreign],
     visualDeleteClaims: []
@@ -276,9 +441,44 @@ test('keeps partial and unacknowledged visual deletes claimed until a later retr
   let cleanupAttempt = 0;
   let acknowledgeAttempt = 0;
   const deleteCalls = [];
+  function assertLease(lease) {
+    if (cache.sourceSyncLeaseOwner !== lease.owner
+      || cache.sourceSyncLeaseUntil.getTime() <= lease.now.getTime()) {
+      const error = new Error('SOURCE_SYNC_LEASE_LOST');
+      error.code = 'SOURCE_SYNC_LEASE_LOST';
+      throw error;
+    }
+  }
   const repository = {
     get: async () => cache,
-    touch: async () => {},
+    acquireSourceSyncLease: async (owner, acquiredAt, expiresAt) => {
+      if (cache.sourceSyncLeaseOwner
+        && cache.sourceSyncLeaseUntil.getTime() > acquiredAt.getTime()) {
+        return { acquired: false, document: cache };
+      }
+      cache = {
+        ...cache,
+        sourceSyncLeaseOwner: owner,
+        sourceSyncLeaseAcquiredAt: acquiredAt,
+        sourceSyncLeaseUntil: expiresAt
+      };
+      return { acquired: true, document: cache };
+    },
+    releaseSourceSyncLease: async (owner) => {
+      if (cache.sourceSyncLeaseOwner !== owner) return false;
+      cache = {
+        ...cache,
+        sourceSyncLeaseOwner: '',
+        sourceSyncLeaseAcquiredAt: null,
+        sourceSyncLeaseUntil: null
+      };
+      return true;
+    },
+    patchSourceState: async (fields, lease) => {
+      assertLease(lease);
+      cache = { ...cache, ...fields };
+      return cache;
+    },
     claimVisualDeletes: async (fileIds) => {
       const active = new Set(cache.items.flatMap((item) => [
         item.coverFileId,
@@ -306,10 +506,8 @@ test('keeps partial and unacknowledged visual deletes claimed until a later retr
       };
     }
   };
-  const service = createFeedService({
+  const cleanup = createVisualCleanupService({
     repository,
-    source: { provider: 'test', loadSelected: async () => ({ notModified: true }) },
-    cacheConfig: CACHE_CONFIG,
     ownedVisualPrefixes: [previewPrefix],
     deleteFiles: async (fileIds) => {
       cleanupAttempt += 1;
@@ -323,15 +521,15 @@ test('keeps partial and unacknowledged visual deletes claimed until a later retr
       }
       return { deletedFileIds: fileIds, retryFileIds: [], uncertain: false };
     },
-    now: () => NOW,
+    now: () => new Date(NOW),
     logger: { warn() {}, error() {} }
   });
 
-  await service.getFeed({ filters: { time: '7d' } });
+  await cleanup.run();
   assert.deepEqual(cache.pendingVisualDeletes, [foreign]);
   assert.deepEqual(cache.visualDeleteClaims.sort(), [deletedBeforeAck, retryAfterPartial].sort());
 
-  await service.getFeed({ filters: { time: '7d' } });
+  await cleanup.run();
   assert.deepEqual(deleteCalls[1].sort(), [deletedBeforeAck, retryAfterPartial].sort());
   assert.deepEqual(cache.visualDeleteClaims, []);
   assert.deepEqual(cache.pendingVisualDeletes, [foreign]);
@@ -341,7 +539,6 @@ test('fails with the stable public error when no cache or source is available', 
   const service = createFeedService({
     repository: repositoryWith(null),
     source: { provider: 'test', loadSelected: async () => { throw new Error('offline'); } },
-    cacheConfig: CACHE_CONFIG,
     now: () => NOW,
     logger: { error() {} }
   });
@@ -453,31 +650,21 @@ test('uploads a unique cover revision and writes it only for the current source 
   assert.deepEqual(receivedPatches[0].discardFileIds, [firstFileId]);
 });
 
-test('runs visual preparation only for the configured timer trigger', async () => {
-  const triggerName = 'knowledge-feed-visual-sync';
-  const event = { Type: 'Timer', TriggerName: triggerName };
-  assert.equal(isVisualMaintenanceEvent(event, triggerName, 'timer'), true);
-  assert.equal(isVisualMaintenanceEvent(event, triggerName, 'api'), false);
-  assert.equal(isVisualMaintenanceEvent({ ...event, TriggerName: 'other' }, triggerName, 'timer'), false);
-
+test('runs only due preview retries during scheduled visual maintenance', async () => {
   const calls = [];
   const service = createVisualMaintenanceService({
-    cloud: { getWXContext: () => ({}) },
-    feedService: {
-      getFeed: async (query) => {
-        calls.push(['feed', query]);
-        return { updatedAt: '2026-07-16T01:00:00.000Z', stale: false };
+    sourceSyncService: {
+      ensureCache: async () => {
+        calls.push(['cache']);
+        return { fetchedAt: '2026-07-16T01:00:00.000Z', sourceLastErrorCode: '' };
       }
     },
     coverService: {
-      hydrateCovers: async (limit, force, scheduled) => {
-        calls.push(['covers', limit, force, scheduled]);
-        return { attempted: 1, resolved: 0, missing: 1 };
-      }
+      hydrateCovers: async () => { throw new Error('scheduled maintenance must not ingest new covers'); }
     },
     previewService: {
-      hydratePreviews: async (limit, force, token) => {
-        calls.push(['previews', limit, force, token]);
+      hydratePreviews: async (limit, force, token, options) => {
+        calls.push(['previews', limit, force, token, options]);
         return { attempted: 1, resolved: 1 };
       },
       maintenanceStatus: async (token) => {
@@ -486,28 +673,150 @@ test('runs visual preparation only for the configured timer trigger', async () =
       }
     },
     previewMaintenanceToken: 'm'.repeat(40),
-    config: { triggerName, coverBatchSize: 9, previewBatchSize: 2 },
-    triggerSource: 'timer',
+    config: {
+      coverBatchSize: 9,
+      previewBatchSize: 1,
+      immediateCoverBatchSize: 3,
+      immediatePreviewBatchSize: 1
+    },
     logger: { info() {} }
   });
 
-  const result = await service.run(event);
-  assert.equal(result.status.totalWithVisuals, 2);
+  const result = await service.runMaintenance();
+  assert.equal(result.publication.totalWithVisuals, 2);
+  assert.equal(result.covers.skipped, true);
   assert.deepEqual(calls, [
-    ['feed', { limit: 1 }],
-    ['covers', 9, false, true],
-    ['previews', 2, false, 'm'.repeat(40)],
+    ['cache'],
+    ['previews', 1, false, 'm'.repeat(40), { retryOnly: true }],
     ['status', 'm'.repeat(40)]
   ]);
+});
 
-  const userService = createVisualMaintenanceService({
-    cloud: { getWXContext: () => ({ OPENID: 'user-openid' }) },
-    feedService: {},
-    coverService: {},
-    previewService: {},
+test('runs visual cleanup at most hourly unless explicitly forced', async () => {
+  let clock = new Date('2026-07-16T01:00:00.000Z');
+  let cleanupCalls = 0;
+  const cache = {
+    fetchedAt: clock,
+    sourceLastErrorCode: '',
+    visualCleanupCheckedAt: new Date('2026-07-16T00:30:00.000Z')
+  };
+  const service = createVisualMaintenanceService({
+    repository: {
+      patchSourceState: async (fields) => { Object.assign(cache, fields); }
+    },
+    sourceSyncService: { ensureCache: async () => cache },
+    coverService: { hydrateCovers: async () => { throw new Error('cover ingestion is not maintenance'); } },
+    previewService: {
+      hydratePreviews: async () => ({ attempted: 0, resolved: 0, failed: 0 }),
+      maintenanceStatus: async () => ({ totalItems: 0, totalWithVisuals: 0 })
+    },
+    cleanupService: {
+      run: async () => {
+        cleanupCalls += 1;
+        return { attempted: 2, deleted: 2, retry: 0 };
+      }
+    },
     previewMaintenanceToken: 'm'.repeat(40),
-    config: { triggerName, coverBatchSize: 9, previewBatchSize: 2 },
-    triggerSource: 'api'
+    config: { previewBatchSize: 1, leaseMs: 4 * 60 * 1000 },
+    now: () => clock.getTime(),
+    logger: { info() {}, warn() {} }
   });
-  await assert.rejects(() => userService.run(event), { code: 'TEMPORARY_FAILURE' });
+
+  const early = await service.runMaintenance();
+  assert.equal(early.cleanup.skipped, true);
+  assert.equal(cleanupCalls, 0);
+
+  clock = new Date('2026-07-16T01:30:00.000Z');
+  const due = await service.runMaintenance();
+  assert.equal(due.cleanup.skipped, false);
+  assert.equal(cleanupCalls, 1);
+  assert.equal(cache.visualCleanupCheckedAt.toISOString(), '2026-07-16T01:30:00.000Z');
+
+  clock = new Date('2026-07-16T01:35:00.000Z');
+  const skipped = await service.runMaintenance();
+  assert.equal(skipped.cleanup.skipped, true);
+  assert.equal(cleanupCalls, 1);
+
+  const forced = await service.runMaintenance({ forceCleanup: true });
+  assert.equal(forced.cleanup.skipped, false);
+  assert.equal(cleanupCalls, 2);
+});
+
+test('runs visual maintenance every five scheduled minutes in the single timer cycle', async () => {
+  const calls = [];
+  const maintenanceOptions = [];
+  const service = createSyncCycleService({
+    sourceSyncService: {
+      run: async () => {
+        calls.push('source');
+        return { triggerName: 'knowledge-feed-source-sync', status: 'unchanged' };
+      }
+    },
+    visualMaintenanceService: {
+      preparePendingPublication: async () => {
+        calls.push('immediate');
+        return { publication: { totalWithVisuals: 2 } };
+      },
+      runMaintenance: async (options) => {
+        calls.push('maintenance');
+        maintenanceOptions.push(options);
+        return { publication: { totalWithVisuals: 2 } };
+      }
+    },
+    visualIntervalMinutes: 5
+  });
+
+  const dueEvent = { Time: '2026-07-17T00:10:00.000Z' };
+  const idleEvent = { Time: '2026-07-17T00:11:00.000Z' };
+  assert.equal(isVisualMaintenanceDue(dueEvent, 5), true);
+  assert.equal(isVisualMaintenanceDue(idleEvent, 5), false);
+  assert.equal(isVisualCleanupTick(dueEvent), false);
+  assert.equal(isVisualCleanupTick({ Time: '2026-07-17T01:00:00.000Z' }), true);
+  const due = await service.run(dueEvent);
+  const idle = await service.run(idleEvent);
+  assert.equal(due.visualMaintenance.publication.totalWithVisuals, 2);
+  assert.equal(idle.visualMaintenance, null);
+  assert.deepEqual(calls, [
+    'source', 'immediate', 'maintenance',
+    'source', 'immediate'
+  ]);
+  assert.deepEqual(maintenanceOptions, [{ forceCleanup: false }]);
+});
+
+test('prepares newly discovered item visuals in the same minute cycle', async () => {
+  const prepared = [];
+  let archiveCalls = 0;
+  const service = createSyncCycleService({
+    sourceSyncService: {
+      run: async () => ({
+        triggerName: 'knowledge-feed-source-sync',
+        status: 'updated',
+        changed: true,
+        pendingVisualItemIds: ['newitem01', 'newitem02']
+      })
+    },
+    archiveService: {
+      run: async () => { archiveCalls += 1; return { status: 'ready' }; }
+    },
+    visualMaintenanceService: {
+      preparePendingPublication: async (itemIds) => {
+        prepared.push(...itemIds);
+        return {
+          covers: { attempted: 2 },
+          previews: { attempted: 0 },
+          publication: { pendingPublication: 0 }
+        };
+      },
+      runMaintenance: async () => ({ publication: { pendingPublication: 0 } })
+    },
+    visualIntervalMinutes: 5
+  });
+
+  const result = await service.run({ Time: '2026-07-17T00:10:00.000Z' });
+  assert.deepEqual(prepared, ['newitem01', 'newitem02']);
+  assert.equal(result.pendingVisualCount, 2);
+  assert.equal(archiveCalls, 0);
+  assert.deepEqual(result.archive, { status: 'deferred', reason: 'immediate-visuals' });
+  assert.equal(result.visualMaintenance, null);
+  assert.equal(result.visualMaintenanceDeferred, 'immediate-visuals');
 });

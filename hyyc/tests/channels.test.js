@@ -20,6 +20,7 @@ test('decorates channel navigation with active state and counts', () => {
     { channelKey: 'english' }
   ];
   const channels = decorateChannels(entries, 'ai');
+  assert.equal(channels[0].label, '全部');
   assert.equal(channels.find((channel) => channel.key === 'all').count, 3);
   assert.equal(channels.find((channel) => channel.key === 'ai').count, 2);
   assert.equal(channels.find((channel) => channel.key === 'ai').active, true);

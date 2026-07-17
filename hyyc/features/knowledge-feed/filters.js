@@ -1,7 +1,8 @@
 const TIME_WINDOWS = Object.freeze({
   '1d': 24 * 60 * 60 * 1000,
   '3d': 3 * 24 * 60 * 60 * 1000,
-  '7d': 7 * 24 * 60 * 60 * 1000
+  '7d': 7 * 24 * 60 * 60 * 1000,
+  '30d': 30 * 24 * 60 * 60 * 1000
 });
 
 function hasTopic(item, key) {
@@ -9,11 +10,12 @@ function hasTopic(item, key) {
 }
 
 function filterFeedItems(items, filters, now = Date.now()) {
+  const showAll = filters.time === 'all';
   const windowMs = TIME_WINDOWS[filters.time] || TIME_WINDOWS['7d'];
   const threshold = now - windowMs;
   return (items || []).filter((item) => {
     const publishedAt = new Date(item.publishedAt).getTime();
-    const withinTime = filters.time === '7d' || (Number.isFinite(publishedAt) && publishedAt >= threshold);
+    const withinTime = Number.isFinite(publishedAt) && (showAll || publishedAt >= threshold);
     return withinTime && hasTopic(item, filters.company) && hasTopic(item, filters.direction);
   });
 }

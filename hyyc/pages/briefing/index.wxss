@@ -1,0 +1,46 @@
+.briefing-page { box-sizing: border-box; min-height: 100vh; padding: 30rpx var(--editorial-gutter) 100rpx; }
+.briefing-header { padding: 8rpx 0 28rpx; border-bottom: 1rpx solid var(--editorial-ink); }
+.briefing-kicker { display: flex; align-items: center; gap: 12rpx; color: var(--editorial-muted); font-size: 18rpx; font-weight: 760; letter-spacing: 2rpx; }
+.briefing-kicker text { width: 26rpx; height: 5rpx; background: var(--editorial-blue); }
+.briefing-title { margin-top: 18rpx; font-size: 52rpx; font-weight: 850; line-height: 1.2; letter-spacing: -2rpx; }
+.briefing-deck { width: 90%; margin-top: 14rpx; color: var(--editorial-muted); font-size: 24rpx; line-height: 1.65; }
+.window-tabs { display: flex; height: 82rpx; align-items: stretch; gap: 34rpx; border-bottom: 1rpx solid var(--editorial-rule); }
+.window-tab { display: flex; align-items: center; border-bottom: 4rpx solid transparent; color: var(--editorial-muted); font-size: 22rpx; font-weight: 720; }
+.window-tab-active { border-bottom-color: var(--editorial-blue); color: var(--editorial-ink); }
+.briefing-gate { padding: 34rpx 0 24rpx; border-bottom: 1rpx solid var(--editorial-rule); }
+.gate-status, .section-kicker { color: var(--editorial-blue); font-size: 19rpx; font-weight: 800; }
+.gate-title { margin-top: 10rpx; font-size: 36rpx; font-weight: 820; }
+.gate-copy { margin-top: 14rpx; color: var(--editorial-muted); font-size: 23rpx; line-height: 1.7; }
+.gate-link, .text-action { margin-top: 20rpx; font-size: 22rpx; font-weight: 760; }
+.briefing-loading, .briefing-empty { padding: 90rpx 0; }
+.loading-line { width: 78%; height: 18rpx; margin-top: 20rpx; background: var(--editorial-rule); }
+.loading-line-strong { width: 94%; height: 34rpx; background: var(--editorial-muted); }
+.loading-line-short { width: 46%; }
+.empty-title { font-size: 34rpx; font-weight: 820; }
+.empty-copy { margin-top: 16rpx; color: var(--editorial-muted); font-size: 23rpx; line-height: 1.7; }
+.pending-state { border-bottom: 1rpx solid var(--editorial-rule); }
+.briefing-meta { display: flex; flex-wrap: wrap; gap: 8rpx 22rpx; padding: 20rpx 0; color: var(--editorial-muted); font-size: 18rpx; }
+.coverage-note { padding: 15rpx 0; border-top: 1rpx solid var(--editorial-amber); border-bottom: 1rpx solid var(--editorial-amber); color: #7b5a00; font-size: 19rpx; line-height: 1.55; }
+.topic-scroll { width: 100%; border-bottom: 1rpx solid var(--editorial-rule); white-space: nowrap; }
+.topic-track { display: inline-flex; gap: 30rpx; }
+.topic-choice { padding: 24rpx 0 17rpx; border-bottom: 4rpx solid transparent; color: var(--editorial-muted); font-size: 20rpx; font-weight: 700; }
+.topic-choice-active { border-bottom-color: var(--editorial-blue); color: var(--editorial-ink); }
+.conclusion-block { padding: 34rpx 0 38rpx; border-bottom: 2rpx solid var(--editorial-ink); }
+.conclusion-copy { margin-top: 15rpx; font-size: 36rpx; font-weight: 820; line-height: 1.5; }
+.brief-section { padding-top: 34rpx; }
+.section-head { display: flex; justify-content: space-between; padding-bottom: 18rpx; border-bottom: 1rpx solid var(--editorial-ink); }
+.section-title { font-size: 29rpx; font-weight: 820; }
+.section-count { color: var(--editorial-muted); font-size: 18rpx; }
+.must-row { display: flex; gap: 24rpx; padding: 26rpx 0; border-bottom: 1rpx solid var(--editorial-rule); }
+.must-index { flex: none; color: var(--editorial-blue); font-size: 19rpx; font-weight: 820; }
+.must-copy { flex: 1; min-width: 0; }
+.must-title { font-size: 28rpx; font-weight: 780; line-height: 1.45; }
+.must-why, .text-row-copy, .radar-copy { margin-top: 9rpx; color: var(--editorial-muted); font-size: 22rpx; line-height: 1.65; }
+.text-row, .radar-row, .source-row { padding: 24rpx 0; border-bottom: 1rpx solid var(--editorial-rule); }
+.text-row-title, .source-title { font-size: 27rpx; font-weight: 760; line-height: 1.45; }
+.radar-row { display: grid; grid-template-columns: 170rpx 1fr; gap: 24rpx; }
+.radar-name { color: var(--editorial-blue); font-size: 22rpx; font-weight: 780; }
+.radar-copy { margin-top: 0; }
+.source-section { padding-bottom: 30rpx; }
+.source-meta { margin-top: 10rpx; color: var(--editorial-muted); font-size: 19rpx; }
+.source-meta text { float: right; color: var(--editorial-blue); }

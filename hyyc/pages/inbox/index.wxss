@@ -362,6 +362,21 @@
 
 .feed-page-retry { color: var(--editorial-blue); }
 
+.history-boundary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+  margin-top: 24rpx;
+  padding: 24rpx 0;
+  border-top: 1rpx solid var(--editorial-blue);
+  border-bottom: 1rpx solid var(--editorial-blue);
+}
+
+.history-boundary-title { font-size: 24rpx; font-weight: 780; }
+.history-boundary-copy { margin-top: 6rpx; color: var(--editorial-muted); font-size: 19rpx; }
+.history-boundary > text, .filter-choice-lock { color: var(--editorial-blue); }
+
 .feed-filter-mask {
   position: fixed;
   z-index: 30;

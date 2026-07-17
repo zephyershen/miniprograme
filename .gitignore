@@ -6,6 +6,7 @@ project.private.config.json
 node_modules/
 hyyc/miniprogram_npm/
 hyyc/cloudfunctions/**/node_modules/
+.playwright-cli/
 
 # Cloud function local secrets (do not commit)
 hyyc/cloudfunctions/**/config.local.js

@@ -2,8 +2,8 @@
 title: "知识获取平台小程序项目总览"
 type: overview
 tags: [overview, miniprogram, wechat, knowledge-platform, editorial-index]
-sources: [sources/2026-07-13-digest-inbox-implementation.md, sources/2026-07-14-cloud-cleanup-and-deployment.md, sources/2026-07-15-wechat-e2e-and-runtime-fixes.md, sources/2026-07-15-editorial-ui-implementation.md, sources/2026-07-15-aihot-feed-integration.md, sources/2026-07-16-modular-refactor.md, sources/2026-07-16-source-preview-deployment.md, decisions/2026-07-15-engaging-news-detail.md, decisions/2026-07-16-modular-architecture.md, decisions/2026-07-16-source-preview-renderer.md]
-last_updated: 2026-07-16
+sources: [sources/2026-07-13-digest-inbox-implementation.md, sources/2026-07-14-cloud-cleanup-and-deployment.md, sources/2026-07-15-wechat-e2e-and-runtime-fixes.md, sources/2026-07-15-editorial-ui-implementation.md, sources/2026-07-15-aihot-feed-integration.md, sources/2026-07-16-modular-refactor.md, sources/2026-07-16-source-preview-deployment.md, sources/2026-07-17-fingerprint-sync-and-carousel.md, sources/2026-07-17-feed-history-and-long-preview.md, sources/2026-07-17-full-feed-admin-and-capacity.md, sources/2026-07-17-visual-backfill-quality-and-performance.md, sources/2026-07-17-pro-membership-implementation.md, decisions/2026-07-15-engaging-news-detail.md, decisions/2026-07-16-modular-architecture.md, decisions/2026-07-16-source-preview-renderer.md, decisions/2026-07-17-fingerprint-driven-feed-sync.md, decisions/2026-07-17-full-feed-and-role-entitlements.md, decisions/2026-07-17-full-feed-visual-queue-and-quality.md, decisions/2026-07-17-pro-membership-and-intelligence.md]
+last_updated: 2026-07-17
 status: confirmed
 confidence: high
 ---
@@ -12,7 +12,7 @@ confidence: high
 
 ## 一句话说明
 
-这是一个从个人文章消化箱迁移为编辑型知识获取平台的微信小程序：当前后台保留近 7 天 AI/科技资讯池，首页以非卡片式结构首屏加载 8 条、触底再追加 8 条，并可按时间、公司与模型、技术方向筛选；默认“最新”将包括放大主稿在内的全部资讯按发布时间从新到旧，用户切换“热度”后全部资讯按热度从高到低。真实原图优先，无封面时使用受控原文页面截图；新资讯先在云端暂存，只有真实封面或截图准备完成后才公开，避免首页先出现纯文字再补图。详情用截图多图预览、30 秒导读、完整上游摘要分段、可展开原文 URL 和相关阅读降低阅读负担。个人导入/待处理流程已从首页撤下，娱乐、社会、游戏和英语仍待各自内容源。
+这是一个从个人文章消化箱迁移为编辑型知识获取平台的微信小程序，现有资讯、精选、简报、我的四个原生 Tab。普通用户查看最近 7 天 AI/科技全部资讯，人工 Pro 查看 30 天，当前微信账号由服务端识别为管理员并查看项目实际已归档的全部数据。部署时条目库为 3,090 条；首页每页 8 条，最新、热度和未来精选均使用数据库游标，统计只在首屏返回。全库视觉与 360×253 列表缩略图继续异步补齐；会员、AI 精选、滚动简报的数据结构与权限已经上线，但真实 AI Provider 和支付保持关闭。娱乐、社会、游戏和英语仍待各自内容源。
 
 ## 事实健康表
 
@@ -20,7 +20,7 @@ confidence: high
 | --- | --- | --- |
 | AppID、云环境 ID、Git 历史和远程地址已保留 | confirmed | 项目配置、应用入口、Git 命令 |
 | 旧社区、商品、任务、聊天、实名、定位、钱包、支付和图片审核代码已从活跃树移除 | confirmed | 当前文件树与重建历史 |
-| 6 个页面、3 个云函数及本地测试已实现 | confirmed | 当前代码、90/90 个 Node 测试通过 |
+| 9 个页面、4 个云函数及本地测试已实现 | confirmed | 当前代码、168/168 个 Node 测试通过 |
 | 旧云资源清空及 5 个新集合创建 | confirmed | 2026-07-14 CloudBase 清单与复核 |
 | `digestIngest`、`digestStore` 已部署 | confirmed | 两函数部署结果与云端日志 |
 | 真实 OpenID、数据库闭环和开发者工具编译 | confirmed | 2026-07-15 微信开发者工具端到端验证 |
@@ -28,8 +28,12 @@ confidence: high
 | AI/科技精选聚合、最新/热度排序、服务端分页、筛选、缓存和原始来源追踪 | confirmed | 2026-07-16 线上验证最新倒序、热度倒序及热度与时间筛选组合通过 |
 | 知识资讯主链路按 feature/adapter/repository/service/presenter 分层 | confirmed | 2026-07-16 模块化重构、边界测试与 CloudBase 接口回归 |
 | 完整摘要分段和相关阅读 | confirmed | 无图详情实机打开、云端摘要无人工省略、3 条相关阅读 |
-| 缺图资讯原文截图与多图预览 | confirmed | 最终动态池 106/106 有视觉素材、93 条原文截图、CloudBase 全链路重建和微信 `1/3 → 2/3` 预览 |
-| 新资讯先准备视觉再公开 | confirmed | 5 分钟定时触发器、公开 presenter 门禁、18:00 自动日志及 `pendingPublication=0` |
+| 缺图资讯原文截图与自动轮播 | confirmed | 公网真实长页生成 5 张连续截图；详情自动/手动轮播、圆点和整组全屏预览均有回归覆盖 |
+| AI/科技资讯增量同步 | confirmed | 每分钟指纹检查、6 小时条件校验、24 小时完整刷新、分布式租约和线上连续定时日志 |
+| 无图资讯也公开，视觉只做增强 | confirmed | `mode=all` 不经过视觉门禁；全量缺图进入独立任务队列，实时新增优先于历史 |
+| 移动端筛选与分页预算 | confirmed | 条目级 facet 已改为计数矩阵；分页通过数据路径追加，详情只挂载相邻截图 |
+| 全量存储与角色权益 | confirmed | 普通 7 天、Pro 30 天、管理员全部归档；唯一微信账号授权匹配 |
+| Pro 会员与知识智能骨架 | confirmed | free/member/admin 重鉴权、固定示例、AI 待处理队列、简报引用快照、独立运维函数 |
 | 多来源去重、独立官方源与其他四个频道 | needs-review | 尚未实现，不得宣称为全频道实时新闻服务 |
 | 真正 AI 摘要 | needs-review | 当前套餐模型调用返回 429；应用已透明使用本地临时摘要 |
 | 体验版上传与 30 天验证 | needs-review | 尚未上传体验版 |
@@ -56,27 +60,29 @@ confidence: high
 4. 云 AI 可用时生成相关性、中文摘要和关键句；不可用时生成明确标注的本地临时摘要。
 5. 用户必须丢弃或保留结论；卡片满 20 张时必须显式选择替换对象。
 
-上述代码和云函数仍保留，但首页已撤下待处理数量、导入入口、关注方向设置提示和个人队列。当前公开体验不提供任意网页全文、自动剪贴板监听、支付、广告、会员、登录页、定位、推送或全文翻译；已接入的聚合精选仍不等同于各厂商官方源分别直连。
+上述代码和云函数仍保留，但首页已撤下待处理数量、导入入口、关注方向设置提示和个人队列。当前公开体验不提供任意网页全文、自动剪贴板监听、支付、广告、登录页、定位、推送或全文翻译；会员 UI 仅处于人工授权内测，真实精选和简报不会在 AI API 接入前启用。已接入的聚合资讯仍不等同于各厂商官方源分别直连。
 
 ## 代码与数据
 
-- 页面：`pages/inbox/index`（纯资讯首页）、`pages/feed-detail/index`（短读公共资讯详情）、`pages/source-view/index`（仅承载已验证域名）；`pages/digest/index`、`pages/cards/index`、`pages/settings/index` 仍在代码中，但首页不再提供个人导入/待处理入口。
-- 小程序模块：`features/knowledge-feed/` 拥有资讯配置、频道、筛选、阅读、列表/详情模型和 API；`features/digest/` 拥有保留的个人消化 API/展示转换；`services/cloud-functions.js` 是两个能力共享的唯一 CloudBase 传输层。
+- 页面：`pages/inbox/index`、`pages/curated/index`、`pages/briefing/index`、`pages/profile/index` 为四个原生 Tab；详情与来源页继续保留，个人消化、结论卡和设置作为二级入口。
+- 小程序模块：`features/knowledge-feed/`、`membership/`、`curated-feed/`、`briefing/` 分别拥有独立 API、模型和展示状态；`features/digest/` 保留个人消化闭环；`services/cloud-functions.js` 是共享传输层。
 - 微信运行时模块引用统一使用带 `.js` 扩展名的相对 `require`，页面直接引用具体 feature 文件，不再使用 `...require(...)` 聚合入口；项目检查会阻止这两类已验证不兼容写法。
-- 资讯云函数模块：`adapters/` 隔离外部资讯源，`repositories/` 隔离缓存集合，`services/` 编排查询、缓存降级、封面和原文截图维护，`policies/visual-publication.js` 统一控制发布资格，`presenters/` 约束公开 DTO；`knowledgeFeed/index.js` 只装配依赖和路由 action。
+- 资讯云函数模块：`adapters/` 隔离外部资讯源，`repositories/` 隔离条目、日索引、授权和同步状态，`services/` 编排查询、权益、同步、迁移和视觉维护，`policies/` 承载定时入口、访问规则和维护鉴权，`presenters/` 约束公开 DTO；`knowledgeFeed/index.js` 只装配依赖和路由 action。
 - 首页频道：精选、AI 前沿、科技、娱乐、社会、游戏、英语；当前聚合源覆盖前两类，其他频道保留真实空状态。
-- 首页筛选：24 小时、近 3 天、近 7 天；15 个公司与模型主题；14 个技术方向。三个维度可组合，选项显示当前资讯数，零结果项不可选；弹层内容独立滚动，底部操作区不覆盖主题。
+- 首页筛选：普通用户可选 24 小时、近 3 天、近 7 天并看见锁定的 30 天入口；Pro 可选近 30 天；管理员另有“全部归档”。15 个公司与模型主题、14 个技术方向可组合，选项显示当前资讯数，零结果项不可选。
 - 首页排序：默认选中“最新”，当前频道和筛选范围内的全部资讯显式按发布时间从新到旧；用户切换“热度”后，全部资讯按上游热度值从高到低，同热度按发布时间倒序。放大主稿始终只是当前排序的第一条，不再有独立选稿规则。两种模式都在分页前执行，切换会从第一页重新加载。
-- 首页资讯分页：云函数先按频道和筛选条件过滤，再下发当前 8 条完整资讯；第一页同时携带轻量筛选索引，触底后用 `nextOffset` 每次追加 8 条。切换频道、应用筛选和下拉刷新都会从第一页重新开始，重复触底请求会被前端状态锁阻止。
+- 首页资讯分页：云函数先按频道和筛选条件查询，再下发 8 条列表 DTO；第一页携带计数矩阵，后续使用稳定 `nextCursor`，不再重复 count 或矩阵计算。客户端兼容旧 offset，但优先游标，并通过 `feed.remainingItems[n]` 只追加新增行。
 - 视觉基线：`styles/editorial-tokens.wxss`，以米白纸张、黑色排版、细线和单一频道色建立层级。
-- 云函数：`hyyc/cloudfunctions/digestIngest`、`hyyc/cloudfunctions/digestStore`、`hyyc/cloudfunctions/knowledgeFeed`
-- 集合：`digest_queue`、`conclusion_cards`、`user_state`、`daily_stats`、`usage_monthly`、`knowledge_feed_cache`
-- 公共资讯正常缓存 TTL 为 15 分钟并使用 ETag；用户下拉刷新在缓存满 1 分钟后可以强制同步。近 7 天内容池随上游更新，2026-07-16 最终线上验证时为 106 条。原文封面经安全校验后写入 `knowledge-covers/aihot/`；没有真实封面的 93 条资讯使用 `knowledge-previews/source/` 下的原文页面截图，当前 106/106 都有视觉素材。
-- `knowledge-feed-visual-sync` 每 5 分钟运行视觉维护；入口同时要求腾讯云运行时标记 `TRIGGER_SRC=timer` 和正确触发器名称，公开 action 只保留资讯列表与详情。定时路径只有缓存达到正常 15 分钟 TTL 时才同步上游，随后批量尝试真实封面和原文截图。公开列表、详情、筛选计数和相关阅读都会排除尚无视觉素材的暂存条目；截图失败条目 30 分钟后重试，并优先让从未尝试的新条目进入批次。
+- 云函数：`digestIngest`、`digestStore`、`knowledgeFeed`、私有运维入口 `knowledgeOps`
+- 集合：个人闭环 5 个集合；资讯链路包括缓存、归档、独立条目、日索引、同步状态、管理员授权、迁移和视觉任务；会员/智能链路包括 `knowledge_memberships`、`knowledge_feed_item_analysis`、`knowledge_feed_analysis_jobs`、`knowledge_feed_digests`。服务端专用集合均为 `ADMINONLY`。
+- `knowledgeFeed` 由单一 `knowledge-feed-source-sync` 每分钟运行：fingerprint 变化时立即刷新 `mode=all`；指纹不变时每 6 小时做 ETag 条件校验，每 24 小时做完整一致性刷新。用户请求只读取 CloudBase。
+- 每分钟全量视觉 worker 最多处理 2 条：新增/变更优先，历史先近 7 天再向前补；失败指数退避并在 8 次后阻断，孤儿图片清理最多每小时一次。已有完整视觉只派生 360×253 列表缩略图，新视觉在完整图片与缩略图都上传后原子发布；无图条目不隐藏。
+- `knowledge_feed_items` 保存独立条目，`knowledge_feed_day_index` 保存按日轻量索引；新增 `knowledge_memberships`、分析、任务和简报集合。普通用户固定近 7 天，Pro 近 30 天，管理员全部归档。覆盖状态只把连续 `coverage:'all'` 的区间标记为完整，更老日报精选仍明确为 partial。
+- 同步使用数据库租约和事务写入校验防止跨实例重复投递及乱序覆盖；429/5xx 退避持久化在缓存文档。2026-07-17 线上首轮检测到精选指纹变化并更新，下一分钟只返回 `not-modified`；数据库 observed/applied 指纹一致、失败数为 0、租约已释放。
 - 生产资讯同步和外站封面请求由腾讯云 CloudBase 云函数发起；原文截图由独立公网服务器通过受控 Mihomo 出口生成，再由 CloudBase 上传和缓存。开发者本地网络不参与生产抓取；用户主动在浏览器打开原文时才使用自己的网络。
 - 用户界面不显示 AI HOT、API、缓存、规范链接等接入实现，只显示资讯的原始发布方和原文链接。
 - 来源标签会清除 RSS、翻译中转等采集方式后缀，不把技术管道暴露给用户。
-- 详情页不复制原文正文：导读和“完整内容”完整保留上游摘要并按语义单元分段，不再按字符裁剪或添加人工省略号；相关阅读可使用真实封面或原文截图。缺图资讯详情显示第一张页面截图，点击后通过 `wx.previewImage` 浏览最多 3 张。
+- 详情页不复制原文正文：导读和“完整内容”完整保留上游摘要并按语义单元分段，不再按字符裁剪或添加人工省略号；相关阅读可使用真实封面或原文截图。缺图资讯详情通过原生 `swiper` 每 4 秒自动轮播全部截图，也支持手动滑动；截图最多 12 张并显示圆点。点击任意图片时，`wx.previewImage` 从当前图打开整组 URL，可缩放并继续左右切换。
 - 来源区位于“接着看”之前：左侧展示原发布方和单行省略 URL，长链接可展开/收起；右侧是紧凑的复制按钮。`DIRECT_WEBVIEW_HOSTS` 当前为空，因此点击现有外部 URL 会复制并提示到手机浏览器粘贴，不能宣称小程序可直接唤起任意系统浏览器。
 - 身份只取自云函数上下文；数据库使用 OpenID 的 SHA-256 派生值，不保存原始 OpenID。
 - 原始正文只在函数内存中参与处理，不写数据库或云存储。
@@ -92,23 +98,23 @@ confidence: high
 - AI 调用前事务预留预算，成功后结算实际 Token 成本；每月 10 元硬上限。
 - AI 额度错误会释放预算预留并进入本地临时摘要，不产生伪造的 AI 用量记录。
 - 腾讯云自动化凭据仅保存在被 Git 忽略且受本机 ACL 限制的 `wiki/secrets/`，普通 Wiki 不含实际值。
-- 原文截图服务只绑定回环地址，经 Nginx Bearer 鉴权公开；生产必须使用回环代理并在代理解析后拒绝私网/保留地址。服务限制单并发、3 张截图、单图 1.5MB 和总超时，并拒绝 HTTP 4xx/5xx。
+- 原文截图服务只绑定回环地址，经 Nginx Bearer 鉴权公开；生产必须使用回环代理并在代理解析后拒绝私网/保留地址。服务限制单并发、最多 12 张、单图约 1.25MB 和总超时，并拒绝 HTTP 4xx/5xx；滚动后重新测量懒加载高度。
 - 资讯刷新与封面/截图回填使用数据库事务合并；孤儿视觉文件只按模块拥有的前缀删除，失败会进入持久化队列重试。
 - 封面和截图对象路径包含来源 URL 哈希；事务 patch 同时校验 `expectedUrl`。若生成期间条目 URL 改变或被移除，旧图不会写入新资讯，未应用上传会进入受限清理队列；同 URL 强制重建使用独立捕获版本，避免覆盖当前正在引用的截图。
 
 ## 本地验证
 
-- `npm test`：90/90 通过。
-- `npm run check`：21 个 JSON、77 个 JavaScript、6 个页面通过结构、语法与微信模块引用兼容性检查。
+- `npm test`：168/168 通过。
+- `npm run check`：27 个 JSON、141 个 JavaScript、9 个页面通过结构、语法与微信模块引用兼容性检查。
 - `git diff --check`：通过。
-- 微信开发者工具已重新编译当前项目并实际打开资讯首页与资讯详情；模块加载红色错误已清空。详情截图入口和 `wx.previewImage` 已验证从 `1/3` 左滑到 `2/3`，仅剩开发者工具自身的黄色兼容/性能提示。
+- 微信开发者工具此前已重新编译资讯首页与详情并清除项目级红色错误；2026-07-17 的自动/手动轮播与整组全屏预览已通过页面逻辑和标记测试，仍需在真机覆盖 1、5、8 张、从中间图片进入全屏和返回后继续轮播。
 
 ## 云端与端到端状态
 
 - 旧业务的 41 个函数、24 个集合、2,456 条文档、217 个存储对象和 `adminportal/` 已清理。
 - 环境级空存储桶、平台认证文件、AppID 关联和标准版套餐被保留。
-- 6 个当前集合均为 `ADMINONLY`；其中 5 个个人业务集合无测试记录，`knowledge_feed_cache` 保存公共资讯缓存。
-- 三个 Node.js 18.15 云函数已部署；`knowledgeFeed` 当前使用服务端排序、分页和视觉发布门禁，超时为 180 秒，绑定启用中的 5 分钟定时触发器。2026-07-16 18:00 最新部署版本自动运行成功，耗时 706ms；最终状态为 106/106 有视觉素材、原始封面 13、原文截图 93、`pendingPublication=0`、失败 0、待清理 0、清理认领 0。一次强制重建通过 CloudBase → Nginx → Playwright → 云存储完整链路返回 3 张截图。有效详情返回 3 条相关阅读，无效 ID 返回稳定 `ITEM_NOT_FOUND`；公开响应不显示聚合平台、API、缓存和维护字段。
+- 12 个当前集合均由云函数管理；资讯新增集合保存独立条目、日索引、同步状态、管理员授权和迁移进度。
+- 四个 Node.js 18.15 云函数已部署；`knowledgeFeed` 为 Active/Available，512 MB、300 秒、0.4 vCPU，单一每分钟定时触发器；`knowledgeOps` 无触发器且受维护令牌保护。部署时状态为条目 3,090、分析/任务/简报/会员均为 0。新增集合为 `ADMINONLY`，条目、分析任务和简报复合索引已创建。分钟日志确认缩略图 worker 继续 2/2，真实 intelligence 和 digests 为 disabled。
 - 真实微信上下文已验证：保存偏好 → 导入文章 → 生成临时摘要 → 保留结论卡 → 统计更新 → 清除个人数据。
 - 环境“超限按量”关闭；未自动开启新的 AI 付费方案。
 
@@ -121,7 +127,9 @@ confidence: high
 3. 如需微信内直接打开原文，先确认小程序主体支持 `web-view`，再在微信公众平台验证需要开放的业务域名并加入 `DIRECT_WEBVIEW_HOSTS`。
 4. 用户决定是否开通资源点/成长套餐或配置自有模型，以启用真正 AI 摘要、翻译和相关性判断。
 5. 在微信开发者工具中预览并上传体验版，不直接提交公开审核。
-6. 根据新的知识平台目标重写 30 天验证指标。
+6. 用户提供 AI API 后，在测试环境回填最近 30 天；覆盖至少 95% 且人工抽检通过后再开启真实精选和简报。
+7. 使用第二个微信账号人工授予 Pro，完成免费/会员/管理员真机矩阵和 25,000 条规模 P95 报告。
+8. 支付最后接入；正式启用汇付前完成产品开通、签约、解约、回调验签、主动查询、退款和沙箱回放。
 
 ## 已被替代的旧结论
 
@@ -130,3 +138,5 @@ confidence: high
 - “产品不提供资讯流”已被 [编辑索引式知识平台首页决策](decisions/2026-07-15-editorial-knowledge-platform-ui.md) 替代；旧摘要闭环继续作为迁移基础。
 - “真实微信身份和数据库闭环未验证”已在 2026-07-15 被端到端结果替代。
 - “AI 失败不入队”已被 [透明临时摘要决策](decisions/2026-07-15-ai-quota-fallback.md) 替代。
+- “精选一百余条就是全部资讯、无视觉不公开”已被 [全量资讯存储与服务端角色权益](decisions/2026-07-17-full-feed-and-role-entitlements.md) 替代。
+- “只有 free/admin 且管理员默认 90 天”已被 [单一 Pro 会员、能力型权益与可回溯简报](decisions/2026-07-17-pro-membership-and-intelligence.md) 替代。

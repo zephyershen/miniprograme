@@ -60,13 +60,19 @@ function createCoverService({ cloud, repository, fetchPublicBuffer, extractCover
     return results;
   }
 
-  async function hydrateCovers(limit, force = false, scheduled = false) {
+  async function hydrateCovers(limit, force = false, scheduled = false, options = {}) {
     assertScheduledMaintenance(scheduled);
     const cache = await repository.get();
     if (!cache || !Array.isArray(cache.items)) throw new AppError('FEED_UNAVAILABLE', '资讯缓存尚未建立');
     const batchSize = Math.max(1, Math.min(9, Number(limit) || 6));
+    const candidateIds = Array.isArray(options.itemIds) && options.itemIds.length
+      ? new Set(options.itemIds)
+      : null;
     const candidates = cache.items
-      .filter((item) => !hasReadyVisual(item) && (force === true || !coverCheckIsFresh(item)))
+      .filter((item) => (!candidateIds || candidateIds.has(item.id))
+        && !hasReadyVisual(item)
+        && (!options.untriedOnly || !item.coverCheckedAt)
+        && (force === true || !coverCheckIsFresh(item)))
       .slice(0, batchSize);
     if (!candidates.length) {
       return {
@@ -106,7 +112,7 @@ function createCoverService({ cloud, repository, fetchPublicBuffer, extractCover
     };
   }
 
-  return { hydrateCovers };
+  return { resolveAndUploadCover, hydrateCovers };
 }
 
 module.exports = { createCoverService };

@@ -3,7 +3,7 @@ title: "AI HOT 图文资讯源接入与云端验证"
 type: source
 tags: [aihot, knowledge-feed, cloudbase, cover-images, source-preview, editorial-index]
 sources: [../../hyyc/cloudfunctions/knowledgeFeed, ../../hyyc/cloudrun/source-preview-renderer, ../../hyyc/pages/inbox, ../../hyyc/pages/feed-detail, ../../cloudbaserc.json]
-last_updated: 2026-07-16
+last_updated: 2026-07-17
 status: confirmed
 confidence: high
 ---
@@ -37,11 +37,11 @@ confidence: high
 ## 云端资源
 
 - 新建 `knowledge_feed_cache` 集合，权限在创建时设为 `ADMINONLY`。
-- 新增并部署 `knowledgeFeed` 云函数：Node.js 18.15、256MB、180 秒上限，带 5 分钟视觉维护定时触发器。
-- 资讯缓存 TTL 为 15 分钟，使用 ETag 条件请求；刷新失败且已有缓存时返回 stale 数据。
+- 新增并部署 `knowledgeFeed` 云函数：Node.js 18.15、256MB、180 秒上限。最初独立 5 分钟视觉触发器的配置已被后续统一分钟编排 `superseded`。
+- 2026-07-17 起不再使用“用户请求触发的 15 分钟 TTL 刷新”。单一定时器每分钟检查公开 fingerprint；精选指纹变化时才拉取完整条目，未变化时每 15 分钟执行条目 ETag 条件校验、每 6 小时执行无条件完整校验。刷新失败且已有缓存时仍返回 stale 数据。
 - 缓存只处理公共资讯，不含 OpenID、用户偏好或其他个人信息；除公共内容与来源 attribution 外，还保存云存储封面/截图 ID、视觉检查与重试状态，以及受限前缀的待清理文件队列。
 - 封面对象位于 `knowledge-covers/aihot/`，本次验证时共 13 个可用对象。
-- 原文页面截图位于 `knowledge-previews/source/`，由 5 分钟定时入口调用受独立维护令牌保护的内部截图服务生成；小程序公开路由不提供维护 action。最终动态池中 93 条缺封面资讯均有至少一张截图。
+- 原文页面截图位于 `knowledge-previews/source/`。每分钟同步发现新增/变更时立即调用受独立维护令牌保护的内部截图服务；5 分钟刻度只做失败重试、旧图升级和清理。当前保留一个统一触发器是为避开 CloudBase CLI 的单触发器配置/覆盖行为，不能解释为 SCF 平台只能有一个。小程序公开路由不提供维护 action。
 
 ## 网络路径
 
@@ -58,7 +58,7 @@ confidence: high
 - 前端使用 `onReachBottom` 请求 `nextOffset`，同时阻止加载中、筛选弹层打开和已无下一页时的重复请求；切换频道、应用筛选或下拉刷新会重置到第一页。
 - 频道下方提供时间、公司与模型、技术方向三组组合筛选。筛选项附带当前频道的结果数，零结果选项不可选；默认近 7 天覆盖当前完整内容池，但页面只逐页加载，不向用户暴露聚合或接口实现。
 - 首页已撤下“我的待处理”、主动导入文章、关注方向和设置入口，只呈现频道与公共资讯流。
-- `pages/feed-detail/index` 展示真实封面或原文截图、标题、来源、发布时间、30 秒导读、完整上游摘要分段、来源与原文、三条相关阅读；截图可点击进入最多 3 张的 `wx.previewImage` 预览。来源 URL 默认省略、可展开/收起，右侧有紧凑复制按钮。
+- `pages/feed-detail/index` 展示真实封面或原文截图、标题、来源、发布时间、30 秒导读、完整上游摘要分段、来源与原文、三条相关阅读；最多 12 张截图在页面内每 4 秒自动轮播，也可手动滑动，图片下方显示圆点。点击时从当前图打开 `wx.previewImage` 整组 URL，可缩放并左右查看。来源 URL 默认省略、可展开/收起，右侧有紧凑复制按钮。
 - 公开返回会清除来源名称中的 RSS 和翻译中转后缀，例如只显示 `TechCrunch` 或 `Hacker News`。
 - 新增 `pages/source-view/index` 作为已验证业务域名的承载页；当前白名单为空，现有外部来源均走复制链接兜底。
 - 空频道只显示通用的内容补充提示，不暴露来源接入状态，也不用假数据填满娱乐、社会、游戏和英语。
@@ -77,7 +77,7 @@ confidence: high
 
 - 当前只完成 AI HOT 的 AI/科技精选源，不等同于 OpenAI、Grok、GLM、DeepSeek 各厂商官方源已分别直连。
 - AI HOT 是测试版公开 API，生产可用性依赖本地缓存、重试和 stale 回退；当前实现已具备这些基本保护。
-- 旧的“永久隐藏缺图资讯”和“无图资讯立即以纯文字公开”都已 `superseded`。当前规则是全部资讯进入准备流程，视觉准备完成后逐条公开；截图短暂失败时 30 分钟后重试。
+- 旧的“永久隐藏缺图资讯”和“无图资讯立即以纯文字公开”都已 `superseded`。当前规则是全部资讯进入准备流程，视觉准备完成后逐条公开；截图短暂失败时 5 分钟后重试。
 - 后续应分别接入娱乐、社会、游戏和英语来源，并建设跨来源去重、审核、来源优先级和定时封面维护。
 
 ## 2026-07-16 分页部署验证
@@ -98,3 +98,10 @@ confidence: high
 - CloudBase 强制重建一条资讯通过公网渲染链路返回 3 张 `ready` 截图；微信开发者工具详情页可从图片预览 `1/3` 滑到 `2/3`。
 - 2026-07-16 18:00 的最新部署版本由定时触发器真实自动运行成功，状态为 `pendingPublication=0`、`pendingVisualDeletes=0`、`claimedVisualDeletes=0`。发布门禁、URL/代际竞态保护、失败防饥饿和来源区交互已加入回归。
 - 最新本地回归为 90/90 测试；项目检查覆盖 21 个 JSON、77 个 JavaScript 和 6 个页面。
+
+## 2026-07-17 指纹同步与自动轮播补充验证
+
+- 公开 `/api/public/fingerprint` 实际返回非空 `selected`、`all` 和弱 ETag；适配器对 304 不读取 JSON。
+- 每分钟同步由数据库租约保护；只有租约持有者访问条目接口，过期 owner 不能提交旧快照。空缓存下的 429/5xx 退避同样持久化，连续 503 按 1、2、4 分钟递增。
+- CloudBase 函数只保留一个启用中的 `knowledge-feed-source-sync`，cron 为 `0 * * * * * *`。08:31 真实定时调用检测到变化并更新，08:32 只检查指纹并返回 `not-modified`；数据库 observed/applied 指纹一致、失败数为 0、租约已释放。
+- 详情页自动/手动轮播、圆点跟随和从任意图片打开整组全屏预览均有测试覆盖。当前完整回归为 119/119；项目检查覆盖 21 个 JSON、88 个 JavaScript 和 6 个页面。

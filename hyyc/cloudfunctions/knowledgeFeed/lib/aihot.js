@@ -49,7 +49,8 @@ function normalizeAihotItem(input = {}) {
     ? input.category
     : 'ai-products';
   const meta = CATEGORY_META[category];
-  const score = Number(input.score);
+  const hasScore = input.score !== null && input.score !== undefined && input.score !== '';
+  const score = hasScore ? Number(input.score) : Number.NaN;
 
   const normalized = {
     id,
@@ -66,6 +67,7 @@ function normalizeAihotItem(input = {}) {
     channelKey: meta.channelKey,
     coverTone: meta.tone,
     score: Number.isFinite(score) ? Math.max(0, Math.min(100, Math.round(score))) : null,
+    selected: input.selected === true,
     attribution: {
       source: 'AI HOT',
       canonical: validHttpsUrl(input.attribution && input.attribution.canonical) || permalink
@@ -86,4 +88,59 @@ function normalizeAihotResponse(payload, limit = 20) {
   }, []);
 }
 
-module.exports = { CATEGORY_META, cleanSourceLabel, normalizeAihotItem, normalizeAihotResponse };
+function categoryFromDailySection(label) {
+  const value = cleanText(label, 80).toLowerCase();
+  if (/论文|研究|paper|research/.test(value)) return 'paper';
+  if (/方法|技术|实践|工具|开源|tip|method/.test(value)) return 'tip';
+  if (/模型|能力|model/.test(value)) return 'ai-models';
+  if (/产品|发布|更新|product/.test(value)) return 'ai-products';
+  return 'industry';
+}
+
+function itemIdFromPermalink(value) {
+  const permalink = validHttpsUrl(value);
+  if (!permalink) return '';
+  const match = new URL(permalink).pathname.match(/\/items\/([a-z0-9_-]{8,80})\/?$/i);
+  return match ? match[1] : '';
+}
+
+function normalizeAihotDaily(payload = {}) {
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(payload.date || '') ? payload.date : '';
+  if (!date || !Array.isArray(payload.sections)) return { date: '', items: [] };
+  const publishedAt = `${date}T00:00:00.000Z`;
+  const seen = new Set();
+  const items = [];
+  for (const section of payload.sections) {
+    const category = categoryFromDailySection(section && section.label);
+    for (const entry of ((section && section.items) || [])) {
+      const permalink = validHttpsUrl(entry && entry.permalink);
+      const item = normalizeAihotItem({
+        id: itemIdFromPermalink(permalink),
+        title: entry && entry.title,
+        summary: entry && entry.summary,
+        url: entry && entry.sourceUrl,
+        permalink,
+        source: entry && entry.sourceName,
+        publishedAt,
+        category,
+        score: null,
+        selected: true,
+        attribution: entry && entry.attribution
+      });
+      if (!item || seen.has(item.id)) continue;
+      seen.add(item.id);
+      items.push({ ...item, archiveSource: 'daily', archiveDate: date });
+    }
+  }
+  return { date, items };
+}
+
+module.exports = {
+  CATEGORY_META,
+  cleanSourceLabel,
+  normalizeAihotItem,
+  normalizeAihotResponse,
+  normalizeAihotDaily,
+  categoryFromDailySection,
+  itemIdFromPermalink
+};

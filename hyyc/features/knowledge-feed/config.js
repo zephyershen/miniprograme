@@ -1,7 +1,9 @@
 const TIME_FILTERS = Object.freeze([
   { key: '1d', label: '24 小时' },
   { key: '3d', label: '近 3 天' },
-  { key: '7d', label: '近 7 天' }
+  { key: '7d', label: '近 7 天' },
+  { key: '30d', label: '近 30 天' },
+  { key: 'all', label: '全部归档' }
 ]);
 
 const COMPANY_FILTERS = Object.freeze([

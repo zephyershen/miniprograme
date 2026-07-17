@@ -1,6 +1,9 @@
 {
   "pages": [
     "pages/inbox/index",
+    "pages/curated/index",
+    "pages/briefing/index",
+    "pages/profile/index",
     "pages/feed-detail/index",
     "pages/source-view/index",
     "pages/digest/index",
@@ -22,11 +25,19 @@
     "list": [
       {
         "pagePath": "pages/inbox/index",
-        "text": "发现"
+        "text": "资讯"
       },
       {
-        "pagePath": "pages/cards/index",
-        "text": "收藏"
+        "pagePath": "pages/curated/index",
+        "text": "精选"
+      },
+      {
+        "pagePath": "pages/briefing/index",
+        "text": "简报"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "我的"
       }
     ]
   },

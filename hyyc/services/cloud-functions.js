@@ -1,6 +1,8 @@
 function makeCloudError(error) {
   const next = new Error(error && error.message ? error.message : '服务暂时不可用，请稍后重试');
   next.code = error && error.code ? error.code : 'TEMPORARY_FAILURE';
+  next.featureKey = error && (error.featureKey || (error.details && error.details.featureKey));
+  next.details = error && error.details && typeof error.details === 'object' ? error.details : null;
   return next;
 }
 

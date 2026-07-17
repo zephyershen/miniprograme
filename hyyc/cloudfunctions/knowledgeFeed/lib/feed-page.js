@@ -5,10 +5,13 @@ const MAX_PAGE_SIZE = 20;
 const TIME_WINDOWS = Object.freeze({
   '1d': 24 * 60 * 60 * 1000,
   '3d': 3 * 24 * 60 * 60 * 1000,
-  '7d': 7 * 24 * 60 * 60 * 1000
+  '7d': 7 * 24 * 60 * 60 * 1000,
+  '30d': 30 * 24 * 60 * 60 * 1000,
+  '90d': 90 * 24 * 60 * 60 * 1000,
+  all: null
 });
 const CHANNEL_KEYS = new Set(['all', 'ai', 'tech', 'entertainment', 'society', 'games', 'english']);
-const SORT_KEYS = new Set(['latest', 'hot']);
+const SORT_KEYS = new Set(['latest', 'hot', 'importance']);
 const COMPANY_KEYS = new Set(['all', ...TOPIC_RULES
   .map((rule) => rule.key)
   .filter((key) => key.startsWith('company:'))]);
@@ -28,9 +31,11 @@ function allowedValue(value, allowed, fallback) {
 
 function normalizeFeedQuery(input = {}) {
   const filters = input.filters || {};
+  const cursor = typeof input.cursor === 'string' && input.cursor.length <= 1000 ? input.cursor : '';
   return {
-    offset: boundedInteger(input.offset, 0, 0, 10000),
+    offset: boundedInteger(input.offset, 0, 0, 100000),
     limit: boundedInteger(input.limit, DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE),
+    ...(cursor ? { cursor } : {}),
     channel: allowedValue(input.channel, CHANNEL_KEYS, 'all'),
     sort: allowedValue(input.sort, SORT_KEYS, 'latest'),
     filters: {
@@ -72,9 +77,9 @@ function hasTopic(item, key) {
 
 function matchesFilters(item, filters, now) {
   const publishedAt = new Date(item.publishedAt).getTime();
-  const threshold = now - TIME_WINDOWS[filters.time];
-  const withinTime = filters.time === '7d'
-    || (Number.isFinite(publishedAt) && publishedAt >= threshold);
+  const windowMs = TIME_WINDOWS[filters.time];
+  const withinTime = Number.isFinite(publishedAt)
+    && (windowMs === null || publishedAt >= now - windowMs);
   return withinTime
     && hasTopic(item, filters.company)
     && hasTopic(item, filters.direction);
@@ -101,6 +106,7 @@ function buildFeedPage(items, input = {}, now = Date.now()) {
 module.exports = {
   DEFAULT_PAGE_SIZE,
   MAX_PAGE_SIZE,
+  TIME_WINDOWS,
   normalizeFeedQuery,
   sortFeedItems,
   buildFeedPage

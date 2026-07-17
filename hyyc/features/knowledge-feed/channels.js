@@ -1,5 +1,5 @@
 const CHANNELS = Object.freeze([
-  { key: 'all', label: '精选', marker: 'ALL', tone: 'ink' },
+  { key: 'all', label: '全部', marker: 'ALL', tone: 'ink' },
   { key: 'ai', label: 'AI 前沿', marker: 'AI', tone: 'cobalt' },
   { key: 'tech', label: '科技', marker: 'TECH', tone: 'cobalt' },
   { key: 'entertainment', label: '娱乐', marker: 'FUN', tone: 'coral' },
@@ -37,4 +37,18 @@ function decorateChannels(entries, activeKey = 'all') {
   }));
 }
 
-module.exports = { CHANNELS, channelByKey, inferChannel, decorateChannels };
+function decorateChannelCounts(countByKey = {}, activeKey = 'all') {
+  return CHANNELS.map((channel) => ({
+    ...channel,
+    active: channel.key === activeKey,
+    count: Math.max(0, Number(countByKey[channel.key]) || 0)
+  }));
+}
+
+module.exports = {
+  CHANNELS,
+  channelByKey,
+  inferChannel,
+  decorateChannels,
+  decorateChannelCounts
+};

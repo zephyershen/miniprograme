@@ -16,9 +16,23 @@ test('filters by time, company and technical direction together', () => {
   assert.deepEqual(filterFeedItems(items, { time: '3d', company: 'all', direction: 'direction:coding' }, NOW).map((item) => item.id), ['1', '2']);
 });
 
-test('keeps every item in the upstream seven-day pool by default', () => {
+test('drops malformed dates instead of trusting the upstream seven-day pool', () => {
   const pool = [...items, { id: '4', publishedAt: '', topicKeys: [] }];
-  assert.deepEqual(filterFeedItems(pool, { time: '7d', company: 'all', direction: 'all' }, NOW).map((item) => item.id), ['1', '2', '3', '4']);
+  assert.deepEqual(filterFeedItems(pool, { time: '7d', company: 'all', direction: 'all' }, NOW).map((item) => item.id), ['1', '2', '3']);
+});
+
+test('supports member thirty-day history and administrator all-retained history', () => {
+  const day = 24 * 60 * 60 * 1000;
+  const history = [
+    { id: 'recent', publishedAt: new Date(NOW - (6 * day)).toISOString(), topicKeys: [] },
+    { id: 'month', publishedAt: new Date(NOW - (29 * day)).toISOString(), topicKeys: [] },
+    { id: 'quarter', publishedAt: new Date(NOW - (89 * day)).toISOString(), topicKeys: [] },
+    { id: 'expired', publishedAt: new Date(NOW - (91 * day)).toISOString(), topicKeys: [] }
+  ];
+  const base = { company: 'all', direction: 'all' };
+  assert.deepEqual(filterFeedItems(history, { ...base, time: '7d' }, NOW).map((item) => item.id), ['recent']);
+  assert.deepEqual(filterFeedItems(history, { ...base, time: '30d' }, NOW).map((item) => item.id), ['recent', 'month']);
+  assert.deepEqual(filterFeedItems(history, { ...base, time: 'all' }, NOW).map((item) => item.id), ['recent', 'month', 'quarter', 'expired']);
 });
 
 test('builds a compact user-facing filter summary', () => {

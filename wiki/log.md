@@ -179,3 +179,59 @@
 - Sources: 本次用户要求、当前代码、90 个 Node 测试、项目检查、CloudBase 部署信息、2026-07-16 18:00 真实定时触发日志和微信开发者工具验证。
 - Sensitive handling: 未把云函数环境变量、服务器密码、令牌或其他凭据写入普通 Wiki 或 Git；沿用现有受限配置完成部署。
 - Follow-ups: 若后续要在微信内直接打开某个来源，必须先在微信公众平台完成对应业务域名验证；持续观察登录墙、地区限制和反爬导致的截图失败率。
+
+## [2026-07-17] fingerprint-sync-and-carousel | 指纹增量同步与详情自动轮播
+
+- Session: local Codex task
+- Target pages: `wiki/index.md`, `wiki/overview.md`, `wiki/timeline.md`, `wiki/entities/WeChatMiniProgram.md`, `wiki/decisions/2026-07-15-engaging-news-detail.md`, `wiki/decisions/2026-07-16-source-preview-renderer.md`, `wiki/decisions/2026-07-17-fingerprint-driven-feed-sync.md`, `wiki/sources/2026-07-15-aihot-feed-integration.md`, `wiki/sources/2026-07-17-fingerprint-sync-and-carousel.md`, `wiki/log.md`
+- Summary: 将资讯同步改为每分钟 fingerprint 检查、变化才拉条目，并保留 15 分钟条件校验与 6 小时完整校验；加入跨实例租约、事务写校验、持久化退避和 Timer fail closed。因 CloudBase 单函数只保留一个触发器，视觉维护收敛到同一可信周期的 5 分钟刻度。详情截图改为自动轮播、圆点跟随和单图点击放大。
+- Sources: 本次用户要求、当前代码、107 个 Node 测试、项目检查、CloudBase 函数与触发器状态、08:31/08:32 真实定时日志、缓存状态查询。
+- Sensitive handling: 代码更新采用仅上传函数代码的方式，线上三个截图服务环境变量名称保留；普通 Wiki 未记录任何变量值、账号、密码或令牌。
+- Follow-ups: 在真机抽查 1/2/3 张截图、循环圆点和返回后继续轮播；持续观察 fingerprint 接口的可用性、429/5xx 退避和 5 分钟视觉分支日志。
+
+## [2026-07-17] history-immediate-visuals | 60 天归档、即时视觉与长页整组预览
+
+- Session: local Codex task
+- Target pages: `README.md`, `wiki/index.md`, `wiki/overview.md`, `wiki/timeline.md`, `wiki/entities/WeChatMiniProgram.md`, `wiki/decisions/2026-07-15-engaging-news-detail.md`, `wiki/decisions/2026-07-16-source-preview-renderer.md`, `wiki/decisions/2026-07-17-fingerprint-driven-feed-sync.md`, `wiki/decisions/2026-07-17-feed-history-and-visual-publication.md`, `wiki/sources/2026-07-15-aihot-feed-integration.md`, `wiki/sources/2026-07-17-fingerprint-sync-and-carousel.md`, `wiki/sources/2026-07-17-feed-history-and-long-preview.md`, `wiki/log.md`
+- Summary: 核实 SCF 平台支持同函数多个触发器，旧“平台只能一个”结论标记为 `superseded`；由于 CloudBase CLI 3.6.1 只支持配置一个并会覆盖列表，线上仍采用单个分钟触发器。新资讯改为同分钟准备封面/截图，5 分钟分支只做重试与清理，并用视觉优先调度、4 分钟租约、控制状态保留和上传清理日志满足 180 秒预算。新增 60 天日报精选归档并前向保留 90 天，免费访问仍固定 7 天。详情列表只传首图、详情返回全部，页面和全屏均支持整组滑动；长页动态重测并最多截 12 张。
+- Sources: AI HOT 公开接入说明与 OpenAPI、腾讯云 SCF/CloudBase CLI 官方文档、当前代码、119 个 Node 测试、项目检查、公网真实 5 图捕获、CloudBase 10:03–10:10 定时日志、线上免费 feed 与 8 图详情调用。
+- Sensitive handling: 公网服务器与 CloudBase 凭据继续只保存在被 Git 忽略的 `wiki/secrets/` 或云环境；普通 Wiki 未写入账号、密码、令牌或环境变量值。
+- Follow-ups: 会员、支付、可信权益解析和历史查询尚未实现；日报回填不是历史全量 items。真机继续抽查 1/5/8 张轮播、从中间图进入全屏及返回后的状态。
+
+## [2026-07-17] full-feed-admin-capacity | 全量资讯、管理员权益与容量收敛
+
+- Session: local Codex task
+- Target pages: `README.md`, `wiki/index.md`, `wiki/overview.md`, `wiki/timeline.md`, `wiki/entities/WeChatMiniProgram.md`, `wiki/decisions/2026-07-17-fingerprint-driven-feed-sync.md`, `wiki/decisions/2026-07-17-feed-history-and-visual-publication.md`, `wiki/decisions/2026-07-17-full-feed-and-role-entitlements.md`, `wiki/sources/2026-07-17-fingerprint-sync-and-carousel.md`, `wiki/sources/2026-07-17-feed-history-and-long-preview.md`, `wiki/sources/2026-07-17-full-feed-admin-and-capacity.md`, `wiki/reports/architecture-2026-07-16.md`, `wiki/reports/architecture-2026-07-17.md`, `wiki/log.md`
+- Summary: 将公开首页从旧 `selected` 一百余条切到近 7 天 `mode=all` 独立条目库；无图资讯也公开。新增按日轻量索引、服务端 free/admin 权益、旧归档迁移和维护 action；当前唯一微信账号已授权为管理员。同步收敛为分钟 fingerprint、6 小时条件校验、24 小时完整刷新；5 分钟任务只重试到期失败视觉，清理最多每小时一次。抓取上限调整为 6,000、facet 上限 12,000、offset 100,000，日索引支持超过 100 天分页。
+- Sources: 本次用户要求、当前代码、AI HOT 公开接入说明、CloudBase/SCF 官方文档、138 个 Node 测试、项目检查、函数部署与状态 action、公网截图健康及服务器既有容量审计。
+- Online evidence: 2026-07-17 最终状态为当前 7 天全量 1,949、60 天日索引 2,995、资讯文档 3,034、迁移完成、同步无错误；`knowledgeFeed` Active/Available，512 MB、300 秒；新增集合均为 `ADMINONLY`。
+- Sensitive handling: 管理员身份只记录“唯一微信账号授权匹配”的结论，不写 OpenID、派生哈希、维护令牌、服务器账号或密码；实际敏感值继续只存在受限 `wiki/secrets/` 或云环境变量中。
+- Follow-ups: 付费开放持续增长的 90 天全量前，改为聚合筛选计数和游标分页；稳定观察后收敛旧精选兼容链路；继续监控截图服务器偶发健康探测超时。
+
+## [2026-07-17] full-visual-queue-quality-performance | 全量补图、质量信号与移动端预算
+
+- Session: local Codex task
+- Target pages: `wiki/index.md`, `wiki/overview.md`, `wiki/timeline.md`, `wiki/entities/WeChatMiniProgram.md`, `wiki/decisions/2026-07-16-source-preview-renderer.md`, `wiki/decisions/2026-07-17-full-feed-and-role-entitlements.md`, `wiki/decisions/2026-07-17-full-feed-visual-queue-and-quality.md`, `wiki/sources/2026-07-17-visual-backfill-quality-and-performance.md`, `wiki/reports/architecture-2026-07-17.md`, `wiki/log.md`
+- Summary: 将旧精选专用视觉维护扩展为全量去重任务队列，历史先近 7 天后向前补，实时新增拥有最高优先级；线上完成 seed 并验证 worker 2/2。把精选收敛为版本化质量信号，为未来 `curated-filter` 权益预留边界。首页条目级 facet 改为约 19 KB 计数矩阵，分页只追加数据路径，详情只挂载当前及相邻截图并在自动播放一轮后停止。
+- Sources: 本次用户要求、当前代码、公开资讯源说明、CloudBase 集合 ACL/索引/函数部署/状态调用、在线 27,092-byte 首屏响应、148 个 Node 测试、项目检查、云函数错误日志。
+- Sensitive handling: 维护令牌只从本机受限配置读取并用于调用，未显示、记录或写入普通 Wiki；服务器凭据与截图令牌保持在既有受限位置。
+- Follow-ups: 继续观察约 24 小时全量补图队列和函数 P95；为列表派生 360×253 缩略图与约 720px 主图；付费前完成游标分页、规模测试和独立 `curated-filter` entitlement。
+
+## [2026-07-17] list-thumbnails-and-full-reseed | 列表缩略图上线并重新扫描全库
+
+- Session: local Codex task
+- Target pages: `README.md`, `wiki/index.md`, `wiki/overview.md`, `wiki/timeline.md`, `wiki/decisions/2026-07-17-full-feed-visual-queue-and-quality.md`, `wiki/sources/2026-07-17-visual-backfill-quality-and-performance.md`, `wiki/reports/architecture-2026-07-17.md`, `wiki/log.md`
+- Summary: 在公网渲染器新增受控 360×253 JPEG 缩略图端点，在 CloudBase 增加临时文件 URL、缩略图上传和原子发布边界；列表与相关阅读优先轻量图，详情保留完整视觉。部署后按版本重跑全库 seed，3,005 条有效资讯对应 2,993 个待处理任务，最新分钟 worker 2/2 成功、无 retry/blocked。
+- Sources: 当前代码、公网服务部署与健康状态、真实 CloudBase 临时文件缩略图测试、CloudBase 函数部署、受保护 visualStatus、151 个 Node 测试和项目检查。
+- Sensitive handling: 部署与维护令牌只从既有受限本机配置读取，未输出实际值，也未写入普通 Wiki 或 Git。
+- Follow-ups: 持续观察约 25 小时全库回填和真机性能面板；付费开放持续增长的历史前完成游标分页、12,001/25,000 条规模测试和独立 `curated-filter` entitlement。
+
+## [2026-07-17] pro-membership-intelligence-foundation | Pro 会员与知识智能骨架上线
+
+- Session: local Codex task
+- Target pages: `README.md`, `wiki/index.md`, `wiki/overview.md`, `wiki/timeline.md`, `wiki/entities/WeChatMiniProgram.md`, `wiki/decisions/2026-07-17-pro-membership-and-intelligence.md`, `wiki/sources/2026-07-17-pro-membership-implementation.md`, `wiki/reports/architecture-2026-07-17-membership.md`, `wiki/log.md`
+- Summary: 落地普通 7 天、Pro 30 天、管理员全部归档的能力型权益；新增资讯/精选/简报/我的四 Tab、固定示例、服务端重鉴权、游标分页、AI 待处理队列、可回溯简报和独立 `knowledgeOps`。生产 AI、真实精选、真实简报与支付入口保持关闭。
+- Online evidence: `knowledgeFeed` 和 `knowledgeOps` 已部署为 Active/Available；新集合为 `ADMINONLY`，条目/队列/简报复合索引已创建。受保护运维状态为资讯 3,090、分析/任务/简报/会员 0；分钟日志确认缩略图 worker 继续 2/2，intelligence/digests 为 disabled。
+- Sources: 本次用户确认方案、当前代码、168 个 Node 测试、项目检查、CloudBase 函数详情、运维状态、集合 ACL、索引清单和分钟触发日志。
+- Sensitive handling: 维护令牌只从本机受限配置读取并写入云函数环境变量；普通 Wiki、Git 和用户可见输出不记录令牌、OpenID、派生 ownerKey、账号或密码。
+- Follow-ups: 用户提供 AI API 后在测试环境回填最近 30 天，覆盖至少 95% 且人工抽检通过后再开启真实精选/简报；使用第二个微信账号人工测试 Pro；支付最后接入并单独验证汇付签约、验签、查询、退款和沙箱流程。

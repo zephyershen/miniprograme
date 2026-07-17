@@ -1,9 +1,19 @@
 class AppError extends Error {
-  constructor(code, message) {
+  constructor(code, message, details = {}) {
     super(message);
     this.name = 'AppError';
     this.code = code;
+    this.details = publicErrorDetails(details);
   }
+}
+
+function publicErrorDetails(details) {
+  const result = {};
+  if (details && typeof details.featureKey === 'string'
+    && /^[a-z0-9_]{3,64}$/.test(details.featureKey)) {
+    result.featureKey = details.featureKey;
+  }
+  return result;
 }
 
 function ok(data) {
@@ -17,9 +27,10 @@ function fail(error) {
     ok: false,
     error: {
       code: known ? error.code : 'TEMPORARY_FAILURE',
-      message: known ? error.message : '资讯服务暂时不可用，请稍后重试'
+      message: known ? error.message : '资讯服务暂时不可用，请稍后重试',
+      ...(known ? publicErrorDetails(error.details) : {})
     }
   };
 }
 
-module.exports = { AppError, ok, fail };
+module.exports = { AppError, publicErrorDetails, ok, fail };

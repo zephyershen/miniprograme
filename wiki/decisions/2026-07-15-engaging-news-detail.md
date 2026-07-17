@@ -4,7 +4,7 @@ type: decision
 tags: [decision, detail-page, reading, source-access]
 sources: [../sources/2026-07-15-aihot-feed-integration.md]
 date: 2026-07-15
-last_updated: 2026-07-16
+last_updated: 2026-07-17
 status: accepted
 confidence: high
 ---
@@ -35,6 +35,7 @@ confidence: high
 - 当前 `DIRECT_WEBVIEW_HOSTS` 为空，因此现有外部资讯均使用复制链接兜底。后续不能因为某个网址技术上可访问就绕过微信业务域名验证。
 - 来源区左侧直接显示原文 URL，默认单行省略；长链接可展开/收起，点击 URL 执行当前来源策略。右侧只保留紧凑的“复制链接”按钮，不再使用占整行的大按钮。
 - 微信小程序没有打开任意系统浏览器的通用能力；未验证来源只能复制链接并提示用户到手机浏览器粘贴，不能用中转页规避业务域名规则。
+- 原文截图在页面内自动循环轮播，也支持手动左右滑动并显示对应圆点；数量按原文页面长度决定，安全上限 12 张。点击任意一张后，`wx.previewImage` 从当前图开始并接收整组 URL，因此可放大，也可在全屏继续左右查看。
 
 ## 为什么这样定
 
@@ -47,7 +48,7 @@ confidence: high
 - `knowledgeFeed` 的单条详情响应提供完整上游摘要和 3 条有图相关阅读。
 - `features/knowledge-feed/reading.js` 和 `detail-model.js` 集中处理短读导览、相关阅读排序和来源打开策略。
 - 新增 `pages/source-view/` 作为已验证业务域名的承载页；当前仍由复制链接路径兜底。
-- 页面数为 6；当前完整回归为 90 个 Node 测试。
+- 页面数为 6；当前完整回归为 119 个 Node 测试。
 - 相关代码：`hyyc/pages/feed-detail/`、`hyyc/pages/source-view/`、`hyyc/features/knowledge-feed/reading.js`、`hyyc/features/knowledge-feed/detail-model.js`。
 
 ## 状态
@@ -57,3 +58,4 @@ confidence: high
 ## 已被替代的细节
 
 - “导读最多约 56 个字符、最多三条关键信息、每条最多约 58 个字符”已于 2026-07-15 被本页的新规则 `superseded`。旧规则会切掉句尾事实，正是截图中 `C…`、`A…` 等内容缺失的原因。
+- “全屏只放大当前单图、最多 3 张”已于 2026-07-17 被 `superseded`；详情现在获取完整截图数组并支持整组全屏滑动。
