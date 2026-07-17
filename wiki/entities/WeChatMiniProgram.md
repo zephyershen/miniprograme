@@ -42,11 +42,12 @@ confidence: high
 
 ## 如何运行与验证
 
-- 在微信开发者工具打开 `D:\miniprogram`，小程序根目录由 `project.config.json` 指向 `hyyc/`。
+- 默认使用 `D:\Apps\miniprogram\cli.bat auto --project D:\miniprogram --port 9420 --trust-project` 启动或接管微信开发者工具；端口只监听 `127.0.0.1`。完整启动、验证和恢复步骤见 [微信开发者工具 CLI 优先工作流](../concepts/WeChatDevToolsCLI.md)。
+- 小程序根目录由 `project.config.json` 指向 `hyyc/`；扫码、验证码、权限和审核确认仍由用户完成。
 - 本地执行 `npm test` 与 `npm run check`。
 - 真实微信上下文的已验证闭环：保存关注方向、导入公开文章、查看摘要、保留卡片、核对统计、清除个人数据。
 - 2026-07-16 微信开发者工具已编译并渲染分页资讯首页、原文截图详情、来源 URL 和相关阅读；来源区位于“接着看”之前，控制台无项目级红色错误。
-- 当前本地回归为 168/168 个 Node 测试；项目检查覆盖 27 个 JSON、141 个 JavaScript 和 9 个页面。
+- 当前本地回归为 170/170 个 Node 测试；项目检查覆盖 27 个 JSON、143 个 JavaScript 和 9 个页面。
 
 ## 部署状态
 

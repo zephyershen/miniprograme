@@ -244,3 +244,12 @@
 - Online evidence: `knowledgeFeed` 重新部署成功；身份预览的 free/member、非法角色和非管理员拒绝路径均有测试覆盖。回归为 170/170，项目检查覆盖 27 JSON、143 JavaScript、9 页面。
 - Sensitive handling: 未读取、记录或提交 OpenID、ownerKey、账号、密码、维护令牌或其他实际凭据；预览状态不创建真实会员记录。
 - Follow-ups: 在微信开发者工具或真机点击三种按钮核对视觉；真实会员到期、宽限、撤销和续费状态仍用第二个微信账号验收。
+
+## [2026-07-17] wechat-devtools-cli-workflow | 固化微信开发者工具 CLI 优先工作流
+
+- Session: local Codex task
+- Target pages: `wiki/index.md`, `wiki/overview.md`, `wiki/entities/WeChatMiniProgram.md`, `wiki/concepts/WeChatDevToolsCLI.md`, `wiki/log.md`
+- Summary: 将后续微信开发者工具操作固定为 CLI 优先：使用本机既有 CLI、项目根目录和 `9420` 回环服务端口自动启动、打开与验证；图形界面只保留扫码、验证码、权限、审核和主观视觉验收等人工环节。CloudBase 和 Git 继续使用各自 CLI。
+- Evidence: Stable 2.01.2510290 下 `auto`、`open`、`islogin` 均成功，登录状态有效，自动化端口只监听 `127.0.0.1:9420`。
+- Sensitive handling: 未记录自动化握手值、会话标识、用户数据目录、账号、密码、令牌或其他临时运行信息；普通 Wiki 和 Git 不保存凭据。
+- Follow-ups: 微信开发者工具升级后重新验证 CLI 路径、版本和回环端口；每次 CLI 操作后检查 Git 差异，避免提交 `project.config.json` 的无业务格式漂移。
