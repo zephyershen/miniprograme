@@ -32,7 +32,7 @@
           loading="{{roleSwitching && switchingRole === item.key}}"
         >{{item.label}}</button>
       </view>
-      <view wx:if="{{membership.isRolePreview}}" class="role-preview-status">正在以 {{membership.roleLabel}} 查看小程序；回到资讯、精选或简报 Tab 即可检查对应体验。</view>
+      <view wx:if="{{membership.isRolePreview}}" class="role-preview-status">正在以 {{membership.roleLabel}} 查看小程序；切到资讯、专栏或简报，或从资讯顶部打开精选，即可检查对应体验。</view>
     </view>
 
     <view wx:if="{{!membership.isPrivileged}}" class="internal-block">

@@ -1,4 +1,11 @@
 <view class="editorial-page">
+  <view wx:if="{{newItemsVisible}}" class="new-items-float {{applyingNewItems ? 'new-items-float-loading' : ''}}" bindtap="applyNewItems" aria-role="button" aria-label="{{newItemsLabel}}，点击查看最新资讯">
+    <view class="new-items-signal"></view>
+    <text class="new-items-label">{{applyingNewItems ? '正在载入最新资讯' : newItemsLabel}}</text>
+    <text wx:if="{{!applyingNewItems}}" class="new-items-action">点击查看</text>
+    <text class="new-items-arrow">↑</text>
+  </view>
+
   <view wx:if="{{loading}}" class="loading-editorial">
     <view class="loading-media"></view>
     <view class="loading-line loading-line-strong"></view>
@@ -85,7 +92,7 @@
           bindtap="selectChannel"
         >
           <text>{{item.label}}</text>
-          <text wx:if="{{item.count}}" class="channel-count">{{item.count}}</text>
+          <view wx:if="{{item.premium}}" class="channel-lock" aria-label="Pro 会员专属"></view>
         </view>
       </view>
     </scroll-view>

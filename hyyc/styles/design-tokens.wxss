@@ -1,0 +1,45 @@
+page {
+  /* Luma: quiet content surfaces with one focused iris accent. */
+  --ui-canvas: #f3f4f8;
+  --ui-canvas-deep: #eceef4;
+  --ui-surface: rgba(255, 255, 255, 0.92);
+  --ui-surface-solid: #ffffff;
+  --ui-surface-muted: #f0f1f6;
+  --ui-ink: #17181d;
+  --ui-muted: #686d7a;
+  --ui-faint: #9a9fac;
+  --ui-hairline: rgba(24, 27, 36, 0.08);
+  --ui-accent: #5b5ce2;
+  --ui-accent-strong: #4146c9;
+  --ui-accent-soft: #ececff;
+  --ui-violet: #8a6cf1;
+  --ui-coral: #e86661;
+  --ui-amber: #b68016;
+  --ui-lime: #527f52;
+  --ui-cyan: #2681a0;
+  --ui-danger: #b64c4b;
+  --ui-danger-soft: #fff0ef;
+  --ui-gutter: 30rpx;
+  --ui-radius-sm: 16rpx;
+  --ui-radius-md: 24rpx;
+  --ui-radius-lg: 34rpx;
+  --ui-radius-xl: 44rpx;
+  --ui-shadow-soft: 0 8rpx 28rpx rgba(36, 39, 52, 0.07);
+  --ui-shadow-raised: 0 18rpx 56rpx rgba(36, 39, 52, 0.11);
+  --ui-shadow-accent: 0 14rpx 34rpx rgba(83, 83, 215, 0.22);
+
+  /* Compatibility aliases keep feature pages decoupled from theme naming. */
+  --editorial-paper: var(--ui-canvas);
+  --editorial-surface: var(--ui-surface-solid);
+  --editorial-ink: var(--ui-ink);
+  --editorial-muted: var(--ui-muted);
+  --editorial-faint: var(--ui-faint);
+  --editorial-rule: var(--ui-hairline);
+  --editorial-blue: var(--ui-accent);
+  --editorial-coral: var(--ui-coral);
+  --editorial-amber: var(--ui-amber);
+  --editorial-lime: var(--ui-lime);
+  --editorial-cyan: var(--ui-cyan);
+  --editorial-danger: var(--ui-danger);
+  --editorial-gutter: var(--ui-gutter);
+}

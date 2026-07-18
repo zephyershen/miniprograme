@@ -158,6 +158,7 @@ function createItemFeedQueryService({
       includeCount: firstPage
     };
     const page = await itemRepository.queryPage(baseOptions);
+    const headCursor = firstPage ? await itemRepository.latestCursor(baseOptions) : undefined;
     const entitlementBase = {
       since: entitlementSince(entitlement, currentTime),
       channel: 'all', topicKeys: [],
@@ -189,7 +190,8 @@ function createItemFeedQueryService({
       appliedFilters: query.filters,
       ...(firstPage ? {
         totalAvailable,
-        resultCount: Number(page.resultCount) || 0
+        resultCount: Number(page.resultCount) || 0,
+        headCursor
       } : {}),
       offset: query.offset,
       nextOffset,
@@ -202,6 +204,46 @@ function createItemFeedQueryService({
         : page.hasMore,
       items: items.map((item) => publicItem(item)),
       facetMatrix
+    };
+  }
+
+  async function getUpdates(input = {}, entitlement) {
+    const store = await allStoreReady();
+    if (!store.ready) {
+      return { newCount: 0, headCursor: '', updatedAt: null, stale: true };
+    }
+    const time = requestedTimeKey(input, entitlement);
+    const query = normalizeFeedQuery({
+      ...input,
+      filters: { ...((input && input.filters) || {}), time }
+    });
+    const currentTime = now();
+    const baseOptions = {
+      since: querySince(query.filters.time, entitlement, currentTime),
+      channel: query.channel,
+      topicKeys: topicFilters(query.filters),
+      qualityTier: '',
+      sort: 'latest',
+      offset: 0,
+      cursor: '',
+      limit: 1,
+      includeCount: false
+    };
+    const headCursor = await itemRepository.latestCursor(baseOptions);
+    if (!input.headCursor || !headCursor) {
+      return {
+        newCount: 0,
+        headCursor,
+        updatedAt: toIso(store.state.allItemsSyncedAt),
+        stale: Boolean(store.state.allLastErrorCode)
+      };
+    }
+    const counted = await itemRepository.countAfterCursor(baseOptions, input.headCursor);
+    return {
+      newCount: counted === null ? 0 : counted,
+      headCursor,
+      updatedAt: toIso(store.state.allItemsSyncedAt),
+      stale: Boolean(store.state.allLastErrorCode)
     };
   }
 
@@ -242,7 +284,7 @@ function createItemFeedQueryService({
     };
   }
 
-  return { getFeed, getItem, allStoreReady };
+  return { getFeed, getUpdates, getItem, allStoreReady };
 }
 
 module.exports = {

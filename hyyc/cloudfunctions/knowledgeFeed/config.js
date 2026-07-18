@@ -10,6 +10,10 @@ const SOURCE_CONFIG = Object.freeze({
   timeoutMs: 8000
 });
 
+// Visual generation is forward-only from this release. Existing news keeps
+// its current assets and is not backfilled or recaptured by scheduled work.
+const NEW_VISUALS_AFTER = '2026-07-18T04:43:08.568Z';
+
 const CACHE_CONFIG = Object.freeze({
   collectionName: 'knowledge_feed_cache',
   documentId: 'aihot_selected'
@@ -43,7 +47,9 @@ const ITEM_STORE_CONFIG = Object.freeze({
   syncLeaseMs: 4 * 60 * 1000,
   itemsRevalidateMs: 6 * 60 * 60 * 1000,
   fullRefreshMs: 24 * 60 * 60 * 1000,
-  migrationDayBatchSize: 10
+  migrationDayBatchSize: 10,
+  visualNewItemsOnly: true,
+  visualPriorityBoost: 2000
 });
 
 const MEMBERSHIP_CONFIG = Object.freeze({
@@ -82,7 +88,8 @@ const SOURCE_SYNC_CONFIG = Object.freeze({
   rateLimitBackoffMs: 60 * 1000,
   serverErrorBaseBackoffMs: 60 * 1000,
   defaultBackoffMs: 5 * 60 * 1000,
-  maxBackoffMs: 15 * 60 * 1000
+  maxBackoffMs: 15 * 60 * 1000,
+  visualNewItemsAfter: NEW_VISUALS_AFTER
 });
 
 const COVER_CONFIG = Object.freeze({
@@ -90,6 +97,7 @@ const COVER_CONFIG = Object.freeze({
   retryMs: 12 * 60 * 60 * 1000,
   cloudPathPrefix: 'knowledge-covers/aihot/',
   fileIdPrefix: 'cloud://hyyc-1gi3f5sqc5becabf.6879-hyyc-1gi3f5sqc5becabf-1395663220/knowledge-covers/aihot/',
+  newItemsAfter: NEW_VISUALS_AFTER,
   imageTypes: Object.freeze({
     'image/jpeg': 'jpg',
     'image/png': 'png',
@@ -116,6 +124,8 @@ const PREVIEW_CONFIG = Object.freeze({
   maxImageBytes: 1.25 * 1024 * 1024,
   maxSegments: 12,
   captureVersion: 2,
+  captureProfile: 'focus-v1',
+  newItemsAfter: NEW_VISUALS_AFTER,
   cloudPathPrefix: 'knowledge-previews/source/',
   fileIdPrefix: 'cloud://hyyc-1gi3f5sqc5becabf.6879-hyyc-1gi3f5sqc5becabf-1395663220/knowledge-previews/source/'
 });
@@ -151,7 +161,8 @@ const VISUAL_JOB_CONFIG = Object.freeze({
   jobLeaseMs: 4 * 60 * 1000,
   maxAttempts: 8,
   seedBatchSize: 200,
-  recentWindowDays: 7
+  recentWindowDays: 7,
+  newItemsAfter: NEW_VISUALS_AFTER
 });
 
 const SYNC_CYCLE_CONFIG = Object.freeze({

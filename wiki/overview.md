@@ -2,8 +2,8 @@
 title: "知识获取平台小程序项目总览"
 type: overview
 tags: [overview, miniprogram, wechat, knowledge-platform, editorial-index]
-sources: [sources/2026-07-13-digest-inbox-implementation.md, sources/2026-07-14-cloud-cleanup-and-deployment.md, sources/2026-07-15-wechat-e2e-and-runtime-fixes.md, sources/2026-07-15-editorial-ui-implementation.md, sources/2026-07-15-aihot-feed-integration.md, sources/2026-07-16-modular-refactor.md, sources/2026-07-16-source-preview-deployment.md, sources/2026-07-17-fingerprint-sync-and-carousel.md, sources/2026-07-17-feed-history-and-long-preview.md, sources/2026-07-17-full-feed-admin-and-capacity.md, sources/2026-07-17-visual-backfill-quality-and-performance.md, sources/2026-07-17-pro-membership-implementation.md, decisions/2026-07-15-engaging-news-detail.md, decisions/2026-07-16-modular-architecture.md, decisions/2026-07-16-source-preview-renderer.md, decisions/2026-07-17-fingerprint-driven-feed-sync.md, decisions/2026-07-17-full-feed-and-role-entitlements.md, decisions/2026-07-17-full-feed-visual-queue-and-quality.md, decisions/2026-07-17-pro-membership-and-intelligence.md]
-last_updated: 2026-07-17
+sources: [sources/2026-07-13-digest-inbox-implementation.md, sources/2026-07-14-cloud-cleanup-and-deployment.md, sources/2026-07-15-wechat-e2e-and-runtime-fixes.md, sources/2026-07-15-editorial-ui-implementation.md, sources/2026-07-15-aihot-feed-integration.md, sources/2026-07-16-modular-refactor.md, sources/2026-07-16-source-preview-deployment.md, sources/2026-07-17-fingerprint-sync-and-carousel.md, sources/2026-07-17-feed-history-and-long-preview.md, sources/2026-07-17-full-feed-admin-and-capacity.md, sources/2026-07-17-visual-backfill-quality-and-performance.md, sources/2026-07-17-pro-membership-implementation.md, sources/2026-07-17-luma-ui-redesign.md, sources/2026-07-18-premium-ia-and-copy.md, sources/2026-07-18-focus-previews-and-handdrawn-column.md, decisions/2026-07-15-engaging-news-detail.md, decisions/2026-07-16-modular-architecture.md, decisions/2026-07-16-source-preview-renderer.md, decisions/2026-07-17-fingerprint-driven-feed-sync.md, decisions/2026-07-17-full-feed-and-role-entitlements.md, decisions/2026-07-17-full-feed-visual-queue-and-quality.md, decisions/2026-07-17-pro-membership-and-intelligence.md, decisions/2026-07-17-luma-ui-redesign.md, decisions/2026-07-18-premium-learning-and-curation-ia.md, decisions/2026-07-18-forward-only-focus-previews-and-handdrawn-column.md]
+last_updated: 2026-07-18
 status: confirmed
 confidence: high
 ---
@@ -12,7 +12,7 @@ confidence: high
 
 ## 一句话说明
 
-这是一个从个人文章消化箱迁移为编辑型知识获取平台的微信小程序，现有资讯、精选、简报、我的四个原生 Tab。普通用户查看最近 7 天 AI/科技全部资讯，人工 Pro 查看 30 天，当前微信账号由服务端识别为管理员并查看项目实际已归档的全部数据。部署时条目库为 3,090 条；首页每页 8 条，最新、热度和未来精选均使用数据库游标，统计只在首屏返回。全库视觉与 360×253 列表缩略图继续异步补齐；会员、AI 精选、滚动简报的数据结构与权限已经上线，但真实 AI Provider 和支付保持关闭。娱乐、社会、游戏和英语仍待各自内容源。
+这是一个从个人文章消化箱迁移为编辑型知识获取平台的微信小程序，现有资讯、专栏、简报、我的四个原生 Tab；会员精选作为资讯顶部带锁入口进入独立页面。普通用户查看最近 7 天 AI/科技全部资讯，人工 Pro 查看 30 天，并可访问 AI 学习专栏、精选与简报；当前微信账号由服务端识别为管理员。部署时条目库为 3,090 条；首页每页 8 条，最新、热度和未来精选均使用数据库游标。全库视觉与 360×253 列表缩略图继续异步补齐；真实 AI Provider、真实精选/简报和支付仍保持关闭。娱乐、社会、游戏和英语仍待各自内容源。
 
 ## 事实健康表
 
@@ -20,7 +20,7 @@ confidence: high
 | --- | --- | --- |
 | AppID、云环境 ID、Git 历史和远程地址已保留 | confirmed | 项目配置、应用入口、Git 命令 |
 | 旧社区、商品、任务、聊天、实名、定位、钱包、支付和图片审核代码已从活跃树移除 | confirmed | 当前文件树与重建历史 |
-| 9 个页面、4 个云函数及本地测试已实现 | confirmed | 当前代码、170/170 个 Node 测试通过 |
+| 10 个页面、4 个云函数及本地测试已实现 | confirmed | 当前代码、181/181 个 Node 测试通过 |
 | 旧云资源清空及 5 个新集合创建 | confirmed | 2026-07-14 CloudBase 清单与复核 |
 | `digestIngest`、`digestStore` 已部署 | confirmed | 两函数部署结果与云端日志 |
 | 真实 OpenID、数据库闭环和开发者工具编译 | confirmed | 2026-07-15 微信开发者工具端到端验证 |
@@ -34,6 +34,9 @@ confidence: high
 | 移动端筛选与分页预算 | confirmed | 条目级 facet 已改为计数矩阵；分页通过数据路径追加，详情只挂载相邻截图 |
 | 全量存储与角色权益 | confirmed | 普通 7 天、Pro 30 天、管理员全部归档；唯一微信账号授权匹配 |
 | Pro 会员与知识智能骨架 | confirmed | free/member/admin 重鉴权、固定示例、AI 待处理队列、简报引用快照、独立运维函数 |
+| 会员学习与精选信息架构 | confirmed | 资讯顶部精选锁入口、底部 AI 专栏、频道数字移除、微信模拟器六场景截图 |
+| 手绘 AI 知识卡与新资讯聚焦截图 | confirmed | 六课共 18 张完整手绘海报轮播、生产 X 正文裁切、媒体 2/2 就绪、forward-only 视觉边界 |
+| 专栏高清按需查看与资讯被动更新提示 | confirmed | 18 张 1086×1448 云图、原生三图预览、60 秒轻量计数、点击后才更新列表 |
 | 微信开发者工具 CLI 优先工作流 | confirmed | Stable 2.01.2510290 的 `auto`、`open`、`islogin` 已通过；端口只监听 `127.0.0.1:9420` |
 | 多来源去重、独立官方源与其他四个频道 | needs-review | 尚未实现，不得宣称为全频道实时新闻服务 |
 | 真正 AI 摘要 | needs-review | 当前套餐模型调用返回 429；应用已透明使用本地临时摘要 |
@@ -65,15 +68,15 @@ confidence: high
 
 ## 代码与数据
 
-- 页面：`pages/inbox/index`、`pages/curated/index`、`pages/briefing/index`、`pages/profile/index` 为四个原生 Tab；详情与来源页继续保留，个人消化、结论卡和设置作为二级入口。
-- 小程序模块：`features/knowledge-feed/`、`membership/`、`curated-feed/`、`briefing/` 分别拥有独立 API、模型和展示状态；`features/digest/` 保留个人消化闭环；`services/cloud-functions.js` 是共享传输层。
+- 页面：`pages/inbox/index`、`pages/curated/index`、`pages/briefing/index`、`pages/profile/index` 为资讯、专栏、简报、我的四个原生 Tab；`pages/featured/index` 是资讯顶部带锁入口打开的会员精选页。详情与来源页继续保留，个人消化、结论卡和设置作为二级入口。
+- 小程序模块：`features/knowledge-feed/`、`membership/`、`curated-feed/`、`ai-column/`、`briefing/` 分别拥有独立查询或展示模型；`features/digest/` 保留个人消化闭环；`services/cloud-functions.js` 是共享传输层。
 - 微信运行时模块引用统一使用带 `.js` 扩展名的相对 `require`，页面直接引用具体 feature 文件，不再使用 `...require(...)` 聚合入口；项目检查会阻止这两类已验证不兼容写法。
 - 资讯云函数模块：`adapters/` 隔离外部资讯源，`repositories/` 隔离条目、日索引、授权和同步状态，`services/` 编排查询、权益、同步、迁移和视觉维护，`policies/` 承载定时入口、访问规则和维护鉴权，`presenters/` 约束公开 DTO；`knowledgeFeed/index.js` 只装配依赖和路由 action。
-- 首页频道：精选、AI 前沿、科技、娱乐、社会、游戏、英语；当前聚合源覆盖前两类，其他频道保留真实空状态。
+- 首页频道：全部之后显示带锁“精选”导航入口，再依次为 AI 前沿、科技、娱乐、社会、游戏、英语；精选不参与普通频道过滤。频道标签不显示数量，当前聚合源覆盖 AI/科技，其他频道保留真实空状态。
 - 首页筛选：普通用户可选 24 小时、近 3 天、近 7 天并看见锁定的 30 天入口；Pro 可选近 30 天；管理员另有“全部归档”。15 个公司与模型主题、14 个技术方向可组合，选项显示当前资讯数，零结果项不可选。
 - 首页排序：默认选中“最新”，当前频道和筛选范围内的全部资讯显式按发布时间从新到旧；用户切换“热度”后，全部资讯按上游热度值从高到低，同热度按发布时间倒序。放大主稿始终只是当前排序的第一条，不再有独立选稿规则。两种模式都在分页前执行，切换会从第一页重新加载。
 - 首页资讯分页：云函数先按频道和筛选条件查询，再下发 8 条列表 DTO；第一页携带计数矩阵，后续使用稳定 `nextCursor`，不再重复 count 或矩阵计算。客户端兼容旧 offset，但优先游标，并通过 `feed.remainingItems[n]` 只追加新增行。
-- 视觉基线：`styles/editorial-tokens.wxss`，以米白纸张、黑色排版、细线和单一频道色建立层级。
+- 视觉基线：`styles/design-tokens.wxss`，以冷白珍珠画布、实体内容表面、连续圆角和单一蓝紫焦点建立层级；模糊材质只用于悬浮控制与临时覆盖层。
 - 云函数：`digestIngest`、`digestStore`、`knowledgeFeed`、私有运维入口 `knowledgeOps`
 - 集合：个人闭环 5 个集合；资讯链路包括缓存、归档、独立条目、日索引、同步状态、管理员授权、迁移和视觉任务；会员/智能链路包括 `knowledge_memberships`、`knowledge_feed_item_analysis`、`knowledge_feed_analysis_jobs`、`knowledge_feed_digests`。服务端专用集合均为 `ADMINONLY`。
 - `knowledgeFeed` 由单一 `knowledge-feed-source-sync` 每分钟运行：fingerprint 变化时立即刷新 `mode=all`；指纹不变时每 6 小时做 ETag 条件校验，每 24 小时做完整一致性刷新。用户请求只读取 CloudBase。
@@ -100,16 +103,18 @@ confidence: high
 - AI 调用前事务预留预算，成功后结算实际 Token 成本；每月 10 元硬上限。
 - AI 额度错误会释放预算预留并进入本地临时摘要，不产生伪造的 AI 用量记录。
 - 腾讯云自动化凭据仅保存在被 Git 忽略且受本机 ACL 限制的 `wiki/secrets/`，普通 Wiki 不含实际值。
-- 原文截图服务只绑定回环地址，经 Nginx Bearer 鉴权公开；生产必须使用回环代理并在代理解析后拒绝私网/保留地址。服务限制单并发、最多 12 张、单图约 1.25MB 和总超时，并拒绝 HTTP 4xx/5xx；滚动后重新测量懒加载高度。
+- 原文截图服务只绑定回环地址，经 Nginx Bearer 鉴权公开；生产必须使用回环代理并在代理解析后拒绝私网/保留地址。服务限制单并发、最多 12 张、单图约 1.25MB 和总超时，并拒绝 HTTP 4xx/5xx。`focus-v1` 已部署：先站点适配、再通用 DOM 正文识别、低置信度整页回退；截图前等待字体、头像和正文图片稳定。当前不使用 OCR 或视觉大模型，生产只处理 2026-07-18T04:43:08.568Z 之后首次发现的新资讯。
 - 资讯刷新与封面/截图回填使用数据库事务合并；孤儿视觉文件只按模块拥有的前缀删除，失败会进入持久化队列重试。
 - 封面和截图对象路径包含来源 URL 哈希；事务 patch 同时校验 `expectedUrl`。若生成期间条目 URL 改变或被移除，旧图不会写入新资讯，未应用上传会进入受限清理队列；同 URL 强制重建使用独立捕获版本，避免覆盖当前正在引用的截图。
 
 ## 本地验证
 
-- `npm test`：170/170 通过。
-- `npm run check`：27 个 JSON、143 个 JavaScript、9 个页面通过结构、语法与微信模块引用兼容性检查。
+- `npm test`：178/178 通过。
+- `npm run check`：28 个 JSON、154 个 JavaScript、10 个页面通过结构、语法与微信模块引用兼容性检查。
 - `git diff --check`：通过。
-- 微信开发者工具后续默认按 [CLI 优先工作流](concepts/WeChatDevToolsCLI.md) 启动和操作：`D:\Apps\miniprogram\cli.bat auto --project D:\miniprogram --port 9420 --trust-project`；当前 `auto`、`open`、`islogin` 和回环监听已验证。
+- 微信开发者工具模拟器已覆盖资讯、详情、精选、专栏、简报和我的页面；本轮额外验证 Agent 第一/第二张完整海报手动滑动及 Skill 独立海报加载，控制台没有新增红色错误，频道锁和数字移除已确认。
+- 专栏 18 张原始 PNG 保留在 `png/`；运行时统一使用 640×853 非渐进式基线 JPEG，总计 1,603,890 bytes。`swiper` 不使用组件 `lazy-load`，而是显式加载“当前页 + 下一页”：未展开 0 张，展开首屏 2 张，滑动后才加载第 3 张。CLI 新预览实际包体为 1,786,530 bytes；手机旧预览只显示容器背景的问题仍需扫描新二维码复验。
+- 微信开发者工具后续默认按 [CLI 优先工作流](concepts/WeChatDevToolsCLI.md) 启动和操作：`D:\Apps\miniprogram\cli.bat auto --project D:\miniprogram --port 9420 --trust-project`；当前 `auto`、`open`、`islogin` 和回环监听已验证。自动化结束只断开连接，不结束 renderer、不调用 CLI `close`，并把 IDE 留在可验收页面。
 - 微信开发者工具此前已重新编译资讯首页与详情并清除项目级红色错误；2026-07-17 的自动/手动轮播与整组全屏预览已通过页面逻辑和标记测试，仍需在真机覆盖 1、5、8 张、从中间图片进入全屏和返回后继续轮播。
 
 ## 云端与端到端状态
@@ -133,6 +138,7 @@ confidence: high
 6. 用户提供 AI API 后，在测试环境回填最近 30 天；覆盖至少 95% 且人工抽检通过后再开启真实精选和简报。
 7. 当前管理员可完成普通/Pro/管理员页面和权限预览；仍需第二个微信账号验证真实会员到期、宽限、撤销和续费状态，并补充 25,000 条规模 P95 报告。
 8. 支付最后接入；正式启用汇付前完成产品开通、签约、解约、回调验签、主动查询、退款和沙箱回放。
+9. 正式收费前把 AI 专栏完整正文迁移到服务端重鉴权内容接口；聚焦截图已完成并保留整页协议回滚能力，后续仅在真实误判样本证明有必要时再评估视觉模型兜底。
 
 ## 已被替代的旧结论
 

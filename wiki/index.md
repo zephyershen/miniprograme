@@ -2,7 +2,7 @@
 title: "知识获取平台小程序 Wiki 导航"
 type: index
 tags: [index, miniprogram, knowledge-platform, editorial-index]
-last_updated: 2026-07-17
+last_updated: 2026-07-18
 status: confirmed
 confidence: high
 ---
@@ -22,7 +22,11 @@ confidence: high
 ## 关键决策
 
 - [保留项目身份、移除旧业务](decisions/2026-07-13-rebuild-product.md) — 旧项目重建边界
-- [采用编辑索引式知识平台首页](decisions/2026-07-15-editorial-knowledge-platform-ui.md) — 当前产品与 UI 主方向
+- [采用编辑索引式知识平台首页](decisions/2026-07-15-editorial-knowledge-platform-ui.md) — 当前产品结构与内容层级方向
+- [采用 Luma 珍珠表面视觉系统](decisions/2026-07-17-luma-ui-redesign.md) — 当前冷白表面、蓝紫焦点和连续圆角视觉基线
+- [将会员精选移到资讯顶部并把底部入口改为 AI 专栏](decisions/2026-07-18-premium-learning-and-curation-ia.md) — 当前四 Tab、会员精选入口与学习专栏职责
+- [新资讯使用聚焦截图，AI 专栏采用三页手绘知识卡](decisions/2026-07-18-forward-only-focus-previews-and-handdrawn-column.md) — 新资讯截图策略、媒体等待、手绘课程结构与开发者工具保持打开规则
+- [资讯被动提示更新与专栏高清按需预览](decisions/2026-07-18-passive-feed-updates-and-hd-column-preview.md) — 阅读期间不自动换列表、轻量新增计数和 CloudBase 高清图按需打开
 - [资讯详情采用短读导览和条件式原文入口](decisions/2026-07-15-engaging-news-detail.md) — 当前详情阅读结构与原文打开边界
 - [知识平台按能力与依赖边界组织代码](decisions/2026-07-16-modular-architecture.md) — 后续页面、内容源、仓储和服务的扩展规则
 - [缺图资讯使用受控原文页面截图](decisions/2026-07-16-source-preview-renderer.md) — 公网渲染器、CloudBase 回填、多图预览和安全边界
@@ -49,13 +53,17 @@ confidence: high
 - [全量资讯、管理员权益与容量验证](sources/2026-07-17-full-feed-admin-and-capacity.md) — 线上全量/历史数量、管理员授权、函数与服务器容量
 - [全量补图、精选语义与性能验证](sources/2026-07-17-visual-backfill-quality-and-performance.md) — 队列启动、质量信号、响应预算和移动端优化
 - [Pro 会员与知识智能骨架实施证据](sources/2026-07-17-pro-membership-implementation.md) — 四 Tab、服务端重鉴权、游标、运维函数、ACL、索引和部署状态
+- [Luma UI 重构与模拟器验证证据](sources/2026-07-17-luma-ui-redesign.md) — 九页面视觉重构、测试、真实数据截图和溢出修复
+- [会员信息架构、AI 专栏与产品文案改版证据](sources/2026-07-18-premium-ia-and-copy.md) — 十页面结构、六个学习单元、频道锁与截图聚焦可行性分析
+- [聚焦截图与手绘 AI 专栏实施证据](sources/2026-07-18-focus-previews-and-handdrawn-column.md) — 生产 X 正文裁切、媒体就绪、新资讯边界、三页知识卡和微信模拟器验证
+- [专栏高清预览与资讯被动更新实施证据](sources/2026-07-18-hd-column-and-passive-feed-updates.md) — 18 张高清云图、轻量新增计数、云端部署与模拟器验收
 - [2026-07-16 模块化架构评审](reports/architecture-2026-07-16.md) — 历史评分，已被 2026-07-17 复审取代
 - [2026-07-17 模块化架构评审](reports/architecture-2026-07-17.md) — 当前整体 8.9/10、移动端性能 8.8/10，记录规模边界和付费上线前改造项
 - [2026-07-17 会员与知识智能模块化复审](reports/architecture-2026-07-17-membership.md) — 当前整体 8.8/10、会员/智能边界和 AI/支付上线缺口
 
 ## 当前模块
 
-- 小程序页面：资讯、精选、简报、我的四个原生 Tab，以及资讯详情、条件式原始出处和保留的个人消化页面；页面逻辑由 `features/knowledge-feed`、`membership`、`curated-feed`、`briefing` 和 `digest` 承载
+- 小程序页面：资讯、专栏、简报、我的四个原生 Tab，资讯顶部另有会员精选入口；以及资讯详情、条件式原始出处和保留的个人消化页面。页面逻辑由 `features/knowledge-feed`、`membership`、`curated-feed`、`ai-column`、`briefing` 和 `digest` 承载
 - 云函数：`digestIngest`、`digestStore`、`knowledgeFeed`、`knowledgeOps`
 - 数据：个人队列最多 5 条、结论卡最多 20 张；资讯为独立条目 + 按日索引 + 服务端权益，AI 月度硬上限 10 元
 

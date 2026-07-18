@@ -29,6 +29,7 @@ function jobPriority(item, currentTime, recentWindowDays) {
 
 function visualJob(item, config, observedAt, priorityBoost = 0) {
   const timestamp = observedAt instanceof Date ? observedAt : new Date(observedAt);
+  const eligibleAt = item.firstStoredAt || item.firstObservedAt || timestamp;
   return {
     _id: itemDocumentId(config.provider, item.id),
     itemId: item.id,
@@ -48,6 +49,8 @@ function visualJob(item, config, observedAt, priorityBoost = 0) {
     lastErrorCode: '',
     stagedFileIds: [],
     captureVersion: config.captureVersion,
+    captureProfile: config.captureProfile || 'focus-v1',
+    eligibleAt,
     thumbnailVersion: Math.max(1, Number(config.thumbnailVersion) || 1),
     createdAt: timestamp,
     updatedAt: timestamp

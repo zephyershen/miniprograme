@@ -17,6 +17,16 @@ const CHANNEL_RULES = Object.freeze([
   { key: 'tech', pattern: /科技|技术|芯片|软件|硬件|开发|github|apple|google|microsoft|互联网|机器人/i }
 ]);
 
+const FEATURED_SHORTCUT = Object.freeze({
+  key: 'featured',
+  label: '精选',
+  tone: 'cobalt',
+  premium: true,
+  navigation: true,
+  active: false,
+  count: 0
+});
+
 function channelByKey(key) {
   return CHANNELS.find((channel) => channel.key === key) || CHANNELS[0];
 }
@@ -45,10 +55,17 @@ function decorateChannelCounts(countByKey = {}, activeKey = 'all') {
   }));
 }
 
+function addFeaturedShortcut(channels = []) {
+  if (!channels.length) return [{ ...FEATURED_SHORTCUT }];
+  return [channels[0], { ...FEATURED_SHORTCUT }, ...channels.slice(1)];
+}
+
 module.exports = {
   CHANNELS,
+  FEATURED_SHORTCUT,
   channelByKey,
   inferChannel,
   decorateChannels,
-  decorateChannelCounts
+  decorateChannelCounts,
+  addFeaturedShortcut
 };

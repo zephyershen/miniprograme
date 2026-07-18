@@ -8,6 +8,7 @@ test('loads every configured page entrypoint after feature-module migration', ()
   try {
     [
       '../pages/inbox/index',
+      '../pages/featured/index',
       '../pages/curated/index',
       '../pages/briefing/index',
       '../pages/profile/index',
@@ -24,11 +25,15 @@ test('loads every configured page entrypoint after feature-module migration', ()
     if (previousPage) global.Page = previousPage;
     else delete global.Page;
   }
-  assert.equal(registered.length, 9);
+  assert.equal(registered.length, 10);
   assert.equal(typeof registered[0].loadFeed, 'function');
+  assert.equal(typeof registered[0].checkForFeedUpdates, 'function');
+  assert.equal(typeof registered[0].applyNewItems, 'function');
   assert.equal(typeof registered[1].loadFeed, 'function');
-  assert.equal(typeof registered[2].loadBriefing, 'function');
-  assert.equal(typeof registered[3].loadMembership, 'function');
-  assert.equal(typeof registered[4].loadItem, 'function');
-  assert.equal(typeof registered[5].onLoad, 'function');
+  assert.equal(typeof registered[2].resolveAccess, 'function');
+  assert.equal(typeof registered[2].previewPoster, 'function');
+  assert.equal(typeof registered[3].loadBriefing, 'function');
+  assert.equal(typeof registered[4].loadMembership, 'function');
+  assert.equal(typeof registered[5].loadItem, 'function');
+  assert.equal(typeof registered[6].onLoad, 'function');
 });

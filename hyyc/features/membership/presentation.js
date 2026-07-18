@@ -1,7 +1,8 @@
 const MEMBERSHIP_BENEFITS = Object.freeze([
-  { key: 'curated', title: '重要资讯精选', copy: '从每天的新资讯中优先留下真正值得花时间的变化。' },
-  { key: 'briefing', title: '24 小时 / 7 天 / 30 天简报', copy: '先看结论与影响，再决定是否继续阅读来源。' },
-  { key: 'history', title: '30 天完整历史', copy: '简报里的重要引用可以继续回看，不止停留在摘要。' }
+  { key: 'column', title: 'AI 专栏', copy: '从 Agent、Skill、MCP 开始，系统学懂 AI。' },
+  { key: 'curated', title: '重点资讯精选', copy: '去重并判断影响，只留下真正值得看的变化。' },
+  { key: 'briefing', title: '滚动简报', copy: '几分钟读完 24 小时、7 天或 30 天的重要变化。' },
+  { key: 'history', title: '30 天完整历史', copy: '结论与原始来源都能继续回看。' }
 ]);
 const ROLE_PREVIEW_OPTIONS = Object.freeze([
   { key: 'free', label: '普通用户' },
@@ -22,7 +23,7 @@ function membershipPresentation(access) {
   const roleCopy = role === 'admin'
     ? '已拥有全部已归档资讯与所有会员能力。'
     : role === 'member'
-      ? '已开放 30 天历史、精选与三种滚动简报。'
+      ? '已开放 AI 专栏、精选、简报与 30 天历史。'
       : '默认可查看最近 7 天的全部资讯。';
   return {
     role,

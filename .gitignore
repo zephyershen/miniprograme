@@ -8,6 +8,10 @@ hyyc/miniprogram_npm/
 hyyc/cloudfunctions/**/node_modules/
 .playwright-cli/
 
+# Local visual sources and generated verification artifacts.
+png/
+output/
+
 # Cloud function local secrets (do not commit)
 hyyc/cloudfunctions/**/config.local.js
 hyyc/cloudfunctions/**/cert/

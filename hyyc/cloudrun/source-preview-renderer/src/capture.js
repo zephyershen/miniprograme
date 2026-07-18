@@ -11,6 +11,14 @@ const {
 } = require('./capture-plan.js');
 const { pageMetrics, capturePageSegments } = require('./capture-segments.js');
 const {
+  FOCUS_PROFILE,
+  normalizeCaptureProfile,
+  statusIdFromUrl,
+  selectFocusCandidate
+} = require('./focus-policy.js');
+const { stabilizeFocusedContent } = require('./media-stability.js');
+const { captureFocusedSegments } = require('./capture-focused.js');
+const {
   LIST_THUMBNAIL_VERSION,
   renderListThumbnail
 } = require('./list-thumbnail.js');
@@ -43,8 +51,9 @@ function createCaptureService({
     return browserPromise;
   }
 
-  async function capture(url, requestedSegments = DEFAULT_MAX_SEGMENTS, signal) {
+  async function capture(url, requestedSegments = DEFAULT_MAX_SEGMENTS, signal, requestedProfile = 'page') {
     const targetUrl = await guard.assertPublicUrl(url);
+    const profile = normalizeCaptureProfile(requestedProfile);
     const browser = await getBrowser();
     let context = null;
     const abortCapture = () => context && context.close().catch(() => {});
@@ -70,6 +79,9 @@ function createCaptureService({
       });
       const navigationResponse = await page.goto(targetUrl, { waitUntil: 'domcontentloaded' });
       assertRenderableResponse(navigationResponse);
+      if (profile === FOCUS_PROFILE && statusIdFromUrl(targetUrl)) {
+        await page.waitForSelector('article', { timeout: 8000 }).catch(() => {});
+      }
       await page.waitForLoadState('networkidle', { timeout: 2500 }).catch(() => {});
       await page.evaluate(() => {
         const selectors = [
@@ -91,7 +103,18 @@ function createCaptureService({
       }).catch(() => {});
 
       const initialMetrics = await pageMetrics(page);
-      const capture = await capturePageSegments(page, requestedSegments);
+      let focus = null;
+      let media = { total: 0, ready: 0, pending: 0 };
+      let capture = null;
+      if (profile === FOCUS_PROFILE) {
+        focus = await selectFocusCandidate(page, targetUrl).catch(() => null);
+        if (focus) {
+          const stabilized = await stabilizeFocusedContent(page);
+          media = stabilized.media;
+          capture = await captureFocusedSegments(page, stabilized.box, requestedSegments);
+        }
+      }
+      if (!capture) capture = await capturePageSegments(page, requestedSegments);
 
       return {
         finalUrl: page.url(),
@@ -100,6 +123,9 @@ function createCaptureService({
         pageHeight: capture.pageHeight,
         segmentCount: capture.segmentCount,
         truncated: capture.truncated,
+        profile,
+        focus: focus ? { kind: focus.kind, confidence: focus.confidence, score: focus.score } : null,
+        media,
         screenshots: capture.screenshots
       };
     } finally {
@@ -132,5 +158,6 @@ module.exports = {
   HARD_MAX_SEGMENTS,
   CAPTURE_VERSION,
   createCapturePlan,
+  normalizeCaptureProfile,
   createCaptureService
 };

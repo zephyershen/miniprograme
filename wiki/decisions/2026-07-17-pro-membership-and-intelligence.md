@@ -2,8 +2,8 @@
 title: "采用单一 Pro 会员、能力型权益与可回溯知识简报"
 type: decision
 tags: [membership, pro, entitlements, curated-feed, digests, intelligence, payment]
-sources: [sources/2026-07-17-pro-membership-implementation.md]
-last_updated: 2026-07-17
+sources: [sources/2026-07-17-pro-membership-implementation.md, sources/2026-07-18-premium-ia-and-copy.md]
+last_updated: 2026-07-18
 status: confirmed
 confidence: high
 ---
@@ -17,6 +17,7 @@ confidence: high
 | 能力 | 普通用户 | Pro 会员 | 管理员 |
 | --- | --- | --- | --- |
 | 全量资讯 | 最近 7 天 | 最近 30 天 | 项目实际已归档的全部数据 |
+| AI 专栏 | 目录与价值预览 | 可用 | 可用 |
 | AI 精选 | 固定示例 | 可用 | 可用 |
 | 24h / 7d / 30d 简报 | 固定示例 | 可用 | 可用 |
 | 简报来源回看 | 不可用 | 可用 | 可用 |
@@ -26,10 +27,11 @@ confidence: high
 
 ## 前端结构
 
-小程序使用四个原生底部 Tab：资讯、精选、简报、我的。
+2026-07-18 起，小程序使用四个原生底部 Tab：资讯、专栏、简报、我的；旧“资讯、精选、简报、我的”Tab 结论被 [会员学习与精选信息架构决策](2026-07-18-premium-learning-and-curation-ia.md) 部分替代。
 
 - 资讯继续使用编辑索引视觉、8 条一页、缩略图和稳定游标；免费用户可见锁定的 30 天入口，在 7 天边界只显示一次轻量提示。
-- 精选对普通用户只展示固定完整示例；会员页默认按重要度，支持时间、频道、公司/模型和技术方向筛选。
+- 资讯顶部带锁“精选”是独立会员页的导航入口，不参与普通频道筛选；精选对普通用户只展示固定完整示例，会员页默认按重要度并支持时间、频道、公司/模型和技术方向筛选。
+- 专栏对普通用户展示 Agent、Skill、MCP 等学习路径预览；Pro 与管理员可展开完整学习单元。正式收费前，完整专栏正文必须迁移到服务端重鉴权内容接口。
 - 简报使用 24 小时、7 天、30 天滚动窗口，必须包含结论、必须知道、影响、趋势、雷达、继续阅读和来源索引。
 - 我的展示身份、到期时间、数据覆盖与权益。支付关闭期间只显示“会员能力内测中”，不出现价格或虚假购买按钮；收藏与旧结论卡作为二级入口。
 - 真实管理员的“我的”页额外显示普通用户、Pro 会员、管理员三个身份预览按钮。预览状态由服务端验证真实管理员授权后写入同一授权记录；页面参数不能授予权限，预览普通用户后仍以真实管理员身份允许切回。
@@ -72,6 +74,7 @@ generateDigest(window, analyzedItems, previousDigest) => DigestResult
 
 ## 被替代的结论
 
+- “精选必须是原生底部 Tab”被“资讯顶部会员精选入口 + 底部 AI 专栏”替代。
 - “只有 free/admin，管理员默认近 90 天”被 `free/member/admin` 能力权益与管理员全部归档替代。
 - “上游 selected 就是精选”被本地版本化分析与质量硬门槛替代。
 - “offset 足够支撑会员历史”被稳定数据库游标替代。

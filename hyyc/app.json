@@ -1,6 +1,7 @@
 {
   "pages": [
     "pages/inbox/index",
+    "pages/featured/index",
     "pages/curated/index",
     "pages/briefing/index",
     "pages/profile/index",
@@ -12,15 +13,15 @@
   ],
   "window": {
     "navigationBarTitleText": "别收藏了",
-    "navigationBarBackgroundColor": "#f6f3ec",
+    "navigationBarBackgroundColor": "#f7f7fa",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#f6f3ec",
+    "backgroundColor": "#f3f4f8",
     "backgroundTextStyle": "dark"
   },
   "tabBar": {
-    "color": "#77746d",
-    "selectedColor": "#2457ff",
-    "backgroundColor": "#fffefa",
+    "color": "#858a97",
+    "selectedColor": "#5457df",
+    "backgroundColor": "#fbfbfd",
     "borderStyle": "white",
     "list": [
       {
@@ -29,7 +30,7 @@
       },
       {
         "pagePath": "pages/curated/index",
-        "text": "精选"
+        "text": "专栏"
       },
       {
         "pagePath": "pages/briefing/index",

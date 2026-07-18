@@ -2,6 +2,7 @@ const { AppError } = require('../lib/errors');
 const { toDate } = require('../lib/dates');
 const { visualRevisionStem } = require('../lib/visual-version');
 const { hasReadyVisual } = require('../policies/visual-publication');
+const { isNewVisualItem } = require('../policies/new-visuals');
 
 function createCoverService({ cloud, repository, fetchPublicBuffer, extractCoverUrl, config, now = () => new Date(), logger = console }) {
   function assertScheduledMaintenance(scheduled) {
@@ -70,6 +71,7 @@ function createCoverService({ cloud, repository, fetchPublicBuffer, extractCover
       : null;
     const candidates = cache.items
       .filter((item) => (!candidateIds || candidateIds.has(item.id))
+        && (force === true || isNewVisualItem(item, config.newItemsAfter))
         && !hasReadyVisual(item)
         && (!options.untriedOnly || !item.coverCheckedAt)
         && (force === true || !coverCheckIsFresh(item)))

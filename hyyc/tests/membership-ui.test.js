@@ -95,7 +95,7 @@ test('keeps the free briefing example fixed and filterable', () => {
 
 test('renders four native tabs and never shows price or a payment button during internal testing', () => {
   const app = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../app.json'), 'utf8'));
-  assert.deepEqual(app.tabBar.list.map((item) => item.text), ['资讯', '精选', '简报', '我的']);
+  assert.deepEqual(app.tabBar.list.map((item) => item.text), ['资讯', '专栏', '简报', '我的']);
   const profile = fs.readFileSync(path.resolve(__dirname, '../pages/profile/index.wxml'), 'utf8');
   assert.match(profile, /会员能力内测中/);
   assert.match(profile, /管理员测试工具/);
@@ -104,10 +104,21 @@ test('renders four native tabs and never shows price or a payment button during 
 });
 
 test('free locked pages use fixed samples rather than live member content', () => {
-  const curated = fs.readFileSync(path.resolve(__dirname, '../pages/curated/index.wxml'), 'utf8');
+  const featured = fs.readFileSync(path.resolve(__dirname, '../pages/featured/index.wxml'), 'utf8');
+  const column = fs.readFileSync(path.resolve(__dirname, '../pages/curated/index.wxml'), 'utf8');
   const briefing = fs.readFileSync(path.resolve(__dirname, '../pages/briefing/index.wxml'), 'utf8');
-  assert.match(curated, /固定示例/);
-  assert.match(briefing, /固定完整示例/);
-  assert.doesNotMatch(curated, /AIHOT|公开 API/);
+  assert.match(featured, /体验示例/);
+  assert.match(column, /Pro 专属/);
+  assert.match(column, /Agent、Skill、MCP/);
+  assert.match(briefing, /体验示例/);
+  assert.doesNotMatch(featured, /AIHOT|公开 API/);
   assert.doesNotMatch(briefing, /AIHOT|公开 API/);
+});
+
+test('home channel labels hide counts and show a lock on the featured shortcut', () => {
+  const inbox = fs.readFileSync(path.resolve(__dirname, '../pages/inbox/index.wxml'), 'utf8');
+  assert.match(inbox, /class="channel-lock"/);
+  assert.match(inbox, /new-items-float/);
+  assert.match(inbox, /bindtap="applyNewItems"/);
+  assert.doesNotMatch(inbox, /class="channel-count"/);
 });

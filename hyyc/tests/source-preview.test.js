@@ -28,6 +28,19 @@ const {
   capturePageSegments
 } = require('../cloudrun/source-preview-renderer/src/capture-segments');
 const {
+  normalizeCaptureProfile,
+  statusIdFromUrl,
+  candidateScore,
+  chooseFocusCandidate
+} = require('../cloudrun/source-preview-renderer/src/focus-policy');
+const {
+  createFocusCapturePlan
+} = require('../cloudrun/source-preview-renderer/src/capture-focused');
+const {
+  isNewVisualItem,
+  isNewVisualJob
+} = require('../cloudfunctions/knowledgeFeed/policies/new-visuals');
+const {
   LIST_THUMBNAIL_WIDTH,
   LIST_THUMBNAIL_HEIGHT,
   renderListThumbnail
@@ -130,6 +143,60 @@ test('captures consecutive page segments beyond three while enforcing the safety
   assert.equal(twentyScreens.segmentCount, 12);
   assert.equal(twentyScreens.truncated, true);
   assert.equal(twentyScreens.scrollPositions[11], 14850);
+});
+
+test('focuses the matching X status and crops the selected article into bounded segments', () => {
+  const target = 'https://x.com/example/status/2078044693817184577';
+  assert.equal(statusIdFromUrl(target), '2078044693817184577');
+  assert.equal(normalizeCaptureProfile('focus-v1'), 'focus-v1');
+  assert.equal(normalizeCaptureProfile('unknown'), 'page');
+
+  const selected = chooseFocusCandidate([
+    {
+      id: 'sidebar',
+      kind: 'content',
+      textLength: 900,
+      linkTextLength: 850,
+      width: 340,
+      height: 1100,
+      imageCount: 3,
+      meaningfulImageCount: 2
+    },
+    {
+      id: 'tweet',
+      kind: 'x-status',
+      targetStatus: true,
+      textLength: 360,
+      linkTextLength: 40,
+      width: 620,
+      height: 1960,
+      imageCount: 2,
+      meaningfulImageCount: 2,
+      semanticWeight: 900
+    }
+  ], target);
+  assert.equal(selected.id, 'tweet');
+  assert.equal(selected.confidence, 'high');
+  assert.ok(candidateScore(selected) > 10000);
+
+  const plan = createFocusCapturePlan(
+    { x: 180, y: 90, width: 620, height: 1960 },
+    { width: 1080, height: 4000 },
+    12
+  );
+  assert.equal(plan.width, 676);
+  assert.equal(plan.segmentCount, 2);
+  assert.equal(plan.truncated, false);
+  assert.ok(plan.clips.every((clip) => clip.width === 676 && clip.height <= VIEWPORT.height));
+});
+
+test('keeps visual generation forward-only when a release cutoff is configured', () => {
+  const cutoff = '2026-07-18T04:43:08.568Z';
+  assert.equal(isNewVisualItem({ firstStoredAt: '2026-07-18T04:43:08.567Z' }, cutoff), false);
+  assert.equal(isNewVisualItem({ firstObservedAt: '2026-07-18T04:43:08.568Z' }, cutoff), true);
+  assert.equal(isNewVisualJob({ createdAt: '2026-07-19T00:00:00.000Z' }, cutoff), false);
+  assert.equal(isNewVisualJob({ eligibleAt: '2026-07-18T05:00:00.000Z' }, cutoff), true);
+  assert.equal(isNewVisualItem({}, ''), true);
 });
 
 test('remeasures a lazy-loading page while capturing consecutive segments', async () => {

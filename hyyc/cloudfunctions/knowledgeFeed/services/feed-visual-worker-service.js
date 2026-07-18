@@ -4,6 +4,7 @@ const {
   hasListThumbnail
 } = require('../repositories/feed-item');
 const { previewRetryDelay, previewFailureCode } = require('./preview-service');
+const { isNewVisualJob } = require('../policies/new-visuals');
 
 function readyVisualFields(
   kind,
@@ -217,6 +218,7 @@ function createFeedVisualWorkerService({
       const results = [];
       for (const candidate of due) {
         if (results.length >= limit) break;
+        if (!isNewVisualJob(candidate, config.newItemsAfter)) continue;
         const claimed = await jobRepository.claim(
           candidate._id,
           owner,

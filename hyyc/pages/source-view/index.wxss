@@ -1,35 +1,35 @@
 .source-error {
   box-sizing: border-box;
   min-height: 100vh;
-  padding: 150rpx var(--editorial-gutter) 80rpx;
+  padding: 120rpx var(--ui-gutter) 80rpx;
 }
 
-.source-error-kicker {
-  color: var(--editorial-blue);
-  font-size: 20rpx;
-  font-weight: 750;
-  letter-spacing: 2rpx;
+.source-error::before {
+  display: block;
+  width: 70rpx;
+  height: 70rpx;
+  margin-bottom: 28rpx;
+  border-radius: 24rpx;
+  background: linear-gradient(135deg, var(--ui-accent), var(--ui-violet));
+  box-shadow: var(--ui-shadow-accent);
+  content: "↗";
+  color: #fff;
+  font-size: 32rpx;
+  line-height: 70rpx;
+  text-align: center;
 }
 
-.source-error-title {
-  margin-top: 22rpx;
-  font-size: 44rpx;
-  font-weight: 820;
-}
-
-.source-error-copy {
-  margin-top: 20rpx;
-  color: var(--editorial-muted);
-  font-size: 25rpx;
-  line-height: 1.7;
-}
+.source-error-kicker { color: var(--ui-accent); font-size: 20rpx; font-weight: 700; letter-spacing: 1rpx; }
+.source-error-title { margin-top: 20rpx; font-size: 43rpx; font-weight: 760; }
+.source-error-copy { margin-top: 20rpx; color: var(--ui-muted); font-size: 25rpx; line-height: 1.7; }
 
 .source-copy-action {
   width: 100%;
-  margin: 40rpx 0 0;
-  border-radius: 0;
-  background: var(--editorial-ink);
+  margin: 38rpx 0 0;
+  border-radius: 24rpx;
+  background: linear-gradient(135deg, var(--ui-accent), var(--ui-accent-strong));
+  box-shadow: var(--ui-shadow-accent);
   color: #ffffff;
   font-size: 25rpx;
-  line-height: 86rpx;
+  line-height: 88rpx;
 }

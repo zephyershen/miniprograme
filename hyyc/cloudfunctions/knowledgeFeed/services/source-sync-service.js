@@ -2,14 +2,18 @@ const { randomUUID } = require('node:crypto');
 const { toDate } = require('../lib/dates');
 const { isScheduledTrigger } = require('../policies/timer-trigger');
 const { visualFileIds: cachedVisualFileIds } = require('../repositories/feed-cache');
+const { isNewVisualItem } = require('../policies/new-visuals');
 
-function mergeCachedVisuals(items, previous) {
+function mergeCachedVisuals(items, previous, observedAt = new Date()) {
   const previousById = new Map(((previous && previous.items) || []).map((item) => [item.id, item]));
   return items.map((item) => {
     const cached = previousById.get(item.id);
     const reusable = cached && cached.url === item.url ? cached : null;
     return {
       ...item,
+      firstObservedAt: (cached && cached.firstObservedAt)
+        || (cached && previous && previous.fetchedAt)
+        || observedAt,
       coverFileId: (reusable && reusable.coverFileId) || '',
       coverCheckedAt: (reusable && reusable.coverCheckedAt) || null,
       coverStatus: (reusable && reusable.coverStatus) || '',
@@ -44,7 +48,7 @@ function prepareRefreshedDocument(next, previous, ownedPrefixes) {
   const current = {
     ...(previous || {}),
     ...next,
-    items: mergeCachedVisuals(next.items || [], previous)
+    items: mergeCachedVisuals(next.items || [], previous, next.fetchedAt || next.updatedAt || new Date())
   };
   const active = ownedVisualFileIds(current, ownedPrefixes);
   const owned = (Array.isArray(ownedPrefixes) ? ownedPrefixes : [])
@@ -153,7 +157,9 @@ function createSourceSyncService({
       document: persistedDocument,
       notModified: false,
       pendingVisualItemIds: (persistedDocument.items || [])
-        .filter((item) => incomingIds.has(item.id) && !itemHasVisual(item))
+        .filter((item) => incomingIds.has(item.id)
+          && !itemHasVisual(item)
+          && isNewVisualItem(item, config.visualNewItemsAfter))
         .map((item) => item.id)
     };
   }

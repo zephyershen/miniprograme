@@ -170,6 +170,9 @@ function createFeedItemRepository(db, config) {
         || current.url !== document.url
         || needsVisualWork(current);
     });
+    const insertedIds = new Set(inserted.map((document) => document._id));
+    const insertedVisualCandidates = visualCandidates
+      .filter((document) => insertedIds.has(document._id));
     const analysisCandidates = values.filter((document) => {
       const current = existing.get(document._id);
       return !current
@@ -181,6 +184,7 @@ function createFeedItemRepository(db, config) {
       inserted: inserted.length,
       updated: updates.length,
       visualCandidates,
+      insertedVisualCandidates,
       analysisCandidates
     };
   }
@@ -378,6 +382,33 @@ function createFeedItemRepository(db, config) {
     };
   }
 
+  async function latestCursor(options) {
+    const page = await queryPage({
+      ...options,
+      sort: 'latest',
+      offset: 0,
+      cursor: '',
+      limit: 1,
+      includeCount: false
+    });
+    return encodePageCursor(page.items && page.items[0], 'latest');
+  }
+
+  async function countAfterCursor(options, cursorValue) {
+    await ensureCollection();
+    const cursor = decodePageCursor(cursorValue, 'latest');
+    if (!cursor) return null;
+    const command = db.command;
+    const newer = command.or([
+      { publishedAt: command.gt(cursor.publishedAt) },
+      { publishedAt: cursor.publishedAt, _id: command.gt(cursor.id) }
+    ]);
+    const result = await collection()
+      .where(command.and([buildWhere(options), newer]))
+      .count();
+    return Number(result && result.total) || 0;
+  }
+
   async function count(options) {
     await ensureCollection();
     const result = await collection().where(buildWhere(options)).count();
@@ -425,6 +456,8 @@ function createFeedItemRepository(db, config) {
     markVisualQueued,
     visualStats,
     queryPage,
+    latestCursor,
+    countAfterCursor,
     count,
     listFacets,
     hasItems,

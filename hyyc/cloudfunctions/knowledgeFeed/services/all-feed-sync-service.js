@@ -128,9 +128,12 @@ function createAllFeedSyncService({
         );
       }
       let visualJobs = { requested: 0, inserted: 0, reset: 0, retained: 0 };
-      if (visualJobRepository && upsert.visualCandidates && upsert.visualCandidates.length) {
-        visualJobs = await visualJobRepository.enqueueMany(upsert.visualCandidates, itemsCheckedAt, {
-          priorityBoost: 1000
+      const visualCandidates = config.visualNewItemsOnly
+        ? upsert.insertedVisualCandidates
+        : upsert.visualCandidates;
+      if (visualJobRepository && visualCandidates && visualCandidates.length) {
+        visualJobs = await visualJobRepository.enqueueMany(visualCandidates, itemsCheckedAt, {
+          priorityBoost: Math.max(0, Number(config.visualPriorityBoost) || 1000)
         });
         if (typeof itemRepository.markVisualQueued === 'function') {
           await itemRepository.markVisualQueued(visualJobs.queuedItems, itemsCheckedAt);

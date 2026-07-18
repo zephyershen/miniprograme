@@ -5,7 +5,8 @@ This service opens a public HTTPS article with Playwright and returns consecutiv
 ## Runtime contract
 
 - `GET /health` returns readiness without exposing credentials.
-- `POST /capture` requires `Authorization: Bearer <CAPTURE_TOKEN>` and accepts `{ "url": "https://...", "maxSegments": 12, "captureVersion": 2 }`.
+- `POST /capture` requires `Authorization: Bearer <CAPTURE_TOKEN>` and accepts `{ "url": "https://...", "maxSegments": 12, "captureVersion": 2, "profile": "focus-v1" }`.
+- `focus-v1` first selects the primary article from DOM semantics (with an X/Twitter status adapter), scrolls it to trigger lazy media, waits for fonts and meaningful images such as avatars to load, then captures only that content boundary. It falls back to page segments when confidence is low.
 - Only one capture runs at a time. Requests are bounded by body, response, image, navigation and total time limits.
 - The service accepts only public HTTPS targets and blocks service workers and private/reserved addresses.
 

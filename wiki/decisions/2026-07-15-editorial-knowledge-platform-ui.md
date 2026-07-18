@@ -4,7 +4,7 @@ type: decision
 tags: [decision, product, ui, editorial-index, knowledge-platform]
 sources: [../sources/2026-07-15-editorial-ui-implementation.md, ../sources/2026-07-15-aihot-feed-integration.md, 2026-07-16-source-preview-renderer.md]
 date: 2026-07-15
-last_updated: 2026-07-16
+last_updated: 2026-07-17
 status: accepted
 confidence: high
 ---
@@ -47,15 +47,16 @@ confidence: high
 ## 影响
 
 - `hyyc/pages/inbox/` 已成为纯公共资讯首页，不再请求或呈现 `digestStore` 的个人队列数据，也不再调用 `digestIngest`。
-- `hyyc/styles/editorial-tokens.wxss` 成为颜色和间距的视觉基线。
+- `hyyc/styles/editorial-tokens.wxss` 曾是颜色和间距的视觉基线；其具体视觉实现已由 [Luma 珍珠表面视觉系统](2026-07-17-luma-ui-redesign.md) `superseded`。
 - 原 [“别收藏了”首版产品与技术边界](2026-07-13-digest-inbox-v1.md) 中“不做资讯流”的产品边界被本决策替代；其安全、成本、摘要和取舍闭环暂时保留为迁移基础。
 - 对外不得声称当前已经接入实时官方动态。
 
 ## 状态
 
-`accepted`。纯资讯首页和公共资讯详情已落地；个人导入流程仍保留在代码中但未从首页开放，官方内容源管道仍为 `needs-review`。
+`accepted`。产品结构、来源中立、横向频道、主稿层级和公共资讯方向继续有效；“米白纸张 + 密集细线 + 直角控件”的视觉手段已由 [Luma 珍珠表面视觉系统](2026-07-17-luma-ui-redesign.md) `superseded`。个人导入流程仍保留在代码中但未从首页开放，官方内容源管道仍为 `needs-review`。
 
 ## 已被替代的细节
 
 - “无真实图片的条目暂不展示”已于 2026-07-15 被用户明确 `superseded`。
 - “无图资讯固定使用纯文字编辑行”已于 2026-07-16 被 [缺图资讯使用受控原文页面截图](2026-07-16-source-preview-renderer.md) `superseded`；截图临时失败时条目保持待发布状态，当前 5 分钟后重试，不先以纯文字形式暴露给用户。
+- “米白纸张、细线、无圆角卡片”的具体视觉表现已于 2026-07-17 被 [Luma 珍珠表面视觉系统](2026-07-17-luma-ui-redesign.md) `superseded`；内容层级与业务边界不变。

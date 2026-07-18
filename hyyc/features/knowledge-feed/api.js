@@ -5,8 +5,12 @@ function getKnowledgeFeed(options = {}) {
   return callCloudFunction('knowledgeFeed', { action: 'feed', ...query });
 }
 
+function getKnowledgeFeedUpdates(options = {}) {
+  return callCloudFunction('knowledgeFeed', { action: 'feedUpdates', ...options });
+}
+
 function getKnowledgeItem(id) {
   return callCloudFunction('knowledgeFeed', { action: 'item', id });
 }
 
-module.exports = { getKnowledgeFeed, getKnowledgeItem };
+module.exports = { getKnowledgeFeed, getKnowledgeFeedUpdates, getKnowledgeItem };

@@ -72,6 +72,7 @@ const visualJobConfig = Object.freeze({
   provider: ITEM_STORE_CONFIG.provider,
   itemsCollectionName: ITEM_STORE_CONFIG.itemsCollectionName,
   captureVersion: PREVIEW_CONFIG.captureVersion,
+  captureProfile: PREVIEW_CONFIG.captureProfile,
   thumbnailVersion: LIST_THUMBNAIL_CONFIG.version
 });
 const visualJobRepository = createFeedVisualJobRepository(database, visualJobConfig);
@@ -232,6 +233,7 @@ const ACTION_HANDLERS = Object.freeze({
       ? curatedFeedQueryService.getFeed(event, entitlement)
       : itemFeedQueryService.getFeed(event, entitlement);
   },
+  feedUpdates: async (event) => itemFeedQueryService.getUpdates(event, await resolveEntitlement()),
   item: async (event) => itemFeedQueryService.getItem(event.id, await resolveEntitlement()),
   digest: async (event) => digestQueryService.getDigest(event.windowKey, await resolveEntitlement()),
   digestReference: async (event) => digestQueryService.getReference(

@@ -3,7 +3,7 @@ title: "缺图资讯使用受控原文页面截图"
 type: decision
 tags: [source-preview, playwright, cloudbase, security, ux]
 date: 2026-07-16
-last_updated: 2026-07-17
+last_updated: 2026-07-18
 status: accepted
 confidence: high
 ---
@@ -74,6 +74,13 @@ accepted
 
 - “最多 3 张截图、详情只放大单图、30 分钟重试”已于 2026-07-17 被 `superseded`；当前分别为最多 12 张、页面与全屏均可浏览整组、5 分钟失败重试。
 - “视觉任务只维护旧精选缓存、无图新资讯等待视觉后公开”也已于 2026-07-17 被 `superseded`。当前全量条目都可公开，缺图由独立 `knowledge_feed_visual_jobs` 异步回填；详情只挂载当前及相邻截图，自动轮播一轮后停止。
+
+## 2026-07-18 聚焦裁切实施
+
+- 上述“尚未实施”结论已被 `superseded`。`focus-v1` 已按“站点正文适配器 → 通用 DOM 正文识别 → 整页截图兜底”部署；X 首版按状态 URL 和目标 `article` 定位主帖。
+- 字体、头像、正文图片和懒加载媒体会在有界等待内稳定后再裁切；登录墙、站点漂移、正文过小或低置信度继续触发整页回退。
+- CloudBase 仍复用既有 `previewFileIds` 合同，渲染器响应额外携带 profile、focus 和 media 元数据；协议版本保持可兼容，旧视觉不重建。
+- 生产只处理固定发布边界后首次发现的新资讯。当前不接 OCR 或视觉模型，真实误判样本出现前不增加模型成本。证据见 [聚焦截图与手绘 AI 专栏实施证据](../sources/2026-07-18-focus-previews-and-handdrawn-column.md)。
 
 ## 日期和来源
 

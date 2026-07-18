@@ -5,6 +5,7 @@ const {
   reconcileFeedFilters,
   requestFilters,
   createSortState,
+  createNewItemsNotice,
   isSortKey,
   decorateFilterOptions,
   countFacetResults,
@@ -15,40 +16,62 @@ const {
   decorateFeed,
   createInitialListState
 } = require('../../features/knowledge-feed/list-model.js');
-const { getKnowledgeFeed } = require('../../features/knowledge-feed/api.js');
+const {
+  getKnowledgeFeed,
+  getKnowledgeFeedUpdates
+} = require('../../features/knowledge-feed/api.js');
 const {
   refreshMembershipAccess,
   membershipRevision
 } = require('../../features/membership/session.js');
 
+const FEED_UPDATE_POLL_MS = 60 * 1000;
+
 Page({
   data: createInitialListState(),
 
   onLoad() {
+    this.feedPageVisible = false;
     this.skipNextMembershipRefresh = true;
     this.seenMembershipRevision = membershipRevision();
     this.loadFeed(false);
   },
 
   onShow() {
+    this.feedPageVisible = true;
     if (this.skipNextMembershipRefresh) {
       this.skipNextMembershipRefresh = false;
+      this.scheduleFeedUpdateCheck();
       return;
     }
     this.refreshMembershipAndFeed();
+  },
+
+  onHide() {
+    this.feedPageVisible = false;
+    this.stopFeedUpdateChecks();
+  },
+
+  onUnload() {
+    this.feedPageVisible = false;
+    this.stopFeedUpdateChecks();
   },
 
   async refreshMembershipAndFeed() {
     try {
       await refreshMembershipAccess({ force: true });
       const nextRevision = membershipRevision();
-      if (nextRevision === this.seenMembershipRevision) return;
+      if (nextRevision === this.seenMembershipRevision) {
+        this.scheduleFeedUpdateCheck();
+        return;
+      }
       this.seenMembershipRevision = nextRevision;
       this.feedAccessResolved = false;
       this.historyBoundarySeen = false;
       await this.loadFeed(false);
     } catch (error) {
       console.warn('资讯权限暂时未刷新', error && error.code ? error.code : error);
+      this.scheduleFeedUpdateCheck();
     }
   },
 
@@ -60,17 +83,21 @@ Page({
     this.loadFeed(true).finally(() => wx.stopPullDownRefresh());
   },
 
-  async loadFeed(force) {
+  async loadFeed(force, options = {}) {
+    const preserveCurrent = options.preserveCurrent === true;
     const requestId = (this.feedRequestId || 0) + 1;
     this.feedRequestId = requestId;
     const previousRawFeed = this.rawFeed;
+    const previousLoadedItems = this.loadedItems || [];
     const activeChannel = this.data.activeChannel;
     const sort = this.data.sortMode;
     const filters = copyFilters(this.data.filters);
     const accessResolved = this.feedAccessResolved === true;
     const requestedFilters = requestFilters(filters, accessResolved);
-    this.loadedItems = [];
-    this.setData({ loading: true, loadingMore: false, loadMoreError: '', feedError: '' });
+    if (!preserveCurrent) this.loadedItems = [];
+    this.setData(preserveCurrent
+      ? { applyingNewItems: true, loadMoreError: '' }
+      : { loading: true, loadingMore: false, loadMoreError: '', feedError: '' });
     try {
       const rawFeed = await getKnowledgeFeed({
         force,
@@ -81,19 +108,75 @@ Page({
         sort,
         filters: requestedFilters
       });
-      if (requestId !== this.feedRequestId) return;
+      if (requestId !== this.feedRequestId) return false;
       this.rawFeed = rawFeed;
       this.feedAccessResolved = true;
       this.loadedItems = rawFeed.items || [];
+      this.feedHeadCursor = rawFeed.headCursor || '';
       this.present('', reconcileFeedFilters(rawFeed, filters, !accessResolved));
+      this.setData(createNewItemsNotice());
+      this.scheduleFeedUpdateCheck();
+      return true;
     } catch (error) {
-      if (requestId !== this.feedRequestId) return;
+      if (requestId !== this.feedRequestId) return false;
       this.rawFeed = previousRawFeed || { items: [], facets: [] };
-      this.loadedItems = [];
-      this.present(error.message, filters);
+      this.loadedItems = preserveCurrent ? previousLoadedItems : [];
+      if (preserveCurrent) {
+        wx.showToast({ title: error.message || '刷新失败，请重试', icon: 'none' });
+      } else {
+        this.present(error.message, filters);
+      }
+      this.scheduleFeedUpdateCheck();
+      return false;
     } finally {
-      if (requestId === this.feedRequestId) this.setData({ loading: false });
+      if (requestId === this.feedRequestId) {
+        this.setData(preserveCurrent ? { applyingNewItems: false } : { loading: false });
+      }
     }
+  },
+
+  scheduleFeedUpdateCheck(delay = FEED_UPDATE_POLL_MS) {
+    this.stopFeedUpdateChecks();
+    if (!this.feedPageVisible) return;
+    this.feedUpdateTimer = setTimeout(async () => {
+      this.feedUpdateTimer = null;
+      await this.checkForFeedUpdates();
+      this.scheduleFeedUpdateCheck();
+    }, delay);
+  },
+
+  stopFeedUpdateChecks() {
+    if (this.feedUpdateTimer) clearTimeout(this.feedUpdateTimer);
+    this.feedUpdateTimer = null;
+  },
+
+  async checkForFeedUpdates() {
+    if (!this.feedPageVisible || this.feedUpdateCheckActive || !this.feedHeadCursor
+      || this.data.loading || this.data.applyingNewItems || this.data.filterOpen) return;
+    const anchor = this.feedHeadCursor;
+    const requestId = this.feedRequestId;
+    this.feedUpdateCheckActive = true;
+    this.setData({ checkingForUpdates: true });
+    try {
+      const result = await getKnowledgeFeedUpdates({
+        headCursor: anchor,
+        channel: this.data.activeChannel,
+        filters: copyFilters(this.data.filters)
+      });
+      if (!this.feedPageVisible || requestId !== this.feedRequestId || anchor !== this.feedHeadCursor) return;
+      this.setData(createNewItemsNotice(result && result.newCount));
+    } catch (error) {
+      console.warn('新资讯检测暂时失败', error && error.code ? error.code : error);
+    } finally {
+      this.feedUpdateCheckActive = false;
+      if (this.feedPageVisible) this.setData({ checkingForUpdates: false });
+    }
+  },
+
+  async applyNewItems() {
+    if (this.data.applyingNewItems || !this.data.newItemsVisible) return;
+    const refreshed = await this.loadFeed(false, { preserveCurrent: true });
+    if (refreshed) wx.pageScrollTo({ scrollTop: 0, duration: 260 });
   },
 
   async loadMoreFeed() {
@@ -156,6 +239,10 @@ Page({
 
   selectChannel(event) {
     const key = event.currentTarget.dataset.key;
+    if (key === 'featured') {
+      wx.navigateTo({ url: '/pages/featured/index' });
+      return;
+    }
     if (!key || key === this.data.activeChannel) return;
     this.setData({ activeChannel: key }, () => this.loadFeed(false));
   },

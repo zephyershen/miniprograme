@@ -77,7 +77,7 @@ const server = http.createServer(async (request, response) => {
     const body = await readJson(request, MAX_BODY_BYTES);
     const result = isThumbnail
       ? await captureService.thumbnail(body, controller.signal)
-      : await captureService.capture(body.url, body.maxSegments, controller.signal);
+      : await captureService.capture(body.url, body.maxSegments, controller.signal, body.profile);
     sendJson(response, 200, { ok: true, data: result });
   } catch (error) {
     console.warn('Source preview capture failed', { message: error && error.message });

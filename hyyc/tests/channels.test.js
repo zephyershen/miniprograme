@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { inferChannel, decorateChannels } = require('../features/knowledge-feed/channels');
+const { inferChannel, decorateChannels, addFeaturedShortcut } = require('../features/knowledge-feed/channels');
 
 test('infers the requested editorial channels from real article metadata', () => {
   assert.equal(inferChannel({ sourceTitle: 'OpenAI releases a new GPT model' }).key, 'ai');
@@ -24,4 +24,12 @@ test('decorates channel navigation with active state and counts', () => {
   assert.equal(channels.find((channel) => channel.key === 'all').count, 3);
   assert.equal(channels.find((channel) => channel.key === 'ai').count, 2);
   assert.equal(channels.find((channel) => channel.key === 'ai').active, true);
+});
+
+test('adds a member-only featured shortcut without turning it into a feed filter', () => {
+  const channels = addFeaturedShortcut(decorateChannels([], 'all'));
+  assert.deepEqual(channels.slice(0, 3).map((item) => item.key), ['all', 'featured', 'ai']);
+  assert.equal(channels[1].premium, true);
+  assert.equal(channels[1].navigation, true);
+  assert.equal(channels[1].active, false);
 });

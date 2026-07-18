@@ -1,73 +1,35 @@
-.settings-button {
-  margin: 2rpx 0 0;
-}
+.settings-button { margin: 2rpx 0 0; }
 
-.cards-list {
-  display: flex;
-  flex-direction: column;
-  border-top: 1rpx solid var(--editorial-ink);
-}
+.cards-list { display: flex; flex-direction: column; gap: 16rpx; }
 
-.conclusion-card {
-  padding: 34rpx 0;
-  border-top: none;
-}
+.conclusion-card { padding: 28rpx; }
 
-.card-meta,
-.card-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.card-meta {
-  color: var(--editorial-muted);
-  font-size: 20rpx;
-  letter-spacing: 1rpx;
-}
-
-.card-conclusion {
-  margin-top: 22rpx;
-  font-size: 36rpx;
-  font-weight: 760;
-  line-height: 1.5;
-}
+.card-meta, .card-actions { display: flex; align-items: center; justify-content: space-between; }
+.card-meta { color: var(--ui-muted); font-family: "DIN Alternate", -apple-system, sans-serif; font-size: 19rpx; }
+.card-conclusion { margin-top: 20rpx; font-size: 34rpx; font-weight: 730; line-height: 1.52; }
 
 .card-use {
   margin-top: 18rpx;
-  padding: 4rpx 0 4rpx 20rpx;
-  border-left: 5rpx solid var(--editorial-blue);
-  border-radius: 0;
-  background: transparent;
-  color: var(--editorial-muted);
-  line-height: 1.55;
+  padding: 17rpx 19rpx;
+  border-radius: 19rpx;
+  background: var(--ui-accent-soft);
+  color: var(--ui-muted);
+  line-height: 1.58;
 }
 
-.card-source {
-  margin-top: 18rpx;
-  color: var(--editorial-muted);
-  font-size: 24rpx;
-  line-height: 1.5;
-}
-
-.card-actions {
-  justify-content: flex-end;
-  gap: 22rpx;
-  margin-top: 20rpx;
-}
+.card-source { margin-top: 18rpx; color: var(--ui-muted); font-size: 23rpx; line-height: 1.5; }
+.card-actions { justify-content: flex-end; gap: 12rpx; margin-top: 20rpx; }
 
 .mini-action {
+  min-height: 60rpx;
   margin: 0;
-  padding: 0;
-  border-bottom: 2rpx solid var(--editorial-ink);
-  background: transparent;
-  color: var(--editorial-ink);
-  font-size: 23rpx;
-  font-weight: 550;
-  line-height: 56rpx;
+  padding: 0 18rpx;
+  border-radius: 18rpx;
+  background: var(--ui-surface-muted);
+  color: var(--ui-ink);
+  font-size: 22rpx;
+  font-weight: 600;
+  line-height: 60rpx;
 }
 
-.danger-text {
-  border-bottom-color: var(--editorial-danger);
-  color: var(--editorial-danger);
-}
+.danger-text { background: var(--ui-danger-soft); color: var(--ui-danger); }

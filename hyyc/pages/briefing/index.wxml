@@ -1,8 +1,8 @@
 <view class="briefing-page">
   <view class="briefing-header">
-    <view class="briefing-kicker"><text></text>KNOWLEDGE BRIEF</view>
-    <view class="briefing-title">少看一点，知道更多</view>
-    <view class="briefing-deck">把滚动窗口里的变化整理成结论、影响和可回溯来源。</view>
+    <view class="briefing-kicker"><text></text>PRO BRIEF</view>
+    <view class="briefing-title">今天，真正重要的事</view>
+    <view class="briefing-deck">把零散更新压成结论、影响和下一步，几分钟掌握一个周期的变化。</view>
   </view>
 
   <view class="window-tabs">
@@ -10,10 +10,10 @@
   </view>
 
   <view wx:if="{{locked}}" class="briefing-gate">
-    <view class="gate-status">会员能力内测中</view>
-    <view class="gate-title">先看结论，再决定读什么</view>
-    <view class="gate-copy">以下是一份固定完整示例，不包含本期实时会员内容。Pro 将开放 24 小时、7 天和 30 天滚动简报。</view>
-    <view class="gate-link" bindtap="openProfile">查看会员权益 →</view>
+    <view class="gate-status">Pro 专属 · 内测中</view>
+    <view class="gate-title">几分钟，读完一个周期</view>
+    <view class="gate-copy">不是标题合集。先给结论，再解释影响，最后保留可回看的来源。以下为体验示例，非本期实时内容。</view>
+    <view class="gate-link" bindtap="openProfile">查看 Pro 权益 →</view>
   </view>
 
   <view wx:if="{{loading}}" class="briefing-loading">
@@ -25,8 +25,8 @@
     <view class="text-action" bindtap="retry">重新加载 →</view>
   </view>
   <view wx:elif="{{providerPending && !locked}}" class="briefing-empty pending-state">
-    <view class="empty-title">简报能力已经就位</view>
-    <view class="empty-copy">真实分析服务尚未启用。系统不会用普通资讯拼接成一份假简报，接入分析接口后再发布本期内容。</view>
+    <view class="empty-title">本期真实简报尚未发布</view>
+    <view class="empty-copy">分析服务启用后才会生成本期内容。现在不把普通资讯拼成一份假简报。</view>
   </view>
 
   <view wx:else class="briefing-body">
@@ -49,7 +49,7 @@
     </view>
 
     <view class="brief-section">
-      <view class="section-head"><view class="section-title">必须知道</view><view class="section-count">{{briefing.mustKnow.length}}</view></view>
+      <view class="section-head"><view class="section-title">先看这三件事</view><view class="section-count">核心变化</view></view>
       <view wx:for="{{briefing.mustKnow}}" wx:key="index" class="must-row" data-id="{{item.itemId}}" bindtap="openReference">
         <text class="must-index">{{item.index || ('0' + (index + 1))}}</text>
         <view class="must-copy"><view class="must-title">{{item.title}}</view><view class="must-why">{{item.why || item.copy}}</view></view>
@@ -57,12 +57,12 @@
     </view>
 
     <view class="brief-section">
-      <view class="section-head"><view class="section-title">为什么重要 · 趋势变化</view></view>
+      <view class="section-head"><view class="section-title">为什么重要</view></view>
       <view wx:for="{{briefing.trends}}" wx:key="title" class="text-row" data-id="{{item.itemId}}" bindtap="openReference"><view class="text-row-title">{{item.title}}</view><view class="text-row-copy">{{item.copy}}</view></view>
     </view>
 
     <view class="brief-section">
-      <view class="section-head"><view class="section-title">公司与模型雷达</view></view>
+      <view class="section-head"><view class="section-title">公司与模型</view></view>
       <view wx:for="{{briefing.radar}}" wx:key="name" class="radar-row"><view class="radar-name">{{item.name}}</view><view class="radar-copy">{{item.copy}}</view></view>
     </view>
 

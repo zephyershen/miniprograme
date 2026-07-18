@@ -253,3 +253,68 @@
 - Evidence: Stable 2.01.2510290 下 `auto`、`open`、`islogin` 均成功，登录状态有效，自动化端口只监听 `127.0.0.1:9420`。
 - Sensitive handling: 未记录自动化握手值、会话标识、用户数据目录、账号、密码、令牌或其他临时运行信息；普通 Wiki 和 Git 不保存凭据。
 - Follow-ups: 微信开发者工具升级后重新验证 CLI 路径、版本和回环端口；每次 CLI 操作后检查 Git 差异，避免提交 `project.config.json` 的无业务格式漂移。
+
+## [2026-07-17] luma-ui-redesign | Luma 珍珠表面 UI 重构
+
+- Session: local Codex task
+- Target pages: `wiki/index.md`, `wiki/overview.md`, `wiki/timeline.md`, `wiki/decisions/2026-07-15-editorial-knowledge-platform-ui.md`, `wiki/decisions/2026-07-17-luma-ui-redesign.md`, `wiki/sources/2026-07-17-luma-ui-redesign.md`, `wiki/log.md`
+- Summary: 按用户对简约、高端、时尚和 Apple 设计理念的要求，淘汰米白纸张、密集细线和直角视觉；建立冷白珍珠画布、实体表面、蓝紫焦点、连续圆角和悬浮控制层，并重构九个页面 WXSS。业务事件、数据合同、云函数、权限、分页和四 Tab 结构未变。
+- Evidence: 170/170 个 Node 测试、项目检查、差异检查通过；微信开发者工具真实数据截图覆盖资讯、详情、精选、简报和我的，页面异常事件为 0。首轮截图发现并修复三身份分段按钮溢出；临时自动化端口清理后只保留 `127.0.0.1:9420`。
+- Sensitive handling: 未读取或记录 OpenID、ownerKey、账号、密码、维护令牌或其他凭据；普通 Wiki 与截图文件不包含敏感值。
+- Follow-ups: 上传体验版前在至少一台 iPhone 和一台 Android 真机抽查系统字号、透明度/对比度、长标题、筛选抽屉和详情 1/5/8 图场景。
+
+## [2026-07-18] premium-ia-ai-column | 会员精选入口、AI 专栏与产品文案改版
+
+- Session: local Codex task
+- Target pages: `wiki/index.md`, `wiki/overview.md`, `wiki/timeline.md`, `wiki/decisions/2026-07-17-pro-membership-and-intelligence.md`, `wiki/decisions/2026-07-16-source-preview-renderer.md`, `wiki/decisions/2026-07-18-premium-learning-and-curation-ia.md`, `wiki/sources/2026-07-18-premium-ia-and-copy.md`, `wiki/log.md`
+- Summary: 四 Tab 改为资讯、专栏、简报、我的；资讯顶部加入带锁会员精选入口，原精选功能迁移到非 Tab 页面，原 Tab 改为 Agent/Skill/MCP 等 AI 学习专栏。频道标签移除数字，精选与简报改为结果导向产品文案。完成原文截图正文聚焦三级回退可行性分析，但未修改线上捕获。
+- Evidence: 本次用户要求、当前代码、174 个 Node 测试、项目检查、差异检查、微信开发者工具六场景截图和 0 页面异常事件。
+- Sensitive handling: 未读取或记录 OpenID、ownerKey、维护令牌、服务器账号或密码；普通 Wiki 与截图不包含实际凭据。
+- Follow-ups: 正式收费前将专栏完整正文迁移到服务端重鉴权接口；截图聚焦升级需新增站点适配器、通用正文识别、捕获版本和整页兜底合同，并另行部署与回填。
+
+## [2026-07-18] focus-previews-handdrawn-column | 新资讯聚焦截图与手绘知识卡上线
+
+- Session: local Codex task
+- Target pages: `wiki/index.md`, `wiki/overview.md`, `wiki/timeline.md`, `wiki/decisions/2026-07-18-forward-only-focus-previews-and-handdrawn-column.md`, `wiki/sources/2026-07-18-focus-previews-and-handdrawn-column.md`, `wiki/log.md`
+- Summary: 将原文截图升级为站点适配器、通用 DOM 正文识别、媒体稳定等待和整页回退；生产只处理发布日期边界后的新资讯。为六个 AI 专栏学习单元生成手绘主图，并把每课重构为概念、机制、判断三页可滑动知识卡。
+- Online evidence: 渲染器与 `knowledgeFeed` 部署成功；生产 X 状态页高置信度聚焦，媒体 2/2 就绪，生成 622×1004 单张截图。生产完成 1 个符合新边界的视觉任务、待处理为 0，旧任务由策略跳过；随后上游源出现一次独立退避，本机 fingerprint/items 均为 HTTP 200，等待定时任务恢复。
+- Verification: 177/177 个 Node 测试、28 JSON/153 JavaScript/10 页面项目检查和差异检查通过；微信开发者工具实际完成专栏展开和左右滑动，IDE 保持打开。
+- Sensitive handling: 部署与维护凭据继续只从受限本机配置读取；普通 Wiki、Git 和用户可见输出不记录令牌、OpenID、派生身份、账号或密码。
+- Follow-ups: 正式收费前把完整专栏正文迁移到服务端重鉴权内容接口；继续观察上游源退避恢复，并仅在真实聚焦误判样本证明必要时评估视觉模型兜底。
+
+## [2026-07-18] ai-column-external-poster-import | 18 张完整手绘海报接入专栏
+
+- Session: local Codex task
+- Target pages: `wiki/overview.md`, `wiki/timeline.md`, `wiki/decisions/2026-07-18-forward-only-focus-previews-and-handdrawn-column.md`, `wiki/sources/2026-07-18-focus-previews-and-handdrawn-column.md`, `wiki/log.md`
+- Summary: 将用户在 `png/` 提供的 18 张完整中文手绘知识海报按六课三页导入；新增源尺寸校验与 WebP 压缩脚本、独立资源映射，并把专栏页面简化为整幅海报轮播。旧六张 JPEG 占位图已替换，原始 PNG 保留。
+- Evidence: 18/18 个 680×907 WebP 唯一且总计 1,682,558 bytes；主包运行时源文件估算 1,873,666 bytes；177/177 测试、28 JSON/154 JavaScript/10 页面检查及差异检查通过。微信开发者工具验证 Agent 第一/第二页和 Skill 海报，控制台无新增红色错误，IDE 保持打开。
+- Sensitive handling: 本轮只处理本地视觉资产和展示代码，未读取或记录 OpenID、ownerKey、维护令牌、服务器账号、密码或其他凭据。
+- Follow-ups: 正式收费前将完整专栏内容迁移到服务端重鉴权接口；上传体验版前在 iPhone 与 Android 真机复核 WebP 解码、中文细字、长屏滚动和 18 张海报的逐页顺序。
+
+## [2026-07-18] ai-column-mobile-image-compatibility | 修复手机预览海报空白
+
+- Session: local Codex task
+- Target pages: `wiki/overview.md`, `wiki/timeline.md`, `wiki/decisions/2026-07-18-forward-only-focus-previews-and-handdrawn-column.md`, `wiki/sources/2026-07-18-focus-previews-and-handdrawn-column.md`, `wiki/log.md`
+- Summary: 用户手机预览只显示海报黄色背景，而开发者工具正常。将 18 张运行时 WebP 改为 640×853 非渐进式基线 JPEG，移除 `swiper` 内 `lazy-load` 和淡入，增加图片失败提示、资源 key 日志与 Toast；原始 PNG 保留。
+- Evidence: 18/18 个基线 JPEG 唯一且总计 1,603,890 bytes；177/177 测试、28 JSON/154 JavaScript/10 页面检查通过；CLI `preview` 成功并报告总包 1,785,800 bytes。
+- Sensitive handling: 本轮没有读取或记录 OpenID、ownerKey、维护令牌、服务器账号、密码或其他凭据；预览命令仅使用开发者工具既有登录态。
+- Follow-ups: 用户必须扫描本轮新二维码做真机复验，因为旧预览不会自动更新；重点检查六课第一页与左右翻页。若仍失败，读取新加入的 `poster failed to load` 真机日志，不再依赖纯色背景推断。
+
+## [2026-07-18] ai-column-controlled-lazy-loading | 专栏改为受控懒加载窗口
+
+- Session: local Codex task
+- Target pages: `wiki/overview.md`, `wiki/timeline.md`, `wiki/decisions/2026-07-18-forward-only-focus-previews-and-handdrawn-column.md`, `wiki/sources/2026-07-18-focus-previews-and-handdrawn-column.md`, `wiki/log.md`
+- Summary: 保留禁用微信图片组件 `lazy-load` 的真机兼容修复，但不再一次创建三张图片。新增 `posterLoadWindow` 策略：课程未展开时 0 张，展开时加载当前页与下一页，滑到第二页才创建第三页；切换课程或轨道时重置到第一页。
+- Evidence: 新策略对首、中、末页与越界输入均有单元测试；178/178 全量测试、28 JSON/154 JavaScript/10 页面检查通过；CLI 新预览总包 1,786,530 bytes。
+- Sensitive handling: 本轮只修改本地展示状态和测试，未读取或记录任何账号、身份或凭据。
+- Follow-ups: 用户扫描最新二维码做真机复验；如仍出现空白，依据资源 key 错误日志继续定位，而不恢复组件黑盒懒加载。
+
+## [2026-07-18] hd-column-passive-feed-updates | 高清专栏与不打断阅读的资讯更新
+
+- Session: local Codex task
+- Target pages: `wiki/index.md`, `wiki/overview.md`, `wiki/timeline.md`, `wiki/decisions/2026-07-18-passive-feed-updates-and-hd-column-preview.md`, `wiki/sources/2026-07-18-hd-column-and-passive-feed-updates.md`, `wiki/log.md`
+- Summary: 专栏新增 CloudBase 高清图组和原生三图预览，包内仍使用受控加载的轻图；资讯新增 opaque head cursor、过滤一致的轻量计数接口和 X 风格悬浮提示，后台检测不再替换用户正在阅读的列表。
+- Online evidence: 高清云图 18/18 上传并抽查 HTTP 200；`knowledgeFeed` 部署成功，`feedUpdates` 真实调用返回有效游标；微信预览包 1,793,643 bytes，模拟器无页面异常。
+- Verification: 181/181 个 Node 测试、28 JSON/154 JavaScript/10 页面项目检查通过；模拟器确认专栏初始只挂载两张轻图，新资讯提示出现时主稿 ID 保持不变。
+- Sensitive handling: 未读取或记录 OpenID、ownerKey、账号、密码、维护令牌或其他实际凭据。
+- Follow-ups: 用户扫描最新二维码在真机验证高清缩放/三图滑动与新资讯提示；正式收费前仍需将完整专栏正文迁移到服务端重鉴权内容接口。

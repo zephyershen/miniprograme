@@ -2,6 +2,7 @@ const { AppError } = require('../lib/errors');
 const { toDate } = require('../lib/dates');
 const { visualRevisionStem } = require('../lib/visual-version');
 const { maintenanceAuthorized } = require('../policies/maintenance-auth');
+const { isNewVisualItem } = require('../policies/new-visuals');
 
 const DEFAULT_PREVIEW_RETRY_MS = 5 * 60 * 1000;
 const MAX_PREVIEW_RETRY_MS = 24 * 60 * 60 * 1000;
@@ -90,7 +91,8 @@ function createPreviewService({ cloud, repository, config, fetchImpl = fetch, no
         body: JSON.stringify({
           url: item.url,
           maxSegments: config.maxSegments,
-          captureVersion
+          captureVersion,
+          profile: config.captureProfile || 'page'
         }),
         signal: controller.signal,
         redirect: 'error'
@@ -213,6 +215,9 @@ function createPreviewService({ cloud, repository, config, fetchImpl = fetch, no
     const cache = await repository.get();
     const item = cache && (cache.items || []).find((entry) => entry.id === id);
     if (!item) throw new AppError('ITEM_NOT_FOUND', '这条资讯不存在');
+    if (!force && !isNewVisualItem(item, config.newItemsAfter)) {
+      return { id, skipped: 'existing-item', previewFileIds: item.previewFileIds || [] };
+    }
     if (item.coverFileId) return { id, skipped: 'cover-ready', previewFileIds: [] };
     if (!force
       && Array.isArray(item.previewFileIds)
@@ -271,6 +276,7 @@ function createPreviewService({ cloud, repository, config, fetchImpl = fetch, no
     const selectionTime = toDate(now()) || new Date();
     const candidates = cache.items
       .filter((item) => (!candidateIds || candidateIds.has(item.id))
+        && (force === true || isNewVisualItem(item, config.newItemsAfter))
         && !item.coverFileId
         && (!(Array.isArray(item.previewFileIds) && item.previewFileIds.length)
           || Number(item.previewCaptureVersion || 1) !== captureVersion)

@@ -1,0 +1,108 @@
+<view class="curated-page">
+  <view class="curated-header">
+    <view class="page-kicker"><text></text>PRO CURATION</view>
+    <view class="curated-title">精选</view>
+    <view class="curated-deck">每天只留真正影响判断的变化。去重、判断影响，再告诉你为什么值得看。</view>
+  </view>
+
+  <view wx:if="{{locked}}" class="member-gate">
+    <view class="gate-status">Pro 专属 · 内测中</view>
+    <view class="gate-title">把刷资讯，变成做判断</view>
+    <view class="gate-copy">重要更新先讲清“变了什么、为什么重要、要不要继续读”。少看重复，更快抓住行动信号。</view>
+    <view class="benefit-list">
+      <view wx:for="{{membership.benefits}}" wx:key="key" class="benefit-row">
+        <text class="benefit-index">0{{index + 1}}</text>
+        <view><view class="benefit-title">{{item.title}}</view><view class="benefit-copy">{{item.copy}}</view></view>
+      </view>
+    </view>
+    <view class="gate-link" bindtap="openProfile">查看 Pro 权益 →</view>
+
+    <view class="sample-label">体验示例 · 非本期内容</view>
+    <view class="sample-lead">
+      <view class="sample-reason">{{sample.reason}}</view>
+      <view class="sample-title">{{sample.title}}</view>
+      <view class="sample-summary">{{sample.summary}}</view>
+    </view>
+    <view class="sample-list">
+      <view wx:for="{{sample.related}}" wx:key="id" class="sample-row">
+        <view class="sample-reason">{{item.reason}}</view>
+        <view class="sample-row-title">{{item.title}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:elif="{{loading}}" class="curated-loading">
+    <view class="loading-rule"></view><view class="loading-rule loading-rule-wide"></view><view class="loading-rule"></view>
+  </view>
+
+  <view wx:elif="{{error}}" class="curated-empty">
+    <view class="empty-title">精选暂时没有加载成功</view>
+    <view class="empty-copy">{{error}}</view>
+    <view class="text-action" bindtap="retry">重新加载 →</view>
+  </view>
+
+  <block wx:else>
+    <scroll-view scroll-x enhanced show-scrollbar="{{false}}" class="curated-channel-scroll">
+      <view class="curated-channel-track">
+        <view wx:for="{{view.channels}}" wx:key="key" class="curated-channel {{item.active ? 'curated-channel-active' : ''}}" data-key="{{item.key}}" bindtap="selectChannel">{{item.label}}</view>
+      </view>
+    </scroll-view>
+
+    <view class="curated-control-row">
+      <view class="window-track">
+        <view wx:for="{{windowOptions}}" wx:key="key" class="window-choice {{item.active ? 'window-choice-active' : ''}}" data-key="{{item.key}}" bindtap="selectWindow">{{item.label}}</view>
+      </view>
+      <view class="filter-link" bindtap="openFilters">{{filterSummary}} ↘</view>
+    </view>
+    <view class="curated-control-row curated-sort-row">
+      <view class="sort-track">
+        <view wx:for="{{sortOptions}}" wx:key="key" class="sort-choice {{item.active ? 'sort-choice-active' : ''}}" data-key="{{item.key}}" bindtap="selectSort">{{item.label}}</view>
+      </view>
+      <view class="curated-count">已分析 {{view.totalAnalyzed}} · 精选 {{view.resultCount}}</view>
+    </view>
+
+    <view wx:if="{{providerPending}}" class="curated-empty pending-state">
+      <view class="empty-title">真实精选尚未发布</view>
+      <view class="empty-copy">筛选与权限已经就位；分析服务启用后才会发布本期内容。现在不拿热度榜冒充精选。</view>
+    </view>
+    <view wx:elif="{{!view.leadItem}}" class="curated-empty">
+      <view class="empty-title">这一范围没有值得打扰你的更新</view>
+      <view class="empty-copy">精选不为数量凑内容。可以切换时间或主题再看。</view>
+    </view>
+    <block wx:else>
+      <view class="curated-lead" data-id="{{view.leadItem.id}}" bindtap="openItem">
+        <image wx:if="{{view.leadItem.listVisualFileId}}" class="curated-lead-image" src="{{view.leadItem.listVisualFileId}}" mode="aspectFill" lazy-load="{{true}}" />
+        <view class="curation-reason">{{view.leadItem.curationReason}}</view>
+        <view class="curated-lead-title">{{view.leadItem.title}}</view>
+        <view wx:if="{{view.leadItem.summaryPreview}}" class="curated-summary">{{view.leadItem.summaryPreview}}</view>
+        <view class="curated-meta"><text>{{view.leadItem.source}}</text><text>{{view.leadItem.publishedLabel}}</text></view>
+      </view>
+      <view class="curated-list">
+        <view wx:for="{{view.remainingItems}}" wx:key="id" class="curated-row" data-id="{{item.id}}" bindtap="openItem">
+          <view class="curated-row-copy">
+            <view class="curation-reason">{{item.curationReason}}</view>
+            <view class="curated-row-title">{{item.title}}</view>
+            <view class="curated-meta"><text>{{item.source}}</text><text>{{item.publishedLabel}}</text></view>
+          </view>
+          <image wx:if="{{item.listVisualFileId}}" class="curated-thumbnail" src="{{item.listVisualFileId}}" mode="aspectFill" lazy-load="{{true}}" />
+        </view>
+      </view>
+      <view wx:if="{{loadingMore}}" class="load-more"><view class="load-spinner"></view><text>正在加载更多精选</text></view>
+    </block>
+  </block>
+
+  <view wx:if="{{filterOpen}}" class="filter-mask" bindtap="closeFilters">
+    <view class="filter-panel" catchtap="stopPropagation">
+      <view class="filter-head"><view><view class="page-kicker"><text></text>FILTER</view><view class="filter-title">缩小精选范围</view></view><view class="filter-close" bindtap="closeFilters">关闭</view></view>
+      <scroll-view scroll-y class="filter-scroll">
+        <view class="filter-group"><view class="filter-group-title">公司与模型</view><view class="filter-options">
+          <view wx:for="{{companyOptions}}" wx:key="key" class="filter-option {{draftFilters.company === item.key ? 'filter-option-active' : ''}}" data-group="company" data-key="{{item.key}}" bindtap="selectFilter">{{item.label}}</view>
+        </view></view>
+        <view class="filter-group"><view class="filter-group-title">技术方向</view><view class="filter-options">
+          <view wx:for="{{directionOptions}}" wx:key="key" class="filter-option {{draftFilters.direction === item.key ? 'filter-option-active' : ''}}" data-group="direction" data-key="{{item.key}}" bindtap="selectFilter">{{item.label}}</view>
+        </view></view>
+      </scroll-view>
+      <view class="filter-actions"><button class="filter-reset" bindtap="resetFilters">重置</button><button class="filter-apply" bindtap="applyFilters">应用筛选</button></view>
+    </view>
+  </view>
+</view>

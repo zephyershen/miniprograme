@@ -2,7 +2,8 @@ const {
   CHANNELS,
   channelByKey,
   decorateChannels,
-  decorateChannelCounts
+  decorateChannelCounts,
+  addFeaturedShortcut
 } = require('./channels.js');
 const { filterFeedItems, filterSummary, filterOptionsWithCounts } = require('./filters.js');
 const { isFacetMatrix, facetMatrixCount } = require('./facet-matrix.js');
@@ -76,6 +77,15 @@ function createSortState(activeSort = DEFAULT_SORT) {
     sortMode: selected.key,
     sortOptions: SORT_OPTIONS.map((option) => ({ ...option, active: option.key === selected.key })),
     sortHint: selected.hint
+  };
+}
+
+function createNewItemsNotice(value = 0) {
+  const count = Math.max(0, Math.floor(Number(value) || 0));
+  return {
+    newItemCount: count,
+    newItemsVisible: count > 0,
+    newItemsLabel: count > 99 ? '99+ 条新资讯' : `${count} 条新资讯`
   };
 }
 
@@ -220,12 +230,12 @@ function decorateFeed(raw = { items: [], facets: [] }, activeChannel = 'all', fi
     leadItem: visibleItems[0] || null,
     remainingItems: visibleItems.slice(1),
     remainingCount: Math.max(0, resultCount - 1),
-    channels: isFacetMatrix(raw.facetMatrix)
+    channels: addFeaturedShortcut(isFacetMatrix(raw.facetMatrix)
       ? decorateChannelCounts(Object.fromEntries(CHANNELS.map((channel) => [
         channel.key,
         facetMatrixCount(raw.facetMatrix, channel.key, filters)
       ])), activeChannel)
-      : decorateChannels(filteredFacets, activeChannel),
+      : decorateChannels(filteredFacets, activeChannel)),
     activeChannel,
     activeChannelLabel: channelByKey(activeChannel).label,
     resultCount,
@@ -258,6 +268,9 @@ function createInitialListState() {
     ...createFilterDraftState({ facets: [] }, 'all', filters),
     filterOpen: false,
     filterScrollTarget: '',
+    checkingForUpdates: false,
+    applyingNewItems: false,
+    ...createNewItemsNotice(),
     feed: decorateFeed()
   };
 }
@@ -270,6 +283,7 @@ module.exports = {
   requestFilters,
   normalizeFeedAccess,
   createSortState,
+  createNewItemsNotice,
   isSortKey,
   decorateFilterOptions,
   countFacetResults,

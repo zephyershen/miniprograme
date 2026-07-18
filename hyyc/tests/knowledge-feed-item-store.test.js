@@ -11,6 +11,10 @@ const {
   createFeedEntitlementService
 } = require('../cloudfunctions/knowledgeFeed/services/feed-entitlement-service');
 const { createItemFeedQueryService } = require('../cloudfunctions/knowledgeFeed/services/item-feed-query-service');
+const {
+  encodePageCursor,
+  decodePageCursor
+} = require('../cloudfunctions/knowledgeFeed/repositories/feed-item');
 const { createAllFeedSyncService } = require('../cloudfunctions/knowledgeFeed/services/all-feed-sync-service');
 const { createFeedStoreMigrationService } = require('../cloudfunctions/knowledgeFeed/services/feed-store-migration-service');
 const { createFeedAccessAdminService } = require('../cloudfunctions/knowledgeFeed/services/feed-access-admin-service');
@@ -187,6 +191,18 @@ function memoryItemRepository(items) {
         resultCount: filtered.length
       };
     },
+    latestCursor: async (options) => {
+      const latest = selected(options)
+        .sort((left, right) => right.publishedAt.localeCompare(left.publishedAt)
+          || right._id.localeCompare(left._id))[0];
+      return encodePageCursor(latest, 'latest');
+    },
+    countAfterCursor: async (options, value) => {
+      const cursor = decodePageCursor(value, 'latest');
+      if (!cursor) return null;
+      return selected(options).filter((item) => item.publishedAt > cursor.publishedAt
+        || (item.publishedAt === cursor.publishedAt && item._id > cursor.id)).length;
+    },
     count: async (options) => selected(options).length,
     listFacets: async (options) => ({ items: selected(options), truncated: false }),
     getByItemId: async (id) => items.find((item) => item.id === id) || null,
@@ -289,6 +305,34 @@ test('computes feed counts only on the first page', async () => {
   assert.equal(Object.prototype.hasOwnProperty.call(later, 'resultCount'), false);
   assert.deepEqual(includeCount, [true, false]);
   assert.equal(totalCountCalls, 1);
+});
+
+test('counts new matching items from an opaque feed head without rebuilding the current page', async () => {
+  const initial = toStoredFeedItem(rawItem('item1021', '2026-07-17T01:00:00.000Z'), {
+    provider: 'aihot', generation: 'g1', observedAt: new Date(NOW), coverage: 'all'
+  });
+  const items = [initial];
+  const service = createItemFeedQueryService({
+    itemRepository: memoryItemRepository(items),
+    dayIndexRepository: memoryDayIndexRepository(items),
+    syncStateRepository: { get: async () => ({ allItemsSyncedAt: new Date(NOW) }) },
+    legacyFeedService: { getFeed: async () => { throw new Error('legacy not expected'); } },
+    config: ITEM_CONFIG,
+    now: () => NOW
+  });
+  const entitlement = entitlementView('free', ITEM_CONFIG);
+  const firstPage = await service.getFeed({}, entitlement);
+  assert.ok(firstPage.headCursor);
+
+  items.push(toStoredFeedItem(rawItem('item1022', '2026-07-17T02:00:00.000Z'), {
+    provider: 'aihot', generation: 'g2', observedAt: new Date(NOW), coverage: 'all'
+  }));
+  const updates = await service.getUpdates({
+    headCursor: firstPage.headCursor,
+    filters: { time: '7d' }
+  }, entitlement);
+  assert.equal(updates.newCount, 1);
+  assert.notEqual(updates.headCursor, firstPage.headCursor);
 });
 
 test('stores compact filter facets in each day index and upgrades legacy id-only documents', () => {

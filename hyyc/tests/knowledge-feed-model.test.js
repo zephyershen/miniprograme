@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
   createInitialListState,
   createSortState,
+  createNewItemsNotice,
   isSortKey,
   defaultFiltersForFeed,
   reconcileFeedFilters,
@@ -34,6 +35,16 @@ test('keeps sort state validation and labels inside the feature model', () => {
   assert.equal(state.sortMode, 'hot');
   assert.equal(state.sortHint, '热度从高到低');
   assert.equal(state.sortOptions.find((option) => option.key === 'hot').active, true);
+});
+
+test('formats the passive new-items notice without mutating the visible feed', () => {
+  assert.deepEqual(createNewItemsNotice(3), {
+    newItemCount: 3,
+    newItemsVisible: true,
+    newItemsLabel: '3 条新资讯'
+  });
+  assert.equal(createNewItemsNotice(120).newItemsLabel, '99+ 条新资讯');
+  assert.equal(createNewItemsNotice(-1).newItemsVisible, false);
 });
 
 test('merges paginated items without duplicates and builds the page view model', () => {
