@@ -20,6 +20,8 @@ confidence: high
   30 个 JSON、277 个 JavaScript、11 个页面和 0.43 MiB 客户端源码。
 - 同一提交的 GitHub Actions 10/10 作业通过，覆盖 Node 18.15、20.19、
   24.14、覆盖率/依赖风险门禁、五个生产依赖锁安装及渲染器浏览器冷启动。
+  工作流随后升级到基于 Node 24 的 `actions/checkout@v5` 与
+  `actions/setup-node@v5`，消除旧 Node 20 action 运行时弃用告警。
 
 ## 生产控制面
 

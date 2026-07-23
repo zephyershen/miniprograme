@@ -865,6 +865,8 @@
 - Session: local Codex task
 - Snapshot: `1bf9fb8cc7bf01ba54108ca089e02b621b400cda`，标签
   `release-candidate-2026-07-23`；GitHub Actions 10/10，本地 515/515。
+- CI maintenance: `actions/checkout` 与 `actions/setup-node` 升级到 v5，
+  使用 Node 24 action 运行时，消除 GitHub 对 v4/Node 20 的弃用告警。
 - Production: 22 个合同集合全部 `ADMINONLY`，34 个合同索引收敛，用户媒体
   客户端直写关闭；四个正式函数及九个触发器精确回读，两个旧 digest 函数退休。
 - Canaries: GitHub 1,728 条/528 标签/不限时间，截图真实 X 捕获，隔离媒体

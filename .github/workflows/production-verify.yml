@@ -21,8 +21,8 @@ jobs:
       matrix:
         node: ["18.15.0", "20.19.5", "24.14.0"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node }}
           cache: npm
@@ -67,8 +67,8 @@ jobs:
           - hyyc/cloudrun/source-preview-renderer
           - hyyc/cloudrun/source-preview-renderer/docker
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "24.14.0"
           cache: npm
@@ -81,8 +81,8 @@ jobs:
     name: Coverage and dependency risk gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "24.14.0"
           cache: npm
@@ -116,8 +116,8 @@ jobs:
     name: Renderer browser cold starts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: "20.19.5"
           cache: npm
