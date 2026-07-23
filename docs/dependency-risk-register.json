@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "reviewedAt": "2026-07-23",
   "expiresOn": "2026-08-06",
   "owner": "project maintainer",
@@ -10,26 +10,132 @@
   "allowedVulnerabilities": {
     "@cloudbase/database": {
       "maximumSeverity": "high",
+      "packageRoots": [
+        "cloudfunctions/knowledgeFeed",
+        "cloudfunctions/knowledgeOps",
+        "cloudfunctions/membershipBilling",
+        "cloudrun/source-preview-renderer"
+      ],
+      "directPackageRoots": [],
+      "exactVersions": ["1.4.3"],
+      "nodePaths": ["node_modules/@cloudbase/database"],
+      "effects": ["@cloudbase/node-sdk"],
+      "viaPackages": ["lodash.set", "lodash.unset"],
+      "advisories": {},
       "reason": "CloudBase SDK 4.0.2 currently pins database 1.4.3. Application repositories use fixed field paths and validated DTOs rather than caller-controlled lodash paths."
     },
     "@cloudbase/node-sdk": {
       "maximumSeverity": "high",
+      "packageRoots": [
+        "cloudfunctions/knowledgeFeed",
+        "cloudfunctions/knowledgeOps",
+        "cloudfunctions/membershipBilling",
+        "cloudrun/source-preview-renderer"
+      ],
+      "directPackageRoots": ["cloudfunctions/knowledgeFeed"],
+      "exactVersions": ["3.17.2"],
+      "nodePaths": ["node_modules/@cloudbase/node-sdk"],
+      "effects": ["wx-server-sdk"],
+      "viaPackages": ["@cloudbase/database", "axios"],
+      "advisories": {},
       "reason": "This is the current SDK chain required by wx-server-sdk 4.0.2. CloudBase endpoints and request shapes are fixed by server-side adapters."
     },
     "axios": {
       "maximumSeverity": "high",
+      "packageRoots": [
+        "cloudfunctions/knowledgeFeed",
+        "cloudfunctions/knowledgeOps",
+        "cloudfunctions/membershipBilling",
+        "cloudrun/source-preview-renderer"
+      ],
+      "directPackageRoots": [],
+      "exactVersions": ["0.27.2"],
+      "nodePaths": ["node_modules/axios"],
+      "effects": ["@cloudbase/node-sdk"],
+      "viaPackages": [],
+      "advisories": {
+        "1097679": "moderate",
+        "1111034": "high",
+        "1116672": "moderate",
+        "1117573": "moderate",
+        "1117575": "high",
+        "1117579": "low",
+        "1117582": "moderate",
+        "1117586": "moderate",
+        "1117588": "moderate",
+        "1117590": "high",
+        "1117592": "high",
+        "1117594": "moderate",
+        "1117857": "high",
+        "1119403": "moderate",
+        "1120124": "moderate",
+        "1120546": "high",
+        "1120644": "high",
+        "1120646": "high",
+        "1120648": "high",
+        "1120651": "moderate",
+        "1123825": "high",
+        "1123958": "moderate",
+        "1123972": "moderate"
+      },
       "reason": "Axios 0.27.2 is internal to the pinned CloudBase SDK. Application-controlled arbitrary URLs, proxy settings, headers, and axios config objects are not passed into that SDK."
     },
     "lodash.set": {
       "maximumSeverity": "high",
+      "packageRoots": [
+        "cloudfunctions/knowledgeFeed",
+        "cloudfunctions/knowledgeOps",
+        "cloudfunctions/membershipBilling",
+        "cloudrun/source-preview-renderer"
+      ],
+      "directPackageRoots": [],
+      "exactVersions": ["4.3.2"],
+      "nodePaths": ["node_modules/lodash.set"],
+      "effects": ["@cloudbase/database"],
+      "viaPackages": [],
+      "advisories": {
+        "1106906": "high"
+      },
       "reason": "The transitive CloudBase database adapter receives fixed repository field paths; client input is normalized before repository calls."
     },
     "lodash.unset": {
       "maximumSeverity": "moderate",
+      "packageRoots": [
+        "cloudfunctions/knowledgeFeed",
+        "cloudfunctions/knowledgeOps",
+        "cloudfunctions/membershipBilling",
+        "cloudrun/source-preview-renderer"
+      ],
+      "directPackageRoots": [],
+      "exactVersions": ["4.5.2"],
+      "nodePaths": ["node_modules/lodash.unset"],
+      "effects": [],
+      "viaPackages": [],
+      "advisories": {
+        "1115807": "moderate",
+        "1120369": "moderate"
+      },
       "reason": "The transitive CloudBase database adapter receives fixed repository field paths; client input is normalized before repository calls."
     },
     "wx-server-sdk": {
       "maximumSeverity": "high",
+      "packageRoots": [
+        "cloudfunctions/knowledgeFeed",
+        "cloudfunctions/knowledgeOps",
+        "cloudfunctions/membershipBilling",
+        "cloudrun/source-preview-renderer"
+      ],
+      "directPackageRoots": [
+        "cloudfunctions/knowledgeFeed",
+        "cloudfunctions/knowledgeOps",
+        "cloudfunctions/membershipBilling",
+        "cloudrun/source-preview-renderer"
+      ],
+      "exactVersions": ["4.0.2"],
+      "nodePaths": ["node_modules/wx-server-sdk"],
+      "effects": [],
+      "viaPackages": ["@cloudbase/node-sdk"],
+      "advisories": {},
       "reason": "npm reports the wrapper because of the transitive CloudBase chain. Version 4.0.2 is the current upstream release and is pinned exactly."
     }
   }

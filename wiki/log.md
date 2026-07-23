@@ -878,3 +878,21 @@
   真机验收、后台类目/隐私配置和开售前支付退款矩阵仍由管理员完成。
 - Sensitive handling: 未在仓库或普通 Wiki 记录凭据、环境变量值、用户标识、
   Cloud File ID 或短期签名地址。
+
+## [2026-07-23] dependency-audit-hardening | 收敛 npm 瞬态失败并精确锁定风险例外
+
+- Session: local Codex task
+- Scope: GitHub Actions、生产依赖审计 transport/policy、风险登记、渲染器
+  Dockerfile、专项测试与生产发布记录；未改动已部署的小程序业务代码或线上资源。
+- Root cause: 相同审计代码和锁文件的 CI 运行曾先后 2 秒成功、3 秒成功和
+  12 秒失败，失败运行的依赖安装也同步显著变慢；本地复现结构化 npm 服务错误，
+  未发现新增漏洞，结论为 registry/audit 端点瞬态。
+- Change: 安装阶段全部 `--no-audit`，只保留显式门禁；传输异常最多三次、
+  45 秒单次超时、1 秒/3 秒退避且最终失败关闭。风险登记 schema v2 精确绑定
+  6 个风险包、26 个 advisory source、包根、版本、节点、direct/via/effects，
+  不再仅按包名和最高严重度放行。
+- Verification: 审计策略专项 11/11、全量 Node 526/526、覆盖率
+  79.34%/68.84%/76.55%，30 JSON/280 JavaScript/11 pages 项目检查和
+  五份生产锁文件显式审计通过。
+- Sensitive handling: 失败输出只记录响应类型、安全错误码、包根与重试次数，
+  不打印原始 npm stderr、环境变量、凭据或 registry 认证信息。

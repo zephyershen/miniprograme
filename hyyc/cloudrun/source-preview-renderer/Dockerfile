@@ -12,7 +12,7 @@ ENV NODE_ENV=production \
 # are rejected because their DNS and destination policy cannot be proven here.
 
 COPY docker/package.json docker/package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --no-audit
 
 COPY src ./src
 COPY scripts ./scripts
