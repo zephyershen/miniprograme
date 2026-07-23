@@ -1,7 +1,7 @@
 <page-meta page-style="{{membershipPromptVisible ? 'overflow: hidden;' : ''}}" />
 <view class="curated-page">
   <view class="curated-header">
-    <view class="page-kicker"><text></text>PRO CURATION</view>
+    <view class="page-kicker"><text class="kicker-dot"></text><text class="kicker-label">PRO CURATION</text></view>
     <view class="curated-title">精选</view>
     <view class="curated-deck">每天只留真正影响判断的变化。去重、判断影响，再告诉你为什么值得看。</view>
   </view>
@@ -49,17 +49,17 @@
       </view>
     </scroll-view>
 
-    <view class="curated-control-row">
+    <view class="curated-toolbar">
       <view class="window-track">
         <view wx:for="{{windowOptions}}" wx:key="key" class="window-choice {{item.active ? 'window-choice-active' : ''}}" data-key="{{item.key}}" bindtap="selectWindow">{{item.label}}</view>
       </view>
-      <view class="filter-link" bindtap="openFilters">{{filterSummary}} ↘</view>
-    </view>
-    <view class="curated-control-row curated-sort-row">
       <view class="sort-track">
         <view wx:for="{{sortOptions}}" wx:key="key" class="sort-choice {{item.active ? 'sort-choice-active' : ''}}" data-key="{{item.key}}" bindtap="selectSort">{{item.label}}</view>
       </view>
-      <view class="curated-count">精选 {{view.resultCount}}</view>
+    </view>
+    <view class="curated-meta-line" bindtap="openFilters">
+      <text class="curated-count">今日精选 {{view.resultCount}} 条</text>
+      <text class="filter-link">{{filterSummary}} ↘</text>
     </view>
 
     <view wx:if="{{providerPending}}" class="curated-empty pending-state">
@@ -72,10 +72,13 @@
     </view>
     <block wx:else>
       <view class="curated-lead" data-id="{{view.leadItem.id}}" bindtap="openItem">
-        <image wx:if="{{view.leadItem.listVisualUrl}}" class="curated-lead-image" src="{{view.leadItem.listVisualUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="curated:{{view.leadItem.id}}:list" data-file-id="{{view.leadItem.listVisualFileId || view.leadItem.visualFileId}}" data-media-url="{{view.leadItem.listVisualUrl}}" data-media-path="view.leadItem.listVisualUrl" binderror="handleMediaError" />
-        <view class="curation-reason">{{view.leadItem.curationReason}}</view>
+        <view class="reason-block">
+          <text class="reason-kicker">精选理由</text>
+          <text class="reason-text">{{view.leadItem.curationReason}}</text>
+        </view>
         <view class="curated-lead-title">{{view.leadItem.title}}</view>
         <view wx:if="{{view.leadItem.summaryPreview}}" class="curated-summary">{{view.leadItem.summaryPreview}}</view>
+        <image wx:if="{{view.leadItem.listVisualUrl}}" class="curated-lead-image" src="{{view.leadItem.listVisualUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="curated:{{view.leadItem.id}}:list" data-file-id="{{view.leadItem.listVisualFileId || view.leadItem.visualFileId}}" data-media-url="{{view.leadItem.listVisualUrl}}" data-media-path="view.leadItem.listVisualUrl" binderror="handleMediaError" />
         <view class="curated-meta"><text>{{view.leadItem.source}}</text><text>{{view.leadItem.publishedLabel}}</text></view>
       </view>
       <view class="curated-list">
@@ -89,12 +92,13 @@
         </view>
       </view>
       <view wx:if="{{loadingMore}}" class="load-more"><view class="load-spinner"></view><text>正在加载更多精选</text></view>
+      <view wx:elif="{{!view.hasMore}}" class="curated-finished"><view class="finished-mark"></view><text>今天的精选看完了 · 共 {{view.resultCount}} 条</text></view>
     </block>
   </block>
 
   <view wx:if="{{filterOpen}}" class="filter-mask" bindtap="closeFilters">
     <view class="filter-panel" catchtap="stopPropagation">
-      <view class="filter-head"><view><view class="page-kicker"><text></text>FILTER</view><view class="filter-title">缩小精选范围</view></view><view class="filter-close" bindtap="closeFilters">关闭</view></view>
+      <view class="filter-head"><view><view class="page-kicker"><text class="kicker-dot"></text>FILTER</view><view class="filter-title">缩小精选范围</view></view><view class="filter-close" bindtap="closeFilters">关闭</view></view>
       <scroll-view scroll-y class="filter-scroll">
         <view class="filter-group"><view class="filter-group-title">公司与模型</view><view class="filter-options">
           <view wx:for="{{companyOptions}}" wx:key="key" class="filter-option {{draftFilters.company === item.key ? 'filter-option-active' : ''}}" data-group="company" data-key="{{item.key}}" bindtap="selectFilter">{{item.label}}</view>

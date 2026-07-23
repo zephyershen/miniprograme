@@ -24,31 +24,28 @@
 
 .window-tabs {
   display: flex;
-  min-height: 88rpx;
+  min-height: 74rpx;
   align-items: center;
   gap: 5rpx;
   padding: 6rpx;
-  border-radius: 25rpx;
+  border-radius: 22rpx;
   background: rgba(229, 231, 238, 0.82);
 }
 
 .window-tab {
   display: flex;
   flex: 1;
-  min-height: 76rpx;
-  flex-direction: column;
+  min-height: 62rpx;
   align-items: center;
   justify-content: center;
-  gap: 3rpx;
-  border-radius: 20rpx;
+  border-radius: 18rpx;
   color: var(--ui-muted);
+  font-size: 23rpx;
   font-weight: 680;
 }
 
 .window-tab-active { background: var(--ui-surface-solid); box-shadow: 0 5rpx 16rpx rgba(30, 33, 44, .08); color: var(--ui-accent-strong); }
-.window-tab-label { font-size: 22rpx; line-height: 1.2; }
-.window-tab-description { color: var(--ui-muted); font-size: 18rpx; font-weight: 560; line-height: 1.2; }
-.window-tab-active .window-tab-description { color: var(--ui-accent); }
+.window-tab-label { line-height: 1.2; }
 
 .briefing-gate {
   margin-top: 20rpx;

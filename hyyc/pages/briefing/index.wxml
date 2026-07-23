@@ -9,7 +9,6 @@
   <view class="window-tabs">
     <view wx:for="{{windowOptions}}" wx:key="key" class="window-tab {{item.active ? 'window-tab-active' : ''}}" data-key="{{item.key}}" bindtap="selectWindow">
       <text class="window-tab-label">{{item.label}}</text>
-      <text class="window-tab-description">{{item.description}}</text>
     </view>
   </view>
 
@@ -36,7 +35,6 @@
   <view wx:else class="briefing-body">
     <view class="briefing-meta">
       <text wx:if="{{briefing.coverageLabel}}" class="coverage-date">{{briefing.coverageLabel}}</text>
-      <text wx:if="{{briefing.generatedLabel}}">{{briefing.generatedLabel}}</text>
       <text>来源 {{briefing.sourceCount}}</text>
     </view>
 
@@ -58,7 +56,7 @@
     </view>
 
     <view wx:if="{{briefing.mustKnow.length}}" class="brief-section">
-      <view class="section-head"><view class="section-title">{{briefing.mustKnowTitle}}</view><view class="section-count">核心变化</view></view>
+      <view class="section-head"><view class="section-title">{{briefing.mustKnowTitle}}</view></view>
       <view wx:for="{{briefing.mustKnow}}" wx:key="index" class="must-row" data-id="{{item.itemId}}" bindtap="openReference">
         <text class="must-index">{{item.index || ('0' + (index + 1))}}</text>
         <view class="must-copy"><view class="must-title">{{item.title}}</view><view class="must-why">{{item.why || item.copy}}</view></view>

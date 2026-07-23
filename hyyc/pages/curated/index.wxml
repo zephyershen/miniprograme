@@ -43,13 +43,11 @@
 
     <view wx:if="{{activeSection === 'courses'}}" class="manual-section">
       <view class="section-heading">
-        <view><view class="section-index">第一部分</view><view class="section-title">基础课</view></view>
-        <view class="section-note">用生活里的例子，把概念讲清楚</view>
+        <view class="section-title">基础课</view>
       </view>
       <view class="course-groups">
         <view wx:for="{{home.courseGroups}}" wx:for-item="group" wx:key="key" class="course-group">
           <view class="course-track-head">
-            <view class="course-track-number">{{index + 1 < 10 ? '0' + (index + 1) : index + 1}}</view>
             <view class="course-track-copy"><view class="course-track-title">{{group.label}}</view><view wx:if="{{group.note}}" class="course-track-note">{{group.note}}</view></view>
             <view class="course-track-count">{{group.lessons.length}} 节</view>
           </view>
@@ -78,8 +76,7 @@
 
     <view wx:else class="manual-section practical-section">
       <view class="section-heading">
-        <view><view class="section-index">第二部分</view><view class="section-title">动手课</view></view>
-        <view class="section-note">从安装开始，完成第一个真实任务</view>
+        <view class="section-title">动手课</view>
       </view>
       <view class="manual-sheet">
         <view
