@@ -3,8 +3,7 @@
   <view wx:if="{{newItemsVisible}}" class="new-items-float {{applyingNewItems ? 'new-items-float-loading' : ''}}" bindtap="applyNewItems" aria-role="button" aria-label="{{newItemsLabel}}，点击查看最新资讯">
     <view class="new-items-signal"></view>
     <text class="new-items-label">{{applyingNewItems ? '正在载入最新资讯' : newItemsLabel}}</text>
-    <text wx:if="{{!applyingNewItems}}" class="new-items-action">点击查看</text>
-    <text class="new-items-arrow">↑</text>
+    <text wx:if="{{!applyingNewItems}}" class="new-items-arrow">↑</text>
   </view>
 
   <view wx:if="{{channelTransitionLoading}}" class="channel-loading-surface" aria-role="progressbar" aria-label="内容加载中">
@@ -198,9 +197,8 @@
           </view>
         </view>
       </scroll-view>
-      <view class="featured-shortcut" data-key="featured" bindtap="selectChannel">
-        <text>{{feed.featuredShortcut.label}}</text>
-        <view wx:if="{{feed.featuredShortcut.locked}}" class="channel-lock" aria-label="Pro 会员专属"></view>
+      <view class="featured-shortcut" data-key="featured" bindtap="selectChannel" aria-label="精选 · Pro 会员专属">
+        <text class="featured-label">{{feed.featuredShortcut.label}}</text>
       </view>
     </view>
 

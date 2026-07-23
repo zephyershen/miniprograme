@@ -1,6 +1,7 @@
 const { CLOUD_ENV_ID } = require('./constants.js');
 
 const RELEASE_VERSION = 'release';
+const MUTATION_ENABLED_VERSIONS = new Set(['develop', 'trial', RELEASE_VERSION]);
 const MUTATING_ACTIONS = Object.freeze({
   knowledgeFeed: new Set([
     'addComment',
@@ -38,7 +39,7 @@ function runtimeCloudEnvironment(wxApi = currentWxApi()) {
     cloudEnvironmentId: CLOUD_ENV_ID,
     version,
     production: version === RELEASE_VERSION,
-    mutationsAllowed: version === RELEASE_VERSION
+    mutationsAllowed: MUTATION_ENABLED_VERSIONS.has(version)
   });
 }
 
@@ -49,8 +50,9 @@ function isCloudMutation(name, data = {}) {
 
 function assertCloudMutationAllowed(name, data, wxApi = currentWxApi()) {
   if (!isCloudMutation(name, data)) return;
-  if (runtimeCloudEnvironment(wxApi).mutationsAllowed) return;
-  const error = new Error('开发版和体验版为生产只读模式，请在正式版完成此操作');
+  const runtime = runtimeCloudEnvironment(wxApi);
+  if (runtime.mutationsAllowed) return;
+  const error = new Error('无法确认小程序运行版本，已阻止写操作，请重新打开后再试');
   error.code = 'NON_RELEASE_MUTATION_BLOCKED';
   throw error;
 }

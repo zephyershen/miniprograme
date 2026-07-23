@@ -17,23 +17,35 @@ function wxFor(version) {
   };
 }
 
-test('keeps develop and trial builds read-only against the production cloud environment', () => {
-  for (const version of ['develop', 'trial', 'unknown']) {
-    const wxApi = version === 'unknown' ? {} : wxFor(version);
+test('allows every registered write action in develop, trial and release builds', () => {
+  for (const version of ['develop', 'trial', 'release']) {
+    const wxApi = wxFor(version);
     assert.equal(accountEnvironmentVersion(wxApi), version);
-    assert.equal(runtimeCloudEnvironment(wxApi).mutationsAllowed, false);
+    assert.equal(runtimeCloudEnvironment(wxApi).mutationsAllowed, true);
     for (const [functionName, actions] of Object.entries(MUTATING_ACTIONS)) {
       for (const action of actions) {
-        assert.throws(
-          () => assertCloudMutationAllowed(functionName, { action }, wxApi),
-          (error) => error && error.code === 'NON_RELEASE_MUTATION_BLOCKED'
+        assert.doesNotThrow(
+          () => assertCloudMutationAllowed(functionName, { action }, wxApi)
         );
       }
     }
   }
 });
 
-test('allows production mutations while leaving every read action available', () => {
+test('fails closed for every registered write action when the build is unknown', () => {
+  assert.equal(accountEnvironmentVersion({}), 'unknown');
+  assert.equal(runtimeCloudEnvironment({}).mutationsAllowed, false);
+  for (const [functionName, actions] of Object.entries(MUTATING_ACTIONS)) {
+    for (const action of actions) {
+      assert.throws(
+        () => assertCloudMutationAllowed(functionName, { action }, {}),
+        (error) => error && error.code === 'NON_RELEASE_MUTATION_BLOCKED'
+      );
+    }
+  }
+});
+
+test('identifies release builds while leaving every read action available', () => {
   const release = wxFor('release');
   assert.equal(runtimeCloudEnvironment(release).production, true);
   assert.doesNotThrow(() => assertCloudMutationAllowed(
@@ -41,11 +53,12 @@ test('allows production mutations while leaving every read action available', ()
     { action: 'toggleLike' },
     release
   ));
-  for (const version of ['develop', 'trial', 'release']) {
+  for (const version of ['develop', 'trial', 'release', 'unknown']) {
+    const wxApi = version === 'unknown' ? {} : wxFor(version);
     assert.doesNotThrow(() => assertCloudMutationAllowed(
       'knowledgeFeed',
       { action: 'feed' },
-      wxFor(version)
+      wxApi
     ));
   }
   assert.equal(isCloudMutation('membershipBilling', { action: 'createPayment' }), true);

@@ -920,3 +920,36 @@
   导航和时间线。6MB 明确为单次请求体技术边界，不是用户次数或累计容量配额。
 - Sensitive handling: 普通 Wiki 只记录凭据轮换要求，不含实际凭据、环境变量
   值、用户标识、Cloud File ID 或短期签名地址。
+
+## [2026-07-23] admin-role-preview-non-release-exception | 开放管理员测试身份切换
+
+- Session: local Codex task
+- Scope: 小程序客户端环境门禁、专项测试和身份预览项目记忆；未修改云端授权、
+  会员、订单或其他用户数据，也未部署云函数或上传微信版本。
+- Root cause: `setRolePreview` 与互动、资料、媒体和支付写操作共用非正式版统一
+  拦截，请求在到达服务端管理员校验前即返回 `NON_RELEASE_MUTATION_BLOCKED`。
+- Change: 仅对已识别的 `develop`/`trial` 放行
+  `knowledgeFeed:setRolePreview`；未知环境继续失败关闭，其他生产写操作继续拦截。
+  服务端仍要求有效真实管理员授权，只更新该账号的 `previewRole`。
+- Verification: 身份预览与服务端权限专项 17/17、全量 Node 527/527、30 JSON/
+  280 JavaScript/11 pages 项目检查和 `git diff --check` 通过。
+- Sensitive handling: 未读取或记录凭据、OpenID、用户数据、Cloud File ID、
+  短期签名地址或环境变量值。
+
+## [2026-07-23] non-release-write-integration | 开放开发版和体验版真实写链路
+
+- Session: local Codex task
+- Scope: 小程序客户端统一环境门禁、专项测试和当前项目记忆；未部署云函数、
+  未上传体验版，也未执行任何真实点赞、评论、资料、媒体或支付操作。
+- Product correction: 上线前必须在开发版和体验版覆盖真实写链路，不能只验证读取
+  与管理员身份预览；上一条“仅身份预览例外”的本地策略被本条取代。
+- Change: `develop`、`trial`、`release` 均允许全部已登记写请求到达服务端；
+  缺失、异常或未知运行版本继续失败关闭。服务端身份、内容审核、对象所有权、
+  会员、订单和支付配置校验未放宽。
+- Payment boundary: 客户端现在允许创建和查询支付请求，但真实收银台仍要求
+  `WECHAT_VIRTUAL_PAY_ENABLED`、`WECHAT_VIRTUAL_PAY_RELEASE_APPROVED`、商户参数
+  和计划可售状态完整配置；本次未更改或部署这些生产配置。
+- Verification: 写入门禁及相关权限专项 38/38、全量 Node 527/527、30 JSON/
+  280 JavaScript/11 pages 项目检查和 `git diff --check` 通过。
+- Sensitive handling: 未读取或记录凭据、OpenID、用户数据、Cloud File ID、
+  短期签名地址或环境变量值。

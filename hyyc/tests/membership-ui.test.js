@@ -309,10 +309,12 @@ test('keeps direct featured-page access on the shared membership prompt path', (
   assert.match(featuredScript, /openMembershipFromPrompt\(\)/);
 });
 
-test('home channel labels hide counts and render the featured capability lock', () => {
+test('home channel labels hide counts and render the featured premium label', () => {
   const inbox = fs.readFileSync(path.resolve(__dirname, '../pages/inbox/index.wxml'), 'utf8');
-  assert.match(inbox, /wx:if="\{\{feed\.featuredShortcut\.locked\}\}" class="channel-lock"/);
-  assert.doesNotMatch(inbox, /wx:if="\{\{item\.premium\}\}" class="channel-lock"/);
+  const inboxStyle = fs.readFileSync(path.resolve(__dirname, '../pages/inbox/index.wxss'), 'utf8');
+  assert.match(inbox, /class="featured-label">\{\{feed\.featuredShortcut\.label\}\}/);
+  assert.doesNotMatch(inbox, /class="channel-lock"/);
+  assert.match(inboxStyle, /\.featured-label\s*\{[^}]*background-clip:\s*text/);
   assert.match(inbox, /new-items-float/);
   assert.match(inbox, /bindtap="applyNewItems"/);
   assert.doesNotMatch(inbox, /class="channel-count"/);

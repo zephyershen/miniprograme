@@ -3,7 +3,7 @@ title: "采用单一 Pro 会员、能力型权益与可回溯知识简报"
 type: decision
 tags: [membership, pro, entitlements, curated-feed, digests, intelligence, payment]
 sources: [sources/2026-07-17-pro-membership-implementation.md, sources/2026-07-18-premium-ia-and-copy.md, sources/2026-07-19-packy-grok-intelligence.md, sources/2026-07-19-profile-moderation-and-huifu-payment.md]
-last_updated: 2026-07-21
+last_updated: 2026-07-23
 status: confirmed
 confidence: high
 ---
@@ -38,7 +38,7 @@ confidence: high
 - 简报使用 24 小时、7 天、30 天滚动窗口，必须包含结论、必须知道、影响、趋势、雷达、继续阅读和来源索引。
 - 我的展示身份、到期时间、数据覆盖、权益与服务端价格；普通用户可购买一次性 30 天 Pro，会员可主动续费 30 天。配置不完整时显示服务即将开放，不发起请求。
 - 2026-07-21 起，“我的”页与所有受限入口共用七项完整权益模型和服务端计价模型。当前 590/1090 分自动显示 `5.4 折`、`立省 ¥5`；喜欢、收藏动作和分享不包装成 Pro 权益，第三方工具/API/云服务费用明确不包含。
-- 真实管理员的“我的”页额外显示普通用户、Pro 会员、管理员三个身份预览按钮。预览状态由服务端验证真实管理员授权后写入同一授权记录；页面参数不能授予权限，预览普通用户后仍以真实管理员身份允许切回。
+- 真实管理员的“我的”页额外显示普通用户、Pro 会员、管理员三个身份预览按钮。预览状态由服务端验证真实管理员授权后写入同一授权记录；页面参数不能授予权限，预览普通用户后仍以真实管理员身份允许切回。为完整覆盖上线前联调，新构建的 `develop`/`trial` 与 `release` 都可以发起已登记写请求，未知环境继续失败关闭；这只解除客户端环境门禁，不绕过任何服务端权限、内容审核、对象所有权或支付配置校验。
 
 ## 服务端边界
 
