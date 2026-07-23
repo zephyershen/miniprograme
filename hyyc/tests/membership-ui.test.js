@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {
   normalizeMembershipAccess,
+  memberPurchasesEnabled,
   canUseFeature
 } = require('../features/membership/access');
 const {
@@ -28,6 +29,7 @@ test('normalizes the free, Pro and administrator capability matrix', () => {
   assert.equal(canUseFeature(free, 'ai_column'), false);
   assert.equal(canUseFeature(free, 'comments'), false);
   assert.equal(canUseFeature(free, 'digests'), false);
+  assert.equal(memberPurchasesEnabled(free), false);
 
   const member = normalizeMembershipAccess({
     viewer: { role: 'member', membershipStatus: 'active' },
@@ -145,20 +147,40 @@ test('derives the offer, savings and discount only from the server plan amounts'
   assert.equal(changedOffer.percentOffLabel, '省 40%');
   assert.equal(changedOffer.savingsLabel, '¥8');
 
-  const billing = membershipBillingPresentation({ available: true, plan: {
-    key: 'pro_30d', durationDays: 30, priceCents: 590, compareAtPriceCents: 590
-  } });
+  const billing = membershipBillingPresentation(
+    { available: true, plan: {
+      key: 'pro_30d', durationDays: 30, priceCents: 590, compareAtPriceCents: 590
+    } },
+    { memberPurchases: true, mutationsAllowed: true }
+  );
   assert.equal(billing.available, true);
   assert.equal(billing.plan.hasDiscount, false);
   assert.equal(billing.plan.discountLabel, '');
   assert.equal(billing.plan.compareAtPriceLabel, '');
 
-  const unavailable = membershipBillingPresentation({ available: true, plan: {
-    key: 'pro_30d', durationDays: 30, priceCents: 0, compareAtPriceCents: 1090
-  } });
+  const unavailable = membershipBillingPresentation(
+    { available: true, plan: {
+      key: 'pro_30d', durationDays: 30, priceCents: 0, compareAtPriceCents: 1090
+    } },
+    { memberPurchases: true, mutationsAllowed: true }
+  );
   assert.equal(unavailable.available, false);
   assert.equal(unavailable.plan.hasDiscount, false);
   assert.equal(unavailable.plan.compareAtPriceLabel, '');
+
+  const serverReady = {
+    available: true,
+    plan: { key: 'pro_30d', durationDays: 30, priceCents: 590 }
+  };
+  assert.equal(membershipBillingPresentation(serverReady).available, false);
+  assert.equal(membershipBillingPresentation(
+    serverReady,
+    { memberPurchases: true, mutationsAllowed: false }
+  ).available, false);
+  assert.equal(membershipBillingPresentation(
+    serverReady,
+    { memberPurchases: false, mutationsAllowed: true }
+  ).available, false);
 });
 
 test('shows a locked 30-day choice to free users without exposing a count', () => {
@@ -238,11 +260,13 @@ test('renders four native tabs and a real one-time Pro purchase entry', () => {
   assert.match(prompt, /billingPlan\.discountLabel/);
   assert.match(prompt, /billingPlan\.savingsLabel/);
   assert.match(prompt, /billingPlan\.offerTag/);
+  assert.match(prompt, /billingAvailable/);
   assert.match(prompt, /wx:for="\{\{prompt\.benefits\}\}"/);
   assert.match(prompt, /prompt\.benefits\.length/);
   assert.match(prompt, /prompt\.membershipTerms\.supportBoundary/);
   assert.match(prompt, /prompt\.membershipTerms\.renewalCopy/);
   assert.match(prompt, /item\.featured/);
+  assert.match(prompt, /暂不可购买/);
   const promptMaskTag = prompt.match(/<view\b(?=[^>]*class="member-prompt-mask")[^>]*>/)?.[0] || '';
   const promptScrollTag = prompt.match(/<scroll-view\b(?=[^>]*class="member-card-scroll")[^>]*>/)?.[0] || '';
   assert.match(promptMaskTag, /\bcatchtouchmove="stopPropagation"/);

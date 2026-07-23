@@ -1,5 +1,7 @@
 module.exports = {
+  knowledgeMemberPurchasesEnabled: false,
   wechatVirtualPayEnabled: true,
+  wechatVirtualPayReleaseApproved: false,
   wechatVirtualPayEnvironment: 1,
   wechatVirtualPayOfferId: '虚拟支付后台显示的 offerId',
   wechatVirtualPayAppKey: '仅放入云函数环境变量或未提交的 config.local.js',

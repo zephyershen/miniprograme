@@ -141,12 +141,18 @@ function membershipOffer(plan = {}) {
   };
 }
 
-function membershipBillingPresentation(raw = {}) {
+function membershipBillingPresentation(
+  raw = {},
+  { memberPurchases = false, mutationsAllowed = false } = {}
+) {
   const source = raw && typeof raw === 'object' ? raw : {};
   const plan = membershipOffer(source.plan);
   return {
     ...source,
-    available: source.available === true && Boolean(plan.key && plan.priceCents),
+    available: source.available === true
+      && memberPurchases === true
+      && mutationsAllowed === true
+      && Boolean(plan.key && plan.priceCents),
     plan
   };
 }

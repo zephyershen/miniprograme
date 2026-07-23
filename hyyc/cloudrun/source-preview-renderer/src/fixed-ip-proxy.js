@@ -1,6 +1,7 @@
 const http = require('node:http');
 const net = require('node:net');
 const { createRelayConnector } = require('./relay-outbound.js');
+const { safeErrorSummary } = require('./safe-log.js');
 
 const LOOPBACK_HOST = '127.0.0.1';
 const CONNECT_TIMEOUT_MS = 12000;
@@ -98,9 +99,10 @@ function createFixedIpProxy({
       upstream.pipe(clientSocket);
       clientSocket.pipe(upstream);
     } catch (error) {
-      logger.warn('Fixed-IP browser proxy rejected target', {
-        code: error && error.message
-      });
+      logger.warn(
+        'Fixed-IP browser proxy rejected target',
+        safeErrorSummary(error, 'PROXY_TARGET_UNAVAILABLE')
+      );
       if (upstream && !upstream.destroyed) upstream.destroy();
       closeClientSocket(clientSocket);
     }

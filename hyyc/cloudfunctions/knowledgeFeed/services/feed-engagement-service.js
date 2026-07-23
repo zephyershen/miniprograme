@@ -52,9 +52,12 @@ function normalizeMutationId(value) {
   return crypto.randomBytes(18).toString('hex');
 }
 
-function commentView(comment, ownerKey, profile = null) {
+function commentView(comment, ownerKey, profile = null, options = {}) {
   const createdAt = comment && comment.createdAt;
   const author = profileView(profile);
+  const isMine = Boolean(comment && comment.authorKey === ownerKey);
+  const privateStatus = ['hidden', 'appealed'].includes(comment && comment.status);
+  const appealPending = comment && comment.status === 'appealed';
   return {
     id: comment && (comment.id || comment._id),
     content: comment && comment.content || '',
@@ -65,7 +68,15 @@ function commentView(comment, ownerKey, profile = null) {
       initial: author.initial
     },
     authorLabel: author.nickname || '读者',
-    isMine: Boolean(comment && comment.authorKey === ownerKey),
+    isMine,
+    isHidden: privateStatus,
+    appealPending,
+    statusLabel: appealPending ? '申诉处理中' : (privateStatus ? '已隐藏' : ''),
+    canDelete: isMine || options.isAdmin === true,
+    canReport: !privateStatus && !isMine,
+    canAppeal: privateStatus && !appealPending && isMine && options.isAdmin !== true,
+    canRestore: privateStatus && options.isAdmin === true,
+    reported: !privateStatus && options.reported === true,
     createdAt: createdAt instanceof Date ? createdAt.toISOString() : createdAt
   };
 }
@@ -155,17 +166,39 @@ function createFeedEngagementService({
     }
   }
 
+  function isActualAdmin(entitlement) {
+    const viewer = entitlement && entitlement.viewer;
+    return Boolean(viewer && (viewer.isActualAdmin === true || viewer.role === 'admin'));
+  }
+
   async function listComments(itemId, actor, entitlement) {
-    requireComments(entitlement);
-    await itemLoader(itemId, entitlement);
-    const comments = await repository.listComments(itemId, config.commentPageSize);
-    const profiles = await profileRepository.getMany(comments.map((comment) => comment.authorKey));
+    const canParticipate = canComment(entitlement);
+    const admin = isActualAdmin(entitlement);
+    if (canParticipate) await itemLoader(itemId, entitlement);
+    const comments = await repository.listComments(itemId, config.commentPageSize, {
+      ownerKey: actor.ownerKey,
+      isAdmin: admin,
+      includeActive: canParticipate || admin
+    });
+    const [profiles, states] = await Promise.all([
+      profileRepository.getMany(comments.map((comment) => comment.authorKey)),
+      repository.getMany(actor.ownerKey, [itemId])
+    ]);
     const profileMap = new Map(profiles.map((profile) => [profile.ownerKey || profile._id, profile]));
+    const state = states[0] || null;
+    const reportedCommentIds = new Set(
+      Array.isArray(state && state.reportedCommentIds) ? state.reportedCommentIds : []
+    );
     return {
+      canParticipate,
       comments: comments.map((comment) => commentView(
         comment,
         actor.ownerKey,
-        profileMap.get(comment.authorKey)
+        profileMap.get(comment.authorKey),
+        {
+          isAdmin: admin,
+          reported: reportedCommentIds.has(comment._id)
+        }
       )),
       viewerProfile: profileView(profileMap.get(actor.ownerKey) || await profileRepository.get(actor.ownerKey))
     };
@@ -198,7 +231,9 @@ function createFeedEngagementService({
           });
         }
         return {
-          comment: commentView(existing.comment, actor.ownerKey, profile),
+          comment: commentView(existing.comment, actor.ownerKey, profile, {
+            isAdmin: isActualAdmin(entitlement)
+          }),
           commentCount: count(existing.commentCount),
           viewerProfile: publicProfile
         };
@@ -268,9 +303,87 @@ function createFeedEngagementService({
       );
     }
     return {
-      comment: commentView(result.comment, actor.ownerKey, profile),
+      comment: commentView(result.comment, actor.ownerKey, profile, {
+        isAdmin: isActualAdmin(entitlement)
+      }),
       commentCount: count(result.commentCount),
       viewerProfile: publicProfile
+    };
+  }
+
+  async function deleteComment(itemId, commentId, actor, entitlement) {
+    const result = await repository.deleteComment(
+      actor.ownerKey,
+      itemId,
+      commentId,
+      new Date(now()),
+      isActualAdmin(entitlement)
+    );
+    const attachmentFileIds = (result.comment && result.comment.attachments || [])
+      .map((attachment) => attachment && attachment.fileId)
+      .filter(Boolean);
+    if (userMediaService && attachmentFileIds.length) {
+      await userMediaService.deleteOwned(
+        { ownerKey: result.comment.authorKey },
+        'comment',
+        attachmentFileIds
+      ).catch(() => null);
+    }
+    return {
+      commentId,
+      deleted: true,
+      commentCount: count(result.commentCount)
+    };
+  }
+
+  async function reportComment(itemId, commentId, actor, entitlement) {
+    requireComments(entitlement);
+    await itemLoader(itemId, entitlement);
+    const result = await repository.reportComment(
+      actor.ownerKey,
+      itemId,
+      commentId,
+      new Date(now()),
+      config.commentReportThreshold,
+      config.commentReportLimitPerItem
+    );
+    return {
+      commentId,
+      reported: true,
+      hidden: result.hidden === true,
+      commentCount: count(result.commentCount)
+    };
+  }
+
+  async function appealComment(itemId, commentId, actor, entitlement) {
+    const result = await repository.appealComment(
+      actor.ownerKey,
+      itemId,
+      commentId,
+      new Date(now())
+    );
+    return {
+      commentId,
+      appealed: true,
+      commentCount: count(result.commentCount)
+    };
+  }
+
+  async function restoreComment(itemId, commentId, actor, entitlement) {
+    if (!isActualAdmin(entitlement)) {
+      throw new AppError('FORBIDDEN', '只有管理员可以恢复评论');
+    }
+    const result = await repository.restoreComment(
+      actor.ownerKey,
+      itemId,
+      commentId,
+      new Date(now()),
+      true
+    );
+    return {
+      commentId,
+      restored: true,
+      commentCount: count(result.commentCount)
     };
   }
 
@@ -296,6 +409,10 @@ function createFeedEngagementService({
     toggleFavorite,
     listComments,
     addComment,
+    deleteComment,
+    reportComment,
+    appealComment,
+    restoreComment,
     listFavorites
   };
 }

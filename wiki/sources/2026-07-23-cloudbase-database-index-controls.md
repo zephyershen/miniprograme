@@ -62,3 +62,11 @@
 ## 敏感信息处理
 
 普通 Wiki、合同、测试和报告不包含数据库文档、用户数据、Cloud File ID、短期签名地址、函数环境变量值、登录凭据或原始 TCB 响应。
+
+## 2026-07-23 评论私有状态查询增量
+
+- 最终发布审查发现，作者读取自己的 `hidden` / `appealed` 评论仍会先扫描同一资讯下最新 500 条对应状态记录；评论量增长后，较旧的作者私有记录可能被截断。
+- 仓储查询已改为按 `itemId + status + authorKey` 精确过滤并按 `createdAt + _id` 倒序；真实管理员仍按 `itemId + status` 做最多 500 条的有界治理扫描。
+- 版本化增量合同新增 `knowledge_feed_comments/item_status_author_created_id`，字段顺序为 `itemId:1, status:1, authorKey:1, createdAt:-1, _id:-1`，合同总数从 34 增至 35。
+- 本代码修复任务没有执行生产 `apply`；发布流程必须先创建该索引并完成 `check/readback`，再部署依赖它的 `knowledgeFeed` 代码。
+- 本节取代评论治理记录中“无需新增索引”的旧范围结论；集合数量和 additive / preserve-unknown 安全边界不变。

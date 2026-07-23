@@ -265,7 +265,7 @@ test('continues comment pages until the requested approved comments are found', 
   ]);
 });
 
-test('lets every signed-in viewer like and favorite while only members can read and write comments', async () => {
+test('lets every signed-in viewer like, favorite, and manage private history while only members participate in comments', async () => {
   const repository = memoryRepository();
   const profiles = new Map([
     [OWNER, {
@@ -322,9 +322,24 @@ test('lets every signed-in viewer like and favorite while only members can read 
   assert.equal(canComment(free), false);
   assert.equal((await service.toggleLike(ITEM.id, true, actor, free)).engagement.liked, true);
   assert.equal((await service.toggleFavorite(ITEM.id, true, actor, free)).engagement.favorited, true);
-  await assert.rejects(() => service.listComments(ITEM.id, actor, free), (error) => (
-    error.code === 'ENTITLEMENT_REQUIRED' && error.details.featureKey === 'comments'
-  ));
+  const freeComments = await service.listComments(ITEM.id, actor, free);
+  assert.equal(freeComments.canParticipate, false);
+  assert.deepEqual(freeComments.comments, []);
+  await assert.rejects(
+    () => service.addComment(
+      ITEM.id,
+      { content: '不能发布', clientMutationId: 'free_mutation' },
+      actor,
+      free
+    ),
+    (error) => error.code === 'ENTITLEMENT_REQUIRED'
+      && error.details.featureKey === 'comments'
+  );
+  await assert.rejects(
+    () => service.reportComment(ITEM.id, 'comment-to-report', actor, free),
+    (error) => error.code === 'ENTITLEMENT_REQUIRED'
+      && error.details.featureKey === 'comments'
+  );
 
   const payload = {
     content: '  一个\n具体判断  ',

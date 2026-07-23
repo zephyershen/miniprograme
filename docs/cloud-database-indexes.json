@@ -47,6 +47,20 @@
     },
     {
       "collection": "knowledge_feed_comments",
+      "name": "item_status_author_created_id",
+      "unique": false,
+      "keys": [
+        { "field": "itemId", "direction": "1" },
+        { "field": "status", "direction": "1" },
+        { "field": "authorKey", "direction": "1" },
+        { "field": "createdAt", "direction": "-1" },
+        { "field": "_id", "direction": "-1" }
+      ],
+      "owner": "comments",
+      "reason": "List one author's hidden or appealed comments newest-first without scanning other authors."
+    },
+    {
+      "collection": "knowledge_feed_comments",
       "name": "item_status_created_id",
       "unique": false,
       "keys": [

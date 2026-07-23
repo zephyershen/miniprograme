@@ -953,3 +953,56 @@
   280 JavaScript/11 pages 项目检查和 `git diff --check` 通过。
 - Sensitive handling: 未读取或记录凭据、OpenID、用户数据、Cloud File ID、
   短期签名地址或环境变量值。
+
+## [2026-07-23] comment-governance-minimum | 补齐首发评论删除与举报治理
+
+- Session: local Codex task
+- Scope: `knowledgeFeed` 评论仓储/服务/路由、客户端互动 API、评论面板及专项测试；
+  未新增集合或索引，未部署云函数、上传微信版本或修改生产数据。
+- Change: 作者与真实管理员可事务软删除评论，并只在原评论公开可见时递减
+  `commentCount`；删除后按评论作者身份尽力清理附件。具备评论访问权的登录用户可
+  举报他人评论，举报 ID 幂等保存在现有用户互动文档，第三个不同用户举报时自动
+  隐藏并只递减一次公开计数。
+- Privacy: 公开评论与操作 DTO 只返回展示权限、聚合结果和新计数，不返回
+  `authorKey`、`ownerKey`、举报者列表、内部举报计数或审核字段。
+- Client: 评论行提供克制的“举报 / 删除”入口与二次确认；举报成功后显示
+  “已举报”，删除或自动隐藏会同步详情页评论数。
+- Verification: 评论治理/互动/环境门禁专项 18/18，全量 Node 541/541，
+  30 JSON/283 JavaScript/11 pages 项目检查及 `git diff --check` 通过。
+- Supersedes: `2026-07-19-automatic-ai-curation-and-comment-moderation` 中
+  “当前阶段不实现举报、评论删除或自动隐藏”的范围结论。
+
+## [2026-07-23] comment-appeal-recovery-lifecycle | 补齐评论申诉与恢复
+
+- Session: local Codex task
+- Scope: 在现有评论治理基础上补齐作者申诉、管理员恢复、私有列表与媒体读取权限；
+  同步项目导航、总览与时间线。未新增集合或索引，未部署或修改生产数据。
+- Lifecycle: 作者可在当前资讯查看自己的 hidden/appealed 评论并幂等申诉；真实
+  管理员可查看全部 hidden/appealed 评论并恢复或沿用删除。恢复事务只增加一次
+  公开 `commentCount`，将 `reportCount` 重置为 0，并保留举报者侧旧 ID 以阻止
+  同一账号对恢复评论重复计数。
+- Privacy: 普通用户列表继续只返回 active 评论；隐藏或申诉评论的托管/旧版媒体
+  也只对作者或真实管理员解析。公开 DTO 不返回作者键、举报者列表、举报计数、
+  隐藏原因或申诉内部时间。
+- Client: 评论面板增加“已隐藏 / 申诉处理中”状态和带二次确认、ARIA 标签及
+  88rpx 触控区的“申诉 / 恢复”操作。
+- Verification: 评论治理、互动、运行门禁及用户媒体专项 41/41；30 JSON/
+  283 JavaScript/11 pages 项目检查与 `git diff --check` 通过。全量 `verify`
+  留给根任务在并行支付和日志修复合并后统一执行。
+
+## [2026-07-23] comment-author-private-query | 精确读取作者私有评论状态
+
+- Session: local Codex task
+- Scope: 仅修改评论仓储查询、版本化数据库索引合同、专项测试和项目记忆；未改动
+  服务、界面、媒体或支付，也未部署云函数、创建生产索引或修改生产数据。
+- Root cause: 作者读取自己的 `hidden` / `appealed` 评论时，旧实现会扫描同一
+  资讯下每种状态最新 500 条后再按作者过滤，评论量增长后会漏掉较旧的作者记录。
+- Change: 作者路径改为精确查询 `itemId + status + authorKey`，可用
+  `includeActive:false` 只读取私有生命周期；真实管理员仍按 `itemId + status`
+  进行最多 500 条的有界治理扫描。索引合同新增
+  `item_status_author_created_id`，合同总数增至 35。
+- Verification: 评论治理与索引控制专项 18/18，`check:indexes` 确认 35 个索引/
+  16 个 owner，项目检查确认 30 JSON/283 JavaScript/11 pages，
+  `git diff --check` 通过。
+- Supersedes: `comment-appeal-recovery-lifecycle` 中“未新增索引”的范围结论；
+  生产发布前必须先应用并回读新索引，再部署依赖该查询的 `knowledgeFeed`。

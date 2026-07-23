@@ -30,6 +30,7 @@
         "KNOWLEDGE_INTELLIGENCE_ENABLED",
         "KNOWLEDGE_LIVE_CURATED",
         "KNOWLEDGE_LIVE_DIGESTS",
+        "KNOWLEDGE_MEMBER_PURCHASES_ENABLED",
         "SOURCE_PREVIEW_FUNCTION_ENABLED",
         "SOURCE_PREVIEW_HTTP_FALLBACK_ENABLED"
       ]
@@ -122,7 +123,7 @@
       "name": "wechat-payment",
       "owner": "product and application maintainer",
       "secret": false,
-      "required": "new sales require ENABLED and RELEASE_APPROVED plus all provider fields; RELEASE_APPROVED stays false until the real-device matrix is complete",
+      "required": "new sales require the shared KNOWLEDGE_MEMBER_PURCHASES_ENABLED product gate, ENABLED, RELEASE_APPROVED, and all provider fields; RELEASE_APPROVED stays false until the real-device matrix is complete",
       "variables": [
         "WECHAT_MINIPROGRAM_APP_ID",
         "WECHAT_VIRTUAL_PAY_API_BASE_URL",

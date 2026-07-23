@@ -32,6 +32,7 @@
 
 | 环境变量 | 说明 |
 |---|---|
+| `KNOWLEDGE_MEMBER_PURCHASES_ENABLED` | 产品购买能力总开关；必须同时配置到 `knowledgeFeed` 与 `membershipBilling`，缺失或非 `true` 时不展示且不创建新订单 |
 | `WECHAT_VIRTUAL_PAY_ENABLED` | 完成后台开通和商品发布后设为 `true` |
 | `WECHAT_VIRTUAL_PAY_RELEASE_APPROVED` | 仅在下方真机矩阵全部验收并留存证据后设为 `true`；默认缺失即关闭新购 |
 | `WECHAT_VIRTUAL_PAY_ENV` | 沙箱 `1`，正式环境 `0` |

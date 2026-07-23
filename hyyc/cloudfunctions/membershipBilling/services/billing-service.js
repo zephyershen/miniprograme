@@ -47,8 +47,14 @@ function publicOrder(order) {
 
 function createBillingService({ repository, paymentClient, config, plan, missingConfig, now = () => new Date() }) {
   const nextCheckAt = (milliseconds) => new Date(now().getTime() + milliseconds);
-  function available({ requireReleaseApproval = true } = {}) {
-    return missingConfig(config, plan, { requireReleaseApproval }).length === 0;
+  function available({
+    requireMemberPurchases = true,
+    requireReleaseApproval = true
+  } = {}) {
+    return missingConfig(config, plan, {
+      requireMemberPurchases,
+      requireReleaseApproval
+    }).length === 0;
   }
 
   function getPlans() {
@@ -76,7 +82,10 @@ function createBillingService({ repository, paymentClient, config, plan, missing
   }
 
   function assertProviderReady() {
-    if (!available({ requireReleaseApproval: false })) {
+    if (!available({
+      requireMemberPurchases: false,
+      requireReleaseApproval: false
+    })) {
       throw new BillingError('PAYMENT_NOT_READY', '支付状态暂时无法确认，请稍后再试', 503);
     }
   }

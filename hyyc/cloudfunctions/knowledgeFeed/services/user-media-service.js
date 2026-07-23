@@ -489,25 +489,43 @@ function createUserMediaService({
   }
 
   async function deleteRecords(actor, kind, fileIds, { includePublished }) {
-    const records = [];
+    const recordsById = new Map();
     for (const fileId of fileIds) {
       const record = await ownedRecord(actor, kind, fileId);
       if (!includePublished && record.status === 'published') continue;
-      records.push(record);
+      recordsById.set(record.uploadId, record);
     }
+    const records = [...recordsById.values()];
     if (!records.length) return { deletedFileIds: [], retryFileIds: [], uncertain: false };
+    const deletionRequestedAt = new Date(now());
+    for (const record of records) {
+      if (!repository || typeof repository.requestDeletion !== 'function') {
+        throw new AppError('TEMPORARY_FAILURE', TEMPORARY_MEDIA_MESSAGE);
+      }
+      const requested = await repository.requestDeletion(record.uploadId, record.ownerKey, {
+        status: 'deleting',
+        cleanupPending: true,
+        cleanupAfter: deletionRequestedAt,
+        businessBinding: null,
+        publicationIntent: null,
+        deletionRequestedAt,
+        updatedAt: deletionRequestedAt
+      });
+      if (!requested) throw new AppError('TEMPORARY_FAILURE', TEMPORARY_MEDIA_MESSAGE);
+    }
     const canonicalIds = records.flatMap(recordFileIds).filter(Boolean);
     const result = await deleteFiles(canonicalIds);
     const deleted = new Set(result && result.deletedFileIds || []);
     for (const record of records) {
-      const canonicalId = immutableFileId(record);
-      if (!deleted.has(canonicalId)) continue;
+      const recordIds = recordFileIds(record).filter(Boolean);
+      if (recordIds.some((fileId) => !deleted.has(fileId))) continue;
       const updatedAt = new Date(now());
-      await repository.markDeleted(record.uploadId, actor.ownerKey, {
+      await repository.markDeleted(record.uploadId, record.ownerKey, {
         status: 'deleted',
+        cleanupState: 'completed',
         deletedAt: updatedAt,
         updatedAt
-      });
+      }).catch(() => null);
     }
     return result;
   }
@@ -571,7 +589,7 @@ function createUserMediaService({
     });
     const candidates = [...scanned.values()]
       .filter((record) => record
-        && ['reserved', 'reviewing', 'published'].includes(record.status)
+        && ['reserved', 'reviewing', 'published', 'deleting'].includes(record.status)
         && (
           (record.cleanupPending === true
             && cleanupDeadline(record) <= cleanupStartedAt.getTime())
@@ -722,10 +740,18 @@ function createUserMediaService({
         || record.publishedFileId !== fileId
         || !record.businessBinding
         || record.businessBinding.state !== 'attached'
-        || (record.businessBinding.kind === 'comment' && access.comments !== true)
         || (record.businessBinding.kind === 'profile'
           && access.comments !== true
           && record.ownerKey !== access.ownerKey)) continue;
+      if (record.businessBinding.kind === 'comment') {
+        try {
+          if (!publicationVerifier
+            || typeof publicationVerifier.canRead !== 'function'
+            || !await publicationVerifier.canRead(record, access)) continue;
+        } catch (error) {
+          continue;
+        }
+      }
       visible.push(fileId);
     }
     const legacy = requested.filter((fileId) => !managed.includes(fileId));

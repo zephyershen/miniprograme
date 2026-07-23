@@ -16,7 +16,7 @@
             <view class="member-title">{{prompt.title}}</view>
             <view class="member-copy">{{prompt.copy}}</view>
 
-            <view wx:if="{{billingPlan.priceCents}}" class="member-offer">
+            <view wx:if="{{billingAvailable && billingPlan.priceCents}}" class="member-offer">
               <view class="member-offer-main">
                 <view class="member-offer-label">{{billingPlan.offerTag || '当前会员价'}}</view>
                 <view class="member-offer-line">
@@ -45,7 +45,8 @@
         </scroll-view>
 
         <view class="member-card-footer">
-          <button class="member-primary" bindtap="viewBenefits">订阅</button>
+          <button wx:if="{{billingAvailable}}" class="member-primary" bindtap="viewBenefits">订阅</button>
+          <button wx:else class="member-primary" disabled>暂不可购买</button>
           <view class="member-note">{{prompt.membershipTerms.renewalCopy}}</view>
         </view>
       </view>

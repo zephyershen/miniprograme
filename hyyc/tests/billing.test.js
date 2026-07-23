@@ -25,6 +25,7 @@ const {
 } = require('../cloudfunctions/membershipBilling/config');
 
 const CONFIG = Object.freeze({
+  memberPurchasesEnabled: true,
   enabled: true,
   releaseApproved: true,
   environment: 0,
@@ -71,6 +72,172 @@ test('keeps new sales closed until the explicit release gate is approved', async
     []
   );
 });
+
+test('requires the product purchase flag for plans and new orders without blocking old-order recovery', async () => {
+  const closedOrder = {
+    id: 'MP20260723120000abcdefabcdefabcd',
+    ownerKey: 'owner',
+    openId: 'openid',
+    status: 'closed'
+  };
+  const service = createBillingService({
+    repository: {
+      async getOrder() { return closedOrder; }
+    },
+    paymentClient: {},
+    config: { ...CONFIG, memberPurchasesEnabled: false },
+    plan: PLAN,
+    missingConfig: missingPaymentConfig
+  });
+
+  assert.equal(service.getPlans().available, false);
+  await assert.rejects(
+    () => service.createPayment('pro_30d', 'login-code', {
+      ownerKey: 'owner',
+      openId: 'openid'
+    }),
+    (error) => error && error.code === 'PAYMENT_NOT_READY'
+  );
+  assert.deepEqual(
+    missingPaymentConfig(
+      { ...CONFIG, memberPurchasesEnabled: false },
+      PLAN,
+      {
+        requireMemberPurchases: false,
+        requireReleaseApproval: false
+      }
+    ),
+    []
+  );
+  assert.equal(
+    (await service.queryOrder(closedOrder.id, {
+      ownerKey: 'owner',
+      openId: 'openid'
+    })).order.status,
+    'closed'
+  );
+});
+
+function pendingOrderRecoveryHarness(configOverrides) {
+  const owner = { ownerKey: 'owner', openId: 'openid' };
+  const orders = [
+    {
+      id: 'MP20260723120100aaaaaaaaaaaaaaaa',
+      ownerKey: owner.ownerKey,
+      openId: owner.openId,
+      planKey: PLAN.key,
+      amountCents: PLAN.priceCents,
+      productId: CONFIG.productId,
+      provider: 'wechat_virtual_pay',
+      status: 'payment_pending',
+      deliveryStatus: 'not_paid'
+    },
+    {
+      id: 'MP20260723120200bbbbbbbbbbbbbbbb',
+      ownerKey: owner.ownerKey,
+      openId: owner.openId,
+      planKey: PLAN.key,
+      amountCents: PLAN.priceCents,
+      productId: CONFIG.productId,
+      provider: 'wechat_virtual_pay',
+      status: 'payment_pending',
+      deliveryStatus: 'not_paid'
+    }
+  ];
+  const stored = new Map(orders.map((order) => [order.id, order]));
+  const fulfilled = [];
+  const repository = {
+    async createOrder() { throw new Error('new sales must remain closed'); },
+    async getOrder(orderId) { return stored.get(orderId) || null; },
+    async updateOrder(orderId, fields) {
+      const updated = { ...stored.get(orderId), ...fields };
+      stored.set(orderId, updated);
+      return updated;
+    },
+    async fulfill(orderId, payment) {
+      fulfilled.push(orderId);
+      const updated = {
+        ...stored.get(orderId),
+        status: 'paid',
+        paidAt: payment.paidAt,
+        providerStatus: payment.providerStatus,
+        providerTransactionId: payment.providerTransactionId,
+        deliveryStatus: 'pending'
+      };
+      stored.set(orderId, updated);
+      return { order: updated, membership: { status: 'active' } };
+    },
+    async markRefunded() { throw new Error('not expected'); },
+    async listReconciliationOrders() {
+      return [...stored.values()].filter((order) => order.status === 'payment_pending');
+    }
+  };
+  const paymentClient = {
+    async createPayment() { throw new Error('new sales must remain closed'); },
+    async queryPayment(order) {
+      return {
+        state: 'S',
+        orderId: order.id,
+        amountCents: PLAN.priceCents,
+        paidAmountCents: PLAN.priceCents,
+        providerStatus: 2,
+        orderType: 0,
+        environmentType: 1,
+        providerTransactionId: `wx-${order.id}`,
+        paidAt: new Date('2026-07-23T04:05:00.000Z'),
+        delivered: true
+      };
+    },
+    async confirmDelivery() { throw new Error('provider already marked the order delivered'); }
+  };
+  return {
+    fulfilled,
+    orders,
+    owner,
+    service: createBillingService({
+      repository,
+      paymentClient,
+      config: { ...CONFIG, ...configOverrides },
+      plan: PLAN,
+      missingConfig: missingPaymentConfig,
+      now: () => new Date('2026-07-23T04:06:00.000Z')
+    }),
+    stored
+  };
+}
+
+for (const scenario of [
+  {
+    name: 'product purchase gate',
+    config: { memberPurchasesEnabled: false, releaseApproved: true }
+  },
+  {
+    name: 'release approval gate',
+    config: { memberPurchasesEnabled: true, releaseApproved: false }
+  }
+]) {
+  test(`recovers paid pending orders while the ${scenario.name} is closed`, async () => {
+    const harness = pendingOrderRecoveryHarness(scenario.config);
+    const [directOrder, reconciledOrder] = harness.orders;
+
+    assert.equal(harness.service.getPlans().available, false);
+    await assert.rejects(
+      () => harness.service.createPayment(PLAN.key, 'login-code', harness.owner),
+      (error) => error && error.code === 'PAYMENT_NOT_READY'
+    );
+
+    const queried = await harness.service.queryOrder(directOrder.id, harness.owner);
+    assert.equal(queried.order.status, 'paid');
+    assert.equal(harness.stored.get(directOrder.id).status, 'paid');
+
+    assert.deepEqual(
+      await harness.service.reconcilePending(20),
+      { inspected: 1, updated: 1, failed: 0 }
+    );
+    assert.equal(harness.stored.get(reconciledOrder.id).status, 'paid');
+    assert.deepEqual(harness.fulfilled, [directOrder.id, reconciledOrder.id]);
+  });
+}
 
 function jsonResponse(document) {
   return { ok: true, text: async () => JSON.stringify(document) };

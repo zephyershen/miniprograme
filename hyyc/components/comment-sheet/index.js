@@ -1,4 +1,11 @@
-const { getComments, addComment } = require('../../features/engagement/api.js');
+const {
+  getComments,
+  addComment,
+  deleteComment: deleteCommentRequest,
+  reportComment: reportCommentRequest,
+  appealComment: appealCommentRequest,
+  restoreComment: restoreCommentRequest
+} = require('../../features/engagement/api.js');
 const { decorateComments } = require('../../features/engagement/model.js');
 const {
   chooseCommentImages,
@@ -18,6 +25,52 @@ function mutationId() {
   return `comment_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function confirmAction(options) {
+  return new Promise((resolve) => {
+    wx.showModal({
+      ...options,
+      success: (result) => resolve(result && result.confirm === true),
+      fail: () => resolve(false)
+    });
+  });
+}
+
+const COMMENT_ACTION_CONFIG = Object.freeze({
+  delete: Object.freeze({
+    permission: 'canDelete',
+    title: '删除评论',
+    content: '删除后无法恢复，是否继续？',
+    confirmText: '删除',
+    confirmColor: '#c53b32',
+    success: '已删除',
+    failure: '删除失败'
+  }),
+  report: Object.freeze({
+    permission: 'canReport',
+    title: '举报评论',
+    content: '确认举报这条评论？达到处理标准后将自动隐藏。',
+    confirmText: '举报',
+    success: '已举报',
+    failure: '举报失败'
+  }),
+  appeal: Object.freeze({
+    permission: 'canAppeal',
+    title: '申诉评论',
+    content: '提交后管理员会复核，期间仅你和管理员可见。',
+    confirmText: '提交申诉',
+    success: '已提交申诉',
+    failure: '申诉失败'
+  }),
+  restore: Object.freeze({
+    permission: 'canRestore',
+    title: '恢复评论',
+    content: '恢复后，这条评论会重新在评论区公开。',
+    confirmText: '恢复',
+    success: '已恢复',
+    failure: '恢复失败'
+  })
+});
+
 Component({
   options: { styleIsolation: 'apply-shared' },
 
@@ -30,6 +83,7 @@ Component({
   data: {
     commentsLoading: false,
     comments: [],
+    canParticipate: false,
     commentDraft: '',
     commentDraftImages: [],
     commentSubmitting: false,
@@ -40,6 +94,7 @@ Component({
     sheetStyle: '',
     emojiOpen: false,
     emojiOptions: COMMENT_EMOJIS,
+    commentActionBusyId: '',
     viewerProfile: decorateUserProfile(null)
   },
 
@@ -67,7 +122,7 @@ Component({
     itemId() {
       this.commentsLoaded = false;
       this.commentMediaRequestId = (this.commentMediaRequestId || 0) + 1;
-      this.setData({ comments: [] });
+      this.setData({ comments: [], canParticipate: false });
     }
   },
 
@@ -116,6 +171,7 @@ Component({
         const comments = decorateComments(result.comments || []);
         this.setData({
           comments,
+          canParticipate: result.canParticipate === true,
           viewerProfile: decorateUserProfile(result.viewerProfile)
         });
         this.resolveVisibleCommentMedia(comments);
@@ -135,6 +191,10 @@ Component({
 
     onCommentInput(event) {
       this.setData({ commentDraft: event.detail.value || '' });
+    },
+
+    showMembershipBenefits() {
+      this.triggerEvent('locked');
     },
 
     onCommentFocus() {
@@ -217,6 +277,58 @@ Component({
       }
     },
 
+    async handleCommentAction(event) {
+      const commentId = event.currentTarget.dataset.commentId || '';
+      const action = event.currentTarget.dataset.action || '';
+      const comment = this.data.comments.find((entry) => entry.id === commentId);
+      const actionConfig = COMMENT_ACTION_CONFIG[action];
+      if (!comment || !actionConfig || this.data.commentActionBusyId) return;
+      if (!comment[actionConfig.permission] || (action === 'report' && comment.reported)) return;
+      const confirmed = await confirmAction({
+        title: actionConfig.title,
+        content: actionConfig.content,
+        confirmText: actionConfig.confirmText,
+        ...(actionConfig.confirmColor ? { confirmColor: actionConfig.confirmColor } : {})
+      });
+      if (!confirmed) return;
+      this.setData({ commentActionBusyId: commentId });
+      try {
+        const requests = {
+          delete: deleteCommentRequest,
+          report: reportCommentRequest,
+          appeal: appealCommentRequest,
+          restore: restoreCommentRequest
+        };
+        const result = await requests[action](this.data.itemId, commentId);
+        const shouldRemove = action === 'delete' || result.hidden === true;
+        if (action === 'appeal' || action === 'restore') {
+          await this.loadComments(true);
+        } else {
+          const comments = shouldRemove
+            ? this.data.comments.filter((entry) => entry.id !== commentId)
+            : this.data.comments.map((entry) => (
+                entry.id === commentId ? { ...entry, reported: true } : entry
+              ));
+          this.setData({ comments });
+        }
+        this.triggerEvent('changed', { commentCount: result.commentCount });
+        wx.showToast({
+          title: actionConfig.success,
+          icon: 'success'
+        });
+      } catch (error) {
+        if (error && error.code === 'COMMENT_NOT_FOUND') {
+          await this.loadComments(true);
+        }
+        wx.showToast({
+          title: error.message || actionConfig.failure,
+          icon: 'none'
+        });
+      } finally {
+        this.setData({ commentActionBusyId: '' });
+      }
+    },
+
     openProfileEditor() {
       this.profileEditorRequested = true;
       wx.navigateTo({ url: '/pages/profile-edit/index?from=comments' });
@@ -245,7 +357,7 @@ Component({
           return { ...image, ...attachment };
         });
         this.setData({ commentDraftImages: imagesWithFileIds });
-      this.setData({ commentSubmitStatus: '正在发布…' });
+        this.setData({ commentSubmitStatus: '正在发布…' });
         this.commentMutationId = this.commentMutationId || mutationId();
         const result = await addComment(this.data.itemId, {
           content,

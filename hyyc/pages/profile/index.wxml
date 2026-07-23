@@ -37,7 +37,7 @@
         <view class="pro-pass-copy">精选资讯、30 天回看、基础课、动手课和三档简报，一次开通即可使用。</view>
 
         <view wx:if="{{billing.loading}}" class="pro-offer-loading">正在读取会员价格</view>
-        <view wx:elif="{{billing.plan.priceCents}}" class="pro-offer">
+        <view wx:elif="{{billing.available && billing.plan.priceCents}}" class="pro-offer">
           <view class="pro-offer-main">
             <view class="pro-offer-label">{{billing.plan.offerTag || '当前会员价'}}</view>
             <view class="pro-offer-line">

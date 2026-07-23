@@ -41,8 +41,50 @@ function addComment(id, payload) {
   });
 }
 
+function deleteComment(id, commentId) {
+  return retryTemporary(() => callCloudFunction('knowledgeFeed', {
+    action: 'deleteComment',
+    id,
+    commentId
+  }));
+}
+
+function reportComment(id, commentId) {
+  return retryTemporary(() => callCloudFunction('knowledgeFeed', {
+    action: 'reportComment',
+    id,
+    commentId
+  }));
+}
+
+function appealComment(id, commentId) {
+  return retryTemporary(() => callCloudFunction('knowledgeFeed', {
+    action: 'appealComment',
+    id,
+    commentId
+  }));
+}
+
+function restoreComment(id, commentId) {
+  return retryTemporary(() => callCloudFunction('knowledgeFeed', {
+    action: 'restoreComment',
+    id,
+    commentId
+  }));
+}
+
 function getFavorites() {
   return callCloudFunction('knowledgeFeed', { action: 'favorites' });
 }
 
-module.exports = { toggleLike, toggleFavorite, getComments, addComment, getFavorites };
+module.exports = {
+  toggleLike,
+  toggleFavorite,
+  getComments,
+  addComment,
+  deleteComment,
+  reportComment,
+  appealComment,
+  restoreComment,
+  getFavorites
+};

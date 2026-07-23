@@ -7,6 +7,13 @@ function commentContainsFile(comment, fileId) {
     ));
 }
 
+function commentReadable(comment, access = {}) {
+  if (!comment || !moderationApproved(comment.moderation)) return false;
+  if (comment.status === 'active') return access.comments === true;
+  return ['hidden', 'appealed'].includes(comment.status)
+    && (access.isAdmin === true || comment.authorKey === access.ownerKey);
+}
+
 function createUserMediaPublicationVerifier({
   profileRepository,
   engagementRepository
@@ -29,7 +36,7 @@ function createUserMediaPublicationVerifier({
     const comment = result && result.comment;
     return Boolean(comment
       && comment.authorKey === record.ownerKey
-      && comment.status === 'active'
+      && ['active', 'hidden', 'appealed'].includes(comment.status)
       && moderationApproved(comment.moderation)
       && commentContainsFile(comment, record.publishedFileId));
   }
@@ -42,6 +49,30 @@ function createUserMediaPublicationVerifier({
     return false;
   }
 
+  async function canRead(record, access = {}) {
+    const binding = record && record.businessBinding;
+    if (!record || record.status !== 'published' || !binding
+      || binding.state !== 'attached') return false;
+    if (binding.kind === 'profile') {
+      const profile = await profileRepository.get(binding.referenceId);
+      return Boolean(profile
+        && profile.ownerKey === record.ownerKey
+        && moderationApproved(profile.moderation)
+        && profile.avatarFileId === record.publishedFileId
+        && (access.comments === true || access.ownerKey === record.ownerKey));
+    }
+    if (binding.kind !== 'comment' || typeof binding.itemId !== 'string') return false;
+    const result = await engagementRepository.getComment(
+      binding.referenceId,
+      binding.itemId
+    );
+    const comment = result && result.comment;
+    return Boolean(comment
+      && comment.authorKey === record.ownerKey
+      && commentContainsFile(comment, record.publishedFileId)
+      && commentReadable(comment, access));
+  }
+
   async function authorizedLegacyFileIds(fileIds, access = {}) {
     const requested = new Set(
       (Array.isArray(fileIds) ? fileIds : [])
@@ -50,11 +81,12 @@ function createUserMediaPublicationVerifier({
     if (!requested.size) return [];
     const canReadComments = access.comments === true;
     const ownerKey = typeof access.ownerKey === 'string' ? access.ownerKey : '';
+    const canSearchComments = canReadComments || Boolean(ownerKey);
     const [profiles, comments] = await Promise.all([
       typeof profileRepository.findByAvatarFileIds === 'function'
         ? profileRepository.findByAvatarFileIds([...requested])
         : [],
-      canReadComments && typeof engagementRepository.findByAttachmentFileIds === 'function'
+      canSearchComments && typeof engagementRepository.findByAttachmentFileIds === 'function'
         ? engagementRepository.findByAttachmentFileIds([...requested])
         : []
     ]);
@@ -69,9 +101,7 @@ function createUserMediaPublicationVerifier({
       }
     });
     (Array.isArray(comments) ? comments : []).forEach((comment) => {
-      if (!comment
-        || comment.status !== 'active'
-        || !moderationApproved(comment.moderation)) return;
+      if (!commentReadable(comment, access)) return;
       (Array.isArray(comment.attachments) ? comment.attachments : [])
         .filter((attachment) => attachment
           && attachment.type === 'image'
@@ -81,10 +111,11 @@ function createUserMediaPublicationVerifier({
     return [...authorized];
   }
 
-  return { isAttached, authorizedLegacyFileIds };
+  return { isAttached, canRead, authorizedLegacyFileIds };
 }
 
 module.exports = {
   commentContainsFile,
+  commentReadable,
   createUserMediaPublicationVerifier
 };

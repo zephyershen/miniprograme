@@ -456,7 +456,8 @@ const ACTION_HANDLERS = Object.freeze({
     return {
       files: await userMediaService.resolveVisible(event.fileIds, {
         ownerKey: actor.ownerKey,
-        comments: entitlement.entitlements.comments === true
+        comments: entitlement.entitlements.comments === true,
+        isAdmin: entitlement.viewer && entitlement.viewer.isActualAdmin === true
       })
     };
   },
@@ -521,6 +522,42 @@ const ACTION_HANDLERS = Object.freeze({
         attachments: event.attachments,
         clientMutationId: event.clientMutationId
       },
+      actor,
+      await resolveEntitlement(actor)
+    );
+  },
+  deleteComment: async (event) => {
+    const actor = actorService.resolve();
+    return engagementService.deleteComment(
+      event.id,
+      event.commentId,
+      actor,
+      await resolveEntitlement(actor)
+    );
+  },
+  reportComment: async (event) => {
+    const actor = actorService.resolve();
+    return engagementService.reportComment(
+      event.id,
+      event.commentId,
+      actor,
+      await resolveEntitlement(actor)
+    );
+  },
+  appealComment: async (event) => {
+    const actor = actorService.resolve();
+    return engagementService.appealComment(
+      event.id,
+      event.commentId,
+      actor,
+      await resolveEntitlement(actor)
+    );
+  },
+  restoreComment: async (event) => {
+    const actor = actorService.resolve();
+    return engagementService.restoreComment(
+      event.id,
+      event.commentId,
       actor,
       await resolveEntitlement(actor)
     );

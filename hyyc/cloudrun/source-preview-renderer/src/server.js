@@ -1,6 +1,7 @@
 const http = require('node:http');
 const { authorized } = require('./auth.js');
 const { createCaptureService } = require('./capture.js');
+const { safeErrorSummary } = require('./safe-log.js');
 
 const PORT = Math.max(1, Number(process.env.PORT) || 8080);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -80,7 +81,10 @@ const server = http.createServer(async (request, response) => {
       : await captureService.capture(body.url, body.maxSegments, controller.signal, body.profile);
     sendJson(response, 200, { ok: true, data: result });
   } catch (error) {
-    console.warn('Source preview capture failed', { message: error && error.message });
+    console.warn(
+      'Source preview capture failed',
+      safeErrorSummary(error, 'SOURCE_PREVIEW_CAPTURE_FAILED')
+    );
     sendJson(response, 422, { ok: false, error: 'CAPTURE_FAILED' });
   } finally {
     clearTimeout(timeout);

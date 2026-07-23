@@ -5,6 +5,10 @@ const MUTATION_ENABLED_VERSIONS = new Set(['develop', 'trial', RELEASE_VERSION])
 const MUTATING_ACTIONS = Object.freeze({
   knowledgeFeed: new Set([
     'addComment',
+    'appealComment',
+    'deleteComment',
+    'reportComment',
+    'restoreComment',
     'uploadMedia',
     'saveProfile',
     'setRolePreview',

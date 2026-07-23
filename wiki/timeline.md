@@ -237,7 +237,7 @@ confidence: high
 ## 2026-07-19：上线资料审核、付费内容保护与斗拱会员支付骨架
 
 - 昵称与头像在保存公开资料前使用独立严格合同审核；拒绝、不确定、Provider 不可用或头像 URL 失败均不保存，新上传且未采用的头像会清理。“不保存昵称”隐私文案已删除。
-- 产品负责人明确本阶段不实现举报、评论删除、申诉或自动隐藏；评论图文审核继续保持发布前 fail-closed。
+- 产品负责人当日明确暂缓举报、评论删除、申诉和自动隐藏；该范围结论已于 2026-07-23 被首发评论治理闭环取代。评论图文审核继续保持发布前 fail-closed。
 - 18 张完整专栏海报从小程序包移除；会员通过 `knowledgeFeed.columnContent` 重鉴权取得短期地址。云存储改为自定义规则，客户端不能直接读取 `ai-column/`，其他既有公开前缀保持可读。
 - 新增并部署 `membershipBilling`：Node 云函数直调斗拱小程序支付/查单 API，客户端调用 `wx.requestPayment`，回调和查单验签后才以事务幂等发放一次性 30 天 Pro。
 - 新建 `/hyyc/membership/notify` HTTPS 回调和 `knowledge_membership_orders` 集合；订单与会员 ACL 均为 `ADMINONLY`。商户参数、密钥和实际价格未配置，因此线上 `plans` 安全返回 `available:false`，未产生真实扣款。
@@ -377,3 +377,15 @@ confidence: high
 - 只读复核补充一项未完全关闭的 P2：截图执行层仍记录原始 `error.message`；
   依赖风险登记需在 2026-08-06 前复审，支付继续 `available=false`。完整接手
   顺序写入 `syntheses/2026-07-23-release-readiness-handoff.md`。
+
+## 2026-07-23：补齐首发评论治理生命周期
+
+- 不新增集合或索引，复用 `knowledge_feed_comments` 保存隐藏、申诉与恢复状态，
+  复用 `knowledge_feed_user_engagements.reportedCommentIds` 保存每用户幂等举报；
+  每用户、每资讯硬上限 100 条，达到上限拒绝新增且不裁剪旧 ID。
+- 作者和真实管理员可事务删除评论；三个不同用户举报后自动隐藏。作者在当前资讯
+  评论面板可查看自己的 hidden/appealed 评论并申诉，真实管理员可查看全部
+  hidden/appealed 评论并恢复或删除。
+- 恢复操作事务幂等，只把公开 `commentCount` 增加一次并将 `reportCount` 重置为
+  0；普通用户仍只能读取 active 评论，隐藏/申诉评论的图片临时地址也只向作者或
+  真实管理员签发。公开 DTO 不返回作者键、举报者列表、举报计数或隐藏原因。

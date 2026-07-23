@@ -2,6 +2,7 @@ const http = require('node:http');
 const net = require('node:net');
 const WebSocket = require('ws');
 const { isPrivateIp } = require('./network-security.js');
+const { safeErrorSummary } = require('./safe-log.js');
 
 const CONNECT_TIMEOUT_MS = 12000;
 
@@ -89,7 +90,10 @@ function createWebSocketProxyBridge({ relayUrl, relayAddress = '', token, logger
     });
     relay.once('error', (error) => {
       if (!ready) closeSocket(clientSocket);
-      logger.warn('WebSocket proxy relay unavailable', { message: error && error.message });
+      logger.warn(
+        'WebSocket proxy relay unavailable',
+        safeErrorSummary(error, 'PROXY_RELAY_UNAVAILABLE')
+      );
     });
     relay.once('close', () => {
       clearTimeout(timeout);

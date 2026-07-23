@@ -42,6 +42,10 @@ const PLAN = Object.freeze({
 });
 
 const WECHAT_VIRTUAL_PAY_CONFIG = Object.freeze({
+  memberPurchasesEnabled: enabled(value(
+    'KNOWLEDGE_MEMBER_PURCHASES_ENABLED',
+    'knowledgeMemberPurchasesEnabled'
+  )),
   enabled: enabled(value('WECHAT_VIRTUAL_PAY_ENABLED', 'wechatVirtualPayEnabled')),
   releaseApproved: enabled(value(
     'WECHAT_VIRTUAL_PAY_RELEASE_APPROVED',
@@ -73,9 +77,15 @@ const WECHAT_MESSAGE_PUSH_CONFIG = Object.freeze({
 function missingPaymentConfig(
   config = WECHAT_VIRTUAL_PAY_CONFIG,
   plan = PLAN,
-  { requireReleaseApproval = true } = {}
+  {
+    requireMemberPurchases = true,
+    requireReleaseApproval = true
+  } = {}
 ) {
   const required = {
+    ...(requireMemberPurchases
+      ? { KNOWLEDGE_MEMBER_PURCHASES_ENABLED: config.memberPurchasesEnabled }
+      : {}),
     WECHAT_VIRTUAL_PAY_ENABLED: config.enabled,
     ...(requireReleaseApproval
       ? { WECHAT_VIRTUAL_PAY_RELEASE_APPROVED: config.releaseApproved }

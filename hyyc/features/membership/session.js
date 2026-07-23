@@ -13,6 +13,7 @@ function accessRevisionKey(access) {
   const viewer = source.viewer || {};
   const entitlements = source.entitlements || {};
   const history = entitlements.history || {};
+  const features = source.features || {};
   return JSON.stringify({
     role: viewer.role,
     cachePartition: viewer.cachePartition || '',
@@ -23,7 +24,8 @@ function accessRevisionKey(access) {
     curatedFeed: entitlements.curatedFeed === true,
     aiColumn: entitlements.aiColumn === true,
     comments: entitlements.comments === true,
-    digests: [...(entitlements.digests || [])].sort()
+    digests: [...(entitlements.digests || [])].sort(),
+    memberPurchases: features.memberPurchases === true
   });
 }
 

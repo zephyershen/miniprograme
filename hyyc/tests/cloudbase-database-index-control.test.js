@@ -58,6 +58,7 @@ test('versioned index contract covers media, feed, engagement, and billing hot p
     'knowledge_user_profiles/avatar_file_id_1',
     'knowledge_feed_comments/attachments_file_id_1',
     'knowledge_feed_comments/itemId_1',
+    'knowledge_feed_comments/item_status_author_created_id',
     'knowledge_feed_user_engagements/ownerKey_1',
     'knowledge_membership_orders/status_next_check_at_1',
     'knowledge_feed_archive/date_desc',
@@ -67,6 +68,18 @@ test('versioned index contract covers media, feed, engagement, and billing hot p
 
   assert.equal(loaded.contract.preserveUnknownIndexes, true);
   assert.equal(loaded.contract.indexes.every((index) => index.unique === false), true);
+  assert.deepEqual(
+    loaded.contract.indexes.find(
+      (index) => index.name === 'item_status_author_created_id'
+    ).keys,
+    [
+      { field: 'itemId', direction: '1' },
+      { field: 'status', direction: '1' },
+      { field: 'authorKey', direction: '1' },
+      { field: 'createdAt', direction: '-1' },
+      { field: '_id', direction: '-1' }
+    ]
+  );
 });
 
 test('plan is the default and apply requires the exact target environment', () => {

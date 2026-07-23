@@ -4,6 +4,20 @@ function timeoutError() {
   return error;
 }
 
+const SAFE_FAILURE_CODES = new Set([
+  'PREVIEW_FUNCTION_RESPONSE_INVALID',
+  'PREVIEW_FUNCTION_TIMEOUT'
+]);
+
+function safeFailureCode(error) {
+  const code = String(error && (error.code || error.message) || '').trim();
+  return SAFE_FAILURE_CODES.has(code) ? code : 'PREVIEW_FUNCTION_FAILED';
+}
+
+function safeAction(value) {
+  return value === 'capture' || value === 'thumbnail' ? value : 'unknown';
+}
+
 function invokeWithTimeout(cloud, functionName, data, timeoutMs) {
   let timer = null;
   return Promise.race([
@@ -49,8 +63,8 @@ function createSourcePreviewRendererClient({ cloud, config, logger = console }) 
       }, timeoutMs));
     } catch (error) {
       logger.warn('CloudBase source preview worker unavailable', {
-        action: data.action,
-        message: error && error.message,
+        action: safeAction(data.action),
+        code: safeFailureCode(error),
         fallback: allowHttpFallback
       });
       if (allowHttpFallback) return null;
@@ -70,6 +84,8 @@ function createSourcePreviewRendererClient({ cloud, config, logger = console }) 
 
 module.exports = {
   timeoutError,
+  safeFailureCode,
+  safeAction,
   invokeWithTimeout,
   functionPayload,
   createSourcePreviewRendererClient

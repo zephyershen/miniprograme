@@ -15,6 +15,10 @@ const {
   LIST_THUMBNAIL_WIDTH,
   LIST_THUMBNAIL_HEIGHT
 } = require('./src/list-thumbnail.js');
+const {
+  safeErrorSummary,
+  safeRendererAction
+} = require('./src/safe-log.js');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
@@ -221,12 +225,13 @@ async function main(event = {}) {
       : await uploadCapture(event, controller.signal);
     return { ok: true, data };
   } catch (error) {
+    const errorSummary = safeErrorSummary(error, 'SOURCE_PREVIEW_CAPTURE_FAILED');
     console.warn('CloudBase source preview failed', {
-      action: event.action || 'capture',
-      message: error && error.message
+      action: safeRendererAction(event.action || 'capture'),
+      ...errorSummary
     });
-    const failure = new Error(error && error.message || 'SOURCE_PREVIEW_CAPTURE_FAILED');
-    failure.code = failure.message;
+    const failure = new Error(errorSummary.code);
+    failure.code = errorSummary.code;
     throw failure;
   } finally {
     clearTimeout(timeout);

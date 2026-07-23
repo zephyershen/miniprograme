@@ -5,6 +5,9 @@ const {
   createUserMediaService
 } = require('../cloudfunctions/knowledgeFeed/services/user-media-service');
 const {
+  createUserMediaPublicationVerifier
+} = require('../cloudfunctions/knowledgeFeed/services/user-media-publication-verifier');
+const {
   sameBusinessReference
 } = require('../cloudfunctions/knowledgeFeed/repositories/user-media');
 const cloudbase = require('../cloudfunctions/knowledgeFeed/node_modules/@cloudbase/node-sdk');
@@ -131,10 +134,18 @@ function memoryRepository() {
       records.set(uploadId, next);
       return next;
     },
+    requestDeletion: async (uploadId, ownerKey, patch) => {
+      const current = records.get(uploadId);
+      if (!current || current.ownerKey !== ownerKey
+        || !['reserved', 'reviewing', 'published', 'deleting'].includes(current.status)) return null;
+      const next = { ...current, ...patch };
+      records.set(uploadId, next);
+      return next;
+    },
     markDeleted: async (uploadId, ownerKey, patch, claimId = '') => {
       const current = records.get(uploadId);
       if (!current || current.ownerKey !== ownerKey
-        || !['reserved', 'reviewing', 'published'].includes(current.status)
+        || !['reserved', 'reviewing', 'published', 'deleting'].includes(current.status)
         || (claimId && (current.cleanupState !== 'claimed'
           || current.cleanupClaimId !== claimId))) return null;
       const next = {
@@ -236,7 +247,14 @@ function harness(overrides = {}) {
   const service = createUserMediaService({
     repository,
     config: CONFIG,
-    publicationVerifier: { isAttached: async () => false },
+    publicationVerifier: {
+      isAttached: async () => false,
+      canRead: async (record, access = {}) => (
+        record.businessBinding.kind === 'profile'
+          ? access.comments === true || access.ownerKey === record.ownerKey
+          : access.comments === true
+      )
+    },
     uploadFile: serverUpload,
     getTempFileURL: async ({ fileList }) => ({
       fileList: fileList.map((fileID) => ({
@@ -605,6 +623,113 @@ test('a rejected retry cannot delete a publication already attached to the busin
   )).length, 1);
 });
 
+test('resolves hidden and appealed managed comment media to its owner after membership expires', async () => {
+  let status = 'active';
+  const comment = {
+    authorKey: OWNER,
+    moderation: { status: 'approved' },
+    attachments: []
+  };
+  const verifier = createUserMediaPublicationVerifier({
+    profileRepository: { get: async () => null },
+    engagementRepository: {
+      getComment: async () => ({ comment: { ...comment, status } })
+    }
+  });
+  const { service } = harness({ publicationVerifier: verifier });
+  const { cloudPath } = await service.reserveUpload(
+    { ownerKey: OWNER },
+    mediaInput('comment', 'jpg')
+  );
+  const stagingFileId = `cloud://env/${cloudPath}`;
+  await service.filesForReview({ ownerKey: OWNER }, 'comment', [stagingFileId]);
+  const [publishedFileId] = await service.publishOwned(
+    { ownerKey: OWNER },
+    'comment',
+    [stagingFileId],
+    COMMENT_REFERENCE
+  );
+  comment.attachments = [{ type: 'image', fileId: publishedFileId }];
+  await service.bindPublished(
+    { ownerKey: OWNER },
+    'comment',
+    [publishedFileId],
+    COMMENT_REFERENCE
+  );
+
+  assert.deepEqual(await service.resolveVisible(
+    [publishedFileId],
+    { ownerKey: OWNER, comments: false }
+  ), []);
+  for (const privateStatus of ['hidden', 'appealed']) {
+    status = privateStatus;
+    assert.equal((await service.resolveVisible(
+      [publishedFileId],
+      { ownerKey: OWNER, comments: false }
+    )).length, 1);
+    assert.deepEqual(await service.resolveVisible(
+      [publishedFileId],
+      { ownerKey: OTHER, comments: false }
+    ), []);
+  }
+  status = 'deleted';
+  assert.deepEqual(await service.resolveVisible(
+    [publishedFileId],
+    { ownerKey: OWNER, comments: false }
+  ), []);
+});
+
+test('keeps a durable cleanup request when deleting attached media is incomplete', async () => {
+  let deletionFails = false;
+  const runtime = harness({
+    deleteFiles: async (fileIds) => deletionFails
+      ? { deletedFileIds: [], retryFileIds: fileIds, uncertain: true }
+      : { deletedFileIds: fileIds, retryFileIds: [], uncertain: false }
+  });
+  const { cloudPath } = await runtime.service.reserveUpload(
+    { ownerKey: OWNER },
+    mediaInput('comment', 'jpg')
+  );
+  const stagingFileId = `cloud://env/${cloudPath}`;
+  await runtime.service.filesForReview({ ownerKey: OWNER }, 'comment', [stagingFileId]);
+  const [publishedFileId] = await runtime.service.publishOwned(
+    { ownerKey: OWNER },
+    'comment',
+    [stagingFileId],
+    COMMENT_REFERENCE
+  );
+  await runtime.service.bindPublished(
+    { ownerKey: OWNER },
+    'comment',
+    [publishedFileId],
+    COMMENT_REFERENCE
+  );
+
+  deletionFails = true;
+  const result = await runtime.service.deleteOwned(
+    { ownerKey: OWNER },
+    'comment',
+    [publishedFileId]
+  );
+  assert.equal(result.uncertain, true);
+  const pending = runtime.repository.records.get(UPLOAD_ID);
+  assert.equal(pending.status, 'deleting');
+  assert.equal(pending.cleanupPending, true);
+  assert.equal(pending.businessBinding, null);
+  assert.equal(pending.publicationIntent, null);
+
+  deletionFails = false;
+  assert.deepEqual(await runtime.service.cleanupExpired(), {
+    scanned: 1,
+    candidates: 1,
+    deleted: 1,
+    retry: 0,
+    repaired: 0,
+    reclaimed: 0
+  });
+  assert.equal(runtime.repository.records.get(UPLOAD_ID).status, 'deleted');
+});
+
 test('rejects spoofed image bytes before any server-side upload', async () => {
   let uploaded = false;
   const { service } = harness({
@@ -801,6 +926,82 @@ test('cleanup repairs a publication when the business write succeeded before bin
     [publishedFileId],
     { ownerKey: OWNER }
   )).length, 1);
+});
+
+test('cleanup repairs hidden and appealed comment publications but not deleted ones', async () => {
+  const expectedFileId = `cloud://env/user-media/published/comments/${OWNER}/${UPLOAD_ID}.jpg`;
+  const comment = {
+    authorKey: OWNER,
+    moderation: { status: 'approved' },
+    attachments: [{ type: 'image', fileId: expectedFileId }]
+  };
+
+  for (const status of ['hidden', 'appealed']) {
+    const verifier = createUserMediaPublicationVerifier({
+      profileRepository: { get: async () => null },
+      engagementRepository: {
+        getComment: async (commentId, itemId) => {
+          assert.equal(commentId, COMMENT_REFERENCE.id);
+          assert.equal(itemId, COMMENT_REFERENCE.itemId);
+          return { comment: { ...comment, status } };
+        }
+      }
+    });
+    const runtime = harness({ publicationVerifier: verifier });
+    const { cloudPath } = await runtime.service.reserveUpload(
+      { ownerKey: OWNER },
+      mediaInput('comment', 'jpg')
+    );
+    const stagingFileId = `cloud://env/${cloudPath}`;
+    await runtime.service.filesForReview(
+      { ownerKey: OWNER },
+      'comment',
+      [stagingFileId]
+    );
+    const [publishedFileId] = await runtime.service.publishOwned(
+      { ownerKey: OWNER },
+      'comment',
+      [stagingFileId],
+      COMMENT_REFERENCE
+    );
+    assert.equal(publishedFileId, expectedFileId);
+    const cleanupCalls = runtime.deleteCalls.length;
+    runtime.repository.records.get(UPLOAD_ID).cleanupAfter = new Date(NOW - 1);
+
+    assert.deepEqual(await runtime.service.cleanupExpired(), {
+      scanned: 1,
+      candidates: 1,
+      deleted: 0,
+      retry: 0,
+      repaired: 1,
+      reclaimed: 0
+    }, `${status} comment publication should be repaired`);
+    const repaired = runtime.repository.records.get(UPLOAD_ID);
+    assert.equal(repaired.status, 'published');
+    assert.equal(repaired.businessBinding.state, 'attached');
+    assert.equal(repaired.businessBinding.referenceId, COMMENT_REFERENCE.id);
+    assert.equal(repaired.businessBinding.itemId, COMMENT_REFERENCE.itemId);
+    assert.equal(runtime.deleteCalls.length, cleanupCalls);
+  }
+
+  const deletedVerifier = createUserMediaPublicationVerifier({
+    profileRepository: { get: async () => null },
+    engagementRepository: {
+      getComment: async () => ({
+        comment: { ...comment, status: 'deleted' }
+      })
+    }
+  });
+  assert.equal(await deletedVerifier.isAttached({
+    status: 'published',
+    ownerKey: OWNER,
+    publishedFileId: expectedFileId,
+    publicationIntent: {
+      kind: 'comment',
+      referenceId: COMMENT_REFERENCE.id,
+      itemId: COMMENT_REFERENCE.itemId
+    }
+  }), false);
 });
 
 test('cleanup reclaims an expired lease left behind by a crashed worker', async () => {

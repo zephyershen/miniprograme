@@ -245,10 +245,7 @@ Page({
 
   openComments() {
     const engagement = this.data.item && this.data.item.engagement;
-    if (!engagement || !engagement.canComment) {
-      this.openMembershipPrompt('comments');
-      return;
-    }
+    if (!engagement) return;
     this.setData({ commentsOpen: true });
   },
 

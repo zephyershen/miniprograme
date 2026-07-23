@@ -122,6 +122,9 @@ const ENGAGEMENT_CONFIG = Object.freeze({
   commentMaxLength: 280,
   commentPageSize: 30,
   commentImageLimit: 3,
+  commentReportThreshold: 3,
+  commentReportLimitPerItem: 100,
+  commentGovernanceScanLimit: 500,
   commentImageMaxBytes: 3 * 1024 * 1024,
   avatarMaxBytes: 1 * 1024 * 1024,
   userMediaMaxDimension: 4096,
@@ -206,7 +209,11 @@ const MEMBERSHIP_FEATURE_FLAGS = Object.freeze({
     process.env.KNOWLEDGE_LIVE_DIGESTS ?? runtime.knowledgeLiveDigests,
     true
   ),
-  memberPurchases: false
+  memberPurchases: enabledDefault(
+    process.env.KNOWLEDGE_MEMBER_PURCHASES_ENABLED
+      ?? runtime.knowledgeMemberPurchasesEnabled,
+    false
+  )
 });
 
 const INTELLIGENCE_CONFIG = Object.freeze({

@@ -67,7 +67,17 @@ function normalizeMembershipAccess(raw = {}) {
     comments: role === 'admin' || entitlements.comments === true,
     digests: role === 'admin'
       ? ['24h', '7d', '30d']
-      : Array.isArray(entitlements.digests) ? entitlements.digests : []
+        : Array.isArray(entitlements.digests) ? entitlements.digests : []
+  };
+  const rawFeatures = raw.features && typeof raw.features === 'object'
+    ? raw.features
+    : null;
+  const normalizedFeatures = {
+    ...(rawFeatures || {}),
+    membershipUi: rawFeatures ? rawFeatures.membershipUi === true : true,
+    liveCurated: rawFeatures ? rawFeatures.liveCurated === true : false,
+    liveDigests: rawFeatures ? rawFeatures.liveDigests === true : false,
+    memberPurchases: rawFeatures ? rawFeatures.memberPurchases === true : false
   };
   const label = role === 'admin'
     ? '可查看全部已归档资讯'
@@ -75,14 +85,7 @@ function normalizeMembershipAccess(raw = {}) {
   return {
     viewer: normalizedViewer,
     entitlements: normalizedEntitlements,
-    features: raw.features && typeof raw.features === 'object'
-      ? raw.features
-      : {
-          membershipUi: true,
-          liveCurated: false,
-          liveDigests: false,
-          memberPurchases: false
-        },
+    features: normalizedFeatures,
     access: {
       ...legacyAccess,
       history,
@@ -98,6 +101,10 @@ function normalizeMembershipAccess(raw = {}) {
         ? raw.archiveCoverage
       : { state: 'partial', completeFrom: null }
   };
+}
+
+function memberPurchasesEnabled(access) {
+  return normalizeMembershipAccess(access).features.memberPurchases === true;
 }
 
 function canUseFeature(access, featureKey) {
@@ -126,6 +133,7 @@ module.exports = {
   MEMBER_TIME_KEYS,
   ADMIN_TIME_KEYS,
   normalizeMembershipAccess,
+  memberPurchasesEnabled,
   canUseFeature,
   roleAtLeast
 };

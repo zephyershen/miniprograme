@@ -125,11 +125,20 @@ function createUserMediaRepository(db, config) {
     });
   }
 
+  async function requestDeletion(uploadId, ownerKey, patch) {
+    return transitionOwned(
+      uploadId,
+      ownerKey,
+      ['reserved', 'reviewing', 'published', 'deleting'],
+      patch
+    );
+  }
+
   async function claimCleanup(uploadId, ownerKey, claimedAt, claimId, claimExpiresAt) {
     return transitionOwned(
       uploadId,
       ownerKey,
-      ['reserved', 'reviewing', 'published'],
+      ['reserved', 'reviewing', 'published', 'deleting'],
       {
         cleanupPending: false,
         cleanupAfter: null,
@@ -150,7 +159,7 @@ function createUserMediaRepository(db, config) {
     return transitionOwned(
       uploadId,
       ownerKey,
-      ['reserved', 'reviewing', 'published'],
+      ['reserved', 'reviewing', 'published', 'deleting'],
       {
         cleanupPending: false,
         cleanupAfter: null,
@@ -229,6 +238,7 @@ function createUserMediaRepository(db, config) {
     ),
     markBound,
     recordPublicationIntent,
+    requestDeletion,
     scheduleCleanup: (uploadId, ownerKey, patch) => (
       transitionOwned(
         uploadId,
@@ -239,7 +249,7 @@ function createUserMediaRepository(db, config) {
       )
     ),
     markDeleted: (uploadId, ownerKey, patch, claimId = '') => (
-      transitionOwned(uploadId, ownerKey, ['reserved', 'reviewing', 'published'], {
+      transitionOwned(uploadId, ownerKey, ['reserved', 'reviewing', 'published', 'deleting'], {
         cleanupPending: false,
         cleanupAfter: null,
         cleanupClaimId: '',

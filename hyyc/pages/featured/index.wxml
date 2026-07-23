@@ -51,15 +51,15 @@
 
     <view class="curated-toolbar">
       <view class="window-track">
-        <view wx:for="{{windowOptions}}" wx:key="key" class="window-choice {{item.active ? 'window-choice-active' : ''}}" data-key="{{item.key}}" bindtap="selectWindow">{{item.label}}</view>
+        <view wx:for="{{windowOptions}}" wx:key="key" class="window-choice {{item.active ? 'window-choice-active' : ''}}" data-key="{{item.key}}" bindtap="selectWindow" aria-role="button" aria-label="时间范围：{{item.label}}{{item.active ? '，已选' : ''}}">{{item.label}}</view>
       </view>
       <view class="sort-track">
-        <view wx:for="{{sortOptions}}" wx:key="key" class="sort-choice {{item.active ? 'sort-choice-active' : ''}}" data-key="{{item.key}}" bindtap="selectSort">{{item.label}}</view>
+        <view wx:for="{{sortOptions}}" wx:key="key" class="sort-choice {{item.active ? 'sort-choice-active' : ''}}" data-key="{{item.key}}" bindtap="selectSort" aria-role="button" aria-label="排序方式：{{item.label}}{{item.active ? '，已选' : ''}}">{{item.label}}</view>
       </view>
     </view>
-    <view class="curated-meta-line" bindtap="openFilters">
-      <text class="curated-count">今日精选 {{view.resultCount}} 条</text>
-      <text class="filter-link">{{filterSummary}} ↘</text>
+    <view class="curated-meta-line" bindtap="openFilters" hover-class="curated-meta-line-pressed" aria-role="button" aria-label="打开筛选，当前{{filterSummary}}">
+      <text class="curated-count">{{filters.time === '1d' ? '24 小时内精选' : (filters.time === '30d' ? '近 30 天精选' : '近 7 天精选')}} {{view.resultCount}} 条</text>
+      <text class="filter-link">筛选 · {{filterSummary}} ↘</text>
     </view>
 
     <view wx:if="{{providerPending}}" class="curated-empty pending-state">
@@ -92,7 +92,7 @@
         </view>
       </view>
       <view wx:if="{{loadingMore}}" class="load-more"><view class="load-spinner"></view><text>正在加载更多精选</text></view>
-      <view wx:elif="{{!view.hasMore}}" class="curated-finished"><view class="finished-mark"></view><text>今天的精选看完了 · 共 {{view.resultCount}} 条</text></view>
+      <view wx:elif="{{!view.hasMore}}" class="curated-finished"><view class="finished-mark"></view><text>{{filters.time === '1d' ? '24 小时内精选已看完' : (filters.time === '30d' ? '近 30 天精选已看完' : '近 7 天精选已看完')}} · 共 {{view.resultCount}} 条</text></view>
     </block>
   </block>
 

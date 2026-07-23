@@ -80,7 +80,7 @@ Page({
     if (this.pageDisposed) return false;
     const access = await this.loadMembership({ force });
     if (this.pageDisposed) return false;
-    const tasks = [this.loadBilling({ force })];
+    const tasks = [this.loadBilling({ force, access })];
     if (access) tasks.push(this.loadProfile({ force }));
     await Promise.all(tasks);
     return Boolean(access);
@@ -94,6 +94,7 @@ Page({
     try {
       const access = await refreshMembershipAccess({ force });
       if (this.pageDisposed || requestId !== this.membershipLoadRequestId) return null;
+      this.membershipAccess = access;
       this.membershipLoaded = true;
       this.setData({
         loading: false,
@@ -123,14 +124,14 @@ Page({
     }
   },
 
-  async loadBilling({ force = false } = {}) {
+  async loadBilling({ force = false, access = this.membershipAccess } = {}) {
     if (this.pageDisposed) return false;
     const requestId = (this.billingLoadRequestId || 0) + 1;
     this.billingLoadRequestId = requestId;
     const purchasing = this.data.billing.purchasing === true;
     if (!this.billingLoaded) this.setData({ 'billing.loading': true });
     try {
-      const billing = await loadBillingPlans({ force });
+      const billing = await loadBillingPlans({ force, access });
       if (this.pageDisposed || requestId !== this.billingLoadRequestId) return false;
       this.billingLoaded = true;
       this.setData({
@@ -194,7 +195,11 @@ Page({
     try {
       assertVirtualPaymentAvailable();
       const loginCode = await loginForPayment();
-      const created = await createMembershipPayment(this.data.billing.plan.key, loginCode);
+      const created = await createMembershipPayment(
+        this.data.billing.plan.key,
+        loginCode,
+        this.membershipAccess
+      );
       orderId = created && created.order && created.order.id || '';
       if (!orderId) throw new Error('支付订单创建失败');
       rememberPendingMembershipOrder(orderId);
@@ -234,6 +239,7 @@ Page({
     this.setData({ roleSwitching: true, switchingRole: role });
     try {
       const access = await changeMembershipRolePreview(role);
+      this.membershipAccess = access;
       this.setData({
         membership: membershipPresentation(access)
       });

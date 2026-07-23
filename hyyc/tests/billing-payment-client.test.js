@@ -10,6 +10,12 @@ const {
   forgetPendingMembershipOrder,
   virtualPaymentAvailable
 } = require('../features/billing/payment.js');
+const {
+  createMembershipPayment
+} = require('../features/billing/api.js');
+const {
+  loadBillingPlans
+} = require('../features/billing/session.js');
 
 const originalWx = global.wx;
 
@@ -102,4 +108,83 @@ test('keeps an order pending until the matching server-confirmed order is cleare
   assert.equal(pendingMembershipOrderId(), 'MP202607190001');
   assert.equal(forgetPendingMembershipOrder('MP202607190001'), true);
   assert.equal(pendingMembershipOrderId(), '');
+});
+
+test('fails closed when the product gate or runtime environment is not verified', async () => {
+  const enabledAccess = {
+    viewer: { role: 'free' },
+    features: { memberPurchases: true }
+  };
+  const disabledAccess = {
+    viewer: { role: 'free' },
+    features: { memberPurchases: false }
+  };
+  assert.throws(
+    () => createMembershipPayment('pro_30d', 'login-code', disabledAccess),
+    (error) => error && error.code === 'PAYMENT_NOT_READY'
+  );
+
+  global.wx = supportedWx({
+    getAccountInfoSync: () => ({ miniProgram: { envVersion: 'unknown-build' } }),
+    cloud: {
+      async callFunction() {
+        throw new Error('must not call cloud');
+      }
+    }
+  });
+  await assert.rejects(
+    () => createMembershipPayment('pro_30d', 'login-code', enabledAccess),
+    (error) => error && error.code === 'NON_RELEASE_MUTATION_BLOCKED'
+  );
+});
+
+test('shows and invokes purchasing only when product, provider and runtime gates all pass', async () => {
+  const enabledAccess = {
+    viewer: { role: 'free' },
+    features: { memberPurchases: true }
+  };
+  const calls = [];
+  global.wx = supportedWx({
+    getAccountInfoSync: () => ({ miniProgram: { envVersion: 'release' } }),
+    cloud: {
+      async callFunction(request) {
+        calls.push(request);
+        if (request.data.action === 'plans') {
+          return {
+            result: {
+              ok: true,
+              data: {
+                available: true,
+                plan: { key: 'pro_30d', durationDays: 30, priceCents: 590 }
+              }
+            }
+          };
+        }
+        return { result: { ok: true, data: { order: { id: 'order' } } } };
+      }
+    }
+  });
+
+  assert.equal(
+    (await loadBillingPlans({ force: true, access: enabledAccess, wxApi: global.wx })).available,
+    true
+  );
+  assert.deepEqual(
+    await createMembershipPayment('pro_30d', 'login-code', enabledAccess),
+    { order: { id: 'order' } }
+  );
+  assert.deepEqual(calls.at(-1), {
+    name: 'membershipBilling',
+    data: {
+      action: 'createPayment',
+      planKey: 'pro_30d',
+      loginCode: 'login-code'
+    }
+  });
+
+  global.wx.getAccountInfoSync = () => ({ miniProgram: { envVersion: 'unsupported' } });
+  assert.equal(
+    (await loadBillingPlans({ force: true, access: enabledAccess, wxApi: global.wx })).available,
+    false
+  );
 });

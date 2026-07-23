@@ -6,17 +6,66 @@
     </view>
     <scroll-view scroll-y enhanced show-scrollbar="{{false}}" class="comments-list">
       <view wx:if="{{commentsLoading}}" class="comments-state">正在读取评论…</view>
-      <view wx:elif="{{!comments.length}}" class="comments-state"><view class="comments-empty-title">还没有评论</view><view>从一个具体判断开始，会更容易聊下去。</view></view>
+      <view wx:elif="{{!comments.length}}" class="comments-state">
+        <view class="comments-empty-title">{{canParticipate ? '还没有评论' : '没有待处理的评论'}}</view>
+        <view>{{canParticipate ? '从一个具体判断开始，会更容易聊下去。' : '会员到期后，你仍可在这里查看、申诉或删除自己被隐藏的评论。'}}</view>
+      </view>
       <block wx:else>
-        <view wx:for="{{comments}}" wx:key="id" class="comment-row">
+        <view wx:for="{{comments}}" wx:key="id" class="comment-row {{item.isHidden ? 'is-hidden' : ''}}">
           <view class="comment-avatar-wrap">
             <image wx:if="{{item.author.avatarUrl}}" class="comment-avatar" src="{{item.author.avatarUrl}}" mode="aspectFill" lazy-load="{{true}}" />
             <view wx:else class="comment-avatar comment-avatar-empty">{{item.author.initial}}</view>
           </view>
           <view class="comment-body">
             <view class="comment-meta">
-              <view class="comment-author"><text>{{item.author.nickname}}</text><text wx:if="{{item.isMine}}" class="comment-mine">我</text></view>
-              <text>{{item.createdLabel}}</text>
+              <view class="comment-author">
+                <text>{{item.author.nickname}}</text>
+                <text wx:if="{{item.isMine}}" class="comment-mine">我</text>
+                <text wx:if="{{item.statusLabel}}" class="comment-status">{{item.statusLabel}}</text>
+              </view>
+              <view class="comment-meta-actions">
+                <text>{{item.createdLabel}}</text>
+                <text
+                  wx:if="{{item.canDelete}}"
+                  class="comment-action {{commentActionBusyId === item.id ? 'is-disabled' : ''}}"
+                  data-comment-id="{{item.id}}"
+                  data-action="delete"
+                  aria-role="button"
+                  aria-label="删除这条评论"
+                  aria-disabled="{{commentActionBusyId === item.id}}"
+                  catchtap="handleCommentAction"
+                >删除</text>
+                <text
+                  wx:if="{{item.canReport}}"
+                  class="comment-action {{item.reported || commentActionBusyId === item.id ? 'is-disabled' : ''}}"
+                  data-comment-id="{{item.id}}"
+                  data-action="report"
+                  aria-role="button"
+                  aria-label="{{item.reported ? '这条评论已举报' : '举报这条评论'}}"
+                  aria-disabled="{{item.reported || commentActionBusyId === item.id}}"
+                  catchtap="handleCommentAction"
+                >{{item.reported ? '已举报' : '举报'}}</text>
+                <text
+                  wx:if="{{item.canAppeal}}"
+                  class="comment-action {{commentActionBusyId === item.id ? 'is-disabled' : ''}}"
+                  data-comment-id="{{item.id}}"
+                  data-action="appeal"
+                  aria-role="button"
+                  aria-label="申诉这条被隐藏的评论"
+                  aria-disabled="{{commentActionBusyId === item.id}}"
+                  catchtap="handleCommentAction"
+                >申诉</text>
+                <text
+                  wx:if="{{item.canRestore}}"
+                  class="comment-action {{commentActionBusyId === item.id ? 'is-disabled' : ''}}"
+                  data-comment-id="{{item.id}}"
+                  data-action="restore"
+                  aria-role="button"
+                  aria-label="恢复这条评论"
+                  aria-disabled="{{commentActionBusyId === item.id}}"
+                  catchtap="handleCommentAction"
+                >恢复</text>
+              </view>
             </view>
             <view wx:if="{{item.content}}" class="comment-copy">{{item.content}}</view>
             <view wx:if="{{item.attachmentMediaCount}}" class="comment-media-grid count-{{item.attachmentMediaCount}}">
@@ -37,7 +86,7 @@
         </view>
       </block>
     </scroll-view>
-    <view class="comment-compose">
+    <view wx:if="{{canParticipate}}" class="comment-compose">
       <view wx:if="{{composerExpanded && !viewerProfile.isComplete}}" class="comment-profile-reminder" bindtap="openProfileEditor">
         <view class="reminder-avatar">{{viewerProfile.initial}}</view>
         <view><view class="reminder-title">先设置头像和昵称</view><view class="reminder-copy">发布时会显示在你的评论旁边</view></view>
@@ -82,6 +131,10 @@
           <view wx:for="{{emojiOptions}}" wx:key="*this" class="comment-emoji" data-emoji="{{item}}" bindtap="insertEmoji">{{item}}</view>
         </view>
       </scroll-view>
+    </view>
+    <view wx:else class="comment-governance-footer">
+      <view>这里只显示需要你处理的历史评论。</view>
+      <button class="comment-governance-benefits" bindtap="showMembershipBenefits">查看会员评论权益</button>
     </view>
   </view>
 </view>

@@ -1,5 +1,6 @@
 const { membershipPrompt } = require('../../features/membership/prompt.js');
 const { loadBillingPlans } = require('../../features/billing/session.js');
+const { cachedMembershipAccess } = require('../../features/membership/session.js');
 
 const EMPTY_PLAN = Object.freeze({
   priceCents: 0,
@@ -16,6 +17,7 @@ Component({
 
   data: {
     prompt: membershipPrompt('curated_feed'),
+    billingAvailable: false,
     billingPlan: { ...EMPTY_PLAN }
   },
 
@@ -38,10 +40,16 @@ Component({
     stopPropagation() {},
     async loadBillingPlan() {
       try {
-        const billing = await loadBillingPlans();
-        this.setData({ billingPlan: billing && billing.plan || { ...EMPTY_PLAN } });
+        const billing = await loadBillingPlans({ access: cachedMembershipAccess() });
+        this.setData({
+          billingAvailable: billing && billing.available === true,
+          billingPlan: billing && billing.plan || { ...EMPTY_PLAN }
+        });
       } catch (error) {
-        this.setData({ billingPlan: { ...EMPTY_PLAN } });
+        this.setData({
+          billingAvailable: false,
+          billingPlan: { ...EMPTY_PLAN }
+        });
       }
     },
     close() {
