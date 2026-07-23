@@ -896,3 +896,27 @@
   五份生产锁文件显式审计通过。
 - Sensitive handling: 失败输出只记录响应类型、安全错误码、包根与重试次数，
   不打印原始 npm stderr、环境变量、凭据或 registry 认证信息。
+
+## [2026-07-23] release-readiness-handoff | 固化新会话接手边界与剩余风险
+
+- Session: local Codex task
+- Scope: `wiki/` 只读复核后的主动回写；未修改业务代码、未重新上传体验版、
+  未部署云函数或变更生产资源。
+- Version parity: 体验版 `1.0.0` 基于 `1bf9fb8`，Wiki 回写前的本地与远端
+  业务代码/CI 锚点为 `e2ef825`；两者间无小程序业务或正式云函数运行代码差异，
+  四个线上入口文件逐字节一致。`develop`/`trial` 有意禁止生产写操作，不能把
+  体验版只读结果当作正式版全部写路径证明。
+- CI boundary: 最终 GitHub Actions 10/10、本地 526/526；CI 证明 SHA、
+  lockfile、合同、覆盖率和浏览器冷启动可复现，但不替代微信真机、平台审核、
+  生产网络、上游变化和真实支付。
+- Residual: 旧审计 P1 与 P2-01 至 P2-14 已修复、退休或被门禁中和；
+  `sourcePreviewWorker` 仍有四处原始 `error.message` 日志，P2-15 不能标为
+  完全关闭。需要统一脱敏、补测试、重部署该函数并以失败 canary 验收。
+- Controlled risks: 6 个 CloudBase 传递依赖风险包与 26 个 advisory source
+  精确登记至 2026-08-06；生产 `plans.available=false`，真实支付、退款和
+  权益重锁仍是开售前门禁。
+- Handoff: 新增
+  `wiki/syntheses/2026-07-23-release-readiness-handoff.md`，并同步更新总览、
+  导航和时间线。6MB 明确为单次请求体技术边界，不是用户次数或累计容量配额。
+- Sensitive handling: 普通 Wiki 只记录凭据轮换要求，不含实际凭据、环境变量
+  值、用户标识、Cloud File ID 或短期签名地址。
