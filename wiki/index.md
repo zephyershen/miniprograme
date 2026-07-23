@@ -2,7 +2,7 @@
 title: "知识获取平台小程序 Wiki 导航"
 type: index
 tags: [index, miniprogram, knowledge-platform, editorial-index]
-last_updated: 2026-07-18
+last_updated: 2026-07-23
 status: confirmed
 confidence: high
 ---
@@ -12,6 +12,7 @@ confidence: high
 ## 项目入口
 
 - [项目总览](overview.md) — 当前产品、代码、云端状态、验证结果和剩余工作
+- [2026-07-23 全项目生产就绪审计](reports/production-readiness-audit-2026-07-23.md) — 当前发布门禁、P1/P2 问题、线上规则核对和修复顺序
 - [微信小程序实体](entities/WeChatMiniProgram.md) — AppID、云环境、运行依赖和部署边界
 - [里程碑时间线](timeline.md) — 从旧项目审计到真实微信端到端验证
 
@@ -23,18 +24,35 @@ confidence: high
 
 - [保留项目身份、移除旧业务](decisions/2026-07-13-rebuild-product.md) — 旧项目重建边界
 - [采用编辑索引式知识平台首页](decisions/2026-07-15-editorial-knowledge-platform-ui.md) — 当前产品结构与内容层级方向
-- [采用 Luma 珍珠表面视觉系统](decisions/2026-07-17-luma-ui-redesign.md) — 当前冷白表面、蓝紫焦点和连续圆角视觉基线
+- [采用 Luma 珍珠表面视觉系统](decisions/2026-07-17-luma-ui-redesign.md) — 历史视觉基线，蓝紫微光细节已被编辑蓝方案替代
+- [采用资讯社交动作与编辑蓝会员转化界面](decisions/2026-07-18-engagement-and-editorial-social-ui.md) — 评论/喜爱/收藏/分享、会员转化卡和当前视觉基线
+- [评论采用主动资料身份与原图附件，资讯互动使用乐观目标状态](decisions/2026-07-19-profiled-media-comments-and-optimistic-engagement.md) — 即时按钮反馈、幂等事务、头像昵称、表情与手机原图评论
+- [精选与简报采用 AI 自动发布，评论采用多模态 AI 先审后发](decisions/2026-07-19-automatic-ai-curation-and-comment-moderation.md) — 自动资讯分析、精选/简报发布、评论图文 fail-closed 审核与治理风险
+- [采用微信小程序虚拟支付销售一次性 30 天会员](decisions/2026-07-19-wechat-virtual-payment-membership.md) — 道具直购、官方查单/发货、幂等权益、退款回收与服务端内容保护；取代斗拱支付决策
+- [CloudBase 主模型与 Packy 自动兜底方案](decisions/2026-07-20-cloudbase-ai-primary-packy-fallback.md) — 已切换资源点计费；CloudBase 为主、Packy 做预算与故障兜底
+- [资讯采用四分钟有界等图，Pro 转化使用简约完整权益卡](decisions/2026-07-21-bounded-visual-publication-and-pro-access-pass.md) — 正常图文一起出现，失败或超时仍公开文字；简报动态计数，七项权益与折扣共用单一模型，会员界面采用无侧轨的白底平铺结构
+- [资讯发布不再依赖图片，动手课改为直接操作手册](decisions/2026-07-21-image-independent-feed-and-direct-practical-manual.md) — 动手课与简报结构继续有效；“排队时立即展示文字”已被四分钟有界等待细化
+- [资讯按视觉就绪发布，专栏收敛为基础课与动手课](decisions/2026-07-21-visual-ready-feed-and-practical-column.md) — 部分已被取代；裁剪修复、双车道与两分钟调度继续有效，视觉发布门禁已经撤销
+- [以实用课程、每周案例与趋势档案重做会员专栏](decisions/2026-07-20-practical-column-editorial-system.md) — 历史方案，已局部替代；24 节原生课程仍保留，周案例与趋势已退出当前界面
+- [在原生课程中恢复受保护的手绘图集](decisions/2026-07-21-restore-protected-handdrawn-galleries.md) — 24 节基础课现已全部接入三页受保护手绘图；72 张 v2 发布副本按课签发短期地址
 - [将会员精选移到资讯顶部并把底部入口改为 AI 专栏](decisions/2026-07-18-premium-learning-and-curation-ia.md) — 当前四 Tab、会员精选入口与学习专栏职责
 - [新资讯使用聚焦截图，AI 专栏采用三页手绘知识卡](decisions/2026-07-18-forward-only-focus-previews-and-handdrawn-column.md) — 新资讯截图策略、媒体等待、手绘课程结构与开发者工具保持打开规则
 - [资讯被动提示更新与专栏高清按需预览](decisions/2026-07-18-passive-feed-updates-and-hd-column-preview.md) — 阅读期间不自动换列表、轻量新增计数和 CloudBase 高清图按需打开
 - [资讯详情采用短读导览和条件式原文入口](decisions/2026-07-15-engaging-news-detail.md) — 当前详情阅读结构与原文打开边界
 - [知识平台按能力与依赖边界组织代码](decisions/2026-07-16-modular-architecture.md) — 后续页面、内容源、仓储和服务的扩展规则
-- [缺图资讯使用受控原文页面截图](decisions/2026-07-16-source-preview-renderer.md) — 公网渲染器、CloudBase 回填、多图预览和安全边界
+- [AIHOT 正文与来源元数据采用双接口显式合同](decisions/2026-07-21-aihot-source-metadata-contract.md) — `/items` 保持正文事实，`/feed` 只补作者、云头像和上游原始标签；页面禁止用内部分类兜底
+- [CloudBase 媒体只以 File ID 持久化，并采用单并发高频视觉调度](decisions/2026-07-21-cloud-media-runtime-and-safe-visual-throughput.md) — 媒体临时 HTTPS 规则继续有效；其中公网单机 Chromium 单并发结论已被 CloudBase 隔离实例六并发取代
+- [缺图资讯使用受控原文页面截图](decisions/2026-07-16-source-preview-renderer.md) — 历史截图决定；公网浏览器执行层已于 2026-07-22 被取代，质量与安全规则继续有效
+- [原文截图迁入 CloudBase SCF，公网服务器只保留受限代理](decisions/2026-07-22-cloudbase-scf-source-preview.md) — 当前截图执行层、六个隔离实例并发、实时等待目标 0、直连/代理路由与队列边界
+- [优先复用来源媒体、限制截图预算并按日期懒加载资讯](decisions/2026-07-22-native-media-first-budgeted-visuals-and-lazy-days.md) — 历史决策；每日截图上限已被后续决策撤销，日期懒加载仍有效
+- [取消截图日限额并采用 AIHOT 来源范围导航](decisions/2026-07-22-unbounded-visual-attempts-and-aihot-source-scopes.md) — 全部/一手信源/资讯/推文、完整来源媒体、最新优先和隔离实例持续清队列
+- [以独立来源适配器接入 GitHub 开源库](decisions/2026-07-23-aigclink-open-source-library.md) — 第五个来源范围、AIGCLINK 标签筛选、全量历史、分钟指纹同步和独立失败边界
+- [原文截图 v3 质量闸门与历史坏图修复](sources/2026-07-21-source-preview-v3-quality-and-repair.md) — HTTP 200 错误壳拦截、精确目标、条件式 AI 复核、公平队列及任务删除/保留生命周期证据
 - [资讯源采用指纹驱动增量同步](decisions/2026-07-17-fingerprint-driven-feed-sync.md) — 每分钟轻量探测、条件回源、分布式租约与单触发器编排
 - [资讯历史归档与视觉就绪发布](decisions/2026-07-17-feed-history-and-visual-publication.md) — 已被全量公开规则取代；保留归档与长图阶段证据
-- [全量资讯存储与服务端角色权益](decisions/2026-07-17-full-feed-and-role-entitlements.md) — 取代精选总量和视觉门禁，普通用户 7 天全量、管理员 90 天
-- [全量视觉队列、质量信号与移动端预算](decisions/2026-07-17-full-feed-visual-queue-and-quality.md) — 全库补图、精选语义、计数矩阵与增量渲染
-- [单一 Pro 会员、能力型权益与可回溯简报](decisions/2026-07-17-pro-membership-and-intelligence.md) — 普通 7 天、Pro 30 天、管理员全部归档，精选与简报等待真实 AI
+- [全量资讯存储与服务端角色权益](decisions/2026-07-17-full-feed-and-role-entitlements.md) — 全量存储、角色权益和“无图也进列表”继续有效
+- [全量视觉队列、质量信号与移动端预算](decisions/2026-07-17-full-feed-visual-queue-and-quality.md) — 队列和性能规则仍有效；单车道与无图公开规则已局部替代
+- [单一 Pro 会员、能力型权益与可回溯简报](decisions/2026-07-17-pro-membership-and-intelligence.md) — 会员与简报边界继续有效；普通 7 天的历史结论已被滚动 24 小时取代，Pro 30 天、管理员全部归档不变
 - [“别收藏了”首版产品与技术边界](decisions/2026-07-13-digest-inbox-v1.md) — 已被替代，但保留为现有摘要闭环的技术基础
 - [AI 额度不可用时使用透明临时摘要](decisions/2026-07-15-ai-quota-fallback.md) — 当前无模型 Token 时的可用性策略
 
@@ -57,24 +75,64 @@ confidence: high
 - [会员信息架构、AI 专栏与产品文案改版证据](sources/2026-07-18-premium-ia-and-copy.md) — 十页面结构、六个学习单元、频道锁与截图聚焦可行性分析
 - [聚焦截图与手绘 AI 专栏实施证据](sources/2026-07-18-focus-previews-and-handdrawn-column.md) — 生产 X 正文裁切、媒体就绪、新资讯边界、三页知识卡和微信模拟器验证
 - [专栏高清预览与资讯被动更新实施证据](sources/2026-07-18-hd-column-and-passive-feed-updates.md) — 18 张高清云图、轻量新增计数、云端部署与模拟器验收
+- [资讯互动、收藏记录、微信分享与会员转化界面实施证据](sources/2026-07-18-engagement-ui-implementation.md) — 新集合、权限、索引、部署、模拟器和真实微信上下文往返
+- [互动可靠性、资料评论与原图附件实施证据](sources/2026-07-19-interaction-reliability-and-comment-media.md) — TransactionBusy 根因、乐观交互、资料 ACL、部署和组件自动化
+- [PackyAPI Grok 知识分析接入、生产自动化与图文审核](sources/2026-07-19-packy-grok-intelligence.md) — 严格结构、低推理、分析合批、自动精选/简报、评论多模态审核和生产状态
+- [资料审核、付费内容保护与斗拱会员支付实施证据](sources/2026-07-19-profile-moderation-and-huifu-payment.md) — 昵称/头像审核、包内正文移除、云存储规则、支付部署与剩余商户配置
+- [生产基础设施、斗拱模式与会员定价复核](sources/2026-07-19-infrastructure-pricing-and-huifu-mode.md) — 公网截图机与 CloudBase 实时容量、直连/间联判断规则和冷启动价格建议
+- [微信虚拟支付会员实现与部署证据](sources/2026-07-19-wechat-virtual-payment.md) — 官方虚拟商品边界、签名/查单/发货实现、测试与安全关闭的云端部署
+- [CloudBase 模型成本、共享资源点与 Packy 混合路由测算](sources/2026-07-20-cloudbase-ai-cost-and-hybrid-routing.md) — 当前真实资源曲线、模型预算、分钟任务浪费与切换阈值
+- [历史内容补审、资讯同步恢复与支付通知上线证据](sources/2026-07-20-launch-readiness-remediation.md) — 生产缺审归零、同步失败恢复、退款安全消息与剩余真实联调边界
+- [实用会员专栏与自动周案例实现证据](sources/2026-07-20-practical-column-implementation.md) — 24 节原生课程、周案例可靠发布、趋势档案、标题级预览与本地构建证据
+- [专栏阅读恢复、手绘图回接与生产验证](sources/2026-07-21-column-reader-restoration.md) — 旧后端合同错配根因、18 张原图状态、六节受保护图集、云端部署与真实微信模拟器证据
+- [视觉渲染修复、双车道队列与实操专栏上线证据](sources/2026-07-21-visual-renderer-and-practical-column.md) — 422 裁剪根因、线上 canary、视觉发布门禁、24+6 专栏、口语化简报与开发者工具验证
+- [CloudBase 超时、无图资讯与动手课生产复核](sources/2026-07-21-timeout-feed-and-manual-production-validation.md) — 84 次模型 trace、资源点快照、无图列表/详情、合同 v4、实操页面与简报生产验证
+- [四分钟等图、动态简报标题与 Pro 权益通行证实施证据](sources/2026-07-21-bounded-visual-and-membership-conversion.md) — 生产查询、云函数部署、314 项测试与微信开发者工具普通/Pro 双态验收
+- [CloudBase 媒体运行时解析与安全截图提速证据](sources/2026-07-21-cloud-media-runtime-and-safe-visual-throughput.md) — 本地图片 500、临时签名 403 与按 `maxAge` 换签边界，AIHOT 移动端结构和生产队列复核
+- [CloudBase 图片临时签名运行态修复与时间语义更正](sources/2026-07-22-cloud-media-proactive-renewal.md) — 更正 TCB `t` 为签名生成时间，修复资讯图片与来源头像全局留白，并保留按 `maxAge`/有界 TTL 的批量续签
+- [CloudBase SCF 截图迁移、公网代理收缩与移动时间线验证](sources/2026-07-22-cloudbase-scf-source-preview-and-mobile-timeline.md) — X 直连/官方嵌入/代理 canary、WSS 中继、410 封口、时间线折叠与 422 项测试
+- [CloudBase 四并发截图与 24 课手绘图 v2 上线证据](sources/2026-07-22-parallel-visual-worker-and-column-media-v2.md) — 真实四实例并发、实时队列目标、72 张压缩上传、24×3 映射与 413 项测试
+- [CloudBase 六并发截图与个人代理余量验证](sources/2026-07-22-six-concurrency-and-personal-proxy-headroom.md) — 两轮六路真实 X 压测、服务器峰值、实时队列目标 0 与个人代理余量
+- [新公网直连中继部署与 CloudBase 回程路由灰度](sources/2026-07-22-new-relay-route-canary.md) — 原公网地址回程失败与生产回滚历史，当前已被替换地址切换结论取代
+- [替换公网地址回程恢复与生产切换](sources/2026-07-22-replacement-relay-ip-cutover.md) — 新地址通过 CloudBase 探针与真实 X canary，生产以正式域名 + 固定地址接入
+- [资讯间距、生产截图链路与运行性能复核](sources/2026-07-22-runtime-reliability-performance-and-feed-spacing.md) — 14rpx 卡片间距、跨站直连、CloudBase 探针/X canary、实时队列、开发者工具首屏与性能边界
+- [生产中继单端点与旧节点角色复核](sources/2026-07-23-relay-single-endpoint-audit.md) — 线上仅配置当前中继；旧公网服务器不在生产路径，也不是自动备用机
+- [新公网节点个人 Clash 代理部署与 Mihomo 验证](sources/2026-07-23-personal-clash-proxy.md) — 复用 Nginx 443 的独立 VLESS/WebSocket 服务、受限订阅与真实 Mihomo 出口验证
+- [来源头像资料延迟回填修复](sources/2026-07-23-source-avatar-profile-join-repair.md) — 正文与作者资料传播错位的根因、作者档案回填、线上强制刷新与头像 HTTP 200 证据
+- [GitHub 开源库接入与生产验证](sources/2026-07-23-aigclink-open-source-library-integration.md) — 分段全量契约、官方头像、1,727 条生产同步、528 个标签、447 项回归和微信预览证据
+- [CloudBase 数据库、存储与函数发布门禁](sources/2026-07-23-cloudbase-access-control-release-controls.md) — ADMINONLY/存储规则、四函数精确 manifest、退休计划与白名单回读
+- [CloudBase 数据库索引合同与生产漂移](sources/2026-07-23-cloudbase-database-index-controls.md) — 34 项增量合同、11 项线上漂移、媒体集合前置门禁与无删除回读/apply 控制
+- [CloudBase 数据库集合创建控制](sources/2026-07-23-cloudbase-database-collection-controls.md) — 复用 22 集合合同、CreateTable + ADMINONLY、线上 21/22 漂移与无删表白名单回读
 - [2026-07-16 模块化架构评审](reports/architecture-2026-07-16.md) — 历史评分，已被 2026-07-17 复审取代
 - [2026-07-17 模块化架构评审](reports/architecture-2026-07-17.md) — 当前整体 8.9/10、移动端性能 8.8/10，记录规模边界和付费上线前改造项
 - [2026-07-17 会员与知识智能模块化复审](reports/architecture-2026-07-17-membership.md) — 当前整体 8.8/10、会员/智能边界和 AI/支付上线缺口
+- [2026-07-18 资讯互动与编辑蓝 UI 模块化复审](reports/architecture-2026-07-18-engagement.md) — 本轮范围 9.2/10、当前整体约 9.0/10
+- [2026-07-19 互动可靠性与媒体评论模块化复审](reports/architecture-2026-07-19-engagement-v2.md) — 本轮范围 9.2/10、评论组件化与公开前内容审核缺口
+- [2026-07-19 Packy/Grok 知识智能模块化复审](reports/architecture-2026-07-19-intelligence.md) — 本轮范围 9.2/10、Provider 可替换性、成本控制与人工审核缺口
+- [2026-07-19 自动知识智能与评论审核模块化复审](reports/architecture-2026-07-19-automatic-intelligence.md) — 本轮 9.3/10、整体约 9.1/10，记录自动发布边界与上线治理缺口
+- [2026-07-20 实用会员专栏模块化复审](reports/architecture-2026-07-20-practical-column.md) — 本轮 9.2/10，记录付费边界、自动周案例可靠性与后续拆分阈值
+- [2026-07-23 全项目生产就绪审计](reports/production-readiness-audit-2026-07-23.md) — 450 项测试和微信预览通过，但媒体所有权、权益缓存、截图 SSRF 与发布快照使当前发布门禁为 Fail
 
 ## 当前模块
 
-- 小程序页面：资讯、专栏、简报、我的四个原生 Tab，资讯顶部另有会员精选入口；以及资讯详情、条件式原始出处和保留的个人消化页面。页面逻辑由 `features/knowledge-feed`、`membership`、`curated-feed`、`ai-column`、`briefing` 和 `digest` 承载
-- 云函数：`digestIngest`、`digestStore`、`knowledgeFeed`、`knowledgeOps`
-- 数据：个人队列最多 5 条、结论卡最多 20 张；资讯为独立条目 + 按日索引 + 服务端权益，AI 月度硬上限 10 元
+- 小程序页面：资讯、专栏、简报、我的四个原生 Tab，资讯顶部另有会员精选入口；以及资讯详情、专栏阅读器、个人资料编辑、条件式原始出处和我的收藏，共 10 个当前产品页面。`trend-detail` 仍注册为第 11 个兼容路由，但当前没有趋势入口。评论由独立 `comment-sheet` 组件承载，页面逻辑由 `features/knowledge-feed`、`engagement`、`user-profile`、`membership`、`billing`、`curated-feed`、`ai-column` 与 `briefing` 承载
+- 云函数：`digestIngest`、`digestStore`、`knowledgeFeed`、`sourcePreviewWorker`、`knowledgeOps`、`membershipBilling`
+- 数据：资讯为独立条目 + 按日索引 + 服务端权益，并有独立视觉任务、用户互动、会员评论、审核资料、会员、订单、分析、简报和模型预算表；历史周案例与趋势档案表只为兼容保留。服务端专用集合均为 `ADMINONLY`
 
 ## 当前风险与下一入口
 
-- 旧云业务已清理，当前会员与智能集合已按 `ADMINONLY` 加入，4 个云函数已部署；真实微信端到端闭环已通过。
-- 当前套餐没有可扣减的模型 Token，`hunyuan-v3 / hy3-preview` 会返回 429；小程序会明确提示并使用本地规则临时摘要，不冒充 AI 翻译或相关性判断。
-- 近 7 天 AI/科技全量已接入公开首页。普通用户服务端限制 7 天，人工 Pro 为 30 天，当前唯一微信账号以管理员身份查看全部已归档数据；部署时运维状态为 3,090 条资讯。全量缺图与列表缩略图继续独立回填。会员架构和固定示例已上线，真实 AI 精选、简报、支付及其他四个频道仍保持关闭。
+- 2026-07-23 生产就绪审计确认当前版本不应直接发布：生产 `user-media/` 规则与服务端删除缺少对象级所有权，资讯详情缓存可在会员降级后短时保留付费内容，截图浏览器存在 DNS rebinding 边界，当前工作树也无法由单一 Git SHA 精确重建。完整分级、验证与修复顺序见 [全项目生产就绪审计](reports/production-readiness-audit-2026-07-23.md)。
+- 旧云业务已清理，当前会员、订单、智能、互动、评论与资料集合均为 `ADMINONLY`，6 个云函数已部署；互动目标状态、会员评论读取与空资料接口的真实微信上下文往返已通过。
+- 环境已不可逆切换到资源点计费，标准版每账期 330,000 点共享池；超限按量关闭。`qwen3.5-flash` 与 `qwen3.5-plus` 已启用，CloudBase 承担主分析/简报/图文与资料审核，Packy/Grok 在超时、限流、结构失败或 60,000 点内部模型预算耗尽时自动兜底。共享池瞬时已用量必须以 CloudBase 控制台为准，Wiki 不再把某次快照写成当前余额；分析/简报/审核阈值为 90/180/30 秒。
+- AI 资讯全量持续入库。来源范围为“全部 / 一手信源 / 资讯 / 推文”，使用 AIHOT 上游成员关系而不是本地关键词分类；普通用户服务端限制为滚动 24 小时，Pro 为 30 天，当前唯一微信账号以管理员身份查看全部已归档数据。首页、精选、更新页、相关阅读和详情均允许无图条目，来源自带媒体优先完整落云，截图只做异步兜底增强。
+- AIHOT 正文与来源资料已拆为显式双接口合同：正文同步不依赖增强接口，作者头像、昵称、账号和原始标签可失败重试且不清空旧值。正文先到而作者资料尚未传播时，会按精确 X 原帖账号复用已有作者档案。页面只显示上游标签；内部频道、主题和 `categoryLabel` 不再冒充标签。
 - 首页支持时间、公司与模型、技术方向组合筛选；筛选项附结果数，空选项不可选。“最新”对全部资讯按发布时间倒序，“热度”对全部资讯按热度倒序，不再单独处理放大主稿。
 - 资讯详情提供原文截图自动/手动轮播、图片下方圆点、点击后整组全屏滑动、30 秒导读、完整上游摘要分段和三条相关阅读；长页最多连续截取 12 张，列表只传首图、详情再取全部。“来源与原文”位于“接着看”之前，URL 可展开/收起并可复制。当前没有已验证的外部业务域名，微信也不能直接唤起任意系统浏览器，因此外部原文点击会复制链接并提示到手机浏览器粘贴。
-- 原文截图服务运行在独立公网服务器并通过回环 Mihomo 代理访问外站；CloudBase 负责定时编排、上传实际 JPEG、保存文件 ID 和公开数据。真实 6,629px 长页已生成 5 张连续截图；协议校验、懒加载重测和上传清理日志均已启用。迁移部署时必须复制同等私网出口阻断。
-- 若要恢复真正 AI 摘要，需要由用户决定开通资源点/成长套餐或配置自有模型；当前未自动开启新的付费能力。
-- 微信开发者工具已启用 CLI 自动化；后续默认通过固定 `127.0.0.1:9420` 服务端口操作，体验版上传与 30 天个人验证仍未完成。
+- 原文截图由 CloudBase `sourcePreviewWorker` 内的 Chromium 执行并直接上传 JPEG；普通站点默认直连，X 优先尝试经受控公网 WSS 中继的官方嵌入页并保留有界后备路径。公网服务器不运行 Mihomo、Chromium 或截图 API，旧截图入口返回 410。v3 目标校验、懒加载重测、视觉审核和上传清理日志继续启用；视觉队列仍承担退避、重试和背压，不承诺绝对零等待。
+- CloudBase 主模型和 Packy 兜底均已生产运行；模型预算只影响后台分析路线，不会打开额外的超限按量计费。
+- 自动精选/简报按产品负责人要求零人工放行；历史 2 条评论和 1 份资料已补审，公开评论和完整资料的缺审计数均为 0。举报、删除、申诉和自动隐藏由产品负责人明确暂缓，不列为本次首发阻塞项。
+- 付费专栏当前为 24 节“基础课”与 6 节“动手课”，合同版本 4；本周案例和趋势档案已退出界面，周案例触发器已删除，旧 action/集合/路由仅作兼容。基础课保留生活例子和受保护手绘图，动手课只给直接步骤，不显示类比或概览图；安装目录按工具命名，详情支持 Windows、macOS、Linux/WSL 官方步骤，命令区为浅色卡片。简报已删除“跟你有什么关系”字段。免费用户只拿标题，全文服务端重鉴权；24 节基础课均可鉴权读取各 3 张短期签名手绘图，客户端只加载当前课程当前页，旧的蓝色概览流程图已停用。会员支付为一次性微信小程序虚拟支付，正式收费仍需消息 Token/AESKey 配对及双端真实订单、退款、权益重锁验收。
+- 任务已拆分降耗：来源每分钟、视觉每分钟四次轻量探测、分析每 10 分钟、归档/旧视觉每小时，日周月简报只在日历边界运行；视觉任务用 live/repair 独立查询和 fresh/recovery 四阶段轮转，有任务时最多调用 6 个隔离截图实例，fresh live 等待目标为 0。成功、已就绪和 stale 任务自动删除，`retry`/`cleanup` 留待收口，`blocked` 保留诊断。截图链路不再使用应用内每日点数硬停机，同批任务按发布时间优先补最新；客户端按日期与课程图片懒加载。60,000 点月度模型预算和 `overrunDetected` 熔断仍只约束模型链路，CloudBase 共享池继续依靠控制台总量告警观察。
+- 微信和 CloudBase 都提供可选的内容安全能力，但不会默认审核普通云存储上传。当前未调用微信内容安全接口、也未配置 COS 自动审核，评论图片继续走现有多模态审核；若改用官方异步审核，需要先完成回调和待发布状态。
+- 新专栏函数已部署，微信开发者工具真实页面自动化已读取合同版本 4、24 节基础课、6 节动手课、会员无锁状态、平台安装详情、无图资讯正文和无个人影响模块的简报；首发前仍需完成普通/Pro 双身份体验版的物理真机验收、真实订阅充值/退款联调，以及名称备案、类目隐私和微信审核发布。其他频道、多来源和长期资源观察均为上线后扩展或运维任务。
 - 当前仓库为 `D:\miniprogram`；接手时先读 [项目总览](overview.md)，再按需要读 [README](../README.md)。

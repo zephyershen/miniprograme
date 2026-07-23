@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/playwright:v1.61.1-noble
+FROM mcr.microsoft.com/playwright:v1.57.0-noble@sha256:3bed4b1a12f2338642f3d8cba28e291deef3c66bd4a964bbeb3e57bbff511dbd
 
 WORKDIR /app
 
@@ -7,13 +7,15 @@ ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
-# Production startup is fail-closed unless PLAYWRIGHT_PROXY_URL points to a
-# loopback-only proxy that rejects private and reserved destinations.
+# Production startup is fail-closed unless ALLOW_DIRECT_EGRESS=true starts the
+# renderer's own loopback CONNECT proxy. Generic PLAYWRIGHT_PROXY_URL endpoints
+# are rejected because their DNS and destination policy cannot be proven here.
 
-COPY package.json package-lock.json ./
+COPY docker/package.json docker/package-lock.json ./
 RUN npm ci --omit=dev
 
 COPY src ./src
+COPY scripts ./scripts
 
 USER pwuser
 

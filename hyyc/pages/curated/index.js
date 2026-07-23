@@ -1,102 +1,102 @@
 const {
-  createColumnState,
-  createColumnView,
-  posterLoadWindow,
-  posterPreviewUrls,
-  validTrack
+  sectionTabs,
+  previewColumnHome,
+  normalizeColumnHome,
+  hasReadableColumnContract
 } = require('../../features/ai-column/model.js');
-const { refreshMembershipAccess } = require('../../features/membership/session.js');
+const {
+  loadColumnHome,
+  clearColumnCache
+} = require('../../features/ai-column/session.js');
+const {
+  refreshMembershipAccess,
+  membershipCacheScope
+} = require('../../features/membership/session.js');
 const { membershipPresentation } = require('../../features/membership/presentation.js');
+
+function accessScope(access) {
+  return membershipCacheScope(access);
+}
 
 Page({
   data: {
-    ...createColumnState(),
-    activePosterIndex: 0,
-    posterLoads: posterLoadWindow(0),
-    posterError: '',
-    membership: membershipPresentation(null)
+    loading: true,
+    error: '',
+    homeNotice: '',
+    locked: false,
+    activeSection: 'courses',
+    sectionTabs: sectionTabs('courses'),
+    home: previewColumnHome(),
+    membership: membershipPresentation(null),
+    membershipPromptVisible: false,
+    membershipPromptFeature: 'ai_column'
   },
 
   onShow() {
-    this.resolveAccess();
+    this.resolveAccess({ force: true });
   },
 
-  async resolveAccess() {
+  async resolveAccess({ force = false } = {}) {
     this.setData({ loading: true, error: '' });
     try {
-      const access = await refreshMembershipAccess({ force: true });
+      const access = await refreshMembershipAccess({ force });
       const membership = membershipPresentation(access);
+      const locked = !membership.isPrivileged;
+      const scope = accessScope(access);
+      let usedFallback = false;
+      if (locked) clearColumnCache();
+      let home;
+      try {
+        home = normalizeColumnHome(await loadColumnHome({ force, scope }));
+        if (!locked && !hasReadableColumnContract(home)) {
+          throw new Error('专栏服务版本暂不支持正文读取');
+        }
+      } catch (error) {
+        if (!locked) throw new Error('专栏服务正在更新，请稍后重新读取');
+        home = previewColumnHome();
+        usedFallback = true;
+      }
+      this.columnAccessScope = scope;
+      this.accessResolvedAt = Date.now();
       this.setData({
         loading: false,
-        locked: !membership.isPrivileged,
-        membership
+        locked,
+        membership,
+        home,
+        homeNotice: usedFallback ? '当前先展示课程目录，稍后可以重新读取完整目录。' : ''
       });
     } catch (error) {
       this.setData({ loading: false, error: error.message || '专栏暂时无法加载' });
     }
   },
 
-  selectTrack(event) {
-    const trackKey = validTrack(event.currentTarget.dataset.key);
-    if (trackKey === this.data.view.trackKey) return;
-    this.setData({
-      expandedId: '',
-      activePosterIndex: 0,
-      posterLoads: posterLoadWindow(0),
-      posterError: '',
-      view: createColumnView({ trackKey })
-    });
+  selectSection(event) {
+    const key = event.currentTarget.dataset.key;
+    if (!['courses', 'practicals'].includes(key) || key === this.data.activeSection) return;
+    this.setData({ activeSection: key, sectionTabs: sectionTabs(key) });
   },
 
-  toggleLesson(event) {
+  openLesson(event) {
+    this.openReader('lesson', event.currentTarget.dataset.id);
+  },
+
+  openPractical(event) {
+    this.openReader('practical', event.currentTarget.dataset.id);
+  },
+
+  openReader(type, id) {
+    const readerContractReady = this.data.locked || hasReadableColumnContract(this.data.home);
+    if (!readerContractReady) {
+      wx.showToast({ title: '专栏服务正在更新，请稍后重新读取', icon: 'none' });
+      return;
+    }
     if (this.data.locked) {
-      this.openProfile();
+      this.openMembershipPrompt();
       return;
     }
-    const id = event.currentTarget.dataset.id;
     if (!id) return;
-    const expandedId = this.data.expandedId === id ? '' : id;
-    this.setData({
-      expandedId,
-      activePosterIndex: 0,
-      posterLoads: posterLoadWindow(0),
-      posterError: '',
-      view: createColumnView({ trackKey: this.data.view.trackKey, expandedId })
-    });
-  },
-
-  stopPropagation() {},
-
-  handlePosterChange(event) {
-    const activePosterIndex = Number(event.detail && event.detail.current) || 0;
-    this.setData({
-      activePosterIndex,
-      posterLoads: posterLoadWindow(activePosterIndex),
-      posterError: ''
-    });
-  },
-
-  handlePosterError(event) {
-    const posterKey = event.currentTarget.dataset.key || 'unknown';
-    console.error('[ai-column] poster failed to load', posterKey, event.detail && event.detail.errMsg);
-    this.setData({ posterError: posterKey });
-    wx.showToast({ title: '海报加载失败，请重试', icon: 'none' });
-  },
-
-  previewPoster(event) {
-    const lessonId = event.currentTarget.dataset.id;
-    const requestedIndex = Number(event.currentTarget.dataset.index) || 0;
-    const lesson = (this.data.view.lessons || []).find((item) => item.id === lessonId);
-    const urls = posterPreviewUrls(lesson);
-    if (!urls.length) {
-      wx.showToast({ title: '高清图暂时不可用', icon: 'none' });
-      return;
-    }
-    const currentIndex = Math.min(Math.max(requestedIndex, 0), urls.length - 1);
-    wx.previewImage({
-      current: urls[currentIndex],
-      urls,
-      fail: () => wx.showToast({ title: '高清图加载失败，请重试', icon: 'none' })
+    wx.navigateTo({
+      url: `/pages/column-reader/index?type=${type}&id=${encodeURIComponent(id)}`
     });
   },
 
@@ -104,7 +104,19 @@ Page({
     wx.switchTab({ url: '/pages/profile/index' });
   },
 
+  openMembershipPrompt() {
+    this.setData({ membershipPromptVisible: true });
+  },
+
+  closeMembershipPrompt() {
+    this.setData({ membershipPromptVisible: false });
+  },
+
+  openMembershipFromPrompt() {
+    this.setData({ membershipPromptVisible: false }, () => this.openProfile());
+  },
+
   retry() {
-    this.resolveAccess();
+    this.resolveAccess({ force: true });
   }
 });

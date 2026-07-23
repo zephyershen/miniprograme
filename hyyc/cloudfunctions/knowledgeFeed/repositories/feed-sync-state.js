@@ -63,6 +63,20 @@ function createFeedSyncStateRepository(db, config) {
     });
   }
 
+  async function renewLease(owner, renewedAt, expiresAt) {
+    await ensureCollection();
+    return db.runTransaction(async (transaction) => {
+      const reference = transaction.collection(config.syncStateCollectionName).doc(config.syncStateDocumentId);
+      const current = (await reference.get()).data;
+      if (current.leaseOwner !== owner || toMillis(current.leaseUntil) <= toMillis(renewedAt)) {
+        return { renewed: false, document: current };
+      }
+      const fields = { leaseHeartbeatAt: renewedAt, leaseUntil: expiresAt };
+      await reference.update({ data: fields });
+      return { renewed: true, document: { ...current, ...fields } };
+    });
+  }
+
   async function releaseLease(owner) {
     await ensureCollection();
     return db.runTransaction(async (transaction) => {
@@ -117,6 +131,7 @@ function createFeedSyncStateRepository(db, config) {
     get,
     patch,
     acquireLease,
+    renewLease,
     releaseLease,
     acquireVisualWorkerLease,
     releaseVisualWorkerLease

@@ -1,0 +1,100 @@
+.reader-page { box-sizing: border-box; min-height: 100vh; padding: 30rpx var(--ui-gutter) 120rpx; background: var(--ui-canvas); }
+.reader-head { padding: 0 4rpx; }
+.reader-kicker, .reader-label, .section-number { color: var(--ui-accent-strong); font-family: "DIN Alternate", -apple-system, sans-serif; font-size: 18rpx; font-weight: 760; letter-spacing: 1.4rpx; }
+.reader-title { max-width: 620rpx; margin-top: 22rpx; color: #101a24; font-size: 48rpx; font-weight: 820; letter-spacing: -1.5rpx; line-height: 1.25; }
+.reader-subtitle { margin-top: 16rpx; color: #4f5d68; font-size: 27rpx; line-height: 1.72; }
+.reader-meta { margin-top: 20rpx; padding-bottom: 30rpx; border-bottom: 1rpx solid #dce3e9; color: #74818c; font-size: 20rpx; }
+
+.reader-state { min-height: 340rpx; margin-top: 24rpx; padding: 64rpx 28rpx; border-top: 2rpx solid #1a2631; border-bottom: 1rpx solid #ccd5dc; background: #fff; }
+.state-title { color: #101a24; font-size: 32rpx; font-weight: 760; }
+.state-copy { margin-top: 16rpx; color: #586671; font-size: 25rpx; line-height: 1.7; }
+.state-action { display: inline-block; margin-top: 24rpx; color: var(--ui-accent-strong); font-size: 24rpx; font-weight: 740; }
+.state-rule { width: 72%; height: 14rpx; margin: 23rpx 0; background: #dfe5ea; }
+.state-rule-strong { width: 94%; height: 27rpx; background: #cbd4db; }
+.state-rule-short { width: 43%; }
+
+.reader-lead { margin-top: 34rpx; padding: 28rpx 28rpx 30rpx; border-top: 2rpx solid #16222c; border-bottom: 1rpx solid #cfd8df; background: #fff; }
+.reader-lead-copy { margin-top: 12rpx; color: #111c25; font-size: 32rpx; font-weight: 720; line-height: 1.58; }
+
+.reader-posters { margin-top: 28rpx; padding-top: 22rpx; border-top: 2rpx solid #16222c; }
+.poster-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20rpx; padding: 0 4rpx 18rpx; }
+.poster-title { margin-top: 7rpx; color: #111c25; font-size: 32rpx; font-weight: 800; }
+.poster-hint { color: #6a7883; font-size: 20rpx; line-height: 1.45; text-align: right; }
+.poster-swiper { width: 100%; height: 938rpx; }
+.poster-frame { position: relative; box-sizing: border-box; width: calc(100% - 8rpx); height: 900rpx; margin: 0 auto; overflow: hidden; border: 1rpx solid #c8d4dc; background: #f2eee3; box-shadow: 0 14rpx 34rpx rgba(22, 34, 44, .11); }
+.poster-fallback { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 40rpx; color: #6a7883; font-size: 22rpx; text-align: center; }
+.poster-image { position: relative; z-index: 1; display: block; width: 100%; height: 100%; }
+.poster-page, .poster-hd { position: absolute; z-index: 2; top: 18rpx; min-height: 46rpx; padding: 0 16rpx; background: rgba(17, 28, 37, .82); color: #fff; font-size: 18rpx; font-weight: 720; line-height: 46rpx; }
+.poster-page { left: 18rpx; font-family: "DIN Alternate", -apple-system, sans-serif; }
+.poster-hd { right: 18rpx; }
+
+.reader-visual { position: relative; margin-top: 26rpx; border: 1rpx solid #cbd8e1; background: #f8fbfd; }
+.reader-image { display: block; width: 100%; max-height: 720rpx; }
+.blueprint { position: relative; overflow: hidden; min-height: 390rpx; padding: 42rpx 30rpx 34rpx; }
+.blueprint::before { position: absolute; top: 0; bottom: 0; left: 50%; width: 1rpx; background: #d7e9f5; content: ""; }
+.blueprint::after { position: absolute; top: 164rpx; right: 0; left: 0; height: 1rpx; background: #d7e9f5; content: ""; }
+.blueprint-core { position: relative; z-index: 1; box-sizing: border-box; max-width: 420rpx; margin: 0 auto; padding: 22rpx 26rpx; border: 2rpx solid var(--ui-accent); background: #fff; color: #102638; font-size: 28rpx; font-weight: 780; line-height: 1.35; text-align: center; }
+.blueprint-rail { position: relative; z-index: 1; width: 2rpx; height: 38rpx; margin: 0 auto; background: var(--ui-accent); }
+.blueprint-nodes { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14rpx; }
+.blueprint-node { position: relative; min-width: 0; padding: 20rpx 18rpx 18rpx 28rpx; border: 1rpx solid #b9d5e7; background: #fff; }
+.blueprint-node::before { position: absolute; top: 27rpx; left: 12rpx; width: 7rpx; height: 7rpx; background: var(--ui-accent); content: ""; }
+.blueprint-node-title { color: #173042; font-size: 24rpx; font-weight: 730; line-height: 1.42; }
+.blueprint-node-note { margin-top: 7rpx; color: #586874; font-size: 21rpx; line-height: 1.55; }
+.blueprint-links { position: relative; z-index: 1; margin-top: 22rpx; padding-top: 16rpx; border-top: 1rpx dashed #b8cfdf; }
+.blueprint-link { margin-top: 7rpx; color: #3f5b6d; font-family: "DIN Alternate", -apple-system, sans-serif; font-size: 20rpx; line-height: 1.5; }
+.visual-caption { padding: 13rpx 18rpx; border-top: 1rpx solid #dce7ee; color: #6d7b86; font-size: 20rpx; line-height: 1.45; text-align: right; }
+
+.platform-guides, .reader-commands { margin-top: 30rpx; padding-top: 22rpx; border-top: 2rpx solid #16222c; }
+.command-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20rpx; padding: 0 4rpx 18rpx; }
+.command-title { margin-top: 7rpx; color: #111c25; font-size: 32rpx; font-weight: 800; }
+.command-hint { max-width: 250rpx; color: #6a7883; font-size: 20rpx; line-height: 1.45; text-align: right; }
+.command-card { position: relative; margin-top: 14rpx; overflow: hidden; padding: 22rpx; border: 1rpx solid #d6e2ea; border-radius: 18rpx; background: #fff; box-shadow: 0 8rpx 24rpx rgba(28, 56, 76, .055); }
+.command-card::before { position: absolute; top: 0; bottom: 0; left: 0; width: 5rpx; background: var(--ui-accent); content: ""; }
+.command-card:first-of-type { margin-top: 0; }
+.command-meta { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; color: #173b52; font-size: 19rpx; font-weight: 760; line-height: 1.4; }
+.command-meta text:last-child { padding: 5rpx 10rpx; border-radius: 999rpx; background: #eef6fb; color: #607786; font-size: 16rpx; font-weight: 620; text-align: right; }
+.command-row { display: flex; align-items: flex-end; gap: 14rpx; margin-top: 15rpx; padding: 15rpx 14rpx 15rpx 18rpx; border: 1rpx solid #e1eaf0; border-radius: 14rpx; background: #f4f8fb; }
+.command-value { display: block; min-width: 0; flex: 1; overflow-wrap: anywhere; color: #172c3b; font-family: Menlo, Consolas, monospace; font-size: 21rpx; line-height: 1.62; user-select: text; }
+.command-copy { display: flex; min-width: 74rpx; min-height: 54rpx; flex: none; align-items: center; justify-content: center; padding: 0 13rpx; border-radius: 13rpx; background: var(--ui-accent); color: #fff; font-size: 18rpx; font-weight: 760; }
+.command-copy:active { opacity: .78; }
+
+.platform-guide { overflow: hidden; margin-top: 16rpx; border: 1rpx solid #d4e1e9; border-radius: 22rpx; background: #fff; box-shadow: 0 10rpx 28rpx rgba(28, 56, 76, .055); }
+.platform-guide:first-of-type { margin-top: 0; }
+.platform-guide-head { display: flex; align-items: center; justify-content: space-between; gap: 18rpx; padding: 23rpx 24rpx 20rpx; border-bottom: 1rpx solid #e5edf2; }
+.platform-guide-title { color: #132431; font-size: 29rpx; font-weight: 800; }
+.platform-guide-terminal { padding: 7rpx 12rpx; border-radius: 999rpx; background: var(--ui-accent-soft); color: var(--ui-accent-strong); font-size: 17rpx; font-weight: 700; }
+.platform-command-list { padding: 18rpx 18rpx 0; }
+.command-card-compact { box-shadow: none; }
+.platform-steps { padding: 20rpx 24rpx 25rpx; }
+.platform-step { display: flex; gap: 15rpx; margin-top: 14rpx; color: #3a4b57; font-size: 24rpx; line-height: 1.68; }
+.platform-step:first-child { margin-top: 0; }
+.platform-step-index { display: flex; width: 34rpx; height: 34rpx; flex: none; align-items: center; justify-content: center; margin-top: 3rpx; border-radius: 50%; background: #e8f5fd; color: var(--ui-accent-strong); font-family: "DIN Alternate", sans-serif; font-size: 17rpx; font-weight: 780; }
+
+.reader-sections { margin-top: 30rpx; border-top: 2rpx solid #16222c; background: #fff; }
+.article-section { padding: 30rpx 26rpx 32rpx; border-bottom: 1rpx solid #dfe5e9; }
+.article-section-conclusion { border-bottom-color: #9bc8e6; background: #f6fbfe; }
+.article-section-muted { background: #f7f8f9; }
+.article-title { color: #15212b; font-size: 27rpx; font-weight: 780; }
+.article-body { margin-top: 15rpx; color: #364550; font-size: 28rpx; line-height: 1.82; }
+.article-list { margin-top: 14rpx; }
+.article-item { display: flex; gap: 16rpx; margin-top: 13rpx; color: #364550; font-size: 27rpx; line-height: 1.74; }
+.article-item-index { width: 38rpx; flex: none; color: var(--ui-accent-strong); font-family: "DIN Alternate", sans-serif; font-size: 20rpx; font-weight: 760; }
+
+.reader-block { margin-top: 36rpx; }
+.block-head { display: flex; align-items: flex-end; justify-content: space-between; padding-bottom: 15rpx; border-bottom: 2rpx solid #16222c; }
+.block-title { color: #15212b; font-size: 30rpx; font-weight: 800; }
+.block-note { color: #6f7d88; font-size: 20rpx; }
+.related-row { display: flex; align-items: center; gap: 18rpx; min-height: 116rpx; padding: 20rpx 8rpx; border-bottom: 1rpx solid #dfe5e9; }
+.related-mark { width: 52rpx; flex: none; color: var(--ui-accent-strong); font-family: "DIN Alternate", sans-serif; font-size: 16rpx; font-weight: 780; }
+.related-copy { flex: 1; min-width: 0; }
+.related-title { color: #17232d; font-size: 26rpx; font-weight: 730; line-height: 1.48; }
+.related-subtitle { overflow: hidden; margin-top: 7rpx; color: #60707c; font-size: 22rpx; text-overflow: ellipsis; white-space: nowrap; }
+.related-arrow { flex: none; color: var(--ui-accent); font-size: 24rpx; }
+
+.timeline { margin-top: 4rpx; }
+.timeline-row { position: relative; padding: 25rpx 12rpx 28rpx; border-bottom: 1rpx solid #dfe5e9; }
+.timeline-date { color: var(--ui-accent-strong); font-family: "DIN Alternate", sans-serif; font-size: 20rpx; font-weight: 760; }
+.timeline-title { margin-top: 9rpx; color: #17232d; font-size: 24rpx; font-weight: 750; line-height: 1.45; }
+.timeline-copy { margin-top: 8rpx; color: #52616d; font-size: 25rpx; line-height: 1.68; }
+.timeline-row-link { padding-right: 86rpx; }
+.timeline-more { position: absolute; right: 10rpx; bottom: 29rpx; color: var(--ui-accent-strong); font-size: 20rpx; font-weight: 700; }

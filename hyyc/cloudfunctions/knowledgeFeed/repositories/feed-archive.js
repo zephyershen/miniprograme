@@ -81,6 +81,7 @@ function createFeedArchiveRepository(db, config) {
     const command = db.command;
     const response = await db.collection(config.collectionName)
       .where({ date: command.lt(cutoffDate) })
+      .field({ _id: true, date: true, itemCount: true })
       .limit(100)
       .get();
     const documents = Array.isArray(response && response.data) ? response.data : [];
@@ -95,6 +96,7 @@ function createFeedArchiveRepository(db, config) {
   async function stats() {
     await ensureCollection();
     const response = await db.collection(config.collectionName)
+      .field({ date: true, itemCount: true })
       .orderBy('date', 'desc')
       .limit(Math.min(100, config.retentionDays))
       .get();

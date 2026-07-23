@@ -3,8 +3,8 @@ title: "缺图资讯使用受控原文页面截图"
 type: decision
 tags: [source-preview, playwright, cloudbase, security, ux]
 date: 2026-07-16
-last_updated: 2026-07-18
-status: accepted
+last_updated: 2026-07-22
+status: superseded
 confidence: high
 ---
 
@@ -68,7 +68,13 @@ confidence: high
 
 ## 状态
 
-accepted
+superseded
+
+## 2026-07-22 执行层取代说明
+
+- “公网服务器运行 Playwright 浏览器与截图 API”的执行层已被 [原文截图迁入 CloudBase SCF，公网服务器只保留受限代理](2026-07-22-cloudbase-scf-source-preview.md) 取代。
+- 本页的截图产品目标、SSRF 防护、v3 质量闸门、多图 DTO、云文件一致性和失败后文字可读规则继续有效。
+- 公网服务器不再运行 Chromium；只在 CloudBase 无法直连 X 或遇到地区性网络失败时提供受限 WSS 出口中继。
 
 ## 已修订的旧细节
 
@@ -81,6 +87,12 @@ accepted
 - 字体、头像、正文图片和懒加载媒体会在有界等待内稳定后再裁切；登录墙、站点漂移、正文过小或低置信度继续触发整页回退。
 - CloudBase 仍复用既有 `previewFileIds` 合同，渲染器响应额外携带 profile、focus 和 media 元数据；协议版本保持可兼容，旧视觉不重建。
 - 生产只处理固定发布边界后首次发现的新资讯。当前不接 OCR 或视觉模型，真实误判样本出现前不增加模型成本。证据见 [聚焦截图与手绘 AI 专栏实施证据](../sources/2026-07-18-focus-previews-and-handdrawn-column.md)。
+
+## 2026-07-21 v3 质量闸门
+
+- “HTTP 200 就可截图”和“X 目标裁切失败后整页回退”已被取代。当前要求错误壳/登录墙/挑战页/空白页拦截、X status id 精确命中、裁切前后复核及一次有界重载。
+- 普通网页和可疑稀疏画面必须经过视觉模型审核；确定性空白直接拒绝。只有高置信目标一致结果才上传，所有不确定结果 fail-closed，资讯文字不依赖截图成功。
+- 历史坏图使用维护端精确 CAS 隔离和 v3 重抓，不开放给小程序客户端。证据见 [原文截图 v3 质量闸门与历史坏图修复](../sources/2026-07-21-source-preview-v3-quality-and-repair.md)。
 
 ## 日期和来源
 

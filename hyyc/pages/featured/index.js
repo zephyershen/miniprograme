@@ -8,8 +8,18 @@ const {
   createCuratedView,
   createCuratedState
 } = require('../../features/curated-feed/model.js');
-const { refreshMembershipAccess } = require('../../features/membership/session.js');
+const {
+  refreshMembershipAccess
+} = require('../../features/membership/session.js');
 const { membershipPresentation } = require('../../features/membership/presentation.js');
+const {
+  applyResolvedFeedMedia,
+  collectFeedMediaFileIds,
+  knowledgeMediaSession
+} = require('../../features/knowledge-feed/cloud-media-session.js');
+const {
+  createPageMediaRecovery
+} = require('../../features/knowledge-feed/cloud-media-recovery.js');
 
 const PAGE_SIZE = 8;
 
@@ -26,23 +36,42 @@ Page({
   data: {
     ...createCuratedState(),
     sample: CURATED_SAMPLE,
-    membership: membershipPresentation(null)
+    membership: membershipPresentation(null),
+    membershipPromptVisible: false,
+    membershipPromptFeature: 'curated_feed'
+  },
+
+  onLoad() {
+    this.curatedMediaRequestId = 0;
+    this.mediaRecovery = createPageMediaRecovery(this);
+  },
+
+  onUnload() {
+    this.curatedMediaRequestId = (this.curatedMediaRequestId || 0) + 1;
+    if (this.mediaRecovery) this.mediaRecovery.dispose();
   },
 
   onShow() {
-    this.resolveAccess();
+    if (this.mediaRecovery) this.mediaRecovery.resume();
+    this.resolveAccess({ force: true });
+  },
+
+  onHide() {
+    if (this.mediaRecovery) this.mediaRecovery.pause();
   },
 
   onReachBottom() {
     this.loadMore();
   },
 
-  async resolveAccess() {
+  async resolveAccess({ force = false } = {}) {
     this.setData({ loading: true, error: '' });
     try {
-      const access = await refreshMembershipAccess({ force: true });
+      const access = await refreshMembershipAccess({ force });
       const membership = membershipPresentation(access);
+      this.accessResolvedAt = Date.now();
       if (!membership.isPrivileged) {
+        this.curatedMediaRequestId = (this.curatedMediaRequestId || 0) + 1;
         this.rawItems = [];
         this.setData({ loading: false, locked: true, providerPending: false, membership });
         return;
@@ -79,6 +108,9 @@ Page({
       this.nextOffset = Number(raw.nextOffset) || this.rawItems.length;
       const merged = { ...raw, items: this.rawItems };
       const view = createCuratedView(merged, { activeChannel: this.data.activeChannel });
+      const mediaRequestId = (this.curatedMediaRequestId || 0) + 1;
+      this.curatedMediaRequestId = mediaRequestId;
+      if (this.mediaRecovery) this.mediaRecovery.reset();
       this.setData({
         view,
         providerPending: raw.status === 'pending' || raw.intelligenceStatus === 'pending',
@@ -86,6 +118,7 @@ Page({
         loadingMore: false,
         error: ''
       });
+      this.resolveVisibleCuratedMedia(view, mediaRequestId);
       getApp().globalData.curatedFeed = merged;
     } catch (error) {
       if (requestId !== this.requestId) return;
@@ -99,6 +132,29 @@ Page({
         error: error.message || '精选暂时无法加载'
       });
     }
+  },
+
+  async resolveVisibleCuratedMedia(view, requestId) {
+    const resolvedUrls = await knowledgeMediaSession.resolveForFeed(view);
+    if (requestId !== this.curatedMediaRequestId) return false;
+    const currentView = this.data && this.data.view;
+    if (!currentView) return false;
+    const hydrated = applyResolvedFeedMedia(currentView, resolvedUrls);
+    hydrated.items = [hydrated.leadItem, ...(hydrated.remainingItems || [])].filter(Boolean);
+    this.setData({ view: hydrated });
+    if (this.mediaRecovery) {
+      this.mediaRecovery.track(collectFeedMediaFileIds(this.data.view), (freshUrls) => {
+        if (requestId !== this.curatedMediaRequestId || !this.data.view) return;
+        const refreshed = applyResolvedFeedMedia(this.data.view, freshUrls);
+        refreshed.items = [refreshed.leadItem, ...(refreshed.remainingItems || [])].filter(Boolean);
+        this.setData({ view: refreshed });
+      });
+    }
+    return true;
+  },
+
+  handleMediaError(event) {
+    if (this.mediaRecovery) this.mediaRecovery.handleError(event);
   },
 
   loadMore() {
@@ -164,7 +220,19 @@ Page({
     wx.switchTab({ url: '/pages/profile/index' });
   },
 
+  openMembershipPrompt() {
+    this.setData({ membershipPromptVisible: true });
+  },
+
+  closeMembershipPrompt() {
+    this.setData({ membershipPromptVisible: false });
+  },
+
+  openMembershipFromPrompt() {
+    this.setData({ membershipPromptVisible: false }, () => this.openProfile());
+  },
+
   retry() {
-    this.resolveAccess();
+    this.resolveAccess({ force: true });
   }
 });

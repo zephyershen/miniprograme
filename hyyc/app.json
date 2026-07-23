@@ -3,26 +3,31 @@
     "pages/inbox/index",
     "pages/featured/index",
     "pages/curated/index",
+    "pages/column-reader/index",
+    "pages/trend-detail/index",
     "pages/briefing/index",
     "pages/profile/index",
+    "pages/profile-edit/index",
     "pages/feed-detail/index",
     "pages/source-view/index",
-    "pages/digest/index",
-    "pages/cards/index",
-    "pages/settings/index"
+    "pages/cards/index"
   ],
   "window": {
     "navigationBarTitleText": "别收藏了",
-    "navigationBarBackgroundColor": "#f7f7fa",
+    "navigationBarBackgroundColor": "#ffffff",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#f3f4f8",
+    "backgroundColor": "#ffffff",
     "backgroundTextStyle": "dark"
   },
+  "usingComponents": {
+    "membership-prompt": "/components/membership-prompt/index",
+    "comment-sheet": "/components/comment-sheet/index"
+  },
   "tabBar": {
-    "color": "#858a97",
-    "selectedColor": "#5457df",
-    "backgroundColor": "#fbfbfd",
-    "borderStyle": "white",
+    "color": "#536471",
+    "selectedColor": "#1d9bf0",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
     "list": [
       {
         "pagePath": "pages/inbox/index",

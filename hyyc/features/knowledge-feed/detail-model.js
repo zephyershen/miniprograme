@@ -1,5 +1,7 @@
 const { DIRECT_WEBVIEW_HOSTS } = require('../../config/constants.js');
 const { buildReadingGuide, buildRelatedItems, getOriginAction } = require('./reading.js');
+const { decorateItemEngagement } = require('../engagement/model.js');
+const { decorateSourcePresentation } = require('./source-presentation.js');
 
 function formatDetailDate(value) {
   const date = new Date(value);
@@ -19,7 +21,7 @@ function previewSlides(fileIds, currentIndex = 0) {
   return values.map((fileId, index) => {
     const distance = Math.abs(index - active);
     const circularDistance = total > 1 ? Math.min(distance, total - distance) : distance;
-    return { fileId, shouldLoad: circularDistance <= 1 };
+    return { fileId, url: '', shouldLoad: circularDistance <= 1 };
   });
 }
 
@@ -29,15 +31,18 @@ function decorateKnowledgeItem(item, feedItems = []) {
   const related = source.relatedItems && source.relatedItems.length
     ? source.relatedItems
     : buildRelatedItems(feedItems, source);
-  return {
+  return decorateItemEngagement(decorateSourcePresentation({
     ...source,
     previewFileIds,
     previewSlides: previewSlides(previewFileIds, 0),
     publishedLabel: formatDetailDate(source.publishedAt),
     readingGuide: buildReadingGuide(source.summary),
     originAction: getOriginAction(source.url, DIRECT_WEBVIEW_HOSTS),
-    relatedItems: related.map((entry) => ({ ...entry, publishedLabel: formatDetailDate(entry.publishedAt) }))
-  };
+    relatedItems: related.map((entry) => decorateSourcePresentation({
+      ...entry,
+      publishedLabel: formatDetailDate(entry.publishedAt)
+    }))
+  }));
 }
 
 module.exports = { decorateKnowledgeItem, previewSlides };

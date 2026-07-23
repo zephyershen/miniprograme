@@ -13,12 +13,13 @@ const {
 const { createItemFeedQueryService } = require('../cloudfunctions/knowledgeFeed/services/item-feed-query-service');
 const {
   encodePageCursor,
-  decodePageCursor
+  decodePageCursor,
+  withInitialVisualPublicationState
 } = require('../cloudfunctions/knowledgeFeed/repositories/feed-item');
+const {
+  visualPublicationVisible
+} = require('../cloudfunctions/knowledgeFeed/policies/visual-publication');
 const { createAllFeedSyncService } = require('../cloudfunctions/knowledgeFeed/services/all-feed-sync-service');
-const { createFeedStoreMigrationService } = require('../cloudfunctions/knowledgeFeed/services/feed-store-migration-service');
-const { createFeedAccessAdminService } = require('../cloudfunctions/knowledgeFeed/services/feed-access-admin-service');
-const { createFeedMaintenanceService } = require('../cloudfunctions/knowledgeFeed/services/feed-maintenance-service');
 const {
   entriesFromDocument,
   groupEntriesByDay
@@ -28,14 +29,14 @@ const { facetMatrixCount } = require('../features/knowledge-feed/facet-matrix');
 const NOW = Date.parse('2026-07-17T04:00:00.000Z');
 const ITEM_CONFIG = {
   provider: 'aihot',
-  freeWindowDays: 7,
+  freeWindowDays: 1,
   memberWindowDays: 30,
   adminWindowDays: 90,
   facetLimit: 3000,
   syncLeaseMs: 240000,
   itemsRevalidateMs: 3600000,
   fullRefreshMs: 21600000,
-  migrationDayBatchSize: 5
+  visualPublicationGraceMs: 4 * 60 * 1000
 };
 
 function rawItem(id, publishedAt, overrides = {}) {
@@ -141,54 +142,50 @@ test('derives member and administrator history only from server-side documents',
   assert.equal(member.viewer.role, 'member');
   assert.equal(member.access.defaultTimeKey, '30d');
   assert.equal(free.viewer.role, 'free');
-  assert.deepEqual(free.access.allowedTimeKeys, ['1d', '3d', '7d']);
-});
-
-test('protects administrator grants, migrations, sync and status with the maintenance token', async () => {
-  const token = 'm'.repeat(40);
-  let granted = null;
-  const accessAdminService = createFeedAccessAdminService({
-    accessRepository: {
-      grant: async (ownerKey, fields) => (granted = { ownerKey, ...fields })
-    },
-    maintenanceToken: token,
-    now: () => NOW
-  });
-  const service = createFeedMaintenanceService({
-    accessAdminService,
-    allFeedSyncService: { run: async (options) => ({ status: 'updated', ...options }) },
-    migrationService: { run: async () => ({ status: 'complete' }) },
-    itemRepository: { stats: async () => ({ itemCount: 1932 }) },
-    dayIndexRepository: { stats: async () => ({ dayCount: 7, itemCount: 1932 }) },
-    syncStateRepository: { get: async () => ({ allItemCount: 1932 }) },
-    migrationRepository: { get: async () => ({ status: 'complete' }) }
-  });
-
-  await assert.rejects(() => service.status({ token: 'wrong' }), { code: 'AUTH_REQUIRED' });
-  const grant = await service.grantAdmin({ token, ownerKey: 'a'.repeat(64) });
-  assert.equal(grant.role, 'admin');
-  assert.equal(granted.status, 'active');
-  assert.equal((await service.sync({ token, force: true })).force, true);
-  assert.equal((await service.migrate({ token })).status, 'complete');
-  assert.equal((await service.status({ token })).items.itemCount, 1932);
+  assert.deepEqual(free.access.allowedTimeKeys, ['1d']);
 });
 
 function memoryItemRepository(items) {
   function selected(options) {
     const topics = options.topicKeys || [];
     return items.filter((item) => item.publicState === 'active'
+      && (!options.excludeVisualPublicationHolds || item.visualPublicationHeld !== true)
       && (!options.since || item.publishedAt >= options.since)
+      && (!options.until || item.publishedAt < options.until)
+      && (!options.sourceChannel || options.sourceChannel === 'all'
+        || item.sourceChannelKey === options.sourceChannel)
       && (!options.channel || options.channel === 'all' || item.channelKey === options.channel)
+      && (options.sourceTags || []).every((tag) => (item.sourceTags || []).includes(tag))
       && topics.every((topic) => item.topicKeys.includes(topic)));
   }
   return {
     queryPage: async (options) => {
-      const filtered = selected(options).sort((left, right) => options.sort === 'hot'
+      let filtered = selected(options).sort((left, right) => options.sort === 'hot'
         ? right.score - left.score || right.publishedAt.localeCompare(left.publishedAt)
         : right.publishedAt.localeCompare(left.publishedAt));
+      const cursor = decodePageCursor(options.cursor, options.sort);
+      if (cursor) {
+        filtered = filtered.filter((item) => {
+          if (options.sort === 'hot') {
+            return Number(item.score) < Number(cursor.value)
+              || (Number(item.score) === Number(cursor.value)
+                && (item.publishedAt < cursor.publishedAt
+                  || (item.publishedAt === cursor.publishedAt && item._id < cursor.id)));
+          }
+          return item.publishedAt < cursor.publishedAt
+            || (item.publishedAt === cursor.publishedAt && item._id < cursor.id);
+        });
+      }
+      const offset = cursor ? 0 : Math.max(0, Number(options.offset) || 0);
+      const rows = filtered.slice(offset, offset + options.limit + 1);
+      const pageItems = rows.slice(0, options.limit);
       return {
-        items: filtered.slice(options.offset, options.offset + options.limit),
-        resultCount: filtered.length
+        items: pageItems,
+        ...(options.includeCount === false ? {} : { resultCount: filtered.length }),
+        hasMore: rows.length > options.limit,
+        nextCursor: rows.length > options.limit
+          ? encodePageCursor(pageItems[pageItems.length - 1], options.sort)
+          : ''
       };
     },
     latestCursor: async (options) => {
@@ -205,6 +202,20 @@ function memoryItemRepository(items) {
     },
     count: async (options) => selected(options).length,
     listFacets: async (options) => ({ items: selected(options), truncated: false }),
+    releaseExpiredVisualPublicationHolds: async (cutoff, releasedAt) => {
+      const cutoffTime = new Date(cutoff).getTime();
+      const released = [];
+      for (const entry of items) {
+        if (entry.publicState !== 'active'
+          || entry.visualPublicationHeld !== true
+          || new Date(entry.firstStoredAt).getTime() > cutoffTime) continue;
+        entry.visualPublicationHeld = false;
+        entry.visualPublicationReleasedAt = releasedAt;
+        entry.visualPublicationReleaseReason = 'grace-expired';
+        released.push(entry._id);
+      }
+      return released;
+    },
     getByItemId: async (id) => items.find((item) => item.id === id) || null,
     getManyByItemIds: async (ids) => ids
       .map((id) => items.find((item) => item.id === id))
@@ -227,20 +238,78 @@ function memoryDayIndexRepository(items) {
   };
 }
 
-test('serves every current item without a picture and rejects free history escalation', async () => {
-  const current = toStoredFeedItem(rawItem('item1001', '2026-07-17T01:00:00.000Z'), {
+test('applies a four-minute visual grace only to newly held or legacy-observed text cards', () => {
+  const stored = toStoredFeedItem(rawItem('grace0001', '2026-07-17T03:00:00.000Z'), {
+    provider: 'aihot', generation: 'grace', observedAt: new Date(NOW), coverage: 'all'
+  });
+  const waiting = withInitialVisualPublicationState(stored);
+  assert.equal(waiting.visualPublicationHeld, true);
+  assert.equal(visualPublicationVisible(waiting, NOW, ITEM_CONFIG.visualPublicationGraceMs), false);
+  assert.equal(visualPublicationVisible(
+    waiting,
+    NOW + ITEM_CONFIG.visualPublicationGraceMs,
+    ITEM_CONFIG.visualPublicationGraceMs
+  ), true);
+  assert.equal(visualPublicationVisible({
+    ...waiting,
+    visualState: 'retry'
+  }, NOW, ITEM_CONFIG.visualPublicationGraceMs), true);
+
+  const ready = withInitialVisualPublicationState({
+    ...stored,
+    coverFileId: 'cloud://visual/ready-now.jpg'
+  });
+  assert.equal(ready.visualPublicationHeld, false);
+  assert.equal(visualPublicationVisible(ready, NOW, ITEM_CONFIG.visualPublicationGraceMs), true);
+
+  const legacyWaiting = {
+    id: 'legacy-grace',
+    firstObservedAt: new Date(NOW),
+    previewFileIds: []
+  };
+  assert.equal(visualPublicationVisible(
+    legacyWaiting,
+    NOW,
+    ITEM_CONFIG.visualPublicationGraceMs
+  ), false);
+  assert.equal(visualPublicationVisible({
+    ...stored,
+    visualPublicationHeld: undefined
+  }, NOW, ITEM_CONFIG.visualPublicationGraceMs), true);
+});
+
+test('holds new image-less cards briefly, then releases text without weakening history entitlements', async () => {
+  let currentTime = NOW;
+  const current = toStoredFeedItem(rawItem('item1001', '2026-07-17T01:00:00.000Z', {
+    coverFileId: 'cloud://visual/current.jpg', coverStatus: 'ready'
+  }), {
     provider: 'aihot', generation: 'g1', observedAt: new Date(NOW), coverage: 'all'
   });
-  const old = toStoredFeedItem(rawItem('item1002', '2026-06-20T01:00:00.000Z'), {
+  const queued = {
+    ...toStoredFeedItem(rawItem('item1003', '2026-07-17T02:00:00.000Z'), {
+      provider: 'aihot', generation: 'g2', observedAt: new Date(NOW), coverage: 'all'
+    }),
+    visualPublicationHeld: true
+  };
+  const failed = {
+    ...toStoredFeedItem(rawItem('item1004', '2026-07-17T01:30:00.000Z'), {
+      provider: 'aihot', generation: 'g3', observedAt: new Date(NOW), coverage: 'all'
+    }),
+    visualState: 'retry',
+    visualPublicationHeld: false
+  };
+  const old = toStoredFeedItem(rawItem('item1002', '2026-06-20T01:00:00.000Z', {
+    previewFileIds: ['cloud://visual/old.jpg'], previewStatus: 'ready'
+  }), {
     provider: 'aihot', generation: 'g0', observedAt: new Date(NOW), coverage: 'daily-curated'
   });
   const service = createItemFeedQueryService({
-    itemRepository: memoryItemRepository([current, old]),
-    dayIndexRepository: memoryDayIndexRepository([current, old]),
+    itemRepository: memoryItemRepository([current, queued, failed, old]),
+    dayIndexRepository: memoryDayIndexRepository([current, queued, failed, old]),
     syncStateRepository: { get: async () => ({ allItemsSyncedAt: new Date(NOW) }) },
     legacyFeedService: { getFeed: async () => { throw new Error('legacy not expected'); } },
     config: ITEM_CONFIG,
-    now: () => NOW
+    now: () => currentTime
   });
 
   const free = entitlementView('free', ITEM_CONFIG);
@@ -250,30 +319,126 @@ test('serves every current item without a picture and rejects free history escal
     return true;
   });
   const freeFeed = await service.getFeed({}, free);
-  assert.equal(freeFeed.appliedFilters.time, '7d');
-  assert.deepEqual(freeFeed.items.map((item) => item.id), ['item1001']);
+  assert.equal(freeFeed.appliedFilters.time, '1d');
+  assert.deepEqual(freeFeed.items.map((item) => item.id), ['item1004', 'item1001']);
   assert.equal(freeFeed.items[0].visualKind, '');
-  assert.equal((await service.getItem('item1001', free)).id, 'item1001');
+  assert.equal(freeFeed.items[1].visualKind, 'cover');
+  assert.equal(decodePageCursor(freeFeed.headCursor, 'latest').id, failed._id);
+  await assert.rejects(() => service.getItem('item1003', free), { code: 'ITEM_NOT_FOUND' });
+  const detail = await service.getItem('item1001', free);
+  assert.equal(detail.id, 'item1001');
+  assert.deepEqual(detail.relatedItems.map((item) => item.id), ['item1004']);
+  assert.equal(detail.relatedItems[0].visualKind, '');
   await assert.rejects(() => service.getItem('item1002', free), { code: 'ENTITLEMENT_REQUIRED' });
+
+  currentTime += ITEM_CONFIG.visualPublicationGraceMs;
+  const releasedFeed = await service.getFeed({}, free);
+  assert.deepEqual(releasedFeed.items.map((item) => item.id), ['item1003', 'item1004', 'item1001']);
+  assert.equal((await service.getItem('item1003', free)).visualKind, '');
 
   const memberFeed = await service.getFeed({}, entitlementView('member', ITEM_CONFIG));
   assert.equal(memberFeed.appliedFilters.time, '30d');
-  assert.deepEqual(memberFeed.items.map((item) => item.id), ['item1001', 'item1002']);
+  assert.deepEqual(memberFeed.items.map((item) => item.id), ['item1003', 'item1004', 'item1001', 'item1002']);
 
   const adminFeed = await service.getFeed({}, entitlementView('admin', ITEM_CONFIG));
   assert.equal(adminFeed.appliedFilters.time, 'all');
-  assert.deepEqual(adminFeed.items.map((item) => item.id), ['item1001', 'item1002']);
+  assert.deepEqual(adminFeed.items.map((item) => item.id), ['item1003', 'item1004', 'item1001', 'item1002']);
 
   const adminSevenDays = await service.getFeed({ filters: { time: '7d' } }, entitlementView('admin', ITEM_CONFIG));
-  assert.equal(adminSevenDays.totalAvailable, 2);
-  assert.equal(adminSevenDays.resultCount, 1);
+  assert.equal(adminSevenDays.totalAvailable, 4);
+  assert.equal(adminSevenDays.resultCount, 3);
   assert.equal(facetMatrixCount(adminSevenDays.facetMatrix, 'all', {
     time: '7d', company: 'all', direction: 'all'
-  }), 1);
+  }), 3);
+});
+
+test('shows the complete AIGCLINK library to every role and filters it by native source tags', async () => {
+  const libraryItems = [
+    toStoredFeedItem(rawItem('library001', '2023-10-28T04:00:00.000Z', {
+      source: 'GitHub 开源库',
+      sourceChannelKeys: ['openSource'],
+      sourceTags: ['MCP', 'AI agent'],
+      coverFileId: 'cloud://visual/library-1.jpg',
+      coverStatus: 'ready'
+    }), { provider: 'aihot', generation: 'library', observedAt: new Date(NOW), coverage: 'library' }),
+    toStoredFeedItem(rawItem('library002', '2024-02-01T04:00:00.000Z', {
+      source: 'GitHub 开源库',
+      sourceChannelKeys: ['openSource'],
+      sourceTags: ['AI agent'],
+      coverFileId: 'cloud://visual/library-2.jpg',
+      coverStatus: 'ready'
+    }), { provider: 'aihot', generation: 'library', observedAt: new Date(NOW), coverage: 'library' })
+  ];
+  const service = createItemFeedQueryService({
+    itemRepository: memoryItemRepository(libraryItems),
+    dayIndexRepository: memoryDayIndexRepository(libraryItems),
+    syncStateRepository: {
+      get: async () => ({
+        allItemsSyncedAt: new Date(NOW),
+        aigclinkSyncedAt: new Date(NOW)
+      })
+    },
+    legacyFeedService: { getFeed: async () => { throw new Error('legacy not expected'); } },
+    config: ITEM_CONFIG,
+    now: () => NOW
+  });
+  const free = entitlementView('free', ITEM_CONFIG);
+  const library = await service.getFeed({
+    channel: 'openSource',
+    filters: { sourceTag: 'MCP', time: '1d', company: 'company:openai' }
+  }, free);
+  assert.equal(library.appliedFilters.time, 'all');
+  assert.equal(library.appliedFilters.company, 'all');
+  assert.equal(library.appliedFilters.sourceTag, 'MCP');
+  assert.deepEqual(library.items.map((item) => item.id), ['library001']);
+  assert.equal(library.totalAvailable, 2);
+  assert.deepEqual(library.sourceTagFacets, [
+    { value: 'AI agent', count: 2 },
+    { value: 'MCP', count: 1 }
+  ]);
+  assert.equal(library.dayBuckets, undefined);
+  assert.equal((await service.getItem('library001', free)).id, 'library001');
+  const ordinaryFeed = await service.getFeed({}, free);
+  assert.deepEqual(ordinaryFeed.items, []);
+});
+
+test('returns one collapsible header per selected day and pages an opened day only', async () => {
+  const items = [
+    toStoredFeedItem(rawItem('dayitem01', '2026-07-17T03:00:00.000Z', {
+      coverFileId: 'cloud://visual/today.jpg', coverStatus: 'ready'
+    }), { provider: 'aihot', generation: 'g1', observedAt: new Date(NOW), coverage: 'all' }),
+    toStoredFeedItem(rawItem('dayitem02', '2026-07-16T03:00:00.000Z', {
+      coverFileId: 'cloud://visual/yesterday.jpg', coverStatus: 'ready'
+    }), { provider: 'aihot', generation: 'g1', observedAt: new Date(NOW), coverage: 'all' })
+  ];
+  const service = createItemFeedQueryService({
+    itemRepository: memoryItemRepository(items),
+    dayIndexRepository: memoryDayIndexRepository(items),
+    syncStateRepository: { get: async () => ({ allItemsSyncedAt: new Date(NOW) }) },
+    legacyFeedService: { getFeed: async () => { throw new Error('legacy not expected'); } },
+    config: ITEM_CONFIG,
+    now: () => NOW
+  });
+  const member = entitlementView('member', ITEM_CONFIG);
+  const feed = await service.getFeed({ filters: { time: '30d' } }, member);
+  assert.equal(feed.dayBuckets.length, 30);
+  assert.equal(feed.dayBuckets[0].dateKey, '2026-07-17');
+  assert.equal(feed.dayBuckets[1].dateKey, '2026-07-16');
+  assert.equal(feed.dayBuckets[1].count, 1);
+
+  const opened = await service.getDay({
+    dateKey: '2026-07-16',
+    filters: { time: '30d' },
+    limit: 20
+  }, member);
+  assert.deepEqual(opened.items.map((item) => item.id), ['dayitem02']);
+  assert.equal(opened.hasMore, false);
 });
 
 test('computes feed counts only on the first page', async () => {
-  const current = toStoredFeedItem(rawItem('item1011', '2026-07-17T01:00:00.000Z'), {
+  const current = toStoredFeedItem(rawItem('item1011', '2026-07-17T01:00:00.000Z', {
+    coverFileId: 'cloud://visual/count.jpg', coverStatus: 'ready'
+  }), {
     provider: 'aihot', generation: 'g1', observedAt: new Date(NOW), coverage: 'all'
   });
   const itemRepository = memoryItemRepository([current]);
@@ -307,7 +472,8 @@ test('computes feed counts only on the first page', async () => {
   assert.equal(totalCountCalls, 1);
 });
 
-test('counts new matching items from an opaque feed head without rebuilding the current page', async () => {
+test('counts image-less new items from an opaque feed head without rebuilding the current page', async () => {
+  let currentTime = NOW;
   const initial = toStoredFeedItem(rawItem('item1021', '2026-07-17T01:00:00.000Z'), {
     provider: 'aihot', generation: 'g1', observedAt: new Date(NOW), coverage: 'all'
   });
@@ -318,21 +484,72 @@ test('counts new matching items from an opaque feed head without rebuilding the 
     syncStateRepository: { get: async () => ({ allItemsSyncedAt: new Date(NOW) }) },
     legacyFeedService: { getFeed: async () => { throw new Error('legacy not expected'); } },
     config: ITEM_CONFIG,
-    now: () => NOW
+    now: () => currentTime
   });
   const entitlement = entitlementView('free', ITEM_CONFIG);
   const firstPage = await service.getFeed({}, entitlement);
   assert.ok(firstPage.headCursor);
 
-  items.push(toStoredFeedItem(rawItem('item1022', '2026-07-17T02:00:00.000Z'), {
-    provider: 'aihot', generation: 'g2', observedAt: new Date(NOW), coverage: 'all'
-  }));
+  items.push({
+    ...toStoredFeedItem(rawItem('item1022', '2026-07-17T02:00:00.000Z'), {
+      provider: 'aihot', generation: 'g2', observedAt: new Date(NOW), coverage: 'all'
+    }),
+    visualPublicationHeld: true
+  });
+  const waiting = await service.getUpdates({
+    headCursor: firstPage.headCursor,
+    filters: { time: '1d' }
+  }, entitlement);
+  assert.equal(waiting.newCount, 0);
+  assert.equal(waiting.headCursor, firstPage.headCursor);
+
+  currentTime += ITEM_CONFIG.visualPublicationGraceMs;
   const updates = await service.getUpdates({
     headCursor: firstPage.headCursor,
-    filters: { time: '7d' }
+    filters: { time: '1d' }
   }, entitlement);
   assert.equal(updates.newCount, 1);
   assert.notEqual(updates.headCursor, firstPage.headCursor);
+});
+
+test('paginates image-less items normally after the bounded visual grace expires', async () => {
+  const queued = Array.from({ length: 25 }, (_, index) => ({
+    ...toStoredFeedItem(rawItem(
+      `queued${String(index).padStart(3, '0')}`,
+      new Date(NOW + (index + 1) * 1000).toISOString()
+    ), {
+      provider: 'aihot', generation: 'queued', observedAt: new Date(NOW), coverage: 'all'
+    }),
+    visualPublicationHeld: true
+  }));
+  const ready = toStoredFeedItem(rawItem('ready0001', '2026-07-17T01:00:00.000Z', {
+    coverFileId: 'cloud://visual/ready.jpg', coverStatus: 'ready'
+  }), {
+    provider: 'aihot', generation: 'ready', observedAt: new Date(NOW), coverage: 'all'
+  });
+  const allItems = [...queued, ready];
+  const service = createItemFeedQueryService({
+    itemRepository: memoryItemRepository(allItems),
+    dayIndexRepository: memoryDayIndexRepository(allItems),
+    syncStateRepository: { get: async () => ({ allItemsSyncedAt: new Date(NOW) }) },
+    legacyFeedService: { getFeed: async () => { throw new Error('legacy not expected'); } },
+    config: ITEM_CONFIG,
+    now: () => NOW + ITEM_CONFIG.visualPublicationGraceMs
+  });
+  const first = await service.getFeed({ limit: 8 }, entitlementView('admin', ITEM_CONFIG));
+  assert.equal(first.items.length, 8);
+  assert.equal(first.items[0].id, 'queued024');
+  assert.ok(first.items.every((item) => item.visualKind === ''));
+  assert.equal(first.hasMore, true);
+  assert.ok(first.nextCursor);
+
+  const second = await service.getFeed({
+    limit: 8,
+    cursor: first.nextCursor
+  }, entitlementView('admin', ITEM_CONFIG));
+  assert.equal(second.items.length, 8);
+  assert.equal(second.items[0].id, 'queued016');
+  assert.equal(second.items.some((item) => first.items.some((firstItem) => firstItem.id === item.id)), false);
 });
 
 test('stores compact filter facets in each day index and upgrades legacy id-only documents', () => {
@@ -342,6 +559,8 @@ test('stores compact filter facets in each day index and upgrades legacy id-only
     id: 'item1101',
     publishedAt: '2026-07-17T01:00:00.000Z',
     channelKey: 'ai',
+    sourceChannelKeys: ['news'],
+    sourceChannelKey: 'news',
     topicKeys: ['company:openai', 'direction:agent'],
     score: 42,
     qualityTier: 'standard'
@@ -350,6 +569,8 @@ test('stores compact filter facets in each day index and upgrades legacy id-only
     id: 'legacy001',
     publishedAt: '2026-07-16T00:00:00.000Z',
     channelKey: 'ai',
+    sourceChannelKeys: ['news'],
+    sourceChannelKey: 'news',
     topicKeys: [],
     score: null,
     qualityTier: 'standard'
@@ -500,50 +721,36 @@ test('synchronizes mode=all into per-item documents and current day indexes', as
   assert.ok(state.allItemsSyncedAt instanceof Date);
 });
 
-test('migrates the legacy cache visuals and archived days in bounded batches', async () => {
-  const writes = [];
-  const mergedDays = [];
-  let progress = {};
-  const service = createFeedStoreMigrationService({
-    cacheRepository: {
+test('reuses the selected sync fingerprint and skips the all-mode lease when nothing changed', async () => {
+  const recent = new Date(NOW - 60 * 1000);
+  let fingerprintCalls = 0;
+  let leaseCalls = 0;
+  const service = createAllFeedSyncService({
+    source: {
+      loadFingerprint: async () => { fingerprintCalls += 1; throw new Error('must reuse observation'); },
+      loadAll: async () => { throw new Error('items must remain untouched'); }
+    },
+    cacheRepository: null,
+    itemRepository: {},
+    dayIndexRepository: {},
+    syncStateRepository: {
       get: async () => ({
-        items: [rawItem('item3001', '2026-07-17T01:00:00.000Z', {
-          coverFileId: 'cloud://legacy-cover',
-          selected: true
-        })]
-      })
-    },
-    archiveRepository: {
-      listDays: async () => [{
-        date: '2026-06-20',
-        items: [rawItem('item3002', '2026-06-20T01:00:00.000Z', { archiveSource: 'daily' })]
-      }]
-    },
-    itemRepository: {
-      upsertMany: async (documents) => {
-        writes.push(...documents);
-        return { total: documents.length, inserted: documents.length, updated: 0 };
-      }
-    },
-    dayIndexRepository: {
-      mergeHistoricalDay: async (date, entries, updatedAt, coverage) => {
-        mergedDays.push({ date, entries, coverage });
-      }
-    },
-    migrationRepository: {
-      get: async () => progress,
-      patch: async (fields) => (progress = { ...progress, ...fields })
+        allObservedFingerprint: 'all-same',
+        allAppliedFingerprint: 'all-same',
+        allItemsCheckedAt: recent,
+        allFullSyncedAt: recent
+      }),
+      acquireLease: async () => { leaseCalls += 1; return { acquired: true, document: {} }; }
     },
     config: ITEM_CONFIG,
     now: () => NOW,
-    createGeneration: () => 'migration-generation',
     logger: { warn() {} }
   });
 
-  const result = await service.run();
-  assert.equal(result.status, 'complete');
-  assert.equal(writes.length, 2);
-  assert.equal(writes.find((item) => item.id === 'item3001').coverFileId, 'cloud://legacy-cover');
-  assert.deepEqual(mergedDays.map((day) => day.date), ['2026-07-17', '2026-06-20']);
-  assert.deepEqual(mergedDays.map((day) => day.entries[0].id), ['item3001', 'item3002']);
+  const result = await service.run({
+    fingerprintObservation: { notModified: false, etag: 'fp-v2', all: 'all-same' }
+  });
+  assert.equal(result.status, 'unchanged');
+  assert.equal(fingerprintCalls, 0);
+  assert.equal(leaseCalls, 0);
 });

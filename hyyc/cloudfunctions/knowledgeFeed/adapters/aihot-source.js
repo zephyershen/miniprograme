@@ -1,4 +1,6 @@
 const { normalizeAihotResponse, normalizeAihotDaily } = require('../lib/aihot');
+const { sourceMetadataFields } = require('../lib/source-metadata');
+const { visualFields } = require('../lib/stored-feed-item');
 
 function parseRetryAfter(value, now = Date.now()) {
   if (!value) return null;
@@ -20,7 +22,7 @@ function sourceHttpError(response) {
   return error;
 }
 
-function createAihotSource(config, fetchImpl = fetch) {
+function createAihotSource(config, fetchImpl = fetch, enricher = null, logger = console) {
   function assertMode(mode) {
     if (!['selected', 'all'].includes(mode)) throw new Error('FEED_SOURCE_MODE_INVALID');
     return mode;
@@ -86,7 +88,30 @@ function createAihotSource(config, fetchImpl = fetch) {
       nextCursor = nextPage.hasNext ? nextPage.nextCursor : '';
     }
 
-    const items = normalizeAihotResponse({ items: rawItems }, boundedMaximum);
+    const normalizedItems = normalizeAihotResponse({ items: rawItems }, boundedMaximum);
+    let items = normalizedItems;
+    if (enricher && typeof enricher.enrichItems === 'function') {
+      try {
+        const enriched = await enricher.enrichItems(normalizedItems, { mode });
+        const byId = new Map((Array.isArray(enriched) ? enriched : [])
+          .filter((item) => item && typeof item.id === 'string')
+          .map((item) => [item.id, item]));
+        items = normalizedItems.map((item) => {
+          const enrichedItem = byId.get(item.id) || {};
+          return {
+            ...item,
+            ...sourceMetadataFields(enrichedItem),
+            ...visualFields(enrichedItem)
+          };
+        });
+      } catch (error) {
+        logger.warn('AI HOT optional metadata enrichment failed', {
+          mode,
+          message: error && error.message
+        });
+        items = normalizedItems;
+      }
+    }
     if (!items.length) throw new Error('FEED_SOURCE_EMPTY');
     return {
       notModified: false,

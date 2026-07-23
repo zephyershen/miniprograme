@@ -1,3 +1,7 @@
+const { createSafeLogger, logUnexpectedError } = require('./safe-log');
+
+const logger = createSafeLogger(console);
+
 class AppError extends Error {
   constructor(code, message, details = {}) {
     super(message);
@@ -22,7 +26,7 @@ function ok(data) {
 
 function fail(error) {
   const known = error instanceof AppError;
-  if (!known) console.error(error);
+  if (!known) logUnexpectedError(logger, 'Knowledge feed request failed', error);
   return {
     ok: false,
     error: {

@@ -10,8 +10,7 @@
   height: 70rpx;
   margin-bottom: 28rpx;
   border-radius: 24rpx;
-  background: linear-gradient(135deg, var(--ui-accent), var(--ui-violet));
-  box-shadow: var(--ui-shadow-accent);
+  background: var(--ui-accent);
   content: "↗";
   color: #fff;
   font-size: 32rpx;
@@ -27,8 +26,7 @@
   width: 100%;
   margin: 38rpx 0 0;
   border-radius: 24rpx;
-  background: linear-gradient(135deg, var(--ui-accent), var(--ui-accent-strong));
-  box-shadow: var(--ui-shadow-accent);
+  background: var(--ui-ink);
   color: #ffffff;
   font-size: 25rpx;
   line-height: 88rpx;

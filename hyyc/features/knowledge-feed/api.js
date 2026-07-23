@@ -9,8 +9,17 @@ function getKnowledgeFeedUpdates(options = {}) {
   return callCloudFunction('knowledgeFeed', { action: 'feedUpdates', ...options });
 }
 
+function getKnowledgeFeedDay(options = {}) {
+  return callCloudFunction('knowledgeFeed', { action: 'feedDay', ...options });
+}
+
 function getKnowledgeItem(id) {
   return callCloudFunction('knowledgeFeed', { action: 'item', id });
 }
 
-module.exports = { getKnowledgeFeed, getKnowledgeFeedUpdates, getKnowledgeItem };
+module.exports = {
+  getKnowledgeFeed,
+  getKnowledgeFeedDay,
+  getKnowledgeFeedUpdates,
+  getKnowledgeItem
+};

@@ -1,0 +1,73 @@
+<page-meta page-style="{{membershipPromptVisible ? 'overflow: hidden;' : ''}}" />
+<view class="reader-page">
+  <view wx:if="{{loading}}" class="reader-state">
+    <view class="state-rule state-rule-strong"></view><view class="state-rule"></view><view class="state-rule state-rule-short"></view>
+  </view>
+
+  <view wx:elif="{{error}}" class="reader-state">
+    <view class="state-title">这份档案暂时无法打开</view>
+    <view class="state-copy">{{error}}</view>
+    <view wx:if="{{!membershipPromptVisible}}" class="state-action" bindtap="retry">重新读取 →</view>
+  </view>
+
+  <block wx:elif="{{dossier}}">
+    <view class="reader-spine">
+      <view class="reader-kicker">{{dossier.eyebrow}}</view>
+      <view class="reader-title">{{dossier.title}}</view>
+      <view class="reader-subtitle">{{dossier.subtitle}}</view>
+      <view class="reader-meta">{{dossier.metaLabel}}</view>
+    </view>
+
+    <view class="reader-lead">
+      <view class="reader-label">{{dossier.leadLabel}}</view>
+      <view class="reader-lead-copy">{{dossier.lead}}</view>
+    </view>
+
+    <view wx:if="{{dossier.visual.mode !== 'none'}}" class="reader-visual">
+      <image wx:if="{{dossier.visual.mode === 'image'}}" class="reader-image" src="{{dossier.visual.imageUrl}}" mode="widthFix" bindtap="previewIllustration" />
+      <view wx:else class="blueprint">
+        <view class="blueprint-core">{{dossier.visual.center}}</view>
+        <view class="blueprint-rail"></view>
+        <view class="blueprint-nodes">
+          <view wx:for="{{dossier.visual.nodes}}" wx:key="id" class="blueprint-node"><view class="blueprint-node-title">{{item.label}}</view><view wx:if="{{item.note}}" class="blueprint-node-note">{{item.note}}</view></view>
+        </view>
+        <view wx:if="{{dossier.visual.connections.length}}" class="blueprint-links"><view wx:for="{{dossier.visual.connections}}" wx:key="id" class="blueprint-link">{{item.label || (item.from + ' → ' + item.to)}}</view></view>
+      </view>
+      <view class="visual-caption">{{dossier.visual.note || '变化关系图 · 随档案持续修订'}}</view>
+    </view>
+
+    <view class="reader-sections">
+      <view wx:for="{{dossier.sections}}" wx:key="key" class="article-section article-section-{{item.tone}}">
+        <view class="article-title">{{item.label}}</view>
+        <view wx:if="{{item.body}}" class="article-body">{{item.body}}</view>
+        <view wx:if="{{item.items.length}}" class="article-list">
+          <view wx:for="{{item.items}}" wx:for-item="point" wx:key="*this" class="article-item"><text class="article-item-index">{{index + 1 < 10 ? '0' + (index + 1) : index + 1}}</text><text>{{point}}</text></view>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{dossier.timeline.length}}" class="reader-block">
+      <view class="block-head"><view class="block-title">时间线</view><view class="block-note">只记真正改变判断的节点</view></view>
+      <view class="timeline">
+        <view wx:for="{{dossier.timeline}}" wx:key="id" class="timeline-row {{item.caseId ? 'timeline-row-link' : ''}}" data-id="{{item.caseId}}" bindtap="openCase"><view class="timeline-date">{{item.dateLabel}}</view><view wx:if="{{item.title}}" class="timeline-title">{{item.title}}</view><view wx:if="{{item.copy}}" class="timeline-copy">{{item.copy}}</view><view wx:if="{{item.caseId}}" class="timeline-more">阅读案例 ↗</view></view>
+      </view>
+    </view>
+
+    <view wx:if="{{dossier.relatedLessons.length}}" class="reader-block">
+      <view class="block-head"><view class="block-title">相关课程</view><view class="block-note">补齐理解这件事的基础</view></view>
+      <view wx:for="{{dossier.relatedLessons}}" wx:key="id" class="related-row" data-id="{{item.id}}" bindtap="openLesson"><view class="related-mark">LESSON</view><view class="related-copy"><view class="related-title">{{item.title}}</view><view wx:if="{{item.subtitle}}" class="related-subtitle">{{item.subtitle}}</view></view><view class="related-arrow">↗</view></view>
+    </view>
+
+    <view wx:if="{{dossier.relatedCases.length}}" class="reader-block">
+      <view class="block-head"><view class="block-title">相关案例</view><view class="block-note">看看趋势怎样进入现实</view></view>
+      <view wx:for="{{dossier.relatedCases}}" wx:key="id" class="related-row" data-id="{{item.id}}" bindtap="openCase"><view class="related-mark">CASE</view><view class="related-copy"><view class="related-title">{{item.title}}</view><view wx:if="{{item.subtitle}}" class="related-subtitle">{{item.subtitle}}</view></view><view class="related-arrow">↗</view></view>
+    </view>
+
+    <view wx:if="{{dossier.sources.length}}" class="reader-block">
+      <view class="block-head"><view class="block-title">证据来源</view><view class="block-note">可回到原始出处</view></view>
+      <view wx:for="{{dossier.sources}}" wx:key="id" class="related-row" data-index="{{index}}" bindtap="openSource"><view class="related-mark">SOURCE</view><view class="related-copy"><view class="related-title">{{item.title}}</view><view wx:if="{{item.subtitle}}" class="related-subtitle">{{item.subtitle}}</view></view><view class="related-arrow">{{item.itemId || item.url ? '↗' : ''}}</view></view>
+    </view>
+  </block>
+
+  <membership-prompt visible="{{membershipPromptVisible}}" feature-key="{{membershipPromptFeature}}" bindclose="closeMembershipPrompt" bindviewbenefits="openMembershipFromPrompt" />
+</view>

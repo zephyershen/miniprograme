@@ -2,9 +2,7 @@
 
 page {
   min-height: 100%;
-  background:
-    radial-gradient(circle at 92% -4%, rgba(126, 113, 242, 0.13), transparent 32%),
-    linear-gradient(180deg, #f7f7fa 0%, var(--ui-canvas) 34%, var(--ui-canvas-deep) 100%);
+  background: var(--ui-canvas);
   color: var(--ui-ink);
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif;
   font-size: 28rpx;
@@ -14,9 +12,9 @@ page {
 button {
   box-sizing: border-box;
   min-height: 88rpx;
-  border-radius: var(--ui-radius-md);
+  border-radius: 999rpx;
   font-size: 27rpx;
-  font-weight: 650;
+  font-weight: 700;
   line-height: 88rpx;
   transition: opacity 160ms ease, transform 160ms ease;
 }
@@ -52,8 +50,7 @@ button:active { opacity: 0.82; transform: scale(0.985); }
   width: 12rpx;
   height: 12rpx;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--ui-accent), var(--ui-violet));
-  box-shadow: 0 0 18rpx rgba(91, 92, 226, 0.48);
+  background: var(--ui-accent);
   content: "";
 }
 
@@ -78,12 +75,10 @@ button:active { opacity: 0.82; transform: scale(0.985); }
   border: 1rpx solid var(--ui-hairline);
   border-radius: var(--ui-radius-lg);
   background: var(--ui-surface);
-  box-shadow: var(--ui-shadow-soft);
 }
 
 .primary-button {
-  background: linear-gradient(135deg, var(--ui-accent) 0%, var(--ui-accent-strong) 100%);
-  box-shadow: var(--ui-shadow-accent);
+  background: var(--ui-accent);
   color: #ffffff;
 }
 
@@ -103,7 +98,7 @@ button:active { opacity: 0.82; transform: scale(0.985); }
   min-height: 72rpx;
   padding: 0 26rpx;
   border: 1rpx solid var(--ui-hairline);
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--ui-surface-solid);
   color: var(--ui-ink);
   line-height: 72rpx;
 }
@@ -133,8 +128,7 @@ button:active { opacity: 0.82; transform: scale(0.985); }
   inset: 0;
   display: flex;
   align-items: flex-end;
-  background: rgba(21, 23, 31, 0.42);
-  backdrop-filter: blur(12rpx);
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .modal-panel {
@@ -144,8 +138,8 @@ button:active { opacity: 0.82; transform: scale(0.985); }
   max-height: 88vh;
   padding: 48rpx 30rpx calc(32rpx + env(safe-area-inset-bottom));
   border-radius: var(--ui-radius-xl) var(--ui-radius-xl) 0 0;
-  background: rgba(248, 249, 252, 0.98);
-  box-shadow: 0 -20rpx 70rpx rgba(25, 27, 36, 0.18);
+  background: var(--ui-surface-solid);
+  box-shadow: 0 -12rpx 40rpx rgba(15, 20, 25, 0.12);
 }
 
 .modal-panel::before {

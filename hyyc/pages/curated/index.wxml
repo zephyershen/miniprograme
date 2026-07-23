@@ -1,73 +1,118 @@
-<view class="column-page">
-  <view class="column-header">
-    <view class="column-kicker"><text></text>AI KNOWLEDGE</view>
-    <view class="column-title">AI 专栏</view>
-    <view class="column-deck">从 Agent、Skill、MCP 开始，把 AI 的关键概念讲成人话。</view>
+<page-meta page-style="{{membershipPromptVisible ? 'overflow: hidden;' : ''}}" />
+<view class="manual-page">
+  <view class="manual-head">
+    <view class="manual-kicker">AI 学习手册</view>
+    <view class="manual-title">先看懂，再动手</view>
+    <view class="manual-deck">先用日常例子把 AI 讲明白，再跟着步骤把工具装好、真正用起来。</view>
+    <view wx:if="{{home.updatedLabel}}" class="manual-updated">{{home.updatedLabel}}</view>
   </view>
 
-  <view wx:if="{{loading}}" class="column-loading">
-    <view class="loading-orb"></view>
-    <view><view class="loading-line loading-line-wide"></view><view class="loading-line"></view></view>
-  </view>
-
-  <view wx:elif="{{error}}" class="column-empty">
-    <view class="empty-title">专栏暂时没有加载成功</view>
-    <view class="empty-copy">{{error}}</view>
-    <view class="text-action" bindtap="retry">重新加载 →</view>
-  </view>
-
-  <view wx:elif="{{locked}}" class="column-gate">
-    <view class="gate-status"><view class="gate-lock"></view><text>Pro 专属 · 内测中</text></view>
-    <view class="gate-title">把 AI 听懂，也真正用起来</view>
-    <view class="gate-copy">每篇只解决一个问题：一句定义、一个例子、一个判断方法。无需技术背景，也能建立完整认知。</view>
-    <view class="gate-tags"><text>讲人话</text><text>有例子</text><text>能判断</text></view>
-    <view class="gate-action" bindtap="openProfile">查看 Pro 权益 <text>→</text></view>
-
-    <view class="roadmap-label">从这里开始</view>
-    <view class="preview-list">
-      <view wx:for="{{view.previewLessons}}" wx:key="id" class="preview-row" bindtap="openProfile">
-        <view class="preview-order">{{item.order}}</view>
-        <view class="preview-copy"><view class="preview-term">{{item.term}} · {{item.duration}}</view><view class="preview-title">{{item.title}}</view><view class="preview-subtitle">{{item.subtitle}}</view></view>
-        <view class="preview-lock"></view>
-      </view>
+  <view class="section-nav" role="tablist">
+    <view
+      wx:for="{{sectionTabs}}"
+      wx:key="key"
+      class="section-tab {{item.active ? 'section-tab-active' : ''}}"
+      data-key="{{item.key}}"
+      bindtap="selectSection"
+      role="tab"
+    >
+      <text>{{item.label}}</text>
+      <label>{{item.note}}</label>
     </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="manual-state">
+    <view class="state-rule state-rule-wide"></view>
+    <view class="state-rule"></view>
+    <view class="state-rule state-rule-short"></view>
+  </view>
+
+  <view wx:elif="{{error}}" class="manual-state">
+    <view class="state-title">这一页暂时没有加载好</view>
+    <view class="state-copy">{{error}}</view>
+    <view class="text-action" bindtap="retry">重新读取 →</view>
   </view>
 
   <block wx:else>
-    <view class="column-hero">
-      <view class="hero-label">建议从这里开始</view>
-      <view class="hero-title">{{view.nextLesson.title}}</view>
-      <view class="hero-copy">{{view.nextLesson.subtitle}}</view>
-      <view class="hero-action" data-id="{{view.nextLesson.id}}" bindtap="toggleLesson">开始阅读 <text>→</text></view>
-      <view class="hero-glow"></view>
+    <view wx:if="{{locked}}" class="access-note" bindtap="openMembershipPrompt">
+      <view><text class="access-mark">PRO</text><text>Pro 专属 · 当前展示目录预览</text></view>
+      <text class="access-link">查看完整内容 →</text>
     </view>
 
-    <scroll-view scroll-x enhanced show-scrollbar="{{false}}" class="track-scroll">
-      <view class="track-list">
-        <view wx:for="{{view.tracks}}" wx:key="key" class="track-chip {{item.active ? 'track-chip-active' : ''}}" data-key="{{item.key}}" bindtap="selectTrack">{{item.label}}</view>
-      </view>
-    </scroll-view>
+    <view wx:if="{{homeNotice}}" class="home-notice" bindtap="retry">{{homeNotice}} <text>重新读取 →</text></view>
 
-    <view class="lesson-list">
-      <view wx:for="{{view.lessons}}" wx:key="id" class="lesson-card {{item.expanded ? 'lesson-card-open' : ''}}" data-id="{{item.id}}" bindtap="toggleLesson">
-        <view class="lesson-top">
-          <view class="lesson-order">{{item.order}}</view>
-          <view class="lesson-heading"><view class="lesson-term">{{item.term}} · {{item.duration}}</view><view class="lesson-title">{{item.title}}</view><view class="lesson-subtitle">{{item.subtitle}}</view></view>
-          <view class="lesson-toggle">{{item.expanded ? '−' : '+'}}</view>
-        </view>
-        <view wx:if="{{item.expanded}}" class="lesson-body">
-          <view class="poster-intro"><text>手绘故事课</text><text>点开看高清 · 左右滑动 {{item.posters.length}} 页</text></view>
-          <swiper class="poster-swiper" current="{{activePosterIndex}}" indicator-dots="{{true}}" indicator-color="rgba(74, 77, 92, .2)" indicator-active-color="#5457df" duration="320" bindchange="handlePosterChange" catchtap="stopPropagation">
-            <swiper-item wx:for="{{item.posters}}" wx:for-item="poster" wx:for-index="posterIndex" wx:key="key">
-              <view class="poster-frame">
-                <view class="poster-fallback">{{posterError === poster.key ? '海报加载失败，请重新进入专栏' : '正在加载海报…'}}</view>
-                <image wx:if="{{posterLoads[posterIndex]}}" class="poster-image" src="{{poster.image}}" mode="aspectFit" fade-in="{{false}}" aria-label="{{poster.alt}}，点击查看高清大图" data-key="{{poster.key}}" data-id="{{item.id}}" data-index="{{posterIndex}}" catchtap="previewPoster" binderror="handlePosterError" />
-                <view wx:if="{{posterLoads[posterIndex]}}" class="poster-hd-badge" data-id="{{item.id}}" data-index="{{posterIndex}}" catchtap="previewPoster"><text class="poster-hd-icon"></text><text>高清查看</text></view>
+    <view wx:if="{{activeSection === 'courses'}}" class="manual-section">
+      <view class="section-heading">
+        <view><view class="section-index">第一部分</view><view class="section-title">基础课</view></view>
+        <view class="section-note">用生活里的例子，把概念讲清楚</view>
+      </view>
+      <view class="course-groups">
+        <view wx:for="{{home.courseGroups}}" wx:for-item="group" wx:key="key" class="course-group">
+          <view class="course-track-head">
+            <view class="course-track-number">{{index + 1 < 10 ? '0' + (index + 1) : index + 1}}</view>
+            <view class="course-track-copy"><view class="course-track-title">{{group.label}}</view><view wx:if="{{group.note}}" class="course-track-note">{{group.note}}</view></view>
+            <view class="course-track-count">{{group.lessons.length}} 节</view>
+          </view>
+          <view class="manual-sheet">
+            <view
+              wx:for="{{group.lessons}}"
+              wx:for-item="lesson"
+              wx:key="id"
+              class="manual-row"
+              data-id="{{lesson.id}}"
+              bindtap="openLesson"
+            >
+              <view class="row-margin"><text>{{lesson.order}}</text></view>
+              <view class="row-copy">
+                <view class="row-eyebrow">{{lesson.eyebrow}}</view>
+                <view class="row-title">{{lesson.title}}</view>
+                <view wx:if="{{lesson.subtitle}}" class="row-subtitle">{{lesson.subtitle}}</view>
+                <view wx:if="{{lesson.duration || lesson.updatedLabel}}" class="row-meta"><text wx:if="{{lesson.duration}}">{{lesson.duration}}</text><text wx:if="{{lesson.updatedLabel}}">{{lesson.updatedLabel}}</text></view>
               </view>
-            </swiper-item>
-          </swiper>
+              <view class="row-end"><view wx:if="{{locked}}" class="row-lock"></view><text wx:else>↗</text></view>
+            </view>
+          </view>
         </view>
+      </view>
+    </view>
+
+    <view wx:else class="manual-section practical-section">
+      <view class="section-heading">
+        <view><view class="section-index">第二部分</view><view class="section-title">动手课</view></view>
+        <view class="section-note">从安装开始，完成第一个真实任务</view>
+      </view>
+      <view class="manual-sheet">
+        <view
+          wx:for="{{home.practicals}}"
+          wx:key="id"
+          class="manual-row"
+          data-id="{{item.id}}"
+          bindtap="openPractical"
+        >
+          <view class="row-margin"><text>{{item.order}}</text></view>
+          <view class="row-copy">
+            <view class="row-eyebrow">{{item.eyebrow}}</view>
+            <view class="row-title">{{item.title}}</view>
+            <view wx:if="{{item.subtitle}}" class="row-subtitle">{{item.subtitle}}</view>
+            <view wx:if="{{item.duration || item.updatedLabel}}" class="row-meta"><text wx:if="{{item.duration}}">{{item.duration}}</text><text wx:if="{{item.updatedLabel}}">{{item.updatedLabel}}</text></view>
+          </view>
+          <view class="row-end"><view wx:if="{{locked}}" class="row-lock"></view><text wx:else>↗</text></view>
+        </view>
+      </view>
+
+      <view class="support-note">
+        <view class="support-kicker">会员技术支持</view>
+        <view class="support-title">安装卡住了，可以私聊我</view>
+        <view class="support-copy">Pro 会员安装或使用工具时遇到问题，可以私聊我的微信，我会帮你一起排查；这项技术支持不另外收费。</view>
+        <view class="support-boundary">Codex CLI、Claude Code 等工具自身的订阅、API 和云服务费用不包含在会员中。</view>
       </view>
     </view>
   </block>
+
+  <membership-prompt
+    visible="{{membershipPromptVisible}}"
+    feature-key="{{membershipPromptFeature}}"
+    bindclose="closeMembershipPrompt"
+    bindviewbenefits="openMembershipFromPrompt"
+  />
 </view>

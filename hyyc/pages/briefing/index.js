@@ -1,4 +1,4 @@
-const { getBriefing } = require('../../features/briefing/api.js');
+const { loadBriefing: loadBriefingContent } = require('../../features/briefing/session.js');
 const { BRIEFING_SAMPLE } = require('../../features/briefing/sample.js');
 const {
   WINDOW_OPTIONS,
@@ -7,7 +7,10 @@ const {
   filterBriefing,
   createBriefingState
 } = require('../../features/briefing/model.js');
-const { refreshMembershipAccess } = require('../../features/membership/session.js');
+const {
+  refreshMembershipAccess,
+  membershipCacheScope
+} = require('../../features/membership/session.js');
 const { membershipPresentation } = require('../../features/membership/presentation.js');
 
 function activate(options, key) {
@@ -18,18 +21,21 @@ Page({
   data: {
     ...createBriefingState(),
     sample: normalizeBriefing(BRIEFING_SAMPLE),
-    membership: membershipPresentation(null)
+    membership: membershipPresentation(null),
+    membershipPromptVisible: false,
+    membershipPromptFeature: 'digests'
   },
 
   onShow() {
-    this.resolveAccess();
+    this.resolveAccess({ force: true });
   },
 
-  async resolveAccess() {
+  async resolveAccess({ force = false } = {}) {
     this.setData({ loading: true, error: '' });
     try {
-      const access = await refreshMembershipAccess({ force: true });
+      const access = await refreshMembershipAccess({ force });
       const membership = membershipPresentation(access);
+      this.accessResolvedAt = Date.now();
       if (!membership.isPrivileged) {
         this.rawBriefing = null;
         this.setData({
@@ -42,18 +48,18 @@ Page({
         return;
       }
       this.setData({ locked: false, membership });
-      await this.loadBriefing();
+      await this.loadBriefing(force, membershipCacheScope(access));
     } catch (error) {
       this.setData({ loading: false, error: error.message || '简报暂时无法加载' });
     }
   },
 
-  async loadBriefing() {
+  async loadBriefing(force = false, scope = membershipCacheScope()) {
     const requestId = (this.requestId || 0) + 1;
     this.requestId = requestId;
     this.setData({ loading: true, error: '' });
     try {
-      const raw = await getBriefing(this.data.windowKey);
+      const raw = await loadBriefingContent(this.data.windowKey, { force, scope });
       if (requestId !== this.requestId) return;
       const payload = raw && (raw.digest || raw.briefing) || raw || {};
       const briefing = normalizeBriefing(payload);
@@ -110,7 +116,19 @@ Page({
     wx.switchTab({ url: '/pages/profile/index' });
   },
 
+  openMembershipPrompt() {
+    this.setData({ membershipPromptVisible: true });
+  },
+
+  closeMembershipPrompt() {
+    this.setData({ membershipPromptVisible: false });
+  },
+
+  openMembershipFromPrompt() {
+    this.setData({ membershipPromptVisible: false }, () => this.openProfile());
+  },
+
   retry() {
-    this.resolveAccess();
+    this.resolveAccess({ force: true });
   }
 });

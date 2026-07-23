@@ -13,7 +13,6 @@ function publicDigest(document) {
     coverage: document.coverage || { state: 'partial', ratio: 0 },
     executiveSummary: document.executiveSummary || '',
     mustKnow: Array.isArray(document.mustKnow) ? document.mustKnow : [],
-    trends: Array.isArray(document.trends) ? document.trends : [],
     radar: Array.isArray(document.radar) ? document.radar : [],
     followUps: Array.isArray(document.followUps) ? document.followUps : [],
     sourceIndex: Array.isArray(document.sourceIndex) ? document.sourceIndex : []

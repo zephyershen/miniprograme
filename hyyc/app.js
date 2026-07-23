@@ -1,4 +1,4 @@
-const { CLOUD_ENV_ID } = require('./config/constants.js');
+const { runtimeCloudEnvironment } = require('./config/runtime-environment.js');
 const { refreshMembershipAccess } = require('./features/membership/session.js');
 
 App({
@@ -8,14 +8,35 @@ App({
       return;
     }
 
-    wx.cloud.init({
-      env: CLOUD_ENV_ID
-    });
-    this.refreshMembershipAccess(false);
+    const runtime = runtimeCloudEnvironment(wx);
+    wx.cloud.init({ env: runtime.cloudEnvironmentId });
+    this.globalData.runtimeEnvironment = runtime;
+    this.skipNextMembershipResumeRefresh = true;
+    this.refreshMembershipAccess(true);
   },
 
   onShow() {
-    if (wx.cloud) this.refreshMembershipAccess(true);
+    if (wx.cloud) {
+      if (this.skipNextMembershipResumeRefresh) {
+        this.skipNextMembershipResumeRefresh = false;
+      } else {
+        this.refreshMembershipAccess(true);
+      }
+      this.scheduleMembershipOrderRecovery();
+    }
+  },
+
+  onHide() {
+    if (this.membershipRecoveryTimer) clearTimeout(this.membershipRecoveryTimer);
+    this.membershipRecoveryTimer = null;
+  },
+
+  scheduleMembershipOrderRecovery() {
+    if (this.membershipRecoveryTimer) return;
+    this.membershipRecoveryTimer = setTimeout(() => {
+      this.membershipRecoveryTimer = null;
+      this.recoverPendingMembershipOrder();
+    }, 300);
   },
 
   async refreshMembershipAccess(force) {
@@ -27,11 +48,22 @@ App({
     }
   },
 
+  async recoverPendingMembershipOrder() {
+    try {
+      const { recoverPendingMembershipOrder } = require('./features/billing/recovery.js');
+      return await recoverPendingMembershipOrder();
+    } catch (error) {
+      console.warn('待确认订单暂时未刷新', error && error.code ? error.code : error);
+      return null;
+    }
+  },
+
   globalData: {
     dashboard: null,
     knowledgeFeed: null,
     membership: null,
     curatedFeed: null,
-    briefing: null
+    briefing: null,
+    runtimeEnvironment: null
   }
 });

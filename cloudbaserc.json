@@ -4,32 +4,6 @@
   "functionRoot": "hyyc/cloudfunctions",
   "functions": [
     {
-      "name": "digestIngest",
-      "runtime": "Nodejs18.15",
-      "handler": "index.main",
-      "timeout": 60,
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": [
-        "node_modules/**",
-        "config.local.js"
-      ],
-      "description": "Fetches and summarizes one public article for the digest inbox."
-    },
-    {
-      "name": "digestStore",
-      "runtime": "Nodejs18.15",
-      "handler": "index.main",
-      "timeout": 20,
-      "memorySize": 256,
-      "installDependency": true,
-      "ignore": [
-        "node_modules/**",
-        "config.local.js"
-      ],
-      "description": "Stores dashboard preferences, queue decisions, and conclusion cards."
-    },
-    {
       "name": "knowledgeFeed",
       "runtime": "Nodejs18.15",
       "handler": "index.main",
@@ -41,13 +15,63 @@
           "name": "knowledge-feed-source-sync",
           "type": "timer",
           "config": "0 * * * * * *"
+        },
+        {
+          "name": "knowledge-feed-visual-worker",
+          "type": "timer",
+          "config": "10,25,40,55 * * * * * *"
+        },
+        {
+          "name": "knowledge-feed-intelligence-worker",
+          "type": "timer",
+          "config": "30 */10 * * * * *"
+        },
+        {
+          "name": "knowledge-feed-archive-maintenance",
+          "type": "timer",
+          "config": "0 15 * * * * *"
+        },
+        {
+          "name": "knowledge-feed-legacy-visual-maintenance",
+          "type": "timer",
+          "config": "0 45 * * * * *"
+        },
+        {
+          "name": "knowledge-feed-daily-digest",
+          "type": "timer",
+          "config": "0 0 8 * * * *"
+        },
+        {
+          "name": "knowledge-feed-weekly-digest",
+          "type": "timer",
+          "config": "0 5 8 ? * 1 *"
+        },
+        {
+          "name": "knowledge-feed-monthly-digest",
+          "type": "timer",
+          "config": "0 10 8 1 * ? *"
         }
       ],
       "ignore": [
         "node_modules/**",
         "config.local.js"
       ],
-      "description": "Checks updates every minute, stores the complete feed, and enriches missing visuals asynchronously."
+      "description": "Runs isolated source, archive, visual, intelligence, and calendar digest schedules."
+    },
+    {
+      "name": "sourcePreviewWorker",
+      "dir": "hyyc/cloudrun/source-preview-renderer",
+      "runtime": "Nodejs20.19",
+      "handler": "index.main",
+      "timeout": 90,
+      "memorySize": 2048,
+      "installDependency": true,
+      "ignore": [
+        "node_modules/**",
+        "Dockerfile",
+        "README.md"
+      ],
+      "description": "Captures reviewed source-page visuals inside CloudBase and writes JPEG files directly to cloud storage."
     },
     {
       "name": "knowledgeOps",
@@ -61,6 +85,26 @@
         "config.local.js"
       ],
       "description": "Private token-protected membership grants and knowledge operations status."
+    },
+    {
+      "name": "membershipBilling",
+      "runtime": "Nodejs18.15",
+      "handler": "index.main",
+      "timeout": 30,
+      "memorySize": 256,
+      "installDependency": true,
+      "triggers": [
+        {
+          "name": "membership-billing-reconcile",
+          "type": "timer",
+          "config": "0 */15 * * * * *"
+        }
+      ],
+      "ignore": [
+        "node_modules/**",
+        "config.local.js"
+      ],
+      "description": "Signs WeChat virtual purchases, verifies official order state, and grants membership idempotently."
     }
   ]
 }

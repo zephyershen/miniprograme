@@ -17,6 +17,11 @@ function patchVisualFileIds(fields) {
   return visualFileIds([fields || {}]);
 }
 
+function writableDocument(document) {
+  const { _id, ...data } = document || {};
+  return data;
+}
+
 function toMillis(value) {
   if (!value) return Number.NaN;
   if (value instanceof Date) return value.getTime();
@@ -65,7 +70,7 @@ function createFeedCacheRepository(db, config) {
         if (!isNotFound(error)) throw error;
       }
       assertSourceLease(current, lease);
-      const prepared = prepareDocument(data, current);
+      const prepared = writableDocument(prepareDocument(data, current));
       const next = lease ? {
         ...prepared,
         sourceSyncLeaseOwner: current.sourceSyncLeaseOwner,

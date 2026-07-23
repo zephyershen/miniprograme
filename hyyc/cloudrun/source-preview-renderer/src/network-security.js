@@ -31,11 +31,14 @@ function isPrivateIpv4(address) {
 }
 
 function isPrivateIp(address) {
-  const normalized = String(address || '').toLowerCase().split('%')[0];
-  const kind = net.isIP(normalized);
+  const raw = String(address || '').toLowerCase().split('%')[0];
+  const kind = net.isIP(raw);
+  const normalized = kind === 6
+    ? new URL(`http://[${raw}]/`).hostname.replace(/^\[|\]$/g, '')
+    : raw;
   if (kind === 4) return isPrivateIpv4(normalized);
   if (kind !== 6) return true;
-  if (normalized === '::' || normalized === '::1' || normalized.startsWith('fc') || normalized.startsWith('fd')) return true;
+  if (normalized.startsWith('::') || normalized.startsWith('fc') || normalized.startsWith('fd')) return true;
   if (/^fe[89ab]/.test(normalized)) return true;
   if (normalized.startsWith('fec') || normalized.startsWith('fed') || normalized.startsWith('fee') || normalized.startsWith('fef')) return true;
   if (normalized.startsWith('ff') || normalized.startsWith('64:ff9b:') || normalized.startsWith('2002:')) return true;
@@ -63,7 +66,10 @@ function createPublicUrlGuard({ resolver = dns.lookup, timeoutMs = 3000, cacheTt
         .then((addresses) => {
           const list = Array.isArray(addresses) ? addresses : [addresses];
           if (!list.length || list.some((entry) => isPrivateIp(entry && entry.address))) throw new Error('PRIVATE_HOST');
-          return true;
+          return list.map((entry) => ({
+            address: entry.address,
+            family: Number(entry.family) || net.isIP(entry.address)
+          }));
         });
       const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('DNS_TIMEOUT')), timeoutMs));
       const promise = Promise.race([lookup, timeout]).catch((error) => {
@@ -92,7 +98,7 @@ function createPublicUrlGuard({ resolver = dns.lookup, timeoutMs = 3000, cacheTt
     }
   }
 
-  return { assertPublicUrl, allowBrowserRequest };
+  return { resolvePublicHost, assertPublicUrl, allowBrowserRequest };
 }
 
 module.exports = { normalizePublicHttpsUrl, isPrivateIp, createPublicUrlGuard };

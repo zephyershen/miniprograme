@@ -48,7 +48,12 @@ const SORT_OPTIONS = Object.freeze([
   { key: 'hot', label: '热度', hint: '热度从高到低' }
 ]);
 
-const DEFAULT_FEED_FILTERS = Object.freeze({ time: '7d', company: 'all', direction: 'all' });
+const DEFAULT_FEED_FILTERS = Object.freeze({
+  time: '1d',
+  company: 'all',
+  direction: 'all',
+  sourceTag: 'all'
+});
 const DEFAULT_SORT = 'latest';
 const PAGE_SIZE = 8;
 

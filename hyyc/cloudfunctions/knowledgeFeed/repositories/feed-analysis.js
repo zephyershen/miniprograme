@@ -26,13 +26,16 @@ function createFeedAnalysisRepository(db, config) {
       inputHash: analysis.inputHash,
       status: 'ready',
       qualityTier: analysis.qualityTier,
+      reviewMode: 'ai',
       curationScore: analysis.curationScore,
       curationReason: analysis.curationReason || '',
       reasonCodes: analysis.reasonCodes || [],
       companyKeys: analysis.companyKeys || [],
       directionKeys: analysis.directionKeys || [],
       analysisPolicyVersion: analysis.analysisPolicyVersion,
+      intelligenceProvider: analysis.intelligenceProvider || '',
       model: analysis.model || '',
+      usage: analysis.usage || null,
       analyzedAt: updatedAt,
       updatedAt
     };
@@ -55,6 +58,7 @@ function createFeedAnalysisRepository(db, config) {
         analysisPolicyVersion: analysis.analysisPolicyVersion,
         analysisInputHash: analysis.inputHash,
         analysisStatus: 'ready',
+        editorialReviewStatus: 'automated',
         analysisUpdatedAt: updatedAt,
         updatedAt
       };
@@ -79,7 +83,13 @@ function createFeedAnalysisRepository(db, config) {
     });
   }
 
-  return { ensureCollection, get, publish };
+  async function countSince(since) {
+    await ensureCollection();
+    const result = await collection().where({ analyzedAt: db.command.gte(since) }).count();
+    return Number(result && result.total) || 0;
+  }
+
+  return { ensureCollection, get, publish, countSince };
 }
 
 module.exports = { createFeedAnalysisRepository };

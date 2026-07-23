@@ -2,8 +2,31 @@
   "name": "digest-inbox-mini-program",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=18 <25"
+  },
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "check": "node scripts/check-project.js"
+    "test:coverage": "node --experimental-test-coverage --test-coverage-lines=75 --test-coverage-branches=65 --test-coverage-functions=70 --test tests/*.test.js",
+    "check": "node scripts/check-project.js",
+    "check:database": "node scripts/check-database-rules.js",
+    "check:indexes": "node scripts/check-database-indexes.js",
+    "check:env": "node scripts/check-runtime-environment.js",
+    "cloudbase:rules:plan": "node scripts/cloudbase-database-rules.js dry-run && node scripts/cloudbase-storage-rules.js dry-run",
+    "cloudbase:collections:plan": "node scripts/cloudbase-database-collections.js plan",
+    "cloudbase:collections:check": "node scripts/cloudbase-database-collections.js check",
+    "cloudbase:collections:readback": "node scripts/cloudbase-database-collections.js readback",
+    "cloudbase:collections:apply": "node scripts/cloudbase-database-collections.js apply",
+    "cloudbase:database:check": "node scripts/cloudbase-database-rules.js check",
+    "cloudbase:indexes:plan": "node scripts/cloudbase-database-indexes.js plan",
+    "cloudbase:indexes:check": "node scripts/cloudbase-database-indexes.js check",
+    "cloudbase:indexes:readback": "node scripts/cloudbase-database-indexes.js readback",
+    "cloudbase:indexes:apply": "node scripts/cloudbase-database-indexes.js apply",
+    "cloudbase:storage:check": "node scripts/cloudbase-storage-rules.js check",
+    "cloudbase:functions:plan": "node scripts/cloudbase-function-manifest.js dry-run",
+    "cloudbase:functions:check": "node scripts/cloudbase-function-manifest.js check",
+    "cloudbase:functions:retire-plan": "node scripts/cloudbase-retired-functions.js plan",
+    "audit:production": "node scripts/audit-production-dependencies.js",
+    "verify": "npm run check && npm run check:env && npm run check:database && npm run check:indexes && npm test && npm run test:coverage && npm run audit:production"
   }
 }

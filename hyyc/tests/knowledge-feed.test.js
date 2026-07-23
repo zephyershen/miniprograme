@@ -84,13 +84,14 @@ test('returns a bounded first page and a stable next offset', () => {
     channelKey: index % 2 === 0 ? 'ai' : 'tech',
     topicKeys: index % 3 === 0 ? ['company:openai'] : []
   }));
-  const page = buildFeedPage(items, { offset: 0, limit: 8, channel: 'all', filters: { time: '7d' } });
+  const testNow = Date.parse('2026-07-16T02:00:00.000Z');
+  const page = buildFeedPage(items, { offset: 0, limit: 8, channel: 'all', filters: { time: '7d' } }, testNow);
   assert.equal(page.items.length, 8);
   assert.equal(page.resultCount, 18);
   assert.equal(page.nextOffset, 8);
   assert.equal(page.hasMore, true);
 
-  const lastPage = buildFeedPage(items, { offset: 16, limit: 8, channel: 'all', filters: { time: '7d' } });
+  const lastPage = buildFeedPage(items, { offset: 16, limit: 8, channel: 'all', filters: { time: '7d' } }, testNow);
   assert.equal(lastPage.items.length, 2);
   assert.equal(lastPage.nextOffset, 18);
   assert.equal(lastPage.hasMore, false);
@@ -98,15 +99,28 @@ test('returns a bounded first page and a stable next offset', () => {
 
 test('paginates after applying channel and topic filters', () => {
   const items = [
-    { id: '1', publishedAt: '2026-07-15T01:00:00.000Z', channelKey: 'ai', topicKeys: ['company:openai'] },
-    { id: '2', publishedAt: '2026-07-15T01:00:00.000Z', channelKey: 'tech', topicKeys: ['company:openai'] },
-    { id: '3', publishedAt: '2026-07-15T01:00:00.000Z', channelKey: 'ai', topicKeys: ['company:anthropic'] }
+    { id: '1', publishedAt: '2026-07-15T01:00:00.000Z', sourceChannelKeys: ['firstParty', 'news'], topicKeys: ['company:openai'] },
+    { id: '2', publishedAt: '2026-07-15T01:00:00.000Z', sourceChannelKeys: ['x'], topicKeys: ['company:openai'] },
+    { id: '3', publishedAt: '2026-07-15T01:00:00.000Z', sourceChannelKeys: ['firstParty'], topicKeys: ['company:anthropic'] }
   ];
   const page = buildFeedPage(items, {
-    channel: 'ai',
+    channel: 'firstParty',
     filters: { time: '7d', company: 'company:openai', direction: 'all' }
-  });
+  }, Date.parse('2026-07-16T02:00:00.000Z'));
   assert.deepEqual(page.items.map((item) => item.id), ['1']);
+  assert.equal(page.resultCount, 1);
+});
+
+test('keeps the open-source library channel instead of falling back to all news', () => {
+  const query = normalizeFeedQuery({ channel: 'openSource', filters: { time: '30d' } });
+  assert.equal(query.channel, 'openSource');
+
+  const page = buildFeedPage([
+    { id: 'aigclink', publishedAt: '2026-07-20T04:00:00.000Z', sourceChannelKey: 'openSource', topicKeys: [] },
+    { id: 'aihot', publishedAt: '2026-07-20T05:00:00.000Z', sourceChannelKey: 'news', topicKeys: [] }
+  ], query, Date.parse('2026-07-23T00:00:00.000Z'));
+
+  assert.deepEqual(page.items.map((item) => item.id), ['aigclink']);
   assert.equal(page.resultCount, 1);
 });
 
@@ -116,7 +130,11 @@ test('sorts the default feed by publish time instead of trusting upstream order'
     { id: 'newest', publishedAt: '2026-07-16T01:00:00.000Z', channelKey: 'ai', topicKeys: [], score: 60 },
     { id: 'middle', publishedAt: '2026-07-15T01:00:00.000Z', channelKey: 'ai', topicKeys: [], score: 80 }
   ];
-  const page = buildFeedPage(items, { filters: { time: '7d' } });
+  const page = buildFeedPage(
+    items,
+    { filters: { time: '7d' } },
+    Date.parse('2026-07-16T02:00:00.000Z')
+  );
   assert.equal(page.query.sort, 'latest');
   assert.deepEqual(page.items.map((item) => item.id), ['newest', 'middle', 'older']);
 });
@@ -127,7 +145,11 @@ test('sorts the full heat feed by score and uses time as the tie-breaker', () =>
     { id: 'hot-older', publishedAt: '2026-07-15T01:00:00.000Z', channelKey: 'ai', topicKeys: [], score: 90 },
     { id: 'hot-newer', publishedAt: '2026-07-15T02:00:00.000Z', channelKey: 'ai', topicKeys: [], score: 90 }
   ];
-  const page = buildFeedPage(items, { sort: 'hot', filters: { time: '7d' } });
+  const page = buildFeedPage(
+    items,
+    { sort: 'hot', filters: { time: '7d' } },
+    Date.parse('2026-07-16T02:00:00.000Z')
+  );
   assert.equal(page.query.sort, 'hot');
   assert.deepEqual(page.items.map((item) => item.id), ['hot-newer', 'hot-older', 'newest-warm']);
 });
@@ -160,6 +182,6 @@ test('normalizes malformed pagination input to safe defaults', () => {
     limit: 20,
     channel: 'all',
     sort: 'latest',
-    filters: { time: '7d', company: 'all', direction: 'all' }
+    filters: { time: '7d', company: 'all', direction: 'all', sourceTag: 'all' }
   });
 });

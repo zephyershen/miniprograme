@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "mode": "adminOnly",
+  "rule": {
+    "read": false,
+    "write": false
+  },
+  "collections": [
+    "knowledge_ai_budget",
+    "knowledge_column_cases",
+    "knowledge_feed_access_grants",
+    "knowledge_feed_analysis_jobs",
+    "knowledge_feed_archive",
+    "knowledge_feed_cache",
+    "knowledge_feed_comments",
+    "knowledge_feed_day_index",
+    "knowledge_feed_digests",
+    "knowledge_feed_item_analysis",
+    "knowledge_feed_items",
+    "knowledge_feed_migrations",
+    "knowledge_feed_source_profiles",
+    "knowledge_feed_sync_state",
+    "knowledge_feed_user_engagements",
+    "knowledge_feed_visual_jobs",
+    "knowledge_membership_orders",
+    "knowledge_memberships",
+    "knowledge_trend_dossiers",
+    "knowledge_trend_events",
+    "knowledge_user_media",
+    "knowledge_user_profiles"
+  ]
+}

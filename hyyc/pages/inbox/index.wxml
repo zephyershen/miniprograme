@@ -1,3 +1,4 @@
+<page-meta page-style="{{membershipPromptVisible ? 'overflow: hidden;' : ''}}" />
 <view class="editorial-page">
   <view wx:if="{{newItemsVisible}}" class="new-items-float {{applyingNewItems ? 'new-items-float-loading' : ''}}" bindtap="applyNewItems" aria-role="button" aria-label="{{newItemsLabel}}，点击查看最新资讯">
     <view class="new-items-signal"></view>
@@ -6,7 +7,11 @@
     <text class="new-items-arrow">↑</text>
   </view>
 
-  <view wx:if="{{loading}}" class="loading-editorial">
+  <view wx:if="{{channelTransitionLoading}}" class="channel-loading-surface" aria-role="progressbar" aria-label="内容加载中">
+    <view class="channel-loading-spinner"></view>
+  </view>
+
+  <view wx:elif="{{loading}}" class="loading-editorial">
     <view class="loading-media"></view>
     <view class="loading-line loading-line-strong"></view>
     <view class="loading-line"></view>
@@ -19,97 +24,194 @@
     <button class="empty-action" bindtap="retryFeed">重新加载</button>
   </view>
 
-  <view wx:elif="{{!feed.leadItem}}" class="empty-editorial">
+  <view wx:elif="{{!feed.leadItem && (flatFeedMode || !feed.dayGroups.length)}}" class="empty-editorial">
     <view class="empty-title">没有符合当前条件的资讯</view>
-    <view class="empty-copy">可以调整时间或主题，也可以切换其他频道查看。</view>
+    <view class="empty-copy">{{libraryMode ? '可以换一个项目标签，或查看全部标签。' : '可以调整时间或主题，也可以切换其他来源查看。'}}</view>
     <button class="empty-action" bindtap="openFilters">调整筛选</button>
   </view>
 
   <block wx:else>
-    <view class="lead-story" data-id="{{feed.leadItem.id}}" bindtap="openFeedItem">
-      <image wx:if="{{feed.leadItem.listVisualFileId}}" class="lead-cover" src="{{feed.leadItem.listVisualFileId}}" mode="aspectFill" lazy-load="{{true}}" />
-      <view class="story-meta">
-        <text class="channel-label channel-text-{{feed.leadItem.coverTone}}">{{feed.leadItem.categoryLabel}}</text>
-        <text>{{feed.leadItem.source}}</text>
-        <text>{{feed.leadItem.publishedLabel}}</text>
-      </view>
-      <view class="lead-title">{{feed.leadItem.title}}</view>
-      <view wx:if="{{feed.leadItem.summaryPreview}}" class="lead-summary">{{feed.leadItem.summaryPreview}}</view>
-      <view class="lead-footer">
-        <text>{{feed.leadItem.scoreLabel}}</text>
-        <text>查看详情 →</text>
-      </view>
-    </view>
-
-    <view wx:if="{{feed.remainingItems.length}}" class="section-heading">
-      <view class="section-title">更多资讯</view>
-      <view class="section-count">{{feed.remainingCount}}</view>
-    </view>
-
-    <view class="story-list">
-      <view
-        wx:for="{{feed.remainingItems}}"
-        wx:key="id"
-        class="story-row {{item.listVisualFileId ? '' : 'story-row-no-image'}}"
-        data-id="{{item.id}}"
-        bindtap="openFeedItem"
-      >
-        <view class="story-copy">
-          <view class="story-meta">
-            <text class="channel-label channel-text-{{item.coverTone}}">{{item.categoryLabel}}</text>
-            <text>{{item.publishedLabel}}</text>
+    <view class="post-list {{newItemsVisible ? 'post-list-noticed' : ''}} {{flatFeedMode ? (libraryMode ? 'post-list-library' : 'post-list-flat') : 'post-list-timeline'}}">
+      <block wx:if="{{!flatFeedMode}}">
+        <view wx:for="{{feed.dayGroups}}" wx:for-item="dayGroup" wx:for-index="dayIndex" wx:key="dateKey" class="timeline-day-group">
+          <view class="timeline-day {{dayGroup.collapsed ? 'timeline-day-collapsed' : ''}}" data-date-key="{{dayGroup.dateKey}}" bindtap="toggleTimelineDay" aria-role="button" aria-label="{{dayGroup.dayLabel}} {{dayGroup.metaLabel}}">
+            <text class="timeline-day-label">{{dayGroup.dayLabel}}</text>
+            <text class="timeline-weekday">{{dayGroup.metaLabel}}</text>
+            <view class="timeline-day-chevron"></view>
           </view>
-          <view class="story-title">{{item.title}}</view>
-          <view class="story-action">{{item.source}} · {{item.scoreLabel}}</view>
+          <view wx:if="{{!dayGroup.collapsed}}" class="timeline-day-body">
+            <view wx:if="{{dayGroup.loading && !dayGroup.items.length}}" class="timeline-day-state">正在加载这一天的资讯…</view>
+            <view wx:elif="{{dayGroup.error && !dayGroup.items.length}}" class="timeline-day-state timeline-day-state-action" data-date-key="{{dayGroup.dateKey}}" bindtap="loadMoreTimelineDay">{{dayGroup.error}} · 点击重试</view>
+            <view wx:elif="{{!dayGroup.count}}" class="timeline-day-state">这一天暂无符合条件的资讯</view>
+            <view wx:for="{{dayGroup.items}}" wx:for-item="dayItem" wx:for-index="itemIndex" wx:key="id" class="timeline-entry timeline-entry-active {{itemIndex === 0 ? 'timeline-entry-start' : ''}} {{itemIndex === dayGroup.items.length - 1 ? 'timeline-entry-end' : ''}}">
+              <view class="timeline-rail" aria-hidden="true">
+                <view class="timeline-line"></view>
+                <text class="timeline-time">{{dayItem.timeline.timeLabel}}</text>
+                <view class="timeline-node"></view>
+              </view>
+              <view class="post post-tone-{{dayItem.coverTone}}" data-id="{{dayItem.id}}" bindtap="openFeedItem">
+                <view class="post-byline">
+                  <view class="post-author-avatar" aria-hidden="true">
+                    <text class="post-author-initial">{{dayItem.sourceAuthor.avatarInitial}}</text>
+                    <image wx:if="{{dayItem.sourceAuthor.avatarUrl || dayItem.sourceAuthor.fallbackAvatarUrl}}" class="post-author-image" src="{{dayItem.sourceAuthor.avatarUrl || dayItem.sourceAuthor.fallbackAvatarUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="feed:{{dayItem.id}}:avatar" data-file-id="{{dayItem.sourceAuthor.avatarFileId}}" data-media-url="{{dayItem.sourceAuthor.avatarUrl || dayItem.sourceAuthor.fallbackAvatarUrl}}" data-media-fallback="{{dayItem.sourceAuthor.fallbackAvatarUrl}}" data-media-path="feed.dayGroups[{{dayIndex}}].items[{{itemIndex}}].sourceAuthor.avatarUrl" binderror="handleMediaError" />
+                  </view>
+                  <view class="post-author-copy">
+                    <view wx:if="{{dayItem.sourceAuthor.hasIdentity}}" class="post-author-line">
+                      <text class="post-author-name">{{dayItem.sourceAuthor.displayName}}</text>
+                      <text wx:if="{{dayItem.sourceAuthor.handleLabel}}" class="post-author-handle">{{dayItem.sourceAuthor.handleLabel}}</text>
+                    </view>
+                    <text wx:else class="post-author-fallback">{{dayItem.sourceAuthor.fallbackLabel}}</text>
+                  </view>
+                </view>
+                <view class="post-title">{{dayItem.title}}</view>
+                <view wx:if="{{dayItem.summaryPreview}}" class="post-summary">
+                  <view class="post-summary-head"><view class="post-summary-icon"></view><text class="post-summary-tag">速览</text></view>
+                  <text class="post-summary-text">{{dayItem.summaryPreview}}</text>
+                </view>
+                <image wx:if="{{dayItem.listVisualUrl}}" class="post-media" src="{{dayItem.listVisualUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="feed:{{dayItem.id}}:list" data-file-id="{{dayItem.listVisualFileId || dayItem.visualFileId}}" data-media-url="{{dayItem.listVisualUrl}}" data-media-path="feed.dayGroups[{{dayIndex}}].items[{{itemIndex}}].listVisualUrl" binderror="handleMediaError" />
+                <view wx:if="{{dayItem.sourceTags.length}}" class="post-tags" aria-label="来源标签">
+                  <text wx:for="{{dayItem.sourceTags}}" wx:for-item="sourceTag" wx:key="*this" class="post-source-tag">{{sourceTag}}</text>
+                </view>
+                <view class="post-foot"><view class="post-actions" catchtap="stopPropagation">
+                  <view class="post-action {{dayItem.engagement.canComment ? '' : 'post-action-disabled'}}" data-id="{{dayItem.id}}" catchtap="openComments"><view class="action-icon icon-comment"></view><text wx:if="{{dayItem.engagement.commentLabel}}">{{dayItem.engagement.commentLabel}}</text></view>
+                  <view class="post-action {{dayItem.engagement.liked ? 'post-action-liked' : ''}}" data-id="{{dayItem.id}}" catchtap="handleLike"><view class="action-icon icon-like {{dayItem.engagement.liked ? 'icon-like-active' : ''}}"></view><text wx:if="{{dayItem.engagement.likeLabel}}">{{dayItem.engagement.likeLabel}}</text></view>
+                  <view class="post-action {{dayItem.engagement.favorited ? 'post-action-saved' : ''}}" data-id="{{dayItem.id}}" catchtap="handleFavorite"><view class="action-icon icon-bookmark {{dayItem.engagement.favorited ? 'icon-bookmark-active' : ''}}"></view></view>
+                  <button class="post-action post-share" open-type="share" data-id="{{dayItem.id}}" catchtap="noop"><view class="action-icon icon-share"></view></button>
+                </view></view>
+              </view>
+            </view>
+            <view wx:if="{{dayGroup.hasMore}}" class="timeline-day-more" data-date-key="{{dayGroup.dateKey}}" bindtap="loadMoreTimelineDay">{{dayGroup.loading ? '正在加载…' : '加载这一天的更多资讯'}}</view>
+            <view wx:elif="{{dayGroup.error}}" class="timeline-day-more timeline-day-state-action" data-date-key="{{dayGroup.dateKey}}" bindtap="loadMoreTimelineDay">{{dayGroup.error}} · 重试</view>
+          </view>
         </view>
-        <image wx:if="{{item.listVisualFileId}}" class="story-thumbnail" src="{{item.listVisualFileId}}" mode="aspectFill" lazy-load="{{true}}" />
+      </block>
+      <block wx:else>
+      <view class="timeline-unit">
+        <view class="timeline-entry timeline-entry-flat">
+          <view class="post post-tone-{{feed.leadItem.coverTone}}" data-id="{{feed.leadItem.id}}" bindtap="openFeedItem">
+            <view class="post-byline">
+              <view class="post-author-avatar" aria-hidden="true">
+                <text class="post-author-initial">{{feed.leadItem.sourceAuthor.avatarInitial}}</text>
+                <image wx:if="{{feed.leadItem.sourceAuthor.avatarUrl || feed.leadItem.sourceAuthor.fallbackAvatarUrl}}" class="post-author-image" src="{{feed.leadItem.sourceAuthor.avatarUrl || feed.leadItem.sourceAuthor.fallbackAvatarUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="feed:{{feed.leadItem.id}}:avatar" data-file-id="{{feed.leadItem.sourceAuthor.avatarFileId}}" data-media-url="{{feed.leadItem.sourceAuthor.avatarUrl || feed.leadItem.sourceAuthor.fallbackAvatarUrl}}" data-media-fallback="{{feed.leadItem.sourceAuthor.fallbackAvatarUrl}}" data-media-path="feed.leadItem.sourceAuthor.avatarUrl" binderror="handleMediaError" />
+              </view>
+              <view class="post-author-copy">
+                <view wx:if="{{feed.leadItem.sourceAuthor.hasIdentity}}" class="post-author-line">
+                  <text class="post-author-name">{{feed.leadItem.sourceAuthor.displayName}}</text>
+                  <text wx:if="{{feed.leadItem.sourceAuthor.handleLabel}}" class="post-author-handle">{{feed.leadItem.sourceAuthor.handleLabel}}</text>
+                </view>
+                <text wx:else class="post-author-fallback">{{feed.leadItem.sourceAuthor.fallbackLabel}}</text>
+              </view>
+            </view>
+            <view class="post-title">{{feed.leadItem.title}}</view>
+            <view wx:if="{{feed.leadItem.summaryPreview}}" class="post-summary">
+              <view class="post-summary-head">
+                <view class="post-summary-icon"></view>
+                <text class="post-summary-tag">速览</text>
+              </view>
+              <text class="post-summary-text">{{feed.leadItem.summaryPreview}}</text>
+            </view>
+            <image wx:if="{{feed.leadItem.listVisualUrl}}" class="post-media" src="{{feed.leadItem.listVisualUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="feed:{{feed.leadItem.id}}:list" data-file-id="{{feed.leadItem.listVisualFileId || feed.leadItem.visualFileId}}" data-media-url="{{feed.leadItem.listVisualUrl}}" data-media-path="feed.leadItem.listVisualUrl" binderror="handleMediaError" />
+            <view wx:if="{{feed.leadItem.sourceTags.length}}" class="post-tags" aria-label="来源标签">
+              <text wx:for="{{feed.leadItem.sourceTags}}" wx:for-item="sourceTag" wx:key="*this" class="post-source-tag">{{sourceTag}}</text>
+            </view>
+            <view class="post-foot">
+              <view class="post-actions" catchtap="stopPropagation">
+                <view class="post-action {{feed.leadItem.engagement.canComment ? '' : 'post-action-disabled'}}" data-id="{{feed.leadItem.id}}" catchtap="openComments"><view class="action-icon icon-comment"></view><text wx:if="{{feed.leadItem.engagement.commentLabel}}">{{feed.leadItem.engagement.commentLabel}}</text></view>
+                <view class="post-action {{feed.leadItem.engagement.liked ? 'post-action-liked' : ''}}" data-id="{{feed.leadItem.id}}" catchtap="handleLike"><view class="action-icon icon-like {{feed.leadItem.engagement.liked ? 'icon-like-active' : ''}}"></view><text wx:if="{{feed.leadItem.engagement.likeLabel}}">{{feed.leadItem.engagement.likeLabel}}</text></view>
+                <view class="post-action {{feed.leadItem.engagement.favorited ? 'post-action-saved' : ''}}" data-id="{{feed.leadItem.id}}" catchtap="handleFavorite"><view class="action-icon icon-bookmark {{feed.leadItem.engagement.favorited ? 'icon-bookmark-active' : ''}}"></view></view>
+                <button class="post-action post-share" open-type="share" data-id="{{feed.leadItem.id}}" catchtap="noop"><view class="action-icon icon-share"></view></button>
+              </view>
+            </view>
+          </view>
+        </view>
       </view>
+
+      <view wx:for="{{feed.remainingItems}}" wx:key="id" class="timeline-unit">
+        <view class="timeline-entry timeline-entry-flat">
+          <view class="post post-tone-{{item.coverTone}}" data-id="{{item.id}}" bindtap="openFeedItem">
+            <view class="post-byline">
+              <view class="post-author-avatar" aria-hidden="true">
+                <text class="post-author-initial">{{item.sourceAuthor.avatarInitial}}</text>
+                <image wx:if="{{item.sourceAuthor.avatarUrl || item.sourceAuthor.fallbackAvatarUrl}}" class="post-author-image" src="{{item.sourceAuthor.avatarUrl || item.sourceAuthor.fallbackAvatarUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="feed:{{item.id}}:avatar" data-file-id="{{item.sourceAuthor.avatarFileId}}" data-media-url="{{item.sourceAuthor.avatarUrl || item.sourceAuthor.fallbackAvatarUrl}}" data-media-fallback="{{item.sourceAuthor.fallbackAvatarUrl}}" data-media-path="feed.remainingItems[{{index}}].sourceAuthor.avatarUrl" binderror="handleMediaError" />
+              </view>
+              <view class="post-author-copy">
+                <view wx:if="{{item.sourceAuthor.hasIdentity}}" class="post-author-line">
+                  <text class="post-author-name">{{item.sourceAuthor.displayName}}</text>
+                  <text wx:if="{{item.sourceAuthor.handleLabel}}" class="post-author-handle">{{item.sourceAuthor.handleLabel}}</text>
+                </view>
+                <text wx:else class="post-author-fallback">{{item.sourceAuthor.fallbackLabel}}</text>
+              </view>
+            </view>
+            <view class="post-title">{{item.title}}</view>
+            <view wx:if="{{item.summaryPreview}}" class="post-summary">
+              <view class="post-summary-head">
+                <view class="post-summary-icon"></view>
+                <text class="post-summary-tag">速览</text>
+              </view>
+              <text class="post-summary-text">{{item.summaryPreview}}</text>
+            </view>
+            <image wx:if="{{item.listVisualUrl}}" class="post-media" src="{{item.listVisualUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="feed:{{item.id}}:list" data-file-id="{{item.listVisualFileId || item.visualFileId}}" data-media-url="{{item.listVisualUrl}}" data-media-path="feed.remainingItems[{{index}}].listVisualUrl" binderror="handleMediaError" />
+            <view wx:if="{{item.sourceTags.length}}" class="post-tags" aria-label="来源标签">
+              <text wx:for="{{item.sourceTags}}" wx:for-item="sourceTag" wx:key="*this" class="post-source-tag">{{sourceTag}}</text>
+            </view>
+            <view class="post-foot">
+              <view class="post-actions" catchtap="stopPropagation">
+                <view class="post-action {{item.engagement.canComment ? '' : 'post-action-disabled'}}" data-id="{{item.id}}" catchtap="openComments"><view class="action-icon icon-comment"></view><text wx:if="{{item.engagement.commentLabel}}">{{item.engagement.commentLabel}}</text></view>
+                <view class="post-action {{item.engagement.liked ? 'post-action-liked' : ''}}" data-id="{{item.id}}" catchtap="handleLike"><view class="action-icon icon-like {{item.engagement.liked ? 'icon-like-active' : ''}}"></view><text wx:if="{{item.engagement.likeLabel}}">{{item.engagement.likeLabel}}</text></view>
+                <view class="post-action {{item.engagement.favorited ? 'post-action-saved' : ''}}" data-id="{{item.id}}" catchtap="handleFavorite"><view class="action-icon icon-bookmark {{item.engagement.favorited ? 'icon-bookmark-active' : ''}}"></view></view>
+                <button class="post-action post-share" open-type="share" data-id="{{item.id}}" catchtap="noop"><view class="action-icon icon-share"></view></button>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+      </block>
     </view>
 
-    <view wx:if="{{loadingMore}}" class="feed-page-status feed-page-loading">
+    <view wx:if="{{flatFeedMode && loadingMore}}" class="feed-page-status feed-page-loading">
       <view class="feed-loading-spinner"></view>
       <text>正在加载更多资讯</text>
     </view>
-    <view wx:elif="{{loadMoreError}}" class="feed-page-status feed-page-retry" bindtap="loadMoreFeed">
+    <view wx:elif="{{flatFeedMode && loadMoreError}}" class="feed-page-status feed-page-retry" bindtap="loadMoreFeed">
       {{loadMoreError}} · 点击重试
     </view>
     <view wx:if="{{historyBoundaryVisible}}" class="history-boundary" bindtap="openMembership">
-      <view><view class="history-boundary-title">已到普通用户的 7 天边界</view><view class="history-boundary-copy">Pro 可继续查看近 30 天完整历史</view></view><text>→</text>
+      <view><view class="history-boundary-title">已到普通用户的 24 小时边界</view><view class="history-boundary-copy">Pro 可继续查看近 30 天完整历史</view></view><text>→</text>
     </view>
-    <view wx:elif="{{!feed.hasMore && feed.loadedCount > 1}}" class="feed-page-status">
+    <view wx:elif="{{flatFeedMode && !feed.hasMore && feed.loadedCount > 1}}" class="feed-page-status">
       已显示全部 {{feed.resultCount}} 条
     </view>
   </block>
 
   <view class="feed-controls-fixed" catchtap="stopPropagation">
-    <scroll-view scroll-x enhanced show-scrollbar="{{false}}" class="channel-scroll">
-      <view class="channel-track">
-        <view
-          wx:for="{{feed.channels}}"
-          wx:key="key"
-          class="channel-tab {{item.active ? 'channel-tab-active channel-tab-' + item.tone : ''}}"
-          data-key="{{item.key}}"
-          bindtap="selectChannel"
-        >
-          <text>{{item.label}}</text>
-          <view wx:if="{{item.premium}}" class="channel-lock" aria-label="Pro 会员专属"></view>
+    <view class="source-nav-row">
+      <scroll-view scroll-x enhanced show-scrollbar="{{false}}" class="channel-scroll">
+        <view class="channel-track">
+          <view
+            wx:for="{{feed.channels}}"
+            wx:key="key"
+            class="channel-tab {{item.active ? 'channel-tab-active channel-tab-' + item.tone : ''}}"
+            data-key="{{item.key}}"
+            bindtap="selectChannel"
+          >
+            <text>{{item.label}}</text>
+          </view>
         </view>
-      </view>
-    </scroll-view>
-
-    <view class="filter-bar" bindtap="openFilters">
-      <view class="filter-bar-copy">
-        <text class="filter-bar-title">筛选</text>
-        <text class="filter-bar-summary">{{feed.filterSummary}}</text>
-      </view>
-      <view class="filter-bar-count">
-        <text class="filter-bar-result">{{feed.resultCount}} 条资讯 ↘</text>
-        <text wx:if="{{feed.accessSummary}}" class="filter-bar-total">{{feed.accessSummary}}</text>
+      </scroll-view>
+      <view class="featured-shortcut" data-key="featured" bindtap="selectChannel">
+        <text>{{feed.featuredShortcut.label}}</text>
+        <view wx:if="{{feed.featuredShortcut.locked}}" class="channel-lock" aria-label="Pro 会员专属"></view>
       </view>
     </view>
 
-    <view class="sort-bar">
-      <text class="sort-bar-label">排序</text>
+    <view class="filter-sort-row">
+      <view class="filter-bar" bindtap="openFilters">
+        <view class="filter-bar-copy">
+          <text class="filter-bar-title">筛选</text>
+          <text class="filter-bar-summary">{{feed.filterSummary}}</text>
+        </view>
+        <view class="filter-bar-chevron"></view>
+      </view>
       <view class="sort-choice-track">
         <view
           wx:for="{{sortOptions}}"
@@ -119,7 +221,6 @@
           bindtap="selectSort"
         >{{item.label}}</view>
       </view>
-      <text class="sort-bar-hint">{{sortHint}}</text>
     </view>
   </view>
 
@@ -127,15 +228,41 @@
     <view class="feed-filter-panel" catchtap="stopPropagation">
       <view class="filter-panel-head">
         <view>
-          <view class="filter-panel-kicker">内容筛选</view>
-          <view class="filter-panel-title">找到你关心的更新</view>
-          <view class="filter-panel-status">{{feed.accessSummary}}，筛选结果按当前频道实时计算</view>
+          <view wx:if="{{!libraryMode}}" class="filter-panel-kicker">内容筛选</view>
+          <view class="filter-panel-title">{{libraryMode ? '筛选 GitHub 项目' : '找到你关心的更新'}}</view>
+          <view class="filter-panel-status">{{feed.accessSummary}}，筛选结果按当前来源实时计算</view>
         </view>
         <view class="filter-panel-close" bindtap="closeFilters">关闭</view>
       </view>
 
       <scroll-view scroll-y enhanced show-scrollbar="{{false}}" scroll-into-view="{{filterScrollTarget}}" class="filter-panel-scroll">
         <view class="filter-scroll-content">
+        <block wx:if="{{libraryMode}}">
+        <view id="filter-source-tag-group" class="filter-group filter-source-tag-group">
+          <view class="filter-group-title">项目标签</view>
+          <view class="filter-group-note">标签直接来自 AIGCLINK；开源库不限时间，展示全部收录项目</view>
+          <input
+            class="filter-tag-search"
+            type="text"
+            value="{{sourceTagQuery}}"
+            placeholder="搜索标签，例如 MCP、AI agent"
+            confirm-type="search"
+            bindinput="onSourceTagSearch"
+          />
+          <view class="filter-choice-list">
+            <view
+              wx:for="{{filterOptions.sourceTag}}"
+              wx:key="key"
+              class="filter-choice {{item.active ? 'filter-choice-active' : ''}}"
+              data-group="sourceTag"
+              data-key="{{item.key}}"
+              bindtap="selectFilter"
+            ><text>{{item.label}}</text><text class="filter-choice-count">{{item.count}}</text></view>
+          </view>
+          <view wx:if="{{sourceTagQuery && filterOptions.sourceTag.length === 1}}" class="filter-tag-empty">没有匹配的项目标签</view>
+        </view>
+        </block>
+        <block wx:else>
         <view id="filter-time-group" class="filter-group">
           <view class="filter-group-title">时间范围</view>
           <view class="filter-choice-list">
@@ -179,6 +306,7 @@
             ><text>{{item.label}}</text><text class="filter-choice-count">{{item.count}}</text></view>
           </view>
         </view>
+        </block>
         </view>
       </scroll-view>
 
@@ -188,4 +316,11 @@
       </view>
     </view>
   </view>
+
+  <membership-prompt
+    visible="{{membershipPromptVisible}}"
+    feature-key="{{membershipPromptFeature}}"
+    bindclose="closeMembershipPrompt"
+    bindviewbenefits="openMembershipFromPrompt"
+  />
 </view>

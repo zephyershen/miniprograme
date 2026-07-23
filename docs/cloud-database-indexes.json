@@ -1,0 +1,409 @@
+{
+  "schemaVersion": 1,
+  "mode": "additive",
+  "preserveUnknownIndexes": true,
+  "indexes": [
+    {
+      "collection": "knowledge_feed_analysis_jobs",
+      "name": "status_priority_due",
+      "unique": false,
+      "keys": [
+        { "field": "status", "direction": "1" },
+        { "field": "priority", "direction": "-1" },
+        { "field": "nextAttemptAt", "direction": "1" }
+      ],
+      "owner": "analysis-worker",
+      "reason": "Select due analysis jobs by status and priority."
+    },
+    {
+      "collection": "knowledge_feed_archive",
+      "name": "date_desc",
+      "unique": false,
+      "keys": [
+        { "field": "date", "direction": "-1" }
+      ],
+      "owner": "feed-archive",
+      "reason": "Page and expire archive days by date."
+    },
+    {
+      "collection": "knowledge_feed_comments",
+      "name": "attachments_file_id_1",
+      "unique": false,
+      "keys": [
+        { "field": "attachments.fileId", "direction": "1" }
+      ],
+      "owner": "user-media-legacy-lookup",
+      "reason": "Resolve approved legacy comment attachments without scanning comments."
+    },
+    {
+      "collection": "knowledge_feed_comments",
+      "name": "itemId_1",
+      "unique": false,
+      "keys": [
+        { "field": "itemId", "direction": "1" }
+      ],
+      "owner": "comments",
+      "reason": "List comments for one feed item."
+    },
+    {
+      "collection": "knowledge_feed_comments",
+      "name": "item_status_created_id",
+      "unique": false,
+      "keys": [
+        { "field": "itemId", "direction": "1" },
+        { "field": "status", "direction": "1" },
+        { "field": "createdAt", "direction": "-1" },
+        { "field": "_id", "direction": "-1" }
+      ],
+      "owner": "comments",
+      "reason": "Page active comments newest-first before applying fail-closed moderation checks."
+    },
+    {
+      "collection": "knowledge_feed_digests",
+      "name": "window_status_generated",
+      "unique": false,
+      "keys": [
+        { "field": "windowKey", "direction": "1" },
+        { "field": "status", "direction": "1" },
+        { "field": "generatedAt", "direction": "-1" }
+      ],
+      "owner": "digest-query",
+      "reason": "Read the latest published digest for a window."
+    },
+    {
+      "collection": "knowledge_feed_item_analysis",
+      "name": "analyzedAt_1",
+      "unique": false,
+      "keys": [
+        { "field": "analyzedAt", "direction": "1" }
+      ],
+      "owner": "analysis-operations",
+      "reason": "Count and inspect recent analysis records."
+    },
+    {
+      "collection": "knowledge_feed_items",
+      "name": "analysis_coverage",
+      "unique": false,
+      "keys": [
+        { "field": "publicState", "direction": "1" },
+        { "field": "analysisStatus", "direction": "1" },
+        { "field": "publishedAt", "direction": "1" }
+      ],
+      "owner": "analysis-coverage",
+      "reason": "Count ready analysis coverage within a publication window."
+    },
+    {
+      "collection": "knowledge_feed_items",
+      "name": "ps_ch_pub_id",
+      "unique": false,
+      "keys": [
+        { "field": "publicState", "direction": "1" },
+        { "field": "channelKey", "direction": "1" },
+        { "field": "publishedAt", "direction": "-1" },
+        { "field": "_id", "direction": "-1" }
+      ],
+      "owner": "feed-query",
+      "reason": "Page a content channel by newest publication."
+    },
+    {
+      "collection": "knowledge_feed_items",
+      "name": "ps_pub_id",
+      "unique": false,
+      "keys": [
+        { "field": "publicState", "direction": "1" },
+        { "field": "publishedAt", "direction": "-1" },
+        { "field": "_id", "direction": "-1" }
+      ],
+      "owner": "feed-query",
+      "reason": "Page the active feed by newest publication."
+    },
+    {
+      "collection": "knowledge_feed_items",
+      "name": "ps_qt_cur_pub_id",
+      "unique": false,
+      "keys": [
+        { "field": "publicState", "direction": "1" },
+        { "field": "qualityTier", "direction": "1" },
+        { "field": "curationScore", "direction": "-1" },
+        { "field": "publishedAt", "direction": "-1" },
+        { "field": "_id", "direction": "-1" }
+      ],
+      "owner": "curated-feed",
+      "reason": "Page curated items by importance."
+    },
+    {
+      "collection": "knowledge_feed_items",
+      "name": "ps_qt_topic_cur_pub_id",
+      "unique": false,
+      "keys": [
+        { "field": "publicState", "direction": "1" },
+        { "field": "qualityTier", "direction": "1" },
+        { "field": "topicKeys", "direction": "1" },
+        { "field": "curationScore", "direction": "-1" },
+        { "field": "publishedAt", "direction": "-1" },
+        { "field": "_id", "direction": "-1" }
+      ],
+      "owner": "curated-feed",
+      "reason": "Page topic-filtered curated items by importance."
+    },
+    {
+      "collection": "knowledge_feed_items",
+      "name": "ps_sc_pub_id",
+      "unique": false,
+      "keys": [
+        { "field": "publicState", "direction": "1" },
+        { "field": "sourceChannelKey", "direction": "1" },
+        { "field": "publishedAt", "direction": "-1" },
+        { "field": "_id", "direction": "-1" }
+      ],
+      "owner": "feed-query",
+      "reason": "Page a source channel by newest publication."
+    },
+    {
+      "collection": "knowledge_feed_items",
+      "name": "ps_sc_score_pub_id",
+      "unique": false,
+      "keys": [
+        { "field": "publicState", "direction": "1" },
+        { "field": "sourceChannelKey", "direction": "1" },
+        { "field": "score", "direction": "-1" },
+        { "field": "publishedAt", "direction": "-1" },
+        { "field": "_id", "direction": "-1" }
+      ],
+      "owner": "feed-query",
+      "reason": "Page a source channel by heat."
+    },
+    {
+      "collection": "knowledge_feed_items",
+      "name": "ps_sc_tags_pub_id",
+      "unique": false,
+      "keys": [
+        { "field": "publicState", "direction": "1" },
+        { "field": "sourceChannelKey", "direction": "1" },
+        { "field": "sourceTags", "direction": "1" },
+        { "field": "publishedAt", "direction": "-1" },
+        { "field": "_id", "direction": "-1" }
+      ],
+      "owner": "aigclink-feed",
+      "reason": "Page GitHub projects filtered by native AIGCLINK tags."
+    },
+    {
+      "collection": "knowledge_feed_items",
+      "name": "ps_sc_tags_score_pub_id",
+      "unique": false,
+      "keys": [
+        { "field": "publicState", "direction": "1" },
+        { "field": "sourceChannelKey", "direction": "1" },
+        { "field": "sourceTags", "direction": "1" },
+        { "field": "score", "direction": "-1" },
+        { "field": "publishedAt", "direction": "-1" },
+        { "field": "_id", "direction": "-1" }
+      ],
+      "owner": "aigclink-feed",
+      "reason": "Page tag-filtered GitHub projects by heat."
+    },
+    {
+      "collection": "knowledge_feed_items",
+      "name": "ps_sc_topic_pub_id",
+      "unique": false,
+      "keys": [
+        { "field": "publicState", "direction": "1" },
+        { "field": "sourceChannelKey", "direction": "1" },
+        { "field": "topicKeys", "direction": "1" },
+        { "field": "publishedAt", "direction": "-1" },
+        { "field": "_id", "direction": "-1" }
+      ],
+      "owner": "feed-query",
+      "reason": "Page a topic-filtered source channel by newest publication."
+    },
+    {
+      "collection": "knowledge_feed_items",
+      "name": "ps_sc_topic_score_pub_id",
+      "unique": false,
+      "keys": [
+        { "field": "publicState", "direction": "1" },
+        { "field": "sourceChannelKey", "direction": "1" },
+        { "field": "topicKeys", "direction": "1" },
+        { "field": "score", "direction": "-1" },
+        { "field": "publishedAt", "direction": "-1" },
+        { "field": "_id", "direction": "-1" }
+      ],
+      "owner": "feed-query",
+      "reason": "Page a topic-filtered source channel by heat."
+    },
+    {
+      "collection": "knowledge_feed_items",
+      "name": "ps_score_pub_id",
+      "unique": false,
+      "keys": [
+        { "field": "publicState", "direction": "1" },
+        { "field": "score", "direction": "-1" },
+        { "field": "publishedAt", "direction": "-1" },
+        { "field": "_id", "direction": "-1" }
+      ],
+      "owner": "feed-query",
+      "reason": "Page the active feed by heat."
+    },
+    {
+      "collection": "knowledge_feed_items",
+      "name": "ps_topic_pub_id",
+      "unique": false,
+      "keys": [
+        { "field": "publicState", "direction": "1" },
+        { "field": "topicKeys", "direction": "1" },
+        { "field": "publishedAt", "direction": "-1" },
+        { "field": "_id", "direction": "-1" }
+      ],
+      "owner": "feed-query",
+      "reason": "Page topic-filtered items by newest publication."
+    },
+    {
+      "collection": "knowledge_feed_items",
+      "name": "ps_topic_score_pub_id",
+      "unique": false,
+      "keys": [
+        { "field": "publicState", "direction": "1" },
+        { "field": "topicKeys", "direction": "1" },
+        { "field": "score", "direction": "-1" },
+        { "field": "publishedAt", "direction": "-1" },
+        { "field": "_id", "direction": "-1" }
+      ],
+      "owner": "feed-query",
+      "reason": "Page topic-filtered items by heat."
+    },
+    {
+      "collection": "knowledge_feed_items",
+      "name": "visual_held_1",
+      "unique": false,
+      "keys": [
+        { "field": "visualPublicationHeld", "direction": "1" }
+      ],
+      "owner": "visual-publication",
+      "reason": "Release expired visual publication holds without a full feed scan."
+    },
+    {
+      "collection": "knowledge_feed_user_engagements",
+      "name": "ownerKey_1",
+      "unique": false,
+      "keys": [
+        { "field": "ownerKey", "direction": "1" }
+      ],
+      "owner": "favorites",
+      "reason": "List one user's engagement records."
+    },
+    {
+      "collection": "knowledge_feed_user_engagements",
+      "name": "owner_favorited_at",
+      "unique": false,
+      "keys": [
+        { "field": "ownerKey", "direction": "1" },
+        { "field": "favorited", "direction": "1" },
+        { "field": "favoritedAt", "direction": "-1" }
+      ],
+      "owner": "favorites",
+      "reason": "Filter and page one user's favorites before applying the response limit."
+    },
+    {
+      "collection": "knowledge_feed_visual_jobs",
+      "name": "visual_jobs_next_attempt",
+      "unique": false,
+      "keys": [
+        { "field": "nextAttemptAt", "direction": "1" }
+      ],
+      "owner": "visual-worker",
+      "reason": "Find due and obsolete visual jobs."
+    },
+    {
+      "collection": "knowledge_feed_visual_jobs",
+      "name": "visual_jobs_priority_due",
+      "unique": false,
+      "keys": [
+        { "field": "priority", "direction": "-1" },
+        { "field": "nextAttemptAt", "direction": "1" }
+      ],
+      "owner": "visual-worker",
+      "reason": "Order due visual candidates by priority and deadline."
+    },
+    {
+      "collection": "knowledge_feed_visual_jobs",
+      "name": "visual_jobs_status",
+      "unique": false,
+      "keys": [
+        { "field": "status", "direction": "1" }
+      ],
+      "owner": "visual-worker",
+      "reason": "Restrict visual job status scans."
+    },
+    {
+      "collection": "knowledge_membership_orders",
+      "name": "channelOrderId_1",
+      "unique": false,
+      "keys": [
+        { "field": "channelOrderId", "direction": "1" }
+      ],
+      "owner": "billing-callback",
+      "reason": "Resolve a payment notification by channel order id."
+    },
+    {
+      "collection": "knowledge_membership_orders",
+      "name": "providerTransactionId_1",
+      "unique": false,
+      "keys": [
+        { "field": "providerTransactionId", "direction": "1" }
+      ],
+      "owner": "billing-callback",
+      "reason": "Resolve a payment notification by provider transaction id."
+    },
+    {
+      "collection": "knowledge_membership_orders",
+      "name": "status_next_check_at_1",
+      "unique": false,
+      "keys": [
+        { "field": "status", "direction": "1" },
+        { "field": "nextCheckAt", "direction": "1" }
+      ],
+      "owner": "billing-reconciliation",
+      "reason": "Select the oldest due pending or paid orders for reconciliation."
+    },
+    {
+      "collection": "knowledge_membership_orders",
+      "name": "wechatPayTransactionId_1",
+      "unique": false,
+      "keys": [
+        { "field": "wechatPayTransactionId", "direction": "1" }
+      ],
+      "owner": "billing-callback",
+      "reason": "Resolve a payment notification by WeChat transaction id."
+    },
+    {
+      "collection": "knowledge_user_media",
+      "name": "cleanup_after_1",
+      "unique": false,
+      "keys": [
+        { "field": "cleanupAfter", "direction": "1" }
+      ],
+      "owner": "user-media-cleanup",
+      "reason": "Claim expired unbound media in deadline order."
+    },
+    {
+      "collection": "knowledge_user_media",
+      "name": "cleanup_claim_expires_at_1",
+      "unique": false,
+      "keys": [
+        { "field": "cleanupClaimExpiresAt", "direction": "1" }
+      ],
+      "owner": "user-media-cleanup",
+      "reason": "Recover stale cleanup claims in deadline order."
+    },
+    {
+      "collection": "knowledge_user_profiles",
+      "name": "avatar_file_id_1",
+      "unique": false,
+      "keys": [
+        { "field": "avatarFileId", "direction": "1" }
+      ],
+      "owner": "user-media-legacy-lookup",
+      "reason": "Resolve approved legacy avatar references without scanning profiles."
+    }
+  ]
+}

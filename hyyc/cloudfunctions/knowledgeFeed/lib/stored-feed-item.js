@@ -1,5 +1,6 @@
 const crypto = require('node:crypto');
 const { analysisInputHash } = require('../policies/feed-curation');
+const { sourceMetadataFields } = require('./source-metadata');
 
 function storedDocumentId(provider, itemId) {
   if (!/^[a-z0-9_-]{2,24}$/i.test(provider || '')
@@ -79,12 +80,19 @@ function toStoredFeedItem(item, {
   const day = publishedDay(item && item.publishedAt);
   if (!item || !day) throw new Error('FEED_ITEM_PUBLISHED_AT_INVALID');
   const normalized = stableContent(item);
+  const baseScore = Number.isFinite(Number(normalized.score)) ? Number(normalized.score) : 0;
   const source = archiveSource || item.archiveSource || (item.selected ? 'selected' : 'all');
   return {
     _id: storedDocumentId(provider, item.id),
     id: item.id,
     provider,
     ...normalized,
+    ...sourceMetadataFields(item),
+    baseScore,
+    score: baseScore,
+    likeCount: 0,
+    commentCount: 0,
+    favoriteCount: 0,
     publishedDay: day,
     contentHash: contentHash(item),
     analysisInputHash: analysisInputHash(item),

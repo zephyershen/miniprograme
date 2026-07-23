@@ -12,11 +12,6 @@ const {
   createVisualMaintenanceService
 } = require('../cloudfunctions/knowledgeFeed/services/visual-maintenance-service');
 const {
-  createSyncCycleService,
-  isVisualMaintenanceDue,
-  isVisualCleanupTick
-} = require('../cloudfunctions/knowledgeFeed/services/sync-cycle-service');
-const {
   createVisualCleanupService
 } = require('../cloudfunctions/knowledgeFeed/services/visual-cleanup-service');
 
@@ -228,7 +223,8 @@ test('returns cached content as stale after the source synchronizer records a fa
   assert.equal(result.items.length, 1);
 });
 
-test('stages refreshed items until a cover or source preview is ready', async () => {
+test('holds a refreshed legacy-cache item briefly and then releases its text', async () => {
+  let currentTime = NOW;
   const ready = readyFeedItem();
   const pending = feedItem({
     id: 'pending01',
@@ -252,19 +248,27 @@ test('stages refreshed items until a cover or source preview is ready', async ()
   const service = createFeedService({
     repository,
     source: { provider: 'test', loadSelected: async () => ({ etag: 'new', items: [pending, ready] }) },
-    now: () => NOW
+    visualPublicationGraceMs: 4 * 60 * 1000,
+    now: () => currentTime
   });
 
   stored = prepareRefreshedDocument({
     fetchedAt: new Date(NOW),
     items: [pending, ready]
   }, stored, []);
-  const result = await service.getFeed({ filters: { time: '7d' } });
+  const waiting = await service.getFeed({ filters: { time: '7d' } });
   assert.deepEqual(stored.items.map((item) => item.id), ['pending01', 'item0001']);
-  assert.deepEqual(result.items.map((item) => item.id), ['item0001']);
-  assert.equal(result.totalAvailable, 1);
-  assert.equal(result.facetMatrix.version, 1);
+  assert.deepEqual(waiting.items.map((item) => item.id), ['item0001']);
+  assert.equal(waiting.totalAvailable, 1);
   await assert.rejects(() => service.getItem('pending01'), { code: 'ITEM_NOT_FOUND' });
+
+  currentTime += 4 * 60 * 1000;
+  const released = await service.getFeed({ filters: { time: '7d' } });
+  assert.deepEqual(released.items.map((item) => item.id), ['pending01', 'item0001']);
+  assert.equal(released.items[0].visualKind, '');
+  assert.equal(released.totalAvailable, 2);
+  assert.equal(released.facetMatrix.version, 1);
+  assert.equal((await service.getItem('pending01')).id, 'pending01');
 });
 
 test('keeps archived items out of the free seven-day feed and returns all screenshots only in detail', async () => {
@@ -329,7 +333,8 @@ test('does not reuse a visual when an upstream item keeps its id but changes URL
     items: [feedItem({ url: 'https://example.com/replaced-article' })]
   }, previous, []);
   const result = await service.getFeed({ filters: { time: '7d' } });
-  assert.equal(result.items.length, 0);
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].visualKind, '');
   assert.deepEqual(stored.items[0].previewFileIds, []);
 });
 
@@ -740,83 +745,4 @@ test('runs visual cleanup at most hourly unless explicitly forced', async () => 
   const forced = await service.runMaintenance({ forceCleanup: true });
   assert.equal(forced.cleanup.skipped, false);
   assert.equal(cleanupCalls, 2);
-});
-
-test('runs visual maintenance every five scheduled minutes in the single timer cycle', async () => {
-  const calls = [];
-  const maintenanceOptions = [];
-  const service = createSyncCycleService({
-    sourceSyncService: {
-      run: async () => {
-        calls.push('source');
-        return { triggerName: 'knowledge-feed-source-sync', status: 'unchanged' };
-      }
-    },
-    visualMaintenanceService: {
-      preparePendingPublication: async () => {
-        calls.push('immediate');
-        return { publication: { totalWithVisuals: 2 } };
-      },
-      runMaintenance: async (options) => {
-        calls.push('maintenance');
-        maintenanceOptions.push(options);
-        return { publication: { totalWithVisuals: 2 } };
-      }
-    },
-    visualIntervalMinutes: 5
-  });
-
-  const dueEvent = { Time: '2026-07-17T00:10:00.000Z' };
-  const idleEvent = { Time: '2026-07-17T00:11:00.000Z' };
-  assert.equal(isVisualMaintenanceDue(dueEvent, 5), true);
-  assert.equal(isVisualMaintenanceDue(idleEvent, 5), false);
-  assert.equal(isVisualCleanupTick(dueEvent), false);
-  assert.equal(isVisualCleanupTick({ Time: '2026-07-17T01:00:00.000Z' }), true);
-  const due = await service.run(dueEvent);
-  const idle = await service.run(idleEvent);
-  assert.equal(due.visualMaintenance.publication.totalWithVisuals, 2);
-  assert.equal(idle.visualMaintenance, null);
-  assert.deepEqual(calls, [
-    'source', 'immediate', 'maintenance',
-    'source', 'immediate'
-  ]);
-  assert.deepEqual(maintenanceOptions, [{ forceCleanup: false }]);
-});
-
-test('prepares newly discovered item visuals in the same minute cycle', async () => {
-  const prepared = [];
-  let archiveCalls = 0;
-  const service = createSyncCycleService({
-    sourceSyncService: {
-      run: async () => ({
-        triggerName: 'knowledge-feed-source-sync',
-        status: 'updated',
-        changed: true,
-        pendingVisualItemIds: ['newitem01', 'newitem02']
-      })
-    },
-    archiveService: {
-      run: async () => { archiveCalls += 1; return { status: 'ready' }; }
-    },
-    visualMaintenanceService: {
-      preparePendingPublication: async (itemIds) => {
-        prepared.push(...itemIds);
-        return {
-          covers: { attempted: 2 },
-          previews: { attempted: 0 },
-          publication: { pendingPublication: 0 }
-        };
-      },
-      runMaintenance: async () => ({ publication: { pendingPublication: 0 } })
-    },
-    visualIntervalMinutes: 5
-  });
-
-  const result = await service.run({ Time: '2026-07-17T00:10:00.000Z' });
-  assert.deepEqual(prepared, ['newitem01', 'newitem02']);
-  assert.equal(result.pendingVisualCount, 2);
-  assert.equal(archiveCalls, 0);
-  assert.deepEqual(result.archive, { status: 'deferred', reason: 'immediate-visuals' });
-  assert.equal(result.visualMaintenance, null);
-  assert.equal(result.visualMaintenanceDeferred, 'immediate-visuals');
 });

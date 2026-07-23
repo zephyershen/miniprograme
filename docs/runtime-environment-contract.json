@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-07-23",
+  "policy": {
+    "secrets": "Only CloudBase server-side environment variables or ignored config.local.js files may contain secret values.",
+    "unknownVariables": "Runtime code must not consume an environment variable unless it is listed in exactly one group below.",
+    "productionDefaults": "Feature flags default closed when absence could create cost, payment, maintenance, or public-write risk."
+  },
+  "groups": [
+    {
+      "name": "platform-managed",
+      "owner": "CloudBase",
+      "secret": false,
+      "required": "managed by the runtime",
+      "variables": [
+        "HOST",
+        "NODE_PATH",
+        "PORT",
+        "TRIGGER_SRC"
+      ]
+    },
+    {
+      "name": "knowledge-feature-flags",
+      "owner": "application maintainer",
+      "secret": false,
+      "required": "optional; bounded defaults are defined in cloudfunctions/knowledgeFeed/config.js",
+      "variables": [
+        "KNOWLEDGE_CLOUDBASE_AI_ENABLED",
+        "KNOWLEDGE_DIGEST_GENERATION_ENABLED",
+        "KNOWLEDGE_INTELLIGENCE_ENABLED",
+        "KNOWLEDGE_LIVE_CURATED",
+        "KNOWLEDGE_LIVE_DIGESTS",
+        "SOURCE_PREVIEW_FUNCTION_ENABLED",
+        "SOURCE_PREVIEW_HTTP_FALLBACK_ENABLED"
+      ]
+    },
+    {
+      "name": "knowledge-ai-tuning",
+      "owner": "application maintainer",
+      "secret": false,
+      "required": "optional; every numeric value is parsed with a positive upper bound",
+      "variables": [
+        "KNOWLEDGE_CLOUDBASE_AI_MONTHLY_POINT_LIMIT",
+        "KNOWLEDGE_CLOUDBASE_ANALYSIS_MODEL",
+        "KNOWLEDGE_CLOUDBASE_ANALYSIS_TIMEOUT_MS",
+        "KNOWLEDGE_CLOUDBASE_COOLDOWN_MS",
+        "KNOWLEDGE_CLOUDBASE_CORE_RESERVE_POINTS",
+        "KNOWLEDGE_CLOUDBASE_DIGEST_MODEL",
+        "KNOWLEDGE_CLOUDBASE_DIGEST_TIMEOUT_MS",
+        "KNOWLEDGE_CLOUDBASE_FAILURE_THRESHOLD",
+        "KNOWLEDGE_CLOUDBASE_MODEL_GROUP",
+        "KNOWLEDGE_CLOUDBASE_MODERATION_IMAGE_MODEL",
+        "KNOWLEDGE_CLOUDBASE_MODERATION_TEXT_MODEL",
+        "KNOWLEDGE_CLOUDBASE_MODERATION_TIMEOUT_MS",
+        "KNOWLEDGE_CLOUDBASE_MONTHLY_PACKAGE_POINTS",
+        "KNOWLEDGE_CLOUDBASE_SOURCE_PREVIEW_REVIEW_TIMEOUT_MS",
+        "KNOWLEDGE_CLOUDBASE_TIMEOUT_MS",
+        "KNOWLEDGE_INTELLIGENCE_INTERVAL_MINUTES",
+        "KNOWLEDGE_INTELLIGENCE_JOBS_PER_CYCLE",
+        "KNOWLEDGE_MAX_ANALYSIS_JOBS_PER_DAY",
+        "KNOWLEDGE_PACKY_SOURCE_PREVIEW_REVIEW_TIMEOUT_MS",
+        "PACKY_API_BASE_URL",
+        "PACKY_MODEL",
+        "PACKY_MODERATION_TIMEOUT_MS",
+        "PACKY_REASONING_EFFORT",
+        "PACKY_TIMEOUT_MS"
+      ]
+    },
+    {
+      "name": "knowledge-storage",
+      "owner": "application maintainer",
+      "secret": false,
+      "required": "optional migration overrides; defaults are bound to the production CloudBase environment",
+      "variables": [
+        "KNOWLEDGE_LIST_THUMBNAIL_FILE_ID_PREFIX",
+        "KNOWLEDGE_PREVIEW_CAPTURE_VERSION",
+        "KNOWLEDGE_PREVIEW_FILE_ID_PREFIX"
+      ]
+    },
+    {
+      "name": "knowledge-secrets",
+      "owner": "application maintainer",
+      "secret": true,
+      "required": "maintenance tokens require at least 32 characters; provider secrets are optional while their provider is disabled",
+      "variables": [
+        "KNOWLEDGE_FEED_MAINTENANCE_TOKEN",
+        "PACKY_API_KEY",
+        "SOURCE_PREVIEW_RENDERER_TOKEN"
+      ]
+    },
+    {
+      "name": "source-preview-runtime",
+      "owner": "application maintainer",
+      "secret": false,
+      "required": "optional unless the corresponding renderer or relay mode is enabled",
+      "variables": [
+        "ALLOW_DIRECT_EGRESS",
+        "CAPTURE_TIMEOUT_MS",
+        "RELAY_EGRESS_MODE",
+        "RELAY_HOST",
+        "RELAY_PORT",
+        "RELAY_UPSTREAM_HOST",
+        "RELAY_UPSTREAM_PORT",
+        "SOURCE_PREVIEW_EXECUTION_ENV",
+        "SOURCE_PREVIEW_FUNCTION_NAME",
+        "SOURCE_PREVIEW_RELAY_ADDRESS",
+        "SOURCE_PREVIEW_RELAY_URL",
+        "SOURCE_PREVIEW_RENDERER_URL"
+      ]
+    },
+    {
+      "name": "source-preview-secret",
+      "owner": "application maintainer",
+      "secret": true,
+      "required": "required for an HTTP renderer or relay; minimum 32 random characters",
+      "variables": [
+        "CAPTURE_TOKEN",
+        "PLAYWRIGHT_PROXY_URL"
+      ]
+    },
+    {
+      "name": "wechat-payment",
+      "owner": "product and application maintainer",
+      "secret": false,
+      "required": "new sales require ENABLED and RELEASE_APPROVED plus all provider fields; RELEASE_APPROVED stays false until the real-device matrix is complete",
+      "variables": [
+        "WECHAT_MINIPROGRAM_APP_ID",
+        "WECHAT_VIRTUAL_PAY_API_BASE_URL",
+        "WECHAT_VIRTUAL_PAY_ENABLED",
+        "WECHAT_VIRTUAL_PAY_ENV",
+        "WECHAT_VIRTUAL_PAY_PRODUCT_ID",
+        "WECHAT_VIRTUAL_PAY_PRO_30D_COMPARE_AT_PRICE_CENTS",
+        "WECHAT_VIRTUAL_PAY_PRO_30D_PRICE_CENTS",
+        "WECHAT_VIRTUAL_PAY_RELEASE_APPROVED",
+        "WECHAT_VIRTUAL_PAY_TIMEOUT_MS"
+      ]
+    },
+    {
+      "name": "wechat-payment-secrets",
+      "owner": "product and application maintainer",
+      "secret": true,
+      "required": "server-side only; required before payment or encrypted refund callbacks are enabled",
+      "variables": [
+        "WECHAT_MESSAGE_PUSH_ENCODING_AES_KEY",
+        "WECHAT_MESSAGE_PUSH_TOKEN",
+        "WECHAT_MINIPROGRAM_APP_SECRET",
+        "WECHAT_VIRTUAL_PAY_APP_KEY",
+        "WECHAT_VIRTUAL_PAY_OFFER_ID"
+      ]
+    }
+  ]
+}

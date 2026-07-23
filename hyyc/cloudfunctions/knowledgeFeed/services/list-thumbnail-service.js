@@ -22,10 +22,15 @@ function decodeThumbnail(value, maximumBytes) {
   return buffer;
 }
 
-function createListThumbnailService({ cloud, config, fetchImpl = fetch }) {
+function createListThumbnailService({ cloud, config, rendererClient = null, fetchImpl = fetch }) {
   function assertConfigured() {
     const rendererUrl = validHttpsUrl(config.rendererUrl).replace(/\/$/, '');
-    if (!rendererUrl || typeof config.rendererToken !== 'string' || config.rendererToken.length < 32) {
+    const functionConfigured = config.rendererFunctionEnabled === true
+      && rendererClient
+      && typeof rendererClient.thumbnail === 'function';
+    if ((!functionConfigured && !rendererUrl)
+      || typeof config.rendererToken !== 'string'
+      || config.rendererToken.length < 32) {
       throw new Error('THUMBNAIL_RENDERER_UNAVAILABLE');
     }
     return rendererUrl;
@@ -48,13 +53,33 @@ function createListThumbnailService({ cloud, config, fetchImpl = fetch }) {
     return url;
   }
 
-  async function requestThumbnail(sourceUrl) {
+  async function requestThumbnail(sourceUrl, item = null) {
     const url = validHttpsUrl(sourceUrl);
     if (!url) throw new Error('THUMBNAIL_SOURCE_URL_INVALID');
+    const rendererUrl = assertConfigured();
+    if (item && rendererClient && typeof rendererClient.thumbnail === 'function') {
+      const functionThumbnail = await rendererClient.thumbnail({
+        version: config.version,
+        url,
+        cloudPathStem: `${config.cloudPathPrefix}${visualRevisionStem(item)}-v${config.version}`
+      });
+      if (functionThumbnail) {
+        if (Number(functionThumbnail.version) !== Number(config.version)
+          || Number(functionThumbnail.width) !== Number(config.width)
+          || Number(functionThumbnail.height) !== Number(config.height)
+          || functionThumbnail.mimeType !== 'image/jpeg'
+          || typeof functionThumbnail.fileId !== 'string'
+          || !functionThumbnail.fileId.startsWith(config.fileIdPrefix)) {
+          throw new Error('THUMBNAIL_FUNCTION_CONTRACT_MISMATCH');
+        }
+        return { fileId: functionThumbnail.fileId };
+      }
+    }
+    if (!rendererUrl) throw new Error('THUMBNAIL_HTTP_FALLBACK_UNAVAILABLE');
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), config.rendererTimeoutMs);
     try {
-      const response = await fetchImpl(`${assertConfigured()}/thumbnail`, {
+      const response = await fetchImpl(`${rendererUrl}/thumbnail`, {
         method: 'POST',
         headers: {
           authorization: `Bearer ${config.rendererToken}`,
@@ -101,7 +126,10 @@ function createListThumbnailService({ cloud, config, fetchImpl = fetch }) {
 
   async function resolveAndUploadFromFile(item, fileId) {
     const sourceUrl = await temporarySourceUrl(fileId);
-    return uploadThumbnail(item, await requestThumbnail(sourceUrl));
+    const resolution = await requestThumbnail(sourceUrl, item);
+    return resolution && resolution.fileId
+      ? resolution.fileId
+      : uploadThumbnail(item, resolution);
   }
 
   return {

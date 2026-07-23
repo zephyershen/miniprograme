@@ -36,24 +36,28 @@ async function waitForFocusedMedia(page, timeoutMs = 8000) {
   await page.waitForFunction((attribute) => {
     const node = document.querySelector(`[${attribute}="selected"]`);
     if (!node) return true;
-    const images = [...node.querySelectorAll('img')].filter((image) => {
-      const rect = image.getBoundingClientRect();
-      const style = window.getComputedStyle(image);
+    const media = [...node.querySelectorAll('img, video')].filter((element) => {
+      const rect = element.getBoundingClientRect();
+      const style = window.getComputedStyle(element);
       return style.display !== 'none' && style.visibility !== 'hidden'
         && rect.width >= 18 && rect.height >= 18;
     });
-    return images.every((image) => image.complete && image.naturalWidth > 0 && image.naturalHeight > 0);
+    return media.every((element) => element.tagName === 'VIDEO'
+      ? (element.readyState >= 2 || Boolean(element.poster))
+      : (element.complete && element.naturalWidth > 0 && element.naturalHeight > 0));
   }, FOCUS_ATTRIBUTE, { timeout: timeoutMs }).catch(() => {});
   await page.waitForLoadState('networkidle', { timeout: 2200 }).catch(() => {});
   return page.evaluate((attribute) => {
     const node = document.querySelector(`[${attribute}="selected"]`);
     if (!node) return { total: 0, ready: 0, pending: 0 };
-    const images = [...node.querySelectorAll('img')].filter((image) => {
-      const rect = image.getBoundingClientRect();
+    const media = [...node.querySelectorAll('img, video')].filter((element) => {
+      const rect = element.getBoundingClientRect();
       return rect.width >= 18 && rect.height >= 18;
     });
-    const ready = images.filter((image) => image.complete && image.naturalWidth > 0).length;
-    return { total: images.length, ready, pending: Math.max(0, images.length - ready) };
+    const ready = media.filter((element) => element.tagName === 'VIDEO'
+      ? (element.readyState >= 2 || Boolean(element.poster))
+      : (element.complete && element.naturalWidth > 0)).length;
+    return { total: media.length, ready, pending: Math.max(0, media.length - ready) };
   }, FOCUS_ATTRIBUTE).catch(() => ({ total: 0, ready: 0, pending: 0 }));
 }
 

@@ -1,11 +1,61 @@
-const { getKnowledgeItem } = require('../../features/knowledge-feed/api.js');
+const { loadKnowledgeItem } = require('../../features/knowledge-feed/item-session.js');
+const {
+  cachedMembershipAccess,
+  membershipCacheScope
+} = require('../../features/membership/session.js');
 const { getDigestReference } = require('../../features/briefing/api.js');
 const {
   decorateKnowledgeItem,
   previewSlides
 } = require('../../features/knowledge-feed/detail-model.js');
+const {
+  toggleLike
+} = require('../../features/engagement/api.js');
+const { updateFavorite } = require('../../features/engagement/favorites-session.js');
+const { decorateEngagement } = require('../../features/engagement/model.js');
+const {
+  rememberEngagement,
+  engagementPatch
+} = require('../../features/engagement/session.js');
+const { createLatestTargetSync } = require('../../features/engagement/latest-target-sync.js');
+const {
+  applyResolvedItemMedia,
+  collectItemMediaFileIds,
+  knowledgeMediaSession,
+  mediaUrl
+} = require('../../features/knowledge-feed/cloud-media-session.js');
+const {
+  createPageMediaRecovery
+} = require('../../features/knowledge-feed/cloud-media-recovery.js');
 
 const SOURCE_URL_EXPAND_THRESHOLD = 42;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const TRANSIENT_DETAIL_ERROR_CODES = new Set([
+  'TEMPORARY_FAILURE',
+  'NETWORK_ERROR',
+  'REQUEST_TIMEOUT',
+  'TIMEOUT',
+  'CLOUD_FUNCTION_TIMEOUT',
+  'SERVICE_UNAVAILABLE',
+  'SYSTEM_ERROR'
+]);
+
+function canKeepCachedDetail(error) {
+  return Boolean(error && TRANSIENT_DETAIL_ERROR_CODES.has(error.code));
+}
+
+function itemWithinCurrentEntitlement(item, access, now = Date.now()) {
+  if (!item || !access || !access.entitlements) return false;
+  const sourceChannels = Array.isArray(item.sourceChannelKeys) ? item.sourceChannelKeys : [];
+  if (item.sourceChannelKey === 'openSource' || sourceChannels.includes('openSource')) return true;
+  const history = access.entitlements.history || {};
+  if (history.mode === 'all') return true;
+  const days = Number(history.days);
+  const publishedAt = new Date(item.publishedAt || '').getTime();
+  return Number.isFinite(days) && days > 0
+    && Number.isFinite(publishedAt)
+    && publishedAt >= Number(now) - (days * DAY_MS);
+}
 
 Page({
   data: {
@@ -16,54 +66,227 @@ Page({
     previewIndex: 0,
     previewAutoplay: true,
     sourceUrlCanExpand: false,
-    sourceUrlExpanded: false
+    sourceUrlExpanded: false,
+    commentsOpen: false,
+    membershipPromptVisible: false,
+    membershipPromptFeature: 'comments'
   },
 
   onLoad(options) {
     this.itemId = options.id || '';
     this.digestId = options.digestId || '';
+    this.openCommentsAfterLoad = options.comments === '1';
+    this.pageDisposed = false;
+    this.detailLoadRequestId = 0;
+    this.skipNextDetailRevalidation = true;
+    this.detailMediaRequestId = 0;
+    this.mediaRecovery = createPageMediaRecovery(this);
     this.loadItem();
   },
 
-  async loadItem() {
+  onUnload() {
+    this.pageDisposed = true;
+    this.detailLoadRequestId = (this.detailLoadRequestId || 0) + 1;
+    this.detailMediaRequestId = (this.detailMediaRequestId || 0) + 1;
+    if (this.mediaRecovery) this.mediaRecovery.dispose();
+    if (this.engagementSync) this.engagementSync.dispose();
+  },
+
+  onShow() {
+    if (this.mediaRecovery) this.mediaRecovery.resume();
+    if (this.skipNextDetailRevalidation) {
+      this.skipNextDetailRevalidation = false;
+      return;
+    }
+    return this.loadItem({ preserveCurrent: true });
+  },
+
+  onHide() {
+    if (this.mediaRecovery) this.mediaRecovery.pause();
+  },
+
+  async loadItem({ preserveCurrent = false } = {}) {
+    const requestId = (this.detailLoadRequestId || 0) + 1;
+    this.detailLoadRequestId = requestId;
     const feed = getApp().globalData.knowledgeFeed;
     const feedItems = (feed && feed.items) || [];
-    const cached = feedItems.find((item) => item.id === this.itemId);
-    if (cached) this.showItem(cached, feedItems);
+    const currentItem = preserveCurrent ? this.data.item : null;
+    if (!preserveCurrent) {
+      this.setData({
+        item: null,
+        loading: true,
+        error: '',
+        entitlementRequired: false
+      });
+    }
     try {
       const response = this.digestId
         ? await getDigestReference(this.digestId, this.itemId)
-        : await getKnowledgeItem(this.itemId);
+        : await loadKnowledgeItem(this.itemId);
+      if (this.pageDisposed || requestId !== this.detailLoadRequestId) return false;
       const item = response && response.item ? response.item : response;
       this.showItem(item, feedItems);
+      this.authorizedDetailScope = membershipCacheScope();
+      return true;
     } catch (error) {
-      if (!cached) {
-        this.setData({
-          error: error.message,
-          entitlementRequired: error.code === 'ENTITLEMENT_REQUIRED',
-          loading: false
-        });
+      if (this.pageDisposed || requestId !== this.detailLoadRequestId) return false;
+      const currentScope = membershipCacheScope();
+      if (currentItem && canKeepCachedDetail(error)
+        && this.authorizedDetailScope && this.authorizedDetailScope === currentScope
+        && itemWithinCurrentEntitlement(currentItem, cachedMembershipAccess())) {
+        this.setData({ loading: false });
+        return false;
       }
+      this.authorizedDetailScope = '';
+      this.detailMediaRequestId = (this.detailMediaRequestId || 0) + 1;
+      if (this.mediaRecovery) this.mediaRecovery.reset();
+      this.setData({
+        item: null,
+        error: (error && error.message) || '资讯详情暂时无法加载',
+        entitlementRequired: Boolean(error && error.code === 'ENTITLEMENT_REQUIRED'),
+        loading: false
+      });
+      return false;
     }
   },
 
   showItem(item, feedItems = []) {
     const decoratedItem = decorateKnowledgeItem(item, feedItems);
-    const sourceUrl = typeof decoratedItem.url === 'string' ? decoratedItem.url : '';
+    const remembered = decoratedItem.id && engagementPatch(decoratedItem.id);
+    const hydratedItem = remembered
+      ? { ...decoratedItem, engagement: decorateEngagement(remembered) }
+      : decoratedItem;
+    const sourceUrl = typeof hydratedItem.url === 'string' ? hydratedItem.url : '';
     this.previewAutoplaySteps = 0;
+    const mediaRequestId = (this.detailMediaRequestId || 0) + 1;
+    this.detailMediaRequestId = mediaRequestId;
+    if (this.mediaRecovery) this.mediaRecovery.reset();
     this.setData({
-      item: decoratedItem,
+      item: hydratedItem,
+      error: '',
+      entitlementRequired: false,
       loading: false,
       previewIndex: 0,
       previewAutoplay: true,
       sourceUrlCanExpand: sourceUrl.length > SOURCE_URL_EXPAND_THRESHOLD,
       sourceUrlExpanded: false
+    }, () => {
+      if (this.openCommentsAfterLoad) {
+        this.openCommentsAfterLoad = false;
+        this.openComments();
+      }
     });
+    this.resolveVisibleItemMedia(hydratedItem, mediaRequestId);
+  },
+
+  async resolveVisibleItemMedia(item, requestId) {
+    const resolvedUrls = await knowledgeMediaSession.resolveForItem(item);
+    if (requestId !== this.detailMediaRequestId) return false;
+    const currentItem = this.data && this.data.item;
+    if (!currentItem || currentItem.id !== item.id) return false;
+    this.setData({ item: applyResolvedItemMedia(currentItem, resolvedUrls) });
+    if (this.mediaRecovery) {
+      this.mediaRecovery.track(collectItemMediaFileIds(this.data.item), (freshUrls) => {
+        if (requestId !== this.detailMediaRequestId || !this.data.item
+          || this.data.item.id !== item.id) return;
+        this.setData({ item: applyResolvedItemMedia(this.data.item, freshUrls) });
+      });
+    }
+    return true;
+  },
+
+  handleMediaError(event) {
+    if (this.mediaRecovery) this.mediaRecovery.handleError(event);
   },
 
   toggleSourceUrl() {
     if (!this.data.sourceUrlCanExpand) return;
     this.setData({ sourceUrlExpanded: !this.data.sourceUrlExpanded });
+  },
+
+  noop() {},
+
+  applyEngagementResult(result) {
+    if (!result || !result.engagement || !this.data.item) return;
+    const engagement = decorateEngagement(result.engagement);
+    rememberEngagement(this.data.item.id, engagement);
+    this.setData({ 'item.engagement': engagement });
+  },
+
+  engagementSyncFor(item) {
+    if (this.engagementSync && this.engagementSyncItemId === item.id) return this.engagementSync;
+    if (this.engagementSync) this.engagementSync.dispose();
+    this.engagementSyncItemId = item.id;
+    this.engagementSync = createLatestTargetSync({
+      read: () => this.data.item && this.data.item.engagement,
+      apply: (engagement) => this.applyEngagementResult({ itemId: item.id, engagement }),
+      request: (field, target) => (field === 'liked'
+        ? toggleLike(item.id, target)
+        : updateFavorite(item.id, target)),
+      onError: (error, field) => wx.showToast({
+        title: (error && error.message) || (field === 'liked' ? '喜欢失败，请重试' : '收藏失败，请重试'),
+        icon: 'none'
+      })
+    });
+    return this.engagementSync;
+  },
+
+  handleLike() {
+    const item = this.data.item;
+    if (!item) return;
+    this.engagementSyncFor(item).toggleLike();
+  },
+
+  handleFavorite() {
+    const item = this.data.item;
+    if (!item) return;
+    this.engagementSyncFor(item).toggleFavorite();
+  },
+
+  openComments() {
+    const engagement = this.data.item && this.data.item.engagement;
+    if (!engagement || !engagement.canComment) {
+      this.openMembershipPrompt('comments');
+      return;
+    }
+    this.setData({ commentsOpen: true });
+  },
+
+  closeComments() {
+    this.setData({ commentsOpen: false });
+  },
+
+  onCommentPublished(event) {
+    const item = this.data.item;
+    if (!item) return;
+    const engagement = decorateEngagement({
+      ...item.engagement,
+      commentCount: event.detail && event.detail.commentCount
+    });
+    rememberEngagement(item.id, engagement);
+    this.setData({ 'item.engagement': engagement });
+  },
+
+  handleCommentsLocked() {
+    this.setData({ commentsOpen: false });
+    this.openMembershipPrompt('comments');
+  },
+
+  openMembershipPrompt(featureKey) {
+    this.setData({
+      membershipPromptVisible: true,
+      membershipPromptFeature: featureKey || 'comments'
+    });
+  },
+
+  closeMembershipPrompt() {
+    this.setData({ membershipPromptVisible: false });
+  },
+
+  openMembershipFromPrompt() {
+    this.setData({ membershipPromptVisible: false }, () => {
+      wx.switchTab({ url: '/pages/profile/index' });
+    });
   },
 
   openOriginal() {
@@ -111,21 +334,17 @@ Page({
     if (!Array.isArray(fileIds) || !fileIds.length) return;
     const index = Number(event && event.currentTarget && event.currentTarget.dataset.index);
     if (!Number.isInteger(index) || index < 0 || index >= fileIds.length) return;
+    const mediaRequestId = this.detailMediaRequestId;
     try {
-      const cacheKey = fileIds.join('|');
-      let resolved = this.previewTempCache && this.previewTempCache.key === cacheKey
-        ? this.previewTempCache.items
-        : null;
-      if (!resolved) {
-        const result = await wx.cloud.getTempFileURL({ fileList: fileIds });
-        resolved = ((result && result.fileList) || [])
-          .map((entry, originalIndex) => ({
-            originalIndex,
-            url: entry && entry.tempFileURL
-          }))
-          .filter((entry) => typeof entry.url === 'string' && entry.url);
-        this.previewTempCache = { key: cacheKey, items: resolved };
-      }
+      const resolvedUrls = await knowledgeMediaSession.resolveFileIds(fileIds);
+      if (mediaRequestId !== this.detailMediaRequestId
+        || !this.data.item || this.data.item.id !== item.id) return;
+      const resolved = fileIds
+        .map((fileId, originalIndex) => ({
+          originalIndex,
+          url: mediaUrl(fileId, resolvedUrls)
+        }))
+        .filter((entry) => entry.url);
       const urls = resolved.map((entry) => entry.url);
       const current = (resolved.find((entry) => entry.originalIndex === index) || resolved[0] || {}).url;
       if (!current || !urls.length) throw new Error('PREVIEW_UNAVAILABLE');
@@ -142,14 +361,26 @@ Page({
   },
 
   openMembership() {
-    wx.switchTab({ url: '/pages/profile/index' });
+    this.openMembershipPrompt('history_30d');
   },
 
   onShareAppMessage() {
     const item = this.data.item;
-    return {
-      title: item ? item.title : '知识更新',
+    const share = {
+      title: item ? item.title : 'AI 资讯',
       path: `/pages/feed-detail/index?id=${encodeURIComponent(this.itemId)}`
     };
+    if (item && item.listVisualUrl) share.imageUrl = item.listVisualUrl;
+    return share;
+  },
+
+  onShareTimeline() {
+    const item = this.data.item;
+    const share = {
+      title: item ? item.title : 'AI 资讯',
+      query: `id=${encodeURIComponent(this.itemId)}`
+    };
+    if (item && item.listVisualUrl) share.imageUrl = item.listVisualUrl;
+    return share;
   }
 });

@@ -1,3 +1,5 @@
+const { installGuardedContextRoutes } = require('./browser-network-policy.js');
+
 const LIST_THUMBNAIL_VERSION = 1;
 const LIST_THUMBNAIL_WIDTH = 360;
 const LIST_THUMBNAIL_HEIGHT = 253;
@@ -19,17 +21,13 @@ async function renderListThumbnail(browser, sourceUrl, guard, signal) {
   });
   const abortRender = () => context.close().catch(() => {});
   try {
+    await installGuardedContextRoutes(context, guard);
     if (signal) {
       if (signal.aborted) throw new Error('THUMBNAIL_ABORTED');
       signal.addEventListener('abort', abortRender, { once: true });
     }
     const page = await context.newPage();
     page.setDefaultTimeout(5000);
-    await page.route('**/*', async (route) => {
-      const allowed = await guard.allowBrowserRequest(route.request().url());
-      if (allowed) await route.continue();
-      else await route.abort('blockedbyclient');
-    });
     await page.setContent(thumbnailDocument(), { waitUntil: 'domcontentloaded', timeout: 5000 });
     await page.evaluate((url) => { document.querySelector('#source').src = url; }, sourceUrl);
     await page.waitForFunction(() => {

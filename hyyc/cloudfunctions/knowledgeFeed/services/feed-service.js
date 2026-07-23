@@ -1,11 +1,12 @@
 const { AppError } = require('../lib/errors');
-const { hasReadyVisual } = require('../policies/visual-publication');
 const { presentFeed, presentItem } = require('../presenters/public-feed');
 const { freeItemVisible } = require('../policies/feed-access');
+const { visualPublicationVisible } = require('../policies/visual-publication');
 
 function createFeedService({
   repository,
   ensureCache = null,
+  visualPublicationGraceMs = 0,
   now = () => Date.now(),
   logger = console
 }) {
@@ -29,7 +30,8 @@ function createFeedService({
     return presentFeed(cache, {
       stale: Boolean(cache.sourceLastErrorCode),
       query,
-      now: now()
+      now: now(),
+      visualPublicationGraceMs
     });
   }
 
@@ -40,10 +42,12 @@ function createFeedService({
     const cache = await readCache();
     const item = cache && (cache.items || []).find((entry) => entry.id === id);
     const currentTime = now();
-    if (!item || !hasReadyVisual(item) || !freeItemVisible(item, currentTime)) {
+    if (!item
+      || !freeItemVisible(item, currentTime)
+      || !visualPublicationVisible(item, currentTime, visualPublicationGraceMs)) {
       throw new AppError('ITEM_NOT_FOUND', '这条资讯已更新，请返回首页刷新');
     }
-    return presentItem(cache, item, { now: currentTime });
+    return presentItem(cache, item, { now: currentTime, visualPublicationGraceMs });
   }
 
   return { getFeed, getItem };

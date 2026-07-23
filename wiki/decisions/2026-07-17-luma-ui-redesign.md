@@ -4,12 +4,14 @@ type: decision
 tags: [decision, ui, visual-system, apple-inspired, miniprogram]
 sources: [../sources/2026-07-17-luma-ui-redesign.md]
 date: 2026-07-17
-last_updated: 2026-07-17
-status: accepted
+last_updated: 2026-07-18
+status: superseded
 confidence: high
 ---
 
 # 采用 Luma 珍珠表面视觉系统
+
+> 2026-07-18：蓝紫渐变、微光和珍珠材质的具体表达已由 [资讯社交动作与编辑蓝会员转化界面](2026-07-18-engagement-and-editorial-social-ui.md) 替代。冷白画布、实体内容面、连续圆角、系统字体与控制层/内容层分离原则继续有效。
 
 ## 背景
 

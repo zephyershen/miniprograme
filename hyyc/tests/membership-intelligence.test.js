@@ -22,6 +22,7 @@ const {
 const { qualityTier } = require('../cloudfunctions/knowledgeFeed/policies/feed-quality');
 const {
   analysisJobId,
+  analysisPriority,
   analysisJob
 } = require('../cloudfunctions/knowledgeFeed/repositories/feed-analysis-job');
 const {
@@ -45,7 +46,7 @@ const {
 } = require('../cloudfunctions/knowledgeFeed/services/digest-query-service');
 
 const NOW = Date.parse('2026-07-17T08:00:00.000Z');
-const CONFIG = { freeWindowDays: 7, memberWindowDays: 30 };
+const CONFIG = { freeWindowDays: 1, memberWindowDays: 30 };
 
 test('returns capability entitlements for free, member and all-retained admin roles', async () => {
   const service = createFeedEntitlementService({
@@ -65,7 +66,7 @@ test('returns capability entitlements for free, member and all-retained admin ro
   const free = await service.resolve({ ownerKey: 'c'.repeat(64) });
   const member = await service.resolve({ ownerKey: 'b'.repeat(64) });
   const admin = await service.resolve({ ownerKey: 'a'.repeat(64) });
-  assert.deepEqual(free.entitlements.history, { mode: 'rolling', days: 7 });
+  assert.deepEqual(free.entitlements.history, { mode: 'rolling', days: 1 });
   assert.equal(free.entitlements.curatedFeed, false);
   assert.deepEqual(member.entitlements.history, { mode: 'rolling', days: 30 });
   assert.deepEqual(member.entitlements.digests, ['24h', '7d', '30d']);
@@ -100,7 +101,7 @@ test('lets a real administrator preview free and member entitlements without los
   assert.equal(free.viewer.actualRole, 'admin');
   assert.equal(free.viewer.canPreviewRoles, true);
   assert.equal(free.viewer.isRolePreview, true);
-  assert.deepEqual(free.entitlements.history, { mode: 'rolling', days: 7 });
+  assert.deepEqual(free.entitlements.history, { mode: 'rolling', days: 1 });
 
   await previewService.set(actor, 'member');
   const member = await entitlementService.resolve(actor);
@@ -164,6 +165,12 @@ test('analysis identity ignores popularity and upstream selection changes', () =
   assert.equal(first._id, analysisJobId('test', item.id, first.expectedInputHash, 1));
 });
 
+test('prioritizes newly published analysis work over the historical backlog', () => {
+  assert.ok(analysisPriority({ publishedAt: '2026-07-19T00:00:00.000Z' }, 1000)
+    > analysisPriority({ publishedAt: '2026-06-19T00:00:00.000Z' }, 1000));
+  assert.equal(analysisPriority({}, 1000), 1000);
+});
+
 test('keeps the production intelligence worker idle while no provider is configured', async () => {
   const service = createFeedAnalysisWorkerService({
     provider: createDisabledIntelligenceProvider(),
@@ -183,7 +190,10 @@ test('gates curated and rolling digest reads without leaking live member content
   await assert.rejects(() => curated.getFeed({}, free), (error) => (
     error.code === 'ENTITLEMENT_REQUIRED' && error.details.featureKey === 'curated_feed'
   ));
-  assert.deepEqual(await curated.getFeed({}, member), { mode: 'curated', sort: 'importance' });
+  assert.deepEqual(await curated.getFeed({}, member), {
+    mode: 'curated',
+    sort: 'importance'
+  });
 
   const digestDocument = {
     _id: 'digest_24h_20260717', windowKey: '24h', status: 'published',
@@ -206,6 +216,39 @@ test('gates curated and rolling digest reads without leaking live member content
   const reference = await digests.getReference('digest_24h_20260717', 'item0001', member);
   assert.equal(reference.mode, 'snapshot');
   assert.equal(reference.item.title, 'Snapshot');
+});
+
+test('keeps backend analysis and moderation mechanics out of user-facing copy', () => {
+  const userFacingFiles = [
+    '../pages/featured/index.wxml',
+    '../pages/briefing/index.wxml',
+    '../components/comment-sheet/index.js',
+    '../features/membership/prompt.js',
+    '../cloudfunctions/knowledgeFeed/services/comment-moderation-service.js',
+    '../cloudfunctions/knowledgeFeed/services/curated-feed-query-service.js',
+    '../cloudfunctions/knowledgeFeed/services/digest-query-service.js'
+  ];
+  const forbidden = /AI 正在|AI 自动|由 AI|云端 AI|AI 用量|模型 Token|分析服务启用|真实分析服务|aiDisclosure|当前数据覆盖不完整|结论仅代表已收录范围/;
+  userFacingFiles.forEach((relativePath) => {
+    const content = fs.readFileSync(path.join(__dirname, relativePath), 'utf8');
+    assert.doesNotMatch(content, forbidden, relativePath);
+  });
+});
+
+test('keeps launch copy free of internal-test and incomplete-coverage notices', () => {
+  const userFacingFiles = [
+    '../pages/featured/index.wxml',
+    '../pages/briefing/index.wxml',
+    '../pages/curated/index.wxml',
+    '../pages/profile/index.wxml',
+    '../pages/profile/index.js',
+    '../features/membership/prompt.js'
+  ];
+  const forbidden = /内测中|不会在这里发起扣款|数据仍在持续补全|完整起点/;
+  userFacingFiles.forEach((relativePath) => {
+    const content = fs.readFileSync(path.join(__dirname, relativePath), 'utf8');
+    assert.doesNotMatch(content, forbidden, relativePath);
+  });
 });
 
 test('encodes stable latest, heat and importance cursors', () => {

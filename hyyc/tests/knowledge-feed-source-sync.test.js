@@ -192,13 +192,21 @@ test('does not load items when only the all-mode fingerprint changes', async () 
   assert.equal(memory.read().sourceObservedAllFingerprint, 'all-new');
 });
 
-test('preserves the renderer capture version with reusable source previews', () => {
+test('preserves reusable source previews and source metadata when optional enrichment is unavailable', () => {
   const previewFileId = 'cloud://env.bucket/knowledge-previews/source/item0001-v2-1.jpg';
+  const sourceAvatarFileId = 'cloud://env.bucket/knowledge-source-avatars/x/rohan.webp';
   const previous = baseCache({
     items: [item({
       previewFileIds: [previewFileId],
       previewStatus: 'ready',
-      previewCaptureVersion: 2
+      previewCaptureVersion: 2,
+      sourceIdentity: {
+        platform: 'x',
+        displayName: 'Rohan Paul',
+        handle: 'rohanpaul_ai'
+      },
+      sourceTags: ['开源生态', '数据/训练'],
+      sourceAvatarFileId
     })]
   });
   const refreshed = prepareRefreshedDocument({
@@ -206,6 +214,14 @@ test('preserves the renderer capture version with reusable source previews', () 
   }, previous, ['cloud://env.bucket/knowledge-previews/source/']);
   assert.deepEqual(refreshed.items[0].previewFileIds, [previewFileId]);
   assert.equal(refreshed.items[0].previewCaptureVersion, 2);
+  assert.deepEqual(refreshed.items[0].sourceIdentity, {
+    platform: 'x',
+    displayName: 'Rohan Paul',
+    handle: 'rohanpaul_ai'
+  });
+  assert.deepEqual(refreshed.items[0].sourceTags, ['开源生态', '数据/训练']);
+  assert.equal(refreshed.items[0].sourceAvatarFileId, sourceAvatarFileId);
+  assert.equal(refreshed.items[0].sourceMetadataHash.length, 64);
 });
 
 test('loads items once when selected changes and advances applied only after success', async () => {
@@ -451,6 +467,41 @@ test('enforces source leases in the persistent repository transaction boundary',
     owner: 'lease-first', now: new Date(NOW + 1001)
   }), /SOURCE_SYNC_LEASE_LOST/);
   assert.equal(stored.marker, 'first');
+});
+
+test('does not send the CloudBase-managed document id when replacing a source snapshot', async () => {
+  let stored = {
+    _id: 'selected',
+    sourceSyncLeaseOwner: 'lease-owner',
+    sourceSyncLeaseAcquiredAt: new Date(NOW),
+    sourceSyncLeaseUntil: new Date(NOW + 1000),
+    items: [item({ id: 'previous' })]
+  };
+  let writtenData = null;
+  const reference = {
+    get: async () => ({ data: stored }),
+    set: async ({ data }) => {
+      if (Object.hasOwn(data, '_id')) throw new Error('CANNOT_UPDATE_DOCUMENT_ID');
+      writtenData = data;
+      stored = { _id: 'selected', ...data };
+    }
+  };
+  const repository = createFeedCacheRepository({
+    runTransaction: async (operation) => operation({
+      collection: () => ({ doc: () => reference })
+    })
+  }, { collectionName: 'feed', documentId: 'selected' });
+
+  const result = await repository.replace({ items: [item({ id: 'current' })] },
+    (next, current) => ({ ...current, ...next }), {
+      owner: 'lease-owner',
+      now: new Date(NOW + 500)
+    });
+
+  assert.equal(Object.hasOwn(writtenData, '_id'), false);
+  assert.equal(result.document.items[0].id, 'current');
+  assert.equal(result.document.sourceSyncLeaseOwner, 'lease-owner');
+  assert.equal(stored._id, 'selected');
 });
 
 test('prevents an expired lease owner from overwriting a newer snapshot', async () => {

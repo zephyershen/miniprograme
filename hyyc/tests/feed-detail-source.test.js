@@ -85,7 +85,7 @@ test('renders source screenshots as an automatic carousel with dots below the im
   assert.match(markup, /circular="{{item\.previewFileIds\.length > 1}}"/);
   assert.match(markup, /bindchange="onPreviewChange"/);
   assert.match(markup, /wx:for="{{item\.previewSlides}}"[\s\S]*data-index="{{previewImageIndex}}"/);
-  assert.match(markup, /wx:if="{{previewSlide\.shouldLoad}}"[\s\S]*src="{{previewSlide\.fileId}}"/);
+  assert.match(markup, /wx:if="{{previewSlide\.shouldLoad && previewSlide\.url}}"[\s\S]*src="{{previewSlide\.url}}"/);
   assert.match(markup, /class="source-preview-dots"/);
   assert.doesNotMatch(markup, /source-preview-action/);
 });
@@ -121,9 +121,9 @@ test('tracks the visible screenshot and opens the full screenshot set at the tap
         requested.push(...options.fileList);
         return {
           fileList: [
-            { tempFileURL: 'https://temp.example.com/first.jpg' },
-            { tempFileURL: 'https://temp.example.com/second.jpg' },
-            { tempFileURL: 'https://temp.example.com/third.jpg' }
+            { fileID: 'cloud://first.jpg', status: 0, tempFileURL: 'https://temp.example.com/first.jpg' },
+            { fileID: 'cloud://second.jpg', status: 0, tempFileURL: 'https://temp.example.com/second.jpg' },
+            { fileID: 'cloud://third.jpg', status: 0, tempFileURL: 'https://temp.example.com/third.jpg' }
           ]
         };
       }

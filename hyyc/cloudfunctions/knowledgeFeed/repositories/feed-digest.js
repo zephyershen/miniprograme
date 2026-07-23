@@ -34,7 +34,7 @@ function createFeedDigestRepository(db, config) {
     await ensureCollection();
     assertWindowKey(document && document.windowKey);
     if (!document || typeof document._id !== 'string') throw new Error('DIGEST_ID_REQUIRED');
-    const data = { ...document, status: 'published' };
+    const data = { ...document, status: 'published', reviewMode: 'ai' };
     delete data._id;
     await collection().doc(document._id).set({ data });
     return { ...data, _id: document._id };

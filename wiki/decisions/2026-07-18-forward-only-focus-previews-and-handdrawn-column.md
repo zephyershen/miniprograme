@@ -4,7 +4,7 @@ type: decision
 tags: [source-preview, visual-policy, ai-column, handdrawn, membership]
 sources: [sources/2026-07-18-focus-previews-and-handdrawn-column.md]
 date: 2026-07-18
-last_updated: 2026-07-18
+last_updated: 2026-07-21
 status: accepted
 confidence: high
 ---
@@ -30,6 +30,12 @@ confidence: high
 - 三页完整故事海报比“插画嵌在原生卡片里”更接近用户给出的手绘课堂笔记，也避免界面与图片重复解释同一内容。
 - 真机预览兼容性优先于 WebP 的局部压缩收益。基线 JPEG 与显式加载窗口减少设备解码和轮播可见性差异；新预览实测包体仍只有 1,786,530 bytes。
 - 受控条件渲染比组件黑盒懒加载更适合三页课程：首屏最多解码两张，同时提前准备下一页，不会在进入专栏时拉取六课 18 张。
+
+## 2026-07-21 截图审核修订
+
+- 第 2 条“当前不接视觉大模型”已被真实错误样本取代：普通网页与可疑稀疏截图现在进入视觉审核，X 精确目标保留低成本确定性快路；空白、错误壳和目标不符均不能发布。
+- 第 3 条“旧截图不重跑、不删除”增加有界例外：只有经字节重复、人工画面复核或确定性空白证实的坏图，才通过维护端精确 CAS 隔离并排入 v3 重抓；未命中当前首图、非 active 或存在租约的记录不改动。
+- 证据见 [原文截图 v3 质量闸门与历史坏图修复](../sources/2026-07-21-source-preview-v3-quality-and-repair.md)。
 
 ## 回滚边界
 

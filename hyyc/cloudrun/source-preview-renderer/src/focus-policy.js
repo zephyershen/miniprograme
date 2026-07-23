@@ -8,6 +8,11 @@ function normalizeCaptureProfile(value) {
 function statusIdFromUrl(value) {
   try {
     const url = new URL(value);
+    if (url.hostname.toLowerCase() === 'platform.twitter.com'
+      && url.pathname.toLowerCase() === '/embed/tweet.html') {
+      const embeddedId = url.searchParams.get('id') || '';
+      return /^\d+$/.test(embeddedId) ? embeddedId : '';
+    }
     if (!/(^|\.)(x\.com|twitter\.com)$/i.test(url.hostname)) return '';
     const match = url.pathname.match(/\/status\/(\d+)/i);
     return match ? match[1] : '';
@@ -93,7 +98,10 @@ async function collectFocusCandidates(page, targetUrl) {
         return imageRect.width >= 24 && imageRect.height >= 24;
       }).length;
       const targetStatus = Boolean(targetStatusId && links.some((link) => (
-        String(link.getAttribute('href') || '').includes(`/status/${targetStatusId}`)
+        String(link.getAttribute('href') || '')
+          .split(/[?#]/, 1)[0]
+          .replace(/\/+$/, '')
+          .endsWith(`/status/${targetStatusId}`)
       )));
       const navigationPenalty = node.matches('nav,header,footer,[role="navigation"]') ? 1800 : 0;
       return {
@@ -125,7 +133,12 @@ async function selectFocusCandidate(page, targetUrl) {
     const selected = document.querySelector(`[${attribute}="${id}"]`);
     if (selected) selected.setAttribute(attribute, 'selected');
   }, { attribute: FOCUS_ATTRIBUTE, id: chosen.id });
-  return { kind: chosen.kind, confidence: chosen.confidence, score: Math.round(chosen.score) };
+  return {
+    kind: chosen.kind,
+    confidence: chosen.confidence,
+    score: Math.round(chosen.score),
+    targetMatched: chosen.targetStatus === true
+  };
 }
 
 module.exports = {

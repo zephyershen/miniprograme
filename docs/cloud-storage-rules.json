@@ -1,0 +1,4 @@
+{
+  "read": "/^knowledge-covers\\//.test(resource.path) || /^knowledge-previews\\//.test(resource.path) || /^knowledge-thumbnails\\//.test(resource.path) || /^knowledge-source-avatars\\//.test(resource.path)",
+  "write": "false"
+}

@@ -6,6 +6,7 @@ const CATEGORY_META = Object.freeze({
   tip: { label: '方法实践', marker: 'PRACTICE', channelKey: 'ai', tone: 'lime' }
 });
 const { inferTopicKeys } = require('./topics');
+const { inferSourceChannelKeys } = require('./source-channels');
 
 function cleanText(value, maxLength) {
   if (typeof value !== 'string') return '';
@@ -68,6 +69,7 @@ function normalizeAihotItem(input = {}) {
     coverTone: meta.tone,
     score: Number.isFinite(score) ? Math.max(0, Math.min(100, Math.round(score))) : null,
     selected: input.selected === true,
+    sourceChannelKeys: inferSourceChannelKeys(input),
     attribution: {
       source: 'AI HOT',
       canonical: validHttpsUrl(input.attribution && input.attribution.canonical) || permalink

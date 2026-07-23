@@ -17,11 +17,12 @@ function createCuratedFeedQueryService({ itemFeedQueryService, liveEnabled = tru
         items: []
       };
     }
-    return itemFeedQueryService.getFeed({
+    const feed = await itemFeedQueryService.getFeed({
       ...input,
       mode: 'curated',
       sort: input.sort === 'latest' ? 'latest' : 'importance'
     }, entitlement);
+    return feed;
   }
 
   return { getFeed };

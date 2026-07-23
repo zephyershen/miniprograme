@@ -7,6 +7,7 @@ node_modules/
 hyyc/miniprogram_npm/
 hyyc/cloudfunctions/**/node_modules/
 .playwright-cli/
+.codex-tmp/
 
 # Local visual sources and generated verification artifacts.
 png/
@@ -23,3 +24,4 @@ wiki/secrets/
 
 # Local infrastructure handoff files may contain credentials.
 docs/txserverinfo.txt
+docs/packyapi.txt

@@ -16,6 +16,14 @@ function analysisJobId(provider, itemId, inputHash, policyVersion) {
     .digest('hex');
 }
 
+function analysisPriority(item, basePriority = 100) {
+  const publishedAt = new Date(item && item.publishedAt).getTime();
+  const recencyDay = Number.isFinite(publishedAt)
+    ? Math.max(0, Math.floor(publishedAt / (24 * 60 * 60 * 1000)))
+    : 0;
+  return Math.max(0, Number(basePriority) || 0) + recencyDay;
+}
+
 function analysisJob(item, config, observedAt = new Date(), priority = 100) {
   const inputHash = analysisInputHash(item);
   const policyVersion = Math.max(1, Number(config.policyVersion) || 1);
@@ -25,7 +33,7 @@ function analysisJob(item, config, observedAt = new Date(), priority = 100) {
     itemId: item.id,
     expectedInputHash: inputHash,
     policyVersion,
-    priority: Math.max(0, Number(priority) || 0),
+    priority: analysisPriority(item, priority),
     status: 'pending',
     attempts: 0,
     nextAttemptAt: observedAt,
@@ -155,6 +163,7 @@ function createFeedAnalysisJobRepository(db, config) {
 
 module.exports = {
   analysisJobId,
+  analysisPriority,
   analysisJob,
   createFeedAnalysisJobRepository
 };

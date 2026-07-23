@@ -75,11 +75,7 @@ function createFeedArchiveService({
     if (!due) return { skipped: true };
     const groups = groupByArchiveDate(cache.items);
     const result = await persistGroups(groups);
-    await repository.patchSourceState({
-      archiveCurrentCheckedAt: new Date(now()),
-      archiveLastErrorCode: ''
-    });
-    return result;
+    return { ...result, checkedAt: new Date(now()) };
   }
 
   async function backfillHistory(cache) {
@@ -102,32 +98,63 @@ function createFeedArchiveService({
     }
 
     const remaining = retainedDates.filter((date) => !storedDates.has(date)).length;
-    const fields = {
+    const statePatch = {
       archiveDailyDates: [...storedDates].sort().slice(-config.retentionDays),
       archiveBackfillRemaining: remaining,
       archiveLastErrorCode: ''
     };
-    if (!remaining) fields.archiveHistoryCheckedAt = new Date(now());
-    await repository.patchSourceState(fields);
+    if (!remaining) statePatch.archiveHistoryCheckedAt = new Date(now());
     return {
       attemptedDays: batch.length,
       importedItems,
       remaining,
-      availableDays: retainedDates.length
+      availableDays: retainedDates.length,
+      statePatch
     };
   }
 
-  async function run({ sourceChanged = false } = {}) {
-    const cache = await repository.get();
+  async function run({ sourceChanged = false, cache: suppliedCache = null } = {}) {
+    const cache = suppliedCache || await repository.get();
     if (!cache || !Array.isArray(cache.items)) return { status: 'waiting-for-cache' };
     try {
       const current = await archiveCurrent(cache, sourceChanged);
-      const latest = await repository.get();
-      const history = await backfillHistory(latest || cache);
+      let latest = current.checkedAt
+        ? { ...cache, archiveCurrentCheckedAt: current.checkedAt }
+        : cache;
+      const history = await backfillHistory(latest);
+      if (history.statePatch) latest = { ...latest, ...history.statePatch };
+
+      const retentionIntervalMs = Math.max(
+        60 * 60 * 1000,
+        Number(config.retentionCheckMs) || DAY_MS
+      );
+      const retentionDue = elapsed(latest.archiveRetentionCheckedAt) >= retentionIntervalMs;
+      const retentionCheckedAt = retentionDue ? new Date(now()) : null;
       const cutoff = utcDate(now() - (config.retentionDays * DAY_MS));
-      const deletedDays = await archiveRepository.deleteBefore(cutoff);
-      const stats = await archiveRepository.stats();
-      await repository.patchSourceState({ archiveStats: stats, archiveLastErrorCode: '' });
+      const deletedDays = retentionDue ? await archiveRepository.deleteBefore(cutoff) : 0;
+
+      const archiveChanged = !current.skipped
+        || Number(history.attemptedDays) > 0
+        || Number(deletedDays) > 0;
+      const statsRefreshMs = Math.max(
+        60 * 60 * 1000,
+        Number(config.statsRefreshMs) || DAY_MS
+      );
+      const statsDue = !latest.archiveStats
+        || elapsed(latest.archiveStatsCheckedAt) >= statsRefreshMs;
+      const stats = archiveChanged || statsDue
+        ? await archiveRepository.stats()
+        : latest.archiveStats;
+      const statsCheckedAt = archiveChanged || statsDue ? new Date(now()) : null;
+      const statePatch = {
+        archiveLastErrorCode: '',
+        ...(current.checkedAt ? { archiveCurrentCheckedAt: current.checkedAt } : {}),
+        ...(history.statePatch || {}),
+        ...(retentionCheckedAt ? { archiveRetentionCheckedAt: retentionCheckedAt } : {}),
+        ...(statsCheckedAt ? { archiveStats: stats, archiveStatsCheckedAt: statsCheckedAt } : {})
+      };
+      await repository.patchSourceState(statePatch);
+      delete history.statePatch;
       const result = { status: 'ready', current, history, deletedDays, stats };
       logger.info('Knowledge feed archive sync completed', result);
       return result;

@@ -2,8 +2,8 @@
 title: "全量资讯视觉队列、质量信号与移动端预算"
 type: decision
 tags: [knowledge-feed, visual-queue, quality, performance, membership]
-last_updated: 2026-07-17
-status: accepted
+last_updated: 2026-07-21
+status: partially_superseded
 confidence: high
 ---
 
@@ -33,10 +33,17 @@ confidence: high
 
 ## 状态
 
-- accepted，已部署并在线运行。
+- `partially_superseded`，独立队列、质量信号、缩略图和移动端预算仍有效；“无图条目立即公开”已细化为最多四分钟有界等待，旧的单优先级查询、每轮两条捕获与两分钟调度已被公平四阶段轮转和每分钟单捕获取代。
 - 视觉队列集合为 `ADMINONLY`；`priority + nextAttemptAt`、`nextAttemptAt` 和 `status` 索引已创建。
 - 2026-07-17 15:02（Asia/Shanghai）按缩略图版本重新完成全库 seed：有效资讯 3,005 条、队列与缺少列表缩略图的 2,993 条一一对应，`retry=0`、`blocked=0`；最新定时 worker 为 2/2 成功。
 - 公网渲染器已部署 `/thumbnail`，并使用真实 CloudBase 临时文件 URL 验证 360×253 JPEG 输出；CloudBase 云函数已重新部署，列表永久保留“缩略图 → 原图”的回退，因此迁移期间不会出现空白图片框。
+
+## 2026-07-21 更新
+
+- feed、head、updates 和 related 对新资讯执行最多四分钟有界等图：视觉成功时图文同发，首次明确失败或到期后公开文字，后续成功仍可补图。旧无等待字段条目继续公开，无需迁移。
+- live 与 repair 使用独立数据库查询，持久调度器在实时新任务、修复新任务、实时恢复、修复恢复四个阶段轮换，避免历史高优先级积压饿死最新资讯。
+- 视觉 worker 每分钟运行且每次最多启动一个捕获，使用 290 秒软截止。旧 v2 任务按拥有关系清理并在仍缺图时原子升级到 v3；成功、已就绪和 stale 任务自动删除，`retry`/`cleanup` 保留到收口，`blocked` 保留诊断。
+- 渲染器修复 HTTP 200 错误壳、越界/空裁剪和 X 目标不一致；普通网页及可疑稀疏图进入条件式视觉 AI 审核。详见 [四分钟有界等图决策](2026-07-21-bounded-visual-publication-and-pro-access-pass.md) 与 [v3 质量及队列证据](../sources/2026-07-21-source-preview-v3-quality-and-repair.md)。
 
 ## 相关页面
 

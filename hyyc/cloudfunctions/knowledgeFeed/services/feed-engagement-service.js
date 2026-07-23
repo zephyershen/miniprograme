@@ -1,0 +1,312 @@
+const crypto = require('node:crypto');
+const { AppError } = require('../lib/errors');
+const { commentDocumentId } = require('../repositories/feed-engagement');
+const { profileView } = require('./user-profile-service');
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function count(value) {
+  return Math.max(0, Math.floor(Number(value) || 0));
+}
+
+function canComment(entitlement) {
+  return Boolean(entitlement && entitlement.entitlements
+    && entitlement.entitlements.comments === true);
+}
+
+function normalizeCommentContent(value, maxLength = 280, hasAttachments = false) {
+  const content = typeof value === 'string'
+    ? value.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim()
+    : '';
+  if (!content && !hasAttachments) throw new AppError('INVALID_REQUEST', '写点内容或选择图片再发布');
+  if (content.length > maxLength) {
+    throw new AppError('INVALID_REQUEST', `评论最多 ${maxLength} 个字`);
+  }
+  return content;
+}
+
+function normalizeCommentAttachments(value, config) {
+  const values = Array.isArray(value) ? value : [];
+  if (values.length > config.commentImageLimit) {
+    throw new AppError('INVALID_REQUEST', `每条评论最多 ${config.commentImageLimit} 张图片`);
+  }
+  return values.map((attachment) => {
+    const fileId = attachment && attachment.fileId;
+    const stagingPrefix = config.userMediaStagingFileIdPrefix
+      || config.commentImageFileIdPrefix;
+    if (typeof fileId !== 'string' || !fileId.startsWith(stagingPrefix)
+      || fileId.length > 700) {
+      throw new AppError('INVALID_REQUEST', '评论图片无效，请重新选择');
+    }
+    return {
+      type: 'image',
+      fileId,
+      width: Math.max(0, Math.min(10000, Math.floor(Number(attachment.width) || 0))),
+      height: Math.max(0, Math.min(10000, Math.floor(Number(attachment.height) || 0)))
+    };
+  });
+}
+
+function normalizeMutationId(value) {
+  if (typeof value === 'string' && /^[a-z0-9_-]{8,80}$/i.test(value)) return value;
+  return crypto.randomBytes(18).toString('hex');
+}
+
+function commentView(comment, ownerKey, profile = null) {
+  const createdAt = comment && comment.createdAt;
+  const author = profileView(profile);
+  return {
+    id: comment && (comment.id || comment._id),
+    content: comment && comment.content || '',
+    attachments: Array.isArray(comment && comment.attachments) ? comment.attachments : [],
+    author: {
+      nickname: author.nickname || '读者',
+      avatarFileId: author.avatarFileId,
+      initial: author.initial
+    },
+    authorLabel: author.nickname || '读者',
+    isMine: Boolean(comment && comment.authorKey === ownerKey),
+    createdAt: createdAt instanceof Date ? createdAt.toISOString() : createdAt
+  };
+}
+
+function engagementView(item, state, entitlement) {
+  return {
+    liked: Boolean(state && state.liked),
+    favorited: Boolean(state && state.favorited),
+    likeCount: count(item && item.likeCount),
+    commentCount: count(item && item.commentCount),
+    favoriteCount: count(item && item.favoriteCount),
+    canComment: canComment(entitlement)
+  };
+}
+
+function favoriteAvailable(snapshot, entitlement, now) {
+  const history = entitlement && entitlement.entitlements && entitlement.entitlements.history;
+  if (history && history.mode === 'all') return true;
+  const publishedAt = new Date(snapshot && snapshot.publishedAt).getTime();
+  const days = history && Number(history.days);
+  return Number.isFinite(publishedAt) && Number.isFinite(days)
+    && publishedAt >= now - (days * DAY_MS);
+}
+
+function createFeedEngagementService({
+  repository,
+  profileRepository,
+  itemLoader,
+  commentModerationService,
+  userMediaService,
+  config,
+  now = () => Date.now()
+}) {
+  async function statesFor(actor, itemIds) {
+    const documents = await repository.getMany(actor.ownerKey, itemIds);
+    return new Map(documents.map((document) => [document.itemId, document]));
+  }
+
+  async function decorateItems(items, actor, entitlement) {
+    const values = Array.isArray(items) ? items : [];
+    const states = await statesFor(actor, values.map((item) => item.id));
+    return values.map((item) => ({
+      ...item,
+      engagement: engagementView(item, states.get(item.id), entitlement)
+    }));
+  }
+
+  async function decorateFeed(feed, actor, entitlement) {
+    return { ...feed, items: await decorateItems(feed && feed.items, actor, entitlement) };
+  }
+
+  async function decorateItem(item, actor, entitlement) {
+    const [decorated] = await decorateItems([item], actor, entitlement);
+    return decorated;
+  }
+
+  async function toggleLike(itemId, desiredLiked, actor, entitlement) {
+    const item = await itemLoader(itemId, entitlement);
+    const state = await repository.toggleLike(actor.ownerKey, item, new Date(now()), desiredLiked);
+    return { itemId, engagement: { ...state, canComment: canComment(entitlement) } };
+  }
+
+  async function toggleFavorite(itemId, desiredFavorited, actor, entitlement) {
+    let item;
+    try {
+      item = await itemLoader(itemId, entitlement);
+    } catch (error) {
+      if (!error || error.code !== 'ENTITLEMENT_REQUIRED') throw error;
+      const [existing] = await repository.getMany(actor.ownerKey, [itemId]);
+      if (!existing || existing.favorited !== true) throw error;
+      item = { id: itemId, ...(existing.snapshot || {}) };
+    }
+    const state = await repository.toggleFavorite(
+      actor.ownerKey,
+      item,
+      new Date(now()),
+      desiredFavorited
+    );
+    return { itemId, engagement: { ...state, canComment: canComment(entitlement) } };
+  }
+
+  function requireComments(entitlement) {
+    if (!canComment(entitlement)) {
+      throw new AppError('ENTITLEMENT_REQUIRED', '评论区仅对会员开放', {
+        featureKey: 'comments'
+      });
+    }
+  }
+
+  async function listComments(itemId, actor, entitlement) {
+    requireComments(entitlement);
+    await itemLoader(itemId, entitlement);
+    const comments = await repository.listComments(itemId, config.commentPageSize);
+    const profiles = await profileRepository.getMany(comments.map((comment) => comment.authorKey));
+    const profileMap = new Map(profiles.map((profile) => [profile.ownerKey || profile._id, profile]));
+    return {
+      comments: comments.map((comment) => commentView(
+        comment,
+        actor.ownerKey,
+        profileMap.get(comment.authorKey)
+      )),
+      viewerProfile: profileView(profileMap.get(actor.ownerKey) || await profileRepository.get(actor.ownerKey))
+    };
+  }
+
+  async function addComment(itemId, payload, actor, entitlement) {
+    requireComments(entitlement);
+    await itemLoader(itemId, entitlement);
+    const profile = await profileRepository.get(actor.ownerKey);
+    const publicProfile = profileView(profile);
+    if (!publicProfile.isComplete) {
+      throw new AppError('PROFILE_REQUIRED', '先设置头像和昵称，再参与讨论', {
+        featureKey: 'profile'
+      });
+    }
+    const mutationId = normalizeMutationId(payload && payload.clientMutationId);
+    const commentId = commentDocumentId(actor.ownerKey, itemId, mutationId);
+    if (typeof repository.getComment === 'function') {
+      const existing = await repository.getComment(commentId, itemId);
+      if (existing) {
+        const managedFileIds = (existing.comment.attachments || [])
+          .map((attachment) => attachment && attachment.fileId)
+          .filter((fileId) => userMediaService
+            && userMediaService.isOwnedPublishedFileId(fileId));
+        if (managedFileIds.length) {
+          await userMediaService.bindPublished(actor, 'comment', managedFileIds, {
+            kind: 'comment',
+            id: commentId,
+            itemId
+          });
+        }
+        return {
+          comment: commentView(existing.comment, actor.ownerKey, profile),
+          commentCount: count(existing.commentCount),
+          viewerProfile: publicProfile
+        };
+      }
+    }
+    const attachments = normalizeCommentAttachments(payload && payload.attachments, config);
+    const content = normalizeCommentContent(
+      payload && payload.content,
+      config.commentMaxLength,
+      attachments.length > 0
+    );
+    let reviewAttachments = attachments;
+    if (attachments.length) {
+      if (!userMediaService) throw new Error('USER_MEDIA_SERVICE_REQUIRED');
+      const reviewFileIds = await userMediaService.filesForReview(
+        actor,
+        'comment',
+        attachments.map((attachment) => attachment.fileId)
+      );
+      reviewAttachments = attachments.map((attachment, index) => ({
+        ...attachment,
+        fileId: reviewFileIds[index]
+      }));
+    }
+    let moderation;
+    try {
+      moderation = await commentModerationService.review({
+        content,
+        attachments: reviewAttachments
+      });
+    } catch (error) {
+      if (attachments.length && error && error.code === 'CONTENT_REJECTED') {
+        await userMediaService.discardUnpublished(
+          actor,
+          'comment',
+          attachments.map((attachment) => attachment.fileId)
+        ).catch(() => null);
+      }
+      throw error;
+    }
+    let publishedAttachments = attachments;
+    if (attachments.length) {
+      const publishedFileIds = await userMediaService.publishOwned(
+        actor,
+        'comment',
+        attachments.map((attachment) => attachment.fileId),
+        { kind: 'comment', id: commentId, itemId }
+      );
+      publishedAttachments = attachments.map((attachment, index) => ({
+        ...attachment,
+        fileId: publishedFileIds[index]
+      }));
+    }
+    const result = await repository.addComment(
+      actor.ownerKey,
+      itemId,
+      { content, attachments: publishedAttachments, moderation },
+      new Date(now()),
+      commentId
+    );
+    if (publishedAttachments.length) {
+      await userMediaService.bindPublished(
+        actor,
+        'comment',
+        publishedAttachments.map((attachment) => attachment.fileId),
+        { kind: 'comment', id: commentId, itemId }
+      );
+    }
+    return {
+      comment: commentView(result.comment, actor.ownerKey, profile),
+      commentCount: count(result.commentCount),
+      viewerProfile: publicProfile
+    };
+  }
+
+  async function listFavorites(actor, entitlement) {
+    const documents = await repository.listFavorites(actor.ownerKey, config.favoriteListLimit);
+    const currentTime = now();
+    return {
+      items: documents.map((document) => ({
+        id: document.itemId,
+        ...(document.snapshot || {}),
+        savedAt: document.favoritedAt instanceof Date
+          ? document.favoritedAt.toISOString()
+          : document.favoritedAt,
+        available: favoriteAvailable(document.snapshot, entitlement, currentTime)
+      }))
+    };
+  }
+
+  return {
+    decorateFeed,
+    decorateItem,
+    toggleLike,
+    toggleFavorite,
+    listComments,
+    addComment,
+    listFavorites
+  };
+}
+
+module.exports = {
+  canComment,
+  normalizeCommentContent,
+  normalizeCommentAttachments,
+  normalizeMutationId,
+  commentView,
+  engagementView,
+  favoriteAvailable,
+  createFeedEngagementService
+};

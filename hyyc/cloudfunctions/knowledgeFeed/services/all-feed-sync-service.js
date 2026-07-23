@@ -27,6 +27,25 @@ function cachedVisuals(cache) {
   return new Map(((cache && cache.items) || []).map((item) => [item.id, visualFields(item)]));
 }
 
+function observedAllFingerprint(fingerprint, state = {}) {
+  if (fingerprint && typeof fingerprint.all === 'string' && fingerprint.all) {
+    return fingerprint.all;
+  }
+  return state.allObservedFingerprint || '';
+}
+
+function allSyncPlan(state, fingerprint, currentTime, config, force = false) {
+  const observedFingerprint = observedAllFingerprint(fingerprint, state);
+  const fingerprintChanged = Boolean(observedFingerprint
+    && observedFingerprint !== state.allAppliedFingerprint);
+  const needsFullRefresh = force
+    || fingerprintChanged
+    || ageOf(state.allFullSyncedAt || state.allItemsSyncedAt, currentTime) >= config.fullRefreshMs;
+  const needsItemsValidation = needsFullRefresh
+    || ageOf(state.allItemsCheckedAt || state.allItemsSyncedAt, currentTime) >= config.itemsRevalidateMs;
+  return { observedFingerprint, fingerprintChanged, needsFullRefresh, needsItemsValidation };
+}
+
 function createAllFeedSyncService({
   source,
   cacheRepository,
@@ -42,8 +61,40 @@ function createAllFeedSyncService({
 }) {
   let active = null;
 
-  async function syncOnce({ force = false } = {}) {
+  async function syncOnce({
+    force = false,
+    fingerprintObservation = null,
+    legacyCache = null
+  } = {}) {
     const startedAt = now();
+    const snapshot = typeof syncStateRepository.get === 'function'
+      ? (await syncStateRepository.get() || {})
+      : {};
+    let fingerprint = fingerprintObservation;
+    try {
+      if (!fingerprint) fingerprint = await source.loadFingerprint(snapshot.allFingerprintEtag || '');
+      if (fingerprint.notModified && !observedAllFingerprint(fingerprint, snapshot)) {
+        fingerprint = await source.loadFingerprint('');
+      }
+    } catch (error) {
+      const errorCode = allSyncErrorCode(error);
+      logger.warn('Knowledge feed all-items fingerprint check failed', {
+        errorCode,
+        message: error && error.message
+      });
+      return { status: 'failed', changed: false, itemsChecked: false, errorCode };
+    }
+
+    const initialPlan = allSyncPlan(snapshot, fingerprint, startedAt, config, force);
+    if (!initialPlan.needsItemsValidation) {
+      return {
+        status: fingerprint.notModified ? 'not-modified' : 'unchanged',
+        changed: false,
+        itemsChecked: false,
+        fingerprintChanged: initialPlan.fingerprintChanged
+      };
+    }
+
     const leaseOwner = createGeneration();
     const lease = await syncStateRepository.acquireLease(
       leaseOwner,
@@ -54,30 +105,16 @@ function createAllFeedSyncService({
     let state = lease.document || {};
     const leaseForWrite = () => ({ owner: leaseOwner, now: new Date(now()) });
     try {
-      let fingerprint = await source.loadFingerprint(state.allFingerprintEtag || '');
-      if (fingerprint.notModified && !state.allObservedFingerprint) {
-        fingerprint = await source.loadFingerprint('');
-      }
       const checkedAt = new Date(now());
-      const observedFingerprint = fingerprint.notModified
-        ? state.allObservedFingerprint
-        : fingerprint.all;
-      state = await syncStateRepository.patch({
-        allFingerprintEtag: fingerprint.etag || state.allFingerprintEtag || '',
-        allObservedFingerprint: observedFingerprint || '',
-        allFingerprintCheckedAt: checkedAt
-      }, leaseForWrite());
-
-      const fingerprintChanged = Boolean(observedFingerprint
-        && observedFingerprint !== state.allAppliedFingerprint);
-      const needsFullRefresh = force
-        || fingerprintChanged
-        || ageOf(state.allFullSyncedAt || state.allItemsSyncedAt, startedAt) >= config.fullRefreshMs;
-      const needsItemsValidation = needsFullRefresh
-        || ageOf(state.allItemsCheckedAt || state.allItemsSyncedAt, startedAt) >= config.itemsRevalidateMs;
+      const plan = allSyncPlan(state, fingerprint, startedAt, config, force);
+      const {
+        observedFingerprint,
+        fingerprintChanged,
+        needsFullRefresh,
+        needsItemsValidation
+      } = plan;
 
       if (!needsItemsValidation) {
-        await syncStateRepository.patch({ allLastErrorCode: '' }, leaseForWrite());
         return {
           status: fingerprint.notModified ? 'not-modified' : 'unchanged',
           changed: false,
@@ -90,6 +127,9 @@ function createAllFeedSyncService({
       const itemsCheckedAt = new Date(now());
       if (response.notModified) {
         await syncStateRepository.patch({
+          allFingerprintEtag: fingerprint.etag || state.allFingerprintEtag || '',
+          allObservedFingerprint: observedFingerprint || '',
+          allFingerprintCheckedAt: checkedAt,
           allItemsCheckedAt: itemsCheckedAt,
           allAppliedFingerprint: observedFingerprint || state.allAppliedFingerprint || '',
           allLastErrorCode: ''
@@ -106,7 +146,9 @@ function createAllFeedSyncService({
       await syncStateRepository.patch({
         leaseUntil: new Date(now() + config.syncLeaseMs)
       }, leaseForWrite());
-      const legacy = cacheRepository ? await cacheRepository.get().catch(() => null) : null;
+      const legacy = legacyCache || (cacheRepository
+        ? await cacheRepository.get().catch(() => null)
+        : null);
       const visuals = cachedVisuals(legacy);
       const documents = response.items.map((item) => toStoredFeedItem({
         ...item,
@@ -152,6 +194,9 @@ function createAllFeedSyncService({
         itemsCheckedAt
       );
       const nextState = {
+        allFingerprintEtag: fingerprint.etag || state.allFingerprintEtag || '',
+        allObservedFingerprint: observedFingerprint || '',
+        allFingerprintCheckedAt: checkedAt,
         allItemsEtag: response.etag || '',
         allAppliedFingerprint: observedFingerprint || '',
         allItemsCheckedAt: itemsCheckedAt,
@@ -214,5 +259,7 @@ module.exports = {
   ageOf,
   allSyncErrorCode,
   cachedVisuals,
+  observedAllFingerprint,
+  allSyncPlan,
   createAllFeedSyncService
 };

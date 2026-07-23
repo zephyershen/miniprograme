@@ -1,19 +1,23 @@
+<page-meta page-style="{{membershipPromptVisible ? 'overflow: hidden;' : ''}}" />
 <view class="briefing-page">
   <view class="briefing-header">
     <view class="briefing-kicker"><text></text>PRO BRIEF</view>
-    <view class="briefing-title">今天，真正重要的事</view>
-    <view class="briefing-deck">把零散更新压成结论、影响和下一步，几分钟掌握一个周期的变化。</view>
+    <view class="briefing-title">这一期，值得你知道的事</view>
+    <view class="briefing-deck">帮你快速看懂：发生了什么、谁在推进、哪些原文值得继续看。</view>
   </view>
 
   <view class="window-tabs">
-    <view wx:for="{{windowOptions}}" wx:key="key" class="window-tab {{item.active ? 'window-tab-active' : ''}}" data-key="{{item.key}}" bindtap="selectWindow">{{item.label}}</view>
+    <view wx:for="{{windowOptions}}" wx:key="key" class="window-tab {{item.active ? 'window-tab-active' : ''}}" data-key="{{item.key}}" bindtap="selectWindow">
+      <text class="window-tab-label">{{item.label}}</text>
+      <text class="window-tab-description">{{item.description}}</text>
+    </view>
   </view>
 
   <view wx:if="{{locked}}" class="briefing-gate">
-    <view class="gate-status">Pro 专属 · 内测中</view>
+    <view class="gate-status">Pro 专属</view>
     <view class="gate-title">几分钟，读完一个周期</view>
-    <view class="gate-copy">不是标题合集。先给结论，再解释影响，最后保留可回看的来源。以下为体验示例，非本期实时内容。</view>
-    <view class="gate-link" bindtap="openProfile">查看 Pro 权益 →</view>
+    <view class="gate-copy">不是标题合集。先给结论，再整理关键变化，最后保留可回看的来源。以下为体验示例，非本期实时内容。</view>
+    <view class="gate-link" bindtap="openMembershipPrompt">查看 Pro 权益 →</view>
   </view>
 
   <view wx:if="{{loading}}" class="briefing-loading">
@@ -26,16 +30,15 @@
   </view>
   <view wx:elif="{{providerPending && !locked}}" class="briefing-empty pending-state">
     <view class="empty-title">本期真实简报尚未发布</view>
-    <view class="empty-copy">分析服务启用后才会生成本期内容。现在不把普通资讯拼成一份假简报。</view>
+    <view class="empty-copy">本期简报正在整理，稍后再来看看。</view>
   </view>
 
   <view wx:else class="briefing-body">
     <view class="briefing-meta">
-      <text>{{briefing.coverageLabel}}</text>
-      <text>{{briefing.generatedLabel}}</text>
+      <text wx:if="{{briefing.coverageLabel}}" class="coverage-date">{{briefing.coverageLabel}}</text>
+      <text wx:if="{{briefing.generatedLabel}}">{{briefing.generatedLabel}}</text>
       <text>来源 {{briefing.sourceCount}}</text>
     </view>
-    <view wx:if="{{briefing.coverageState === 'partial'}}" class="coverage-note">当前数据覆盖不完整，结论仅代表已收录范围。</view>
 
     <scroll-view scroll-x enhanced show-scrollbar="{{false}}" class="topic-scroll">
       <view class="topic-track">
@@ -43,34 +46,53 @@
       </view>
     </scroll-view>
 
-    <view class="conclusion-block">
+    <view wx:if="{{topicKey === 'all' && briefing.conclusion}}" class="conclusion-block">
       <view class="section-kicker">一句话结论</view>
       <view class="conclusion-copy">{{briefing.conclusion}}</view>
     </view>
 
-    <view class="brief-section">
-      <view class="section-head"><view class="section-title">先看这三件事</view><view class="section-count">核心变化</view></view>
+    <view wx:if="{{briefing.topicEmpty}}" class="topic-empty">
+      <view class="topic-empty-mark"></view>
+      <view class="topic-empty-title">{{briefing.topicEmptyTitle}}</view>
+      <view class="topic-empty-copy">{{briefing.topicEmptyCopy}}</view>
+    </view>
+
+    <view wx:if="{{briefing.mustKnow.length}}" class="brief-section">
+      <view class="section-head"><view class="section-title">{{briefing.mustKnowTitle}}</view><view class="section-count">核心变化</view></view>
       <view wx:for="{{briefing.mustKnow}}" wx:key="index" class="must-row" data-id="{{item.itemId}}" bindtap="openReference">
         <text class="must-index">{{item.index || ('0' + (index + 1))}}</text>
         <view class="must-copy"><view class="must-title">{{item.title}}</view><view class="must-why">{{item.why || item.copy}}</view></view>
       </view>
     </view>
 
-    <view class="brief-section">
-      <view class="section-head"><view class="section-title">为什么重要</view></view>
-      <view wx:for="{{briefing.trends}}" wx:key="title" class="text-row" data-id="{{item.itemId}}" bindtap="openReference"><view class="text-row-title">{{item.title}}</view><view class="text-row-copy">{{item.copy}}</view></view>
+    <view wx:if="{{briefing.radar.length}}" class="brief-section">
+      <view class="section-head"><view class="section-title">谁在做什么</view></view>
+      <view
+        wx:for="{{briefing.radar}}"
+        wx:key="index"
+        class="radar-row {{item.itemId && !locked ? 'radar-row-active' : 'radar-row-disabled'}}"
+        data-id="{{item.itemId}}"
+        bindtap="openReference"
+      >
+        <view class="radar-name">{{item.name}}</view>
+        <view class="radar-detail">
+          <view class="radar-copy">{{item.copy}}</view>
+          <view class="radar-link-state">{{item.itemId && !locked ? '查看对应资讯 →' : '暂无可查看来源'}}</view>
+        </view>
+      </view>
     </view>
 
-    <view class="brief-section">
-      <view class="section-head"><view class="section-title">公司与模型</view></view>
-      <view wx:for="{{briefing.radar}}" wx:key="name" class="radar-row"><view class="radar-name">{{item.name}}</view><view class="radar-copy">{{item.copy}}</view></view>
-    </view>
-
-    <view class="brief-section source-section">
-      <view class="section-head"><view class="section-title">值得继续读</view><view class="section-count">来源索引</view></view>
+    <view wx:if="{{briefing.reading.length}}" class="brief-section source-section">
+      <view class="section-head"><view class="section-title">想了解更多</view><view class="section-count">原始来源</view></view>
       <view wx:for="{{briefing.reading}}" wx:key="itemId" class="source-row" data-id="{{item.itemId}}" bindtap="openReference">
         <view class="source-title">{{item.title}}</view><view class="source-meta">{{item.source}} <text wx:if="{{item.itemId && !locked}}">→</text></view>
       </view>
     </view>
   </view>
+  <membership-prompt
+    visible="{{membershipPromptVisible}}"
+    feature-key="{{membershipPromptFeature}}"
+    bindclose="closeMembershipPrompt"
+    bindviewbenefits="openMembershipFromPrompt"
+  />
 </view>

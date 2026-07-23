@@ -1,4 +1,5 @@
 const { TOPIC_RULES } = require('./topics');
+const { matchesSourceChannel } = require('./source-channels');
 
 const DEFAULT_PAGE_SIZE = 8;
 const MAX_PAGE_SIZE = 20;
@@ -10,7 +11,7 @@ const TIME_WINDOWS = Object.freeze({
   '90d': 90 * 24 * 60 * 60 * 1000,
   all: null
 });
-const CHANNEL_KEYS = new Set(['all', 'ai', 'tech', 'entertainment', 'society', 'games', 'english']);
+const CHANNEL_KEYS = new Set(['all', 'firstParty', 'news', 'x', 'openSource']);
 const SORT_KEYS = new Set(['latest', 'hot', 'importance']);
 const COMPANY_KEYS = new Set(['all', ...TOPIC_RULES
   .map((rule) => rule.key)
@@ -29,19 +30,28 @@ function allowedValue(value, allowed, fallback) {
   return typeof value === 'string' && allowed.has(value) ? value : fallback;
 }
 
+function sourceTagValue(value) {
+  if (value === 'all' || value === undefined || value === null || value === '') return 'all';
+  if (typeof value !== 'string') return 'all';
+  const normalized = value.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 40);
+  return normalized || 'all';
+}
+
 function normalizeFeedQuery(input = {}) {
   const filters = input.filters || {};
   const cursor = typeof input.cursor === 'string' && input.cursor.length <= 1000 ? input.cursor : '';
+  const channel = allowedValue(input.channel, CHANNEL_KEYS, 'all');
   return {
     offset: boundedInteger(input.offset, 0, 0, 100000),
     limit: boundedInteger(input.limit, DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE),
     ...(cursor ? { cursor } : {}),
-    channel: allowedValue(input.channel, CHANNEL_KEYS, 'all'),
+    channel,
     sort: allowedValue(input.sort, SORT_KEYS, 'latest'),
     filters: {
       time: allowedValue(filters.time, new Set(Object.keys(TIME_WINDOWS)), '7d'),
       company: allowedValue(filters.company, COMPANY_KEYS, 'all'),
-      direction: allowedValue(filters.direction, DIRECTION_KEYS, 'all')
+      direction: allowedValue(filters.direction, DIRECTION_KEYS, 'all'),
+      sourceTag: channel === 'openSource' ? sourceTagValue(filters.sourceTag) : 'all'
     }
   };
 }
@@ -75,7 +85,11 @@ function hasTopic(item, key) {
   return key === 'all' || (Array.isArray(item.topicKeys) && item.topicKeys.includes(key));
 }
 
-function matchesFilters(item, filters, now) {
+function matchesFilters(item, filters, now, channel = 'all') {
+  if (channel === 'openSource') {
+    return filters.sourceTag === 'all'
+      || (Array.isArray(item.sourceTags) && item.sourceTags.includes(filters.sourceTag));
+  }
   const publishedAt = new Date(item.publishedAt).getTime();
   const windowMs = TIME_WINDOWS[filters.time];
   const withinTime = Number.isFinite(publishedAt)
@@ -87,10 +101,10 @@ function matchesFilters(item, filters, now) {
 
 function buildFeedPage(items, input = {}, now = Date.now()) {
   const query = normalizeFeedQuery(input);
-  const filtered = (items || []).filter((item) => matchesFilters(item, query.filters, now));
+  const filtered = (items || []).filter((item) => matchesFilters(item, query.filters, now, query.channel));
   const channelItems = query.channel === 'all'
     ? filtered
-    : filtered.filter((item) => item.channelKey === query.channel);
+    : filtered.filter((item) => matchesSourceChannel(item, query.channel));
   const results = sortFeedItems(channelItems, query.sort);
   const pageItems = results.slice(query.offset, query.offset + query.limit);
   const nextOffset = query.offset + pageItems.length;

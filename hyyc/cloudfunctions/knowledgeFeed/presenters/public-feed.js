@@ -2,10 +2,27 @@ const { cleanSourceLabel } = require('../lib/aihot');
 const { toIso } = require('../lib/dates');
 const { buildFeedPage } = require('../lib/feed-page');
 const { inferTopicKeys } = require('../lib/topics');
-const { publishableItems } = require('../policies/visual-publication');
 const { FREE_WINDOW_DAYS, freeItemVisible } = require('../policies/feed-access');
 const { qualityTier } = require('../policies/feed-quality');
+const { visualPublicationVisible } = require('../policies/visual-publication');
 const { buildFacetMatrix } = require('../lib/facet-matrix');
+const { sourceMetadataFields } = require('../lib/source-metadata');
+
+function publicSourceMetadata(item) {
+  const metadata = sourceMetadataFields(item);
+  return {
+    ...(metadata.sourceIdentity ? { sourceIdentity: metadata.sourceIdentity } : {}),
+    ...(Object.prototype.hasOwnProperty.call(metadata, 'sourceTags')
+      ? { sourceTags: metadata.sourceTags }
+      : {}),
+    ...(Object.prototype.hasOwnProperty.call(metadata, 'sourceChannelKeys')
+      ? { sourceChannelKeys: metadata.sourceChannelKeys }
+      : {}),
+    ...(metadata.sourceAvatarFileId
+      ? { sourceAvatarFileId: metadata.sourceAvatarFileId }
+      : {})
+  };
+}
 
 function publicItem(item, { includeAllPreviews = false } = {}) {
   const allPreviewFileIds = Array.isArray(item.previewFileIds)
@@ -21,11 +38,14 @@ function publicItem(item, { includeAllPreviews = false } = {}) {
     summary: item.summary || '',
     url: item.url,
     source: cleanSourceLabel(item.source),
+    ...publicSourceMetadata(item),
     publishedAt: item.publishedAt,
     category: item.category,
     categoryLabel: item.categoryLabel,
     categoryMarker: item.categoryMarker,
     channelKey: item.channelKey,
+    sourceChannelKeys: Array.isArray(item.sourceChannelKeys) ? item.sourceChannelKeys : [],
+    sourceChannelKey: item.sourceChannelKey || '',
     coverTone: item.coverTone,
     coverFileId: item.coverFileId || '',
     previewFileIds,
@@ -36,6 +56,9 @@ function publicItem(item, { includeAllPreviews = false } = {}) {
     visualKind: item.coverFileId ? 'cover' : previewFileIds.length ? 'source-preview' : '',
     topicKeys: Array.isArray(item.topicKeys) ? item.topicKeys : inferTopicKeys(item),
     score: item.score,
+    likeCount: Math.max(0, Number(item.likeCount) || 0),
+    commentCount: Math.max(0, Number(item.commentCount) || 0),
+    favoriteCount: Math.max(0, Number(item.favoriteCount) || 0),
     qualityTier: qualityTier(item),
     curationReason: qualityTier(item) === 'curated' && typeof item.curationReason === 'string'
       ? item.curationReason
@@ -48,12 +71,21 @@ function publicFacet(item) {
     id: item.id,
     publishedAt: item.publishedAt,
     channelKey: item.channelKey,
+    sourceChannelKeys: Array.isArray(item.sourceChannelKeys) ? item.sourceChannelKeys : [],
+    sourceChannelKey: item.sourceChannelKey || '',
     topicKeys: Array.isArray(item.topicKeys) ? item.topicKeys : inferTopicKeys(item)
   };
 }
 
-function presentFeed(cache, { stale = false, query = {}, now = Date.now() } = {}) {
-  const allItems = publishableItems(cache.items).filter((item) => freeItemVisible(item, now));
+function presentFeed(cache, {
+  stale = false,
+  query = {},
+  now = Date.now(),
+  visualPublicationGraceMs = 0
+} = {}) {
+  const allItems = (Array.isArray(cache.items) ? cache.items : [])
+    .filter((item) => freeItemVisible(item, now)
+      && visualPublicationVisible(item, now, visualPublicationGraceMs));
   const page = buildFeedPage(allItems, query, now);
   return {
     updatedAt: toIso(cache.fetchedAt),
@@ -81,6 +113,7 @@ function publicRelatedItem(item) {
     id: item.id,
     title: item.title,
     source: cleanSourceLabel(item.source),
+    ...publicSourceMetadata(item),
     publishedAt: item.publishedAt,
     category: item.category,
     categoryLabel: item.categoryLabel,
@@ -95,9 +128,17 @@ function publicRelatedItem(item) {
   };
 }
 
-function relatedItems(cache, current, limit = 3, now = Date.now()) {
-  return publishableItems(cache.items)
-    .filter((item) => item.id !== current.id && freeItemVisible(item, now))
+function relatedItems(
+  cache,
+  current,
+  limit = 3,
+  now = Date.now(),
+  visualPublicationGraceMs = 0
+) {
+  return (Array.isArray(cache.items) ? cache.items : [])
+    .filter((item) => item.id !== current.id
+      && freeItemVisible(item, now)
+      && visualPublicationVisible(item, now, visualPublicationGraceMs))
     .map((item, originalIndex) => ({
       item,
       originalIndex,
@@ -108,10 +149,13 @@ function relatedItems(cache, current, limit = 3, now = Date.now()) {
     .map(({ item }) => publicRelatedItem(item));
 }
 
-function presentItem(cache, item, { now = Date.now() } = {}) {
+function presentItem(cache, item, {
+  now = Date.now(),
+  visualPublicationGraceMs = 0
+} = {}) {
   return {
     ...publicItem(item, { includeAllPreviews: true }),
-    relatedItems: relatedItems(cache, item, 3, now)
+    relatedItems: relatedItems(cache, item, 3, now, visualPublicationGraceMs)
   };
 }
 

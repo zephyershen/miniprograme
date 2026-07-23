@@ -188,3 +188,46 @@ test('archives a refreshed source snapshot on the minute after visual work defer
   assert.equal(caughtUp.current.dayCount, 1);
   assert.deepEqual(archivedIds, ['current02']);
 });
+
+test('reuses cached archive totals between daily integrity checks', async () => {
+  let statsCalls = 0;
+  let deleteCalls = 0;
+  let cache = {
+    items: [archiveItem('current01', '2026-07-17', 'selected')],
+    updatedAt: new Date(NOW),
+    archiveCurrentCheckedAt: new Date(NOW),
+    archiveHistoryCheckedAt: new Date(NOW),
+    archiveRetentionCheckedAt: new Date(NOW),
+    archiveStatsCheckedAt: new Date(NOW),
+    archiveStats: { dayCount: 90, itemCount: 9000, newestDate: '2026-07-17', oldestDate: '2026-04-19' },
+    archiveDailyDates: []
+  };
+  const service = createFeedArchiveService({
+    repository: {
+      get: async () => cache,
+      patchSourceState: async (fields) => { cache = { ...cache, ...fields }; return cache; }
+    },
+    archiveRepository: {
+      upsertDay: async () => { throw new Error('current archive is fresh'); },
+      deleteBefore: async () => { deleteCalls += 1; return 0; },
+      stats: async () => { statsCalls += 1; return { dayCount: 0, itemCount: 0 }; }
+    },
+    source: { loadDailyIndex: async () => { throw new Error('history is fresh'); } },
+    config: {
+      retentionDays: 90,
+      historyBatchDays: 2,
+      historyIndexTake: 60,
+      historyRefreshMs: 24 * 60 * 60 * 1000,
+      currentRefreshMs: 24 * 60 * 60 * 1000,
+      retentionCheckMs: 24 * 60 * 60 * 1000,
+      statsRefreshMs: 24 * 60 * 60 * 1000
+    },
+    now: () => NOW,
+    logger: { info() {}, warn() {} }
+  });
+
+  const result = await service.run();
+  assert.deepEqual(result.stats, cache.archiveStats);
+  assert.equal(statsCalls, 0);
+  assert.equal(deleteCalls, 0);
+});

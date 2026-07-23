@@ -1,7 +1,7 @@
 const VIEWPORT = Object.freeze({ width: 1080, height: 1350 });
 const DEFAULT_MAX_SEGMENTS = 12;
 const HARD_MAX_SEGMENTS = 12;
-const CAPTURE_VERSION = 2;
+const CAPTURE_VERSION = 3;
 
 function segmentLimit(requestedSegments = DEFAULT_MAX_SEGMENTS) {
   return Math.max(

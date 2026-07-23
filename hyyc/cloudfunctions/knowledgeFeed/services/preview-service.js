@@ -18,8 +18,8 @@ function previewRetryDelay(attempts, baseMs = DEFAULT_PREVIEW_RETRY_MS, maxMs = 
 
 function previewFailureCode(error) {
   if (error && error.name === 'AbortError') return 'PREVIEW_TIMEOUT';
-  const message = String(error && error.message || '');
-  return /^PREVIEW_[A-Z0-9_]+$/.test(message) ? message : 'PREVIEW_CAPTURE_FAILED';
+  const code = String(error && (error.code || error.message) || '');
+  return /^PREVIEW_[A-Z0-9_]+$/.test(code) ? code : 'PREVIEW_CAPTURE_FAILED';
 }
 
 function previewAttemptIsDue(item, currentTime, baseRetryMs = DEFAULT_PREVIEW_RETRY_MS, captureVersion = 1) {
@@ -46,16 +46,32 @@ function validRendererUrl(value) {
   }
 }
 
-function decodeJpeg(value, maxBytes) {
-  if (typeof value !== 'string' || value.length > Math.ceil(maxBytes * 4 / 3) + 8) throw new Error('INVALID_PREVIEW');
-  const buffer = Buffer.from(value, 'base64');
+function validateJpegBuffer(value, maxBytes) {
+  const buffer = Buffer.isBuffer(value)
+    ? value
+    : (value instanceof Uint8Array ? Buffer.from(value) : null);
+  if (!buffer) throw new Error('INVALID_PREVIEW');
   if (!buffer.length || buffer.length > maxBytes || buffer[0] !== 0xff || buffer[1] !== 0xd8) {
     throw new Error('INVALID_PREVIEW');
   }
   return buffer;
 }
 
-function createPreviewService({ cloud, repository, config, fetchImpl = fetch, now = () => new Date(), logger = console }) {
+function decodeJpeg(value, maxBytes) {
+  if (typeof value !== 'string' || value.length > Math.ceil(maxBytes * 4 / 3) + 8) throw new Error('INVALID_PREVIEW');
+  return validateJpegBuffer(Buffer.from(value, 'base64'), maxBytes);
+}
+
+function createPreviewService({
+  cloud,
+  repository,
+  config,
+  sourcePreviewReviewService = null,
+  rendererClient = null,
+  fetchImpl = fetch,
+  now = () => new Date(),
+  logger = console
+}) {
   const captureVersion = Math.max(1, Number(config.captureVersion) || 1);
   const retryBaseMs = Math.max(1000, Number(config.retryMs) || DEFAULT_PREVIEW_RETRY_MS);
   const retryMaxMs = Math.max(retryBaseMs, Number(config.maxRetryMs) || MAX_PREVIEW_RETRY_MS);
@@ -71,14 +87,64 @@ function createPreviewService({ cloud, repository, config, fetchImpl = fetch, no
 
   function assertConfigured() {
     const rendererUrl = validRendererUrl(config.rendererUrl);
-    if (!rendererUrl || typeof config.rendererToken !== 'string' || config.rendererToken.length < 32) {
+    const functionConfigured = config.rendererFunctionEnabled === true
+      && rendererClient
+      && typeof rendererClient.capture === 'function';
+    if ((!functionConfigured && !rendererUrl)
+      || typeof config.rendererToken !== 'string'
+      || config.rendererToken.length < 32) {
       throw new AppError('TEMPORARY_FAILURE', '原文预览服务尚未配置');
     }
     return rendererUrl;
   }
 
+  async function normalizeFunctionCapture(data) {
+    const fileIds = data && data.fileIds;
+    if (!Array.isArray(fileIds)
+      || !fileIds.length
+      || fileIds.length > config.maxSegments
+      || fileIds.some((fileId) => typeof fileId !== 'string'
+        || !fileId.startsWith(config.fileIdPrefix))
+      || Number(data.captureVersion) !== captureVersion
+      || Number(data.segmentCount) !== fileIds.length) {
+      throw new Error('PREVIEW_FUNCTION_CONTRACT_MISMATCH');
+    }
+    try {
+      let reviewImage;
+      if (data.reviewScreenshot && typeof data.reviewScreenshot.data === 'string') {
+        reviewImage = decodeJpeg(data.reviewScreenshot.data, config.maxImageBytes);
+      } else {
+        if (!cloud || typeof cloud.downloadFile !== 'function') {
+          throw new Error('PREVIEW_FUNCTION_REVIEW_DOWNLOAD_UNAVAILABLE');
+        }
+        const downloaded = await cloud.downloadFile({ fileID: fileIds[0] });
+        reviewImage = validateJpegBuffer(downloaded && downloaded.fileContent, config.maxImageBytes);
+      }
+      return {
+        images: [reviewImage],
+        stagedFileIds: fileIds,
+        rendererQuality: data.quality || null,
+        finalUrl: typeof data.finalUrl === 'string' ? data.finalUrl.slice(0, 1200) : ''
+      };
+    } catch (error) {
+      await deleteUploadedFiles(fileIds);
+      throw error;
+    }
+  }
+
   async function requestPreview(item) {
     const rendererUrl = assertConfigured();
+    if (rendererClient && typeof rendererClient.capture === 'function') {
+      const functionCapture = await rendererClient.capture({
+        url: item.url,
+        maxSegments: config.maxSegments,
+        captureVersion,
+        profile: config.captureProfile || 'page',
+        cloudPathStem: `${config.cloudPathPrefix}${visualRevisionStem(item)}`
+      });
+      if (functionCapture) return normalizeFunctionCapture(functionCapture);
+    }
+    if (!rendererUrl) throw new Error('PREVIEW_HTTP_FALLBACK_UNAVAILABLE');
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), config.rendererTimeoutMs);
     try {
@@ -112,7 +178,11 @@ function createPreviewService({ cloud, repository, config, fetchImpl = fetch, no
         || Number(data.segmentCount) !== screenshots.length) {
         throw new Error('PREVIEW_CONTRACT_MISMATCH');
       }
-      return screenshots.map((entry) => decodeJpeg(entry && entry.data, config.maxImageBytes));
+      return {
+        images: screenshots.map((entry) => decodeJpeg(entry && entry.data, config.maxImageBytes)),
+        rendererQuality: data.quality || null,
+        finalUrl: typeof data.finalUrl === 'string' ? data.finalUrl.slice(0, 1200) : ''
+      };
     } finally {
       clearTimeout(timeout);
     }
@@ -138,8 +208,37 @@ function createPreviewService({ cloud, repository, config, fetchImpl = fetch, no
   }
 
   async function resolveAndUploadPreviews(item) {
-    const screenshots = await requestPreview(item);
-    return uploadPreviews(item, screenshots);
+    const capture = await requestPreview(item);
+    let qualityAudit = null;
+    try {
+      if (captureVersion >= 3) {
+        if (!sourcePreviewReviewService
+          || typeof sourcePreviewReviewService.review !== 'function') {
+          const error = new Error('PREVIEW_AI_REVIEW_UNAVAILABLE');
+          error.code = error.message;
+          throw error;
+        }
+        qualityAudit = await sourcePreviewReviewService.review({
+          item,
+          rendererQuality: capture.rendererQuality,
+          images: capture.images,
+          finalUrl: capture.finalUrl
+        });
+      }
+      const fileIds = capture.stagedFileIds || await uploadPreviews(item, capture.images);
+      return { fileIds, qualityAudit };
+    } catch (error) {
+      await deleteUploadedFiles(Array.isArray(capture.stagedFileIds) ? capture.stagedFileIds : []);
+      throw error;
+    }
+  }
+
+  function normalizedResolution(value) {
+    if (Array.isArray(value)) return { fileIds: value, qualityAudit: null };
+    return {
+      fileIds: Array.isArray(value && value.fileIds) ? value.fileIds : [],
+      qualityAudit: value && value.qualityAudit || null
+    };
   }
 
   function retryOutcome(item, error, checkedAt) {
@@ -152,19 +251,22 @@ function createPreviewService({ cloud, repository, config, fetchImpl = fetch, no
       previousFileIds,
       attempts,
       nextAttemptAt: new Date(checkedAt.getTime() + previewRetryDelay(attempts, retryBaseMs, retryMaxMs)),
-      errorCode: previewFailureCode(error)
+      errorCode: previewFailureCode(error),
+      qualityAudit: error && error.previewQualityAudit || null
     };
   }
 
-  function readyOutcome(item, fileIds) {
+  function readyOutcome(item, resolution) {
+    const normalized = normalizedResolution(resolution);
     return {
-      fileIds,
+      fileIds: normalized.fileIds,
       status: 'ready',
       expectedUrl: item.url,
       previousFileIds: Array.isArray(item.previewFileIds) ? item.previewFileIds : [],
       attempts: 0,
       nextAttemptAt: null,
-      errorCode: ''
+      errorCode: '',
+      qualityAudit: normalized.qualityAudit
     };
   }
 
@@ -178,6 +280,7 @@ function createPreviewService({ cloud, repository, config, fetchImpl = fetch, no
         previewNextAttemptAt: result.status === 'ready' ? null : result.nextAttemptAt,
         previewLastErrorCode: result.status === 'ready' ? '' : result.errorCode
       };
+      if (result.qualityAudit) fields.previewQualityAudit = result.qualityAudit;
       if (result.status === 'ready') fields.previewCaptureVersion = captureVersion;
       return {
         id,
@@ -260,7 +363,8 @@ function createPreviewService({ cloud, repository, config, fetchImpl = fetch, no
       previewFileIds: applied ? outcome.fileIds : [],
       status: applied ? outcome.status : 'stale',
       attempts: applied ? outcome.attempts : Math.max(0, Number(item.previewAttempts) || 0),
-      nextAttemptAt: applied ? outcome.nextAttemptAt : item.previewNextAttemptAt || null
+      nextAttemptAt: applied ? outcome.nextAttemptAt : item.previewNextAttemptAt || null,
+      previewQualityAudit: applied ? outcome.qualityAudit : item.previewQualityAudit || null
     };
   }
 
@@ -381,6 +485,7 @@ function createPreviewService({ cloud, repository, config, fetchImpl = fetch, no
 
 module.exports = {
   validRendererUrl,
+  validateJpegBuffer,
   decodeJpeg,
   maintenanceAuthorized,
   previewRetryDelay,

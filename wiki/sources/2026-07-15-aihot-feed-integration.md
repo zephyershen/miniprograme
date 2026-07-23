@@ -1,9 +1,9 @@
 ---
 title: "AI HOT 图文资讯源接入与云端验证"
 type: source
-tags: [aihot, knowledge-feed, cloudbase, cover-images, source-preview, editorial-index]
+tags: [aihot, knowledge-feed, cloudbase, cover-images, source-preview, source-metadata, editorial-index]
 sources: [../../hyyc/cloudfunctions/knowledgeFeed, ../../hyyc/cloudrun/source-preview-renderer, ../../hyyc/pages/inbox, ../../hyyc/pages/feed-detail, ../../cloudbaserc.json]
-last_updated: 2026-07-17
+last_updated: 2026-07-21
 status: confirmed
 confidence: high
 ---
@@ -22,7 +22,7 @@ confidence: high
 
 - 读取 `https://aihot.virxact.com/api/public/items?mode=selected&take=100`，使用可识别的非浏览器 User-Agent，并按 `nextCursor` 继续分页；本地上限 120 条。
 - 上游公开说明确认：`selected` 默认取近 7 天编辑精选，`take` 范围 1–100，支持 `category`、`q`、`cursor` 和 `fields`；更早内容会被截断。当前两页实测合计 108 条，而不是旧实现固定请求的 20 条。
-- 上游条目提供标题、中英文标题、摘要、原文链接、规范链接、来源、发布时间、分类、热度和 attribution；接口本身不提供图片字段或主题标签。小程序公开返回已移除聚合平台名称、规范链接和 attribution，只保留展示资讯所需字段。旧的“封面字段为空也立即公开”规则已被 2026-07-16 的视觉发布门禁 `superseded`：条目仍会进入内部缓存，但只有真实封面或原文截图准备完成后才公开。
+- 上游 `/items` 条目提供标题、中英文标题、摘要、原文链接、规范链接、来源、发布时间、分类、热度和 attribution，但不提供作者头像或 AIHOT 页面显示的标签。2026-07-21 起额外读取 `/feed` 作为可选来源元数据增强；小程序公开返回继续移除聚合平台名称、规范链接和 attribution，只保留展示资讯所需字段。旧的“封面字段为空也立即公开”规则已被后续四分钟有界等图策略细化：新条目短暂等待，首次明确失败或到期后仍公开文字，图片以后可继续补入。
 - AI HOT 分类映射为：`ai-models`、`ai-products`、`paper`、`tip` → AI 前沿；`industry` → 科技。
 - 参考 `/topics` 的信息架构，本地用标题、英文标题、摘要和来源做确定性主题归类：15 个“公司与模型”主题、14 个“技术方向”主题。公开接口没有返回这些主题，因此该归类是本项目实现，不能宣称为上游官方标签。
 - 娱乐、社会、游戏和英语不使用 AI HOT 内容冒充覆盖，页面明确显示这些频道仍待接入独立来源。
@@ -105,3 +105,13 @@ confidence: high
 - 每分钟同步由数据库租约保护；只有租约持有者访问条目接口，过期 owner 不能提交旧快照。空缓存下的 429/5xx 退避同样持久化，连续 503 按 1、2、4 分钟递增。
 - CloudBase 函数只保留一个启用中的 `knowledge-feed-source-sync`，cron 为 `0 * * * * * *`。08:31 真实定时调用检测到变化并更新，08:32 只检查指纹并返回 `not-modified`；数据库 observed/applied 指纹一致、失败数为 0、租约已释放。
 - 详情页自动/手动轮播、圆点跟随和从任意图片打开整组全屏预览均有测试覆盖。当前完整回归为 119/119；项目检查覆盖 21 个 JSON、88 个 JavaScript 和 6 个页面。
+
+## 2026-07-21 作者身份、头像与原始标签补充验证
+
+- `/items` 继续承担正文和分页事实，`/feed` 只补充 `sourceIdentity`、`sourceTags` 和头像。增强数据有独立哈希，变化不会触发截图或资讯 AI 分析。
+- feed 超时或单条匹配失败按 fail-open 处理：正文同步继续，并保留条目上一次成功的来源元数据；后续分钟任务继续补齐。
+- AIHOT 短期头像代理不会持久化到条目或公开 DTO。头像在同步阶段下载并写入 CloudBase `knowledge-source-avatars/x/`，账号资料按规范化 handle 缓存在 `knowledge_feed_source_profiles`。
+- 客户端列表、详情和相关阅读只展示 AIHOT 原始 `sourceTags`，没有原始标签时隐藏整行，不再用内部 `categoryLabel`、频道或主题兜底。作者区统一显示头像、昵称、`@handle` 和时间；缺少增强数据时仅回退原来源文字。
+- 生产验证时已有 114 条资讯带来源标签、25 个来源账号头像完成缓存。用户指出的三条 Rohan Paul 资讯分别保留原始标签 `开源生态 / 现象/趋势 / 部署/工程`、`xAI / 数据/训练 / 模型发布`、`开源生态 / 政策/监管`，并共用 `Rohan Paul / @rohanpaul_ai` 的云端头像。
+- `knowledgeFeed` 已部署并验证公开接口只返回展示字段；最终 384/384 个 Node 测试和 35 JSON/248 JavaScript/11 页面项目检查通过。
+- 长期合同见 [AIHOT 正文与来源元数据采用双接口显式合同](../decisions/2026-07-21-aihot-source-metadata-contract.md)。

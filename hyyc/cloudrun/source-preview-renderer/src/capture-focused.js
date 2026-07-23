@@ -6,17 +6,37 @@ const {
 const { MAX_IMAGE_BYTES } = require('./capture-segments.js');
 
 const FOCUS_PADDING = 28;
+const MIN_FOCUS_WIDTH = 120;
+const MIN_FOCUS_HEIGHT = 80;
 
 function createFocusCapturePlan(box, documentSize, requestedSegments = DEFAULT_MAX_SEGMENTS) {
-  if (!box || Number(box.width) < 1 || Number(box.height) < 1) return null;
-  const documentWidth = Math.max(1, Math.ceil(Number(documentSize && documentSize.width) || VIEWPORT.width));
-  const documentHeight = Math.max(1, Math.ceil(Number(documentSize && documentSize.height) || VIEWPORT.height));
-  const x = Math.max(0, Math.floor(Number(box.x) - FOCUS_PADDING));
-  const y = Math.max(0, Math.floor(Number(box.y) - FOCUS_PADDING));
-  const right = Math.min(documentWidth, Math.ceil(Number(box.x) + Number(box.width) + FOCUS_PADDING));
-  const bottom = Math.min(documentHeight, Math.ceil(Number(box.y) + Number(box.height) + FOCUS_PADDING));
-  const width = Math.max(1, right - x);
-  const height = Math.max(1, bottom - y);
+  if (!box) return null;
+  const values = [box.x, box.y, box.width, box.height].map(Number);
+  if (values.some((value) => !Number.isFinite(value))) return null;
+  const [boxX, boxY, boxWidth, boxHeight] = values;
+  if (boxWidth < 1 || boxHeight < 1) return null;
+
+  const rawDocumentWidth = Number(documentSize && documentSize.width);
+  const rawDocumentHeight = Number(documentSize && documentSize.height);
+  const documentWidth = Math.max(
+    1,
+    Math.ceil(Number.isFinite(rawDocumentWidth) ? rawDocumentWidth : VIEWPORT.width)
+  );
+  const documentHeight = Math.max(
+    1,
+    Math.ceil(Number.isFinite(rawDocumentHeight) ? rawDocumentHeight : VIEWPORT.height)
+  );
+  // The selected node can move or disappear while lazy media is loading. Use
+  // the real intersection with the latest document instead of coercing a
+  // fully stale box into a misleading 1x1 screenshot.
+  const x = Math.max(0, Math.floor(boxX - FOCUS_PADDING));
+  const y = Math.max(0, Math.floor(boxY - FOCUS_PADDING));
+  const right = Math.min(documentWidth, Math.ceil(boxX + boxWidth + FOCUS_PADDING));
+  const bottom = Math.min(documentHeight, Math.ceil(boxY + boxHeight + FOCUS_PADDING));
+  if (right <= x || bottom <= y) return null;
+  const width = right - x;
+  const height = bottom - y;
+  if (width < MIN_FOCUS_WIDTH || height < MIN_FOCUS_HEIGHT) return null;
   const requiredSegments = Math.max(1, Math.ceil(height / VIEWPORT.height));
   const segmentCount = Math.min(segmentLimit(requestedSegments), requiredSegments);
   const clips = [];
@@ -84,6 +104,8 @@ async function captureFocusedSegments(page, box, requestedSegments = DEFAULT_MAX
 
 module.exports = {
   FOCUS_PADDING,
+  MIN_FOCUS_WIDTH,
+  MIN_FOCUS_HEIGHT,
   createFocusCapturePlan,
   documentMetrics,
   captureFocusedSegments

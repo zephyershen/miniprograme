@@ -1,0 +1,38 @@
+<view class="profile-editor">
+  <view class="editor-intro">
+    <view class="editor-kicker">讨论身份</view>
+    <view class="editor-title">让别人认出你的观点</view>
+    <view class="editor-copy">头像和昵称会显示在你发布的评论旁边，之后可以随时修改。</view>
+  </view>
+
+  <view wx:if="{{loading}}" class="editor-loading">正在读取资料…</view>
+  <view wx:else class="editor-card">
+    <button class="avatar-picker" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+      <image wx:if="{{avatarUrl}}" class="avatar-image" src="{{avatarUrl}}" mode="aspectFill" />
+      <view wx:else class="avatar-empty">+</view>
+      <view class="avatar-action">{{avatarUrl ? '更换头像' : '选择微信头像'}}</view>
+    </button>
+
+    <view class="nickname-field">
+      <view class="field-label">昵称</view>
+      <input
+        class="nickname-input"
+        type="nickname"
+        maxlength="24"
+        value="{{nickname}}"
+        placeholder="选择或输入昵称"
+        bindinput="onNicknameInput"
+      />
+      <view class="field-count">{{nickname.length}} / 24</view>
+    </view>
+
+    <button
+      class="editor-submit"
+      disabled="{{!canSave || saving}}"
+      loading="{{saving}}"
+      bindtap="saveProfile"
+    >保存资料</button>
+  </view>
+
+  <view class="privacy-note">这里只保存你主动确认的头像与昵称，用于站内评论展示。</view>
+</view>

@@ -2,8 +2,8 @@
 title: "采用单一 Pro 会员、能力型权益与可回溯知识简报"
 type: decision
 tags: [membership, pro, entitlements, curated-feed, digests, intelligence, payment]
-sources: [sources/2026-07-17-pro-membership-implementation.md, sources/2026-07-18-premium-ia-and-copy.md]
-last_updated: 2026-07-18
+sources: [sources/2026-07-17-pro-membership-implementation.md, sources/2026-07-18-premium-ia-and-copy.md, sources/2026-07-19-packy-grok-intelligence.md, sources/2026-07-19-profile-moderation-and-huifu-payment.md]
+last_updated: 2026-07-21
 status: confirmed
 confidence: high
 ---
@@ -21,7 +21,10 @@ confidence: high
 | AI 精选 | 固定示例 | 可用 | 可用 |
 | 24h / 7d / 30d 简报 | 固定示例 | 可用 | 可用 |
 | 简报来源回看 | 不可用 | 可用 | 可用 |
-| 购买提示 | 只显示内测说明 | 不显示 | 不显示 |
+| 基础课与动手课全文 | 标题目录 | 24 节基础课、6 节动手课及已配套手绘 | 同 Pro |
+| 会员评论 | 不可读写 | 图文读写 | 图文读写 |
+| 微信技术支持 | 不包含 | 安装与使用问题支持，不另外收费 | 同 Pro |
+| 购买入口 | 查看服务端价格并购买 30 天 | 主动续费 30 天 | 不显示 |
 
 管理员授权与会员记录独立，管理员优先。会员状态为 `inactive / active / grace / expired / revoked`，续费状态独立为 `none / auto_renew / cancel_at_period_end`。取消续费不立即剥夺当前周期权益；客户端不能直接写会员状态。
 
@@ -31,9 +34,10 @@ confidence: high
 
 - 资讯继续使用编辑索引视觉、8 条一页、缩略图和稳定游标；免费用户可见锁定的 30 天入口，在 7 天边界只显示一次轻量提示。
 - 资讯顶部带锁“精选”是独立会员页的导航入口，不参与普通频道筛选；精选对普通用户只展示固定完整示例，会员页默认按重要度并支持时间、频道、公司/模型和技术方向筛选。
-- 专栏对普通用户展示 Agent、Skill、MCP 等学习路径预览；Pro 与管理员可展开完整学习单元。正式收费前，完整专栏正文必须迁移到服务端重鉴权内容接口。
+- 专栏对普通用户展示 Agent、Skill、MCP 等学习路径预览；Pro 与管理员通过服务端重鉴权内容接口取得完整学习单元和临时海报地址，完整正文不进入小程序包。
 - 简报使用 24 小时、7 天、30 天滚动窗口，必须包含结论、必须知道、影响、趋势、雷达、继续阅读和来源索引。
-- 我的展示身份、到期时间、数据覆盖与权益。支付关闭期间只显示“会员能力内测中”，不出现价格或虚假购买按钮；收藏与旧结论卡作为二级入口。
+- 我的展示身份、到期时间、数据覆盖、权益与服务端价格；普通用户可购买一次性 30 天 Pro，会员可主动续费 30 天。配置不完整时显示服务即将开放，不发起请求。
+- 2026-07-21 起，“我的”页与所有受限入口共用七项完整权益模型和服务端计价模型。当前 590/1090 分自动显示 `5.4 折`、`立省 ¥5`；喜欢、收藏动作和分享不包装成 Pro 权益，第三方工具/API/云服务费用明确不包含。
 - 真实管理员的“我的”页额外显示普通用户、Pro 会员、管理员三个身份预览按钮。预览状态由服务端验证真实管理员授权后写入同一授权记录；页面参数不能授予权限，预览普通用户后仍以真实管理员身份允许切回。
 
 ## 服务端边界
@@ -57,10 +61,13 @@ confidence: high
 
 ```js
 analyzeItem(normalizedItem) => AnalysisResult
+analyzeItems(normalizedItems[1..5]) => AnalysisResult[]
 generateDigest(window, analyzedItems, previousDigest) => DigestResult
 ```
 
-生产 Provider 在用户提供 API 前保持关闭；任务可保持 `pending`，不能用旧上游 `selected=true` 冒充 AI 精选。分析幂等键为 `provider + itemId + analysisInputHash + policyVersion`，热度与上游精选变化不会导致无意义重跑，也不保存思维链。
+2026-07-19 已接入 PackyAPI Responses 兼容 Provider，令牌模型为 `grok-4.5`，实际响应模型标识为 `grok-4.5-build`。任务可保持 `pending`，不能用旧上游 `selected=true` 冒充 AI 精选。分析幂等键为 `provider + itemId + analysisInputHash + policyVersion`，热度与上游精选变化不会导致无意义重跑，也不保存思维链。后续生产自动化状态由 [精选与简报采用 AI 自动发布，评论采用多模态 AI 先审后发](2026-07-19-automatic-ai-curation-and-comment-moderation.md) 取代本文件的小批关闭结论。
+
+Provider 使用严格 JSON Schema、低推理档、90 秒超时和稳定错误码。worker 最多把五条任务合为一次请求，新资讯优先；原始方案默认 10 分钟一个批次且北京时间每天最多分析 48 条，2026-07-19 自动化决策将生产配置改为每分钟最多 10 条、每日保护上限 10,000 条。用量按条目分摊入库并由 `knowledgeOps` 汇总。`costUsdTicks` 在供应商未给出正式换算合同前只作为原始成本单位，不显示为美元。
 
 精选先做规范化 URL 与标题近似去重，再按 `35% 重要性 + 20% 新颖性 + 20% 来源可信度 + 15% 证据完整度 + 10% 可行动性 - 重复惩罚` 评分。综合分至少 70，单频道最多约 15%；低质量时期允许少于 10%，不能为凑比例纳入垃圾内容。
 
@@ -68,9 +75,9 @@ generateDigest(window, analyzedItems, previousDigest) => DigestResult
 
 ## 功能开关与支付边界
 
-四个开关独立：会员 UI、真实精选、真实简报、购买入口。当前仅会员 UI 开启；真实精选、真实简报和购买入口关闭。AI 回填达到最近 30 天完整且分析覆盖至少 95% 后，才能开启真实精选和简报。
+Provider 分析、简报生成、精选公开、简报公开和购买入口均独立控制。2026-07-19 产品负责人选择自动分析和零人工放行后，前四项生产开关已经启用，购买入口仍关闭。此前“覆盖 95% + 人工抽检后开放”的门槛已被 [自动知识智能决策](2026-07-19-automatic-ai-curation-and-comment-moderation.md) 取代；供应商条款与误判治理风险仍保留，不得把产品决策描述为合规结论。
 
-未来汇付只作为支付适配器：回调必须验签和幂等，订单、到期、宽限、取消、撤销与退款后的会员状态仍由本项目服务端掌控。当前不创建订单、不展示价格、不发起扣款。
+汇付只作为支付适配器：回调必须验签和幂等，订单、到期、取消、撤销与退款后的会员状态仍由本项目服务端掌控。当前已实现一次购买 30 天的下单、`wx.requestPayment`、回调、主动查单和幂等发放，完整边界见 [斗拱会员支付与付费内容决策](2026-07-19-huifu-membership-payment-and-paid-content.md)。生产商户参数和实际价格未配置前不会创建订单或发起扣款；自动续费与退款仍未实现。
 
 ## 被替代的结论
 
@@ -78,3 +85,4 @@ generateDigest(window, analyzedItems, previousDigest) => DigestResult
 - “只有 free/admin，管理员默认近 90 天”被 `free/member/admin` 能力权益与管理员全部归档替代。
 - “上游 selected 就是精选”被本地版本化分析与质量硬门槛替代。
 - “offset 足够支撑会员历史”被稳定数据库游标替代。
+- 早期简报必须包含“影响/趋势”和会员转化卡内测期不显示价格的结论，分别被合同版本 4 与 [四分钟等图及 Pro 通行证决策](2026-07-21-bounded-visual-publication-and-pro-access-pass.md) 取代。

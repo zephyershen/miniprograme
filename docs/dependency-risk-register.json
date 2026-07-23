@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-07-23",
+  "expiresOn": "2026-08-06",
+  "owner": "project maintainer",
+  "upstream": {
+    "wx-server-sdk": "4.0.2",
+    "@cloudbase/node-sdk": "3.17.2"
+  },
+  "allowedVulnerabilities": {
+    "@cloudbase/database": {
+      "maximumSeverity": "high",
+      "reason": "CloudBase SDK 4.0.2 currently pins database 1.4.3. Application repositories use fixed field paths and validated DTOs rather than caller-controlled lodash paths."
+    },
+    "@cloudbase/node-sdk": {
+      "maximumSeverity": "high",
+      "reason": "This is the current SDK chain required by wx-server-sdk 4.0.2. CloudBase endpoints and request shapes are fixed by server-side adapters."
+    },
+    "axios": {
+      "maximumSeverity": "high",
+      "reason": "Axios 0.27.2 is internal to the pinned CloudBase SDK. Application-controlled arbitrary URLs, proxy settings, headers, and axios config objects are not passed into that SDK."
+    },
+    "lodash.set": {
+      "maximumSeverity": "high",
+      "reason": "The transitive CloudBase database adapter receives fixed repository field paths; client input is normalized before repository calls."
+    },
+    "lodash.unset": {
+      "maximumSeverity": "moderate",
+      "reason": "The transitive CloudBase database adapter receives fixed repository field paths; client input is normalized before repository calls."
+    },
+    "wx-server-sdk": {
+      "maximumSeverity": "high",
+      "reason": "npm reports the wrapper because of the transitive CloudBase chain. Version 4.0.2 is the current upstream release and is pinned exactly."
+    }
+  }
+}

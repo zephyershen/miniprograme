@@ -1,6 +1,11 @@
 const { createCollectionEnsurer, isNotFound } = require('./collection-support');
 const { publishedDay } = require('../lib/stored-feed-item');
 const { qualityTier } = require('../policies/feed-quality');
+const {
+  normalizeSourceChannelKeys,
+  inferSourceChannelKeys,
+  sourceChannelKey
+} = require('../lib/source-channels');
 
 function dayDocumentId(provider, date) {
   if (!/^[a-z0-9_-]{2,24}$/i.test(provider || '')
@@ -16,6 +21,14 @@ function indexEntry(item) {
     id: item.id,
     publishedAt: item.publishedAt,
     channelKey: item.channelKey || 'ai',
+    sourceChannelKeys: normalizeSourceChannelKeys(item.sourceChannelKeys).length
+      ? normalizeSourceChannelKeys(item.sourceChannelKeys)
+      : inferSourceChannelKeys(item),
+    sourceChannelKey: item.sourceChannelKey || sourceChannelKey(
+      normalizeSourceChannelKeys(item.sourceChannelKeys).length
+        ? item.sourceChannelKeys
+        : inferSourceChannelKeys(item)
+    ),
     topicKeys: Array.isArray(item.topicKeys) ? item.topicKeys : [],
     score: item.score === undefined ? null : item.score,
     qualityTier: analysisVersion > 0 ? qualityTier(item) : 'standard'
@@ -48,6 +61,8 @@ function entriesFromDocument(document) {
     id,
     publishedAt: `${document.date}T00:00:00.000Z`,
     channelKey: 'ai',
+    sourceChannelKeys: ['news'],
+    sourceChannelKey: 'news',
     topicKeys: [],
     score: null,
     qualityTier: 'standard'

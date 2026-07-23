@@ -1,0 +1,54 @@
+<view wx:if="{{visible}}" class="member-prompt-mask" bindtap="close" catchtouchmove="stopPropagation">
+  <view class="member-prompt-sheet" catchtap="stopPropagation">
+    <view class="member-card">
+      <view class="member-card-shell">
+        <view class="member-card-head">
+          <view class="member-brand">
+            <view class="member-brand-name">Pro 会员</view>
+            <view class="member-brand-note">{{billingPlan.durationLabel || '会员权益'}}</view>
+          </view>
+          <view class="member-close" bindtap="close" aria-role="button" aria-label="关闭会员权益介绍">×</view>
+        </view>
+
+        <scroll-view scroll-y enhanced show-scrollbar="{{false}}" class="member-card-scroll">
+          <view class="member-card-content">
+            <view class="member-context">你正在查看 · {{prompt.eyebrow}}</view>
+            <view class="member-title">{{prompt.title}}</view>
+            <view class="member-copy">{{prompt.copy}}</view>
+
+            <view wx:if="{{billingPlan.priceCents}}" class="member-offer">
+              <view class="member-offer-main">
+                <view class="member-offer-label">{{billingPlan.offerTag || '当前会员价'}}</view>
+                <view class="member-offer-line">
+                  <view class="member-offer-price"><text>{{billingPlan.priceLabel}}</text><label>/ {{billingPlan.durationLabel}}</label></view>
+                  <view wx:if="{{billingPlan.hasDiscount}}" class="member-offer-saving">
+                    <text class="member-offer-discount">{{billingPlan.discountLabel}}</text>
+                    <text>· 立省 {{billingPlan.savingsLabel}}</text>
+                  </view>
+                </view>
+                <view wx:if="{{billingPlan.compareAtPriceLabel}}" class="member-offer-compare">日常价 {{billingPlan.compareAtPriceLabel}}</view>
+              </view>
+            </view>
+
+            <view class="member-benefit-head"><view>包含以下权益</view><text>共 {{prompt.benefits.length}} 项</text></view>
+            <view class="member-benefit-list">
+              <view wx:for="{{prompt.benefits}}" wx:key="key" class="member-benefit-row {{item.featured ? 'member-benefit-featured' : ''}}">
+                <view class="member-benefit-check">✓</view>
+                <view class="member-benefit-body">
+                  <view class="member-benefit-title">{{item.title}}</view>
+                  <view class="member-benefit-copy">{{item.copy}}</view>
+                </view>
+              </view>
+            </view>
+            <view class="member-boundary">{{prompt.membershipTerms.supportBoundary}}</view>
+          </view>
+        </scroll-view>
+
+        <view class="member-card-footer">
+          <button class="member-primary" bindtap="viewBenefits">订阅</button>
+          <view class="member-note">{{prompt.membershipTerms.renewalCopy}}</view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

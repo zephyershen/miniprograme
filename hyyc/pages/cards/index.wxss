@@ -1,35 +1,15 @@
-.settings-button { margin: 2rpx 0 0; }
+.saved-section-head { display: flex; align-items: flex-end; justify-content: space-between; margin: 34rpx 2rpx 16rpx; }
+.saved-section-title { font-size: 30rpx; font-weight: 780; }
+.saved-section-copy { margin-top: 5rpx; color: var(--ui-faint); font-size: 19rpx; }
+.saved-empty { padding: 34rpx 26rpx; border: 1rpx dashed #dce3e8; border-radius: 24rpx; color: var(--ui-muted); font-size: 22rpx; line-height: 1.65; text-align: center; }
 
-.cards-list { display: flex; flex-direction: column; gap: 16rpx; }
-
-.conclusion-card { padding: 28rpx; }
-
-.card-meta, .card-actions { display: flex; align-items: center; justify-content: space-between; }
-.card-meta { color: var(--ui-muted); font-family: "DIN Alternate", -apple-system, sans-serif; font-size: 19rpx; }
-.card-conclusion { margin-top: 20rpx; font-size: 34rpx; font-weight: 730; line-height: 1.52; }
-
-.card-use {
-  margin-top: 18rpx;
-  padding: 17rpx 19rpx;
-  border-radius: 19rpx;
-  background: var(--ui-accent-soft);
-  color: var(--ui-muted);
-  line-height: 1.58;
-}
-
-.card-source { margin-top: 18rpx; color: var(--ui-muted); font-size: 23rpx; line-height: 1.5; }
-.card-actions { justify-content: flex-end; gap: 12rpx; margin-top: 20rpx; }
-
-.mini-action {
-  min-height: 60rpx;
-  margin: 0;
-  padding: 0 18rpx;
-  border-radius: 18rpx;
-  background: var(--ui-surface-muted);
-  color: var(--ui-ink);
-  font-size: 22rpx;
-  font-weight: 600;
-  line-height: 60rpx;
-}
-
-.danger-text { background: var(--ui-danger-soft); color: var(--ui-danger); }
+.favorite-list { overflow: hidden; border: 1rpx solid var(--ui-hairline); border-radius: var(--ui-radius-lg); background: var(--ui-surface-solid); }
+.favorite-row { display: flex; min-height: 118rpx; align-items: center; gap: 18rpx; padding: 18rpx 20rpx; border-bottom: 1rpx solid var(--ui-hairline); }
+.favorite-row:last-child { border-bottom: 0; }
+.favorite-row-locked { background: #fafbfc; }
+.favorite-thumb { width: 104rpx; height: 76rpx; flex: none; border-radius: 14rpx; background: var(--ui-surface-muted); }
+.favorite-copy { flex: 1; min-width: 0; }
+.favorite-title { overflow: hidden; color: var(--ui-ink); font-size: 24rpx; font-weight: 700; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
+.favorite-meta { overflow: hidden; margin-top: 8rpx; color: var(--ui-faint); font-size: 18rpx; text-overflow: ellipsis; white-space: nowrap; }
+.favorite-row-locked .favorite-title { color: var(--ui-muted); }
+.favorite-remove { flex: none; padding: 14rpx 0 14rpx 12rpx; color: var(--ui-faint); font-size: 19rpx; }

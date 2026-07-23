@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { EventEmitter } = require('node:events');
+const net = require('node:net');
 const { authorized } = require('../cloudrun/source-preview-renderer/src/auth');
 const {
   normalizePublicHttpsUrl,
@@ -13,9 +15,14 @@ const {
   createPreviewService
 } = require('../cloudfunctions/knowledgeFeed/services/preview-service');
 const {
+  BROWSER_NETWORK_HARDENING_ARGS,
   normalizeLoopbackProxyUrl,
   browserLaunchOptions
 } = require('../cloudrun/source-preview-renderer/src/proxy');
+const {
+  guardedWebSocketUrl,
+  installGuardedContextRoutes
+} = require('../cloudrun/source-preview-renderer/src/browser-network-policy');
 const { assertRenderableResponse } = require('../cloudrun/source-preview-renderer/src/page-policy');
 const { createCloudFileDeleter } = require('../cloudfunctions/knowledgeFeed/services/cloud-file-deleter');
 const { createFeedCacheRepository } = require('../cloudfunctions/knowledgeFeed/repositories/feed-cache');
@@ -37,6 +44,12 @@ const {
   createFocusCapturePlan
 } = require('../cloudrun/source-preview-renderer/src/capture-focused');
 const {
+  isBrowserLifecycleError,
+  isRecoverableFocusCaptureError,
+  captureFocusedOrPage,
+  createCaptureService
+} = require('../cloudrun/source-preview-renderer/src/capture');
+const {
   isNewVisualItem,
   isNewVisualJob
 } = require('../cloudfunctions/knowledgeFeed/policies/new-visuals');
@@ -48,22 +61,73 @@ const {
 const {
   createListThumbnailService
 } = require('../cloudfunctions/knowledgeFeed/services/list-thumbnail-service');
+const {
+  functionPayload,
+  createSourcePreviewRendererClient
+} = require('../cloudfunctions/knowledgeFeed/adapters/source-preview-renderer-client');
+const {
+  parseConnectTarget,
+  normalizeRelayAddress,
+  createRelayWebSocketOptions
+} = require('../cloudrun/source-preview-renderer/src/ws-proxy-bridge');
+const {
+  normalizeRelayEgressMode,
+  createRelayConnector
+} = require('../cloudrun/source-preview-renderer/src/relay-outbound');
+const {
+  parseHttpsConnectTarget,
+  createFixedIpProxy
+} = require('../cloudrun/source-preview-renderer/src/fixed-ip-proxy');
+const {
+  EXPECTED_CHROMIUM_MAJOR,
+  assertCompatibleBrowser
+} = require('../cloudrun/source-preview-renderer/src/browser-runtime');
+const {
+  captureEgressPlan,
+  captureRouteOptions
+} = require('../cloudrun/source-preview-renderer/src/egress-policy');
+const {
+  probeRelayTunnel
+} = require('../cloudrun/source-preview-renderer/src/relay-probe');
+const {
+  officialXEmbedUrl,
+  shouldRetryThroughForeignProxy,
+  shouldPreferForeignProxy,
+  shouldPreferOpenGraph
+} = require('../cloudrun/source-preview-renderer/src/egress-policy');
+const {
+  normalizeOpenGraphImageUrl
+} = require('../cloudrun/source-preview-renderer/src/open-graph-capture');
 
 const FILE_ID_PREFIX = 'cloud://env.bucket/knowledge-previews/source/';
 
 test('renders a fixed low-memory list thumbnail through guarded browser requests', async () => {
   const jpeg = Buffer.from('ffd8ffe000104a4649460001ffd9', 'hex');
   let routed = null;
+  let webSocketRouted = null;
   let assignedUrl = '';
+  const setupOrder = [];
   const context = {
-    newPage: async () => ({
-      setDefaultTimeout() {},
-      route: async (pattern, handler) => { routed = handler; },
-      setContent: async () => {},
-      evaluate: async (operation, value) => { assignedUrl = value; },
-      waitForFunction: async () => {},
-      screenshot: async () => jpeg
-    }),
+    route: async (pattern, handler) => {
+      assert.equal(pattern, '**/*');
+      setupOrder.push('http-route');
+      routed = handler;
+    },
+    routeWebSocket: async (pattern, handler) => {
+      assert.equal(pattern, '**/*');
+      setupOrder.push('websocket-route');
+      webSocketRouted = handler;
+    },
+    newPage: async () => {
+      setupOrder.push('page');
+      return {
+        setDefaultTimeout() {},
+        setContent: async () => {},
+        evaluate: async (operation, value) => { assignedUrl = value; },
+        waitForFunction: async () => {},
+        screenshot: async () => jpeg
+      };
+    },
     close: async () => {}
   };
   const result = await renderListThumbnail(
@@ -75,6 +139,8 @@ test('renders a fixed low-memory list thumbnail through guarded browser requests
     { allowBrowserRequest: async () => true }
   );
   assert.equal(typeof routed, 'function');
+  assert.equal(typeof webSocketRouted, 'function');
+  assert.deepEqual(setupOrder, ['http-route', 'websocket-route', 'page']);
   assert.equal(assignedUrl, 'https://storage.example/signed.jpg?token=private');
   assert.equal(result.width, 360);
   assert.equal(result.height, 253);
@@ -130,6 +196,336 @@ test('requires a constant-time bearer token for source preview capture', () => {
   assert.equal(authorized(`Bearer ${'b'.repeat(40)}`, token), false);
   assert.equal(authorized('', token), false);
   assert.equal(authorized(`Bearer ${token}`, 'short'), false);
+});
+
+test('uses the CloudBase worker contract before any HTTP renderer fallback', async () => {
+  const calls = [];
+  const client = createSourcePreviewRendererClient({
+    cloud: {
+      callFunction: async (request) => {
+        calls.push(request);
+        return { result: { ok: true, data: { fileIds: ['cloud://env.bucket/a.jpg'] } } };
+      }
+    },
+    config: {
+      rendererFunctionName: 'sourcePreviewWorker',
+      rendererFunctionEnabled: true,
+      rendererFunctionTimeoutMs: 1000,
+      rendererHttpFallbackEnabled: false,
+      rendererToken: 't'.repeat(40)
+    }
+  });
+
+  assert.deepEqual(await client.capture({ url: 'https://x.com/example/status/1' }), {
+    fileIds: ['cloud://env.bucket/a.jpg']
+  });
+  assert.equal(calls[0].name, 'sourcePreviewWorker');
+  assert.equal(calls[0].data.action, 'capture');
+  assert.equal(calls[0].data.token, 't'.repeat(40));
+  assert.equal(calls[0].timeout, 5000);
+  assert.deepEqual(functionPayload({ result: JSON.stringify({ ok: true, data: { ready: true } }) }), {
+    ready: true
+  });
+  assert.throws(() => functionPayload({ result: { ok: false } }), /PREVIEW_FUNCTION_RESPONSE_INVALID/);
+});
+
+test('limits the encrypted relay bridge to HTTPS host targets', () => {
+  assert.deepEqual(parseConnectTarget('x.com:443'), { host: 'x.com', port: 443 });
+  assert.deepEqual(parseConnectTarget('CDN.Example.COM:443'), { host: 'cdn.example.com', port: 443 });
+  assert.throws(() => parseConnectTarget('127.0.0.1:80'), /PROXY_TARGET_INVALID/);
+  assert.throws(() => parseConnectTarget('x.com:8443'), /PROXY_TARGET_INVALID/);
+  assert.throws(() => parseConnectTarget('x.com:443/path'), /PROXY_TARGET_INVALID/);
+});
+
+test('can pin the authenticated relay to a validated public address without changing TLS hostname', () => {
+  assert.equal(normalizeRelayAddress('8.8.8.8'), '8.8.8.8');
+  assert.equal(normalizeRelayAddress(''), '');
+  assert.throws(() => normalizeRelayAddress('127.0.0.1'), /PROXY_RELAY_ADDRESS_INVALID/);
+  assert.throws(() => normalizeRelayAddress('not-an-ip'), /PROXY_RELAY_ADDRESS_INVALID/);
+
+  const options = createRelayWebSocketOptions('x'.repeat(32), '8.8.8.8');
+  let lookupResult = null;
+  options.lookup('source-proxy.example.com', {}, (error, address, family) => {
+    lookupResult = { error, address, family };
+  });
+  assert.deepEqual(lookupResult, { error: null, address: '8.8.8.8', family: 4 });
+  assert.equal(options.headers.authorization, `Bearer ${'x'.repeat(32)}`);
+});
+
+test('probes the authenticated relay through a fixed HTTPS target', async () => {
+  class FakeWebSocket extends EventEmitter {
+    static OPEN = 1;
+
+    constructor(url, options) {
+      super();
+      this.url = url;
+      this.options = options;
+      this.readyState = FakeWebSocket.OPEN;
+      queueMicrotask(() => this.emit('open'));
+    }
+
+    send(payload) {
+      this.payload = JSON.parse(payload);
+      queueMicrotask(() => this.emit('message', Buffer.from('{"ok":true}'), false));
+    }
+
+    close() {
+      this.readyState = 3;
+    }
+
+    terminate() {
+      this.readyState = 3;
+    }
+  }
+
+  const result = await probeRelayTunnel({
+    relayUrl: 'wss://source-proxy.example.com/source-proxy/tunnel',
+    relayAddress: '8.8.8.8',
+    token: 'x'.repeat(32),
+    WebSocketImpl: FakeWebSocket
+  });
+  assert.deepEqual(result, { relayReady: true, target: 'x.com:443' });
+});
+
+test('keeps relay egress explicit and validates direct targets before connecting', async () => {
+  assert.equal(normalizeRelayEgressMode('direct'), 'direct');
+  assert.equal(normalizeRelayEgressMode(''), 'http-connect');
+  assert.throws(() => normalizeRelayEgressMode('open-proxy'), /RELAY_EGRESS_MODE_INVALID/);
+
+  const calls = [];
+  const socket = new EventEmitter();
+  socket.destroy = () => {};
+  const connector = createRelayConnector({
+    mode: 'direct',
+    resolvePublicHost: async (host) => {
+      calls.push(['resolve', host]);
+      return [{ address: '8.8.8.8', family: 4 }];
+    },
+    connect: (options) => {
+      calls.push(['connect', options]);
+      queueMicrotask(() => socket.emit('connect'));
+      return socket;
+    }
+  });
+
+  const result = await connector.open('x.com', 443);
+  assert.equal(result.socket, socket);
+  assert.equal(result.remainder.length, 0);
+  assert.deepEqual(calls, [
+    ['resolve', 'x.com'],
+    ['connect', { host: '8.8.8.8', family: 4, port: 443 }]
+  ]);
+});
+
+test('passes a validated IP literal to the relay upstream proxy', async () => {
+  const calls = [];
+  const socket = new EventEmitter();
+  socket.destroyed = false;
+  socket.destroy = () => { socket.destroyed = true; };
+  socket.write = (payload) => {
+    calls.push(['write', payload]);
+    queueMicrotask(() => socket.emit('data', Buffer.from(
+      'HTTP/1.1 200 Connection Established\r\n\r\n'
+    )));
+  };
+  const connector = createRelayConnector({
+    mode: 'http-connect',
+    resolvePublicHost: async (host) => {
+      calls.push(['resolve', host]);
+      return [{ address: '8.8.8.8', family: 4 }];
+    },
+    proxyHost: '127.0.0.1',
+    proxyPort: 7890,
+    connect: (options) => {
+      calls.push(['connect', options]);
+      queueMicrotask(() => socket.emit('connect'));
+      return socket;
+    }
+  });
+
+  const result = await connector.open('changing.example', 443);
+  assert.equal(result.socket, socket);
+  assert.deepEqual(calls.slice(0, 2), [
+    ['resolve', 'changing.example'],
+    ['connect', { host: '127.0.0.1', port: 7890 }]
+  ]);
+  assert.match(calls[2][1], /^CONNECT 8\.8\.8\.8:443 HTTP\/1\.1/);
+  assert.doesNotMatch(calls[2][1], /changing\.example/);
+});
+
+test('pins each browser CONNECT tunnel to the guard result and rejects DNS rebinding', async (t) => {
+  assert.deepEqual(parseHttpsConnectTarget('Public.Example:443'), {
+    host: 'public.example',
+    port: 443
+  });
+  assert.deepEqual(parseHttpsConnectTarget('[2001:4860:4860::8888]:443'), {
+    host: '2001:4860:4860::8888',
+    port: 443
+  });
+  assert.throws(() => parseHttpsConnectTarget('public.example:80'), /PROXY_TARGET_INVALID/);
+  assert.throws(() => parseHttpsConnectTarget('user@public.example:443'), /PROXY_TARGET_INVALID/);
+
+  const upstream = net.createServer(() => {});
+  await new Promise((resolve, reject) => {
+    upstream.once('error', reject);
+    upstream.listen(0, '127.0.0.1', resolve);
+  });
+  t.after(() => new Promise((resolve) => upstream.close(resolve)));
+  const upstreamPort = upstream.address().port;
+
+  let lookupCount = 0;
+  const connectCalls = [];
+  const guard = createPublicUrlGuard({
+    cacheTtlMs: 0,
+    resolver: async () => {
+      lookupCount += 1;
+      return [{
+        address: lookupCount === 1 ? '8.8.8.8' : '127.0.0.1',
+        family: 4
+      }];
+    }
+  });
+  const proxy = createFixedIpProxy({
+    resolvePublicHost: guard.resolvePublicHost,
+    connect: (options) => {
+      connectCalls.push(options);
+      return net.connect({ host: '127.0.0.1', port: upstreamPort });
+    },
+    logger: { warn() {} }
+  });
+  t.after(() => proxy.close());
+  const proxyUrl = new URL(await proxy.listen());
+
+  async function connectStatus(authority) {
+    return new Promise((resolve, reject) => {
+      const socket = net.connect({
+        host: proxyUrl.hostname,
+        port: Number(proxyUrl.port)
+      });
+      let response = '';
+      const timeout = setTimeout(() => {
+        socket.destroy();
+        reject(new Error('TEST_CONNECT_TIMEOUT'));
+      }, 2000);
+      socket.once('error', reject);
+      socket.on('data', (chunk) => {
+        response += chunk.toString('latin1');
+        if (!response.includes('\r\n\r\n')) return;
+        clearTimeout(timeout);
+        socket.destroy();
+        resolve(Number(response.match(/^HTTP\/1\.1 (\d{3})/)?.[1] || 0));
+      });
+      socket.once('connect', () => {
+        socket.write(
+          `CONNECT ${authority} HTTP/1.1\r\nHost: ${authority}\r\n\r\n`
+        );
+      });
+    });
+  }
+
+  assert.equal(await connectStatus('changing.example:443'), 200);
+  assert.deepEqual(connectCalls, [{ host: '8.8.8.8', family: 4, port: 443 }]);
+  assert.equal(await connectStatus('changing.example:443'), 502);
+  assert.equal(connectCalls.length, 1);
+});
+
+test('enforces one Chromium major across Docker and CloudBase runtimes', () => {
+  assert.equal(EXPECTED_CHROMIUM_MAJOR, 143);
+  const compatible = { version: () => '143.0.7499.4' };
+  assert.equal(assertCompatibleBrowser(compatible), compatible);
+  assert.throws(
+    () => assertCompatibleBrowser({ version: () => '149.0.7827.55' }),
+    /CHROMIUM_VERSION_MISMATCH/
+  );
+});
+
+test('uses the foreign relay only for connectivity or regional access failures', () => {
+  assert.equal(shouldRetryThroughForeignProxy(new Error('page.goto: net::ERR_TIMED_OUT')), true);
+  assert.equal(shouldRetryThroughForeignProxy(new Error('page.goto: Timeout 16000ms exceeded')), true);
+  assert.equal(shouldRetryThroughForeignProxy(new Error('UPSTREAM_HTTP_401')), true);
+  assert.equal(shouldRetryThroughForeignProxy(new Error('UPSTREAM_HTTP_403')), true);
+  assert.equal(shouldRetryThroughForeignProxy(new Error('UPSTREAM_HTTP_404')), true);
+  assert.equal(shouldRetryThroughForeignProxy(new Error('PAGE_QUALITY_LOGIN_WALL')), true);
+  assert.equal(shouldRetryThroughForeignProxy(new Error('TARGET_STATUS_NOT_FOUND')), false);
+  assert.equal(shouldRetryThroughForeignProxy(new Error('SOURCE_PREVIEW_IMAGE_INVALID')), false);
+});
+
+test('builds a bounded official embed fallback only for an exact X status', () => {
+  assert.equal(
+    officialXEmbedUrl('https://x.com/rohanpaul_ai/status/2079465855797334131?ref=feed'),
+    'https://platform.twitter.com/embed/Tweet.html?id=2079465855797334131&dnt=true'
+  );
+  assert.equal(
+    officialXEmbedUrl('https://twitter.com/XDevelopers/status/1228393702244134912'),
+    'https://platform.twitter.com/embed/Tweet.html?id=1228393702244134912&dnt=true'
+  );
+  assert.equal(officialXEmbedUrl('https://x.com/rohanpaul_ai'), '');
+  assert.equal(officialXEmbedUrl('https://example.com/status/2079465855797334131'), '');
+  assert.equal(statusIdFromUrl(
+    'https://platform.twitter.com/embed/Tweet.html?id=2079465855797334131&dnt=true'
+  ), '2079465855797334131');
+});
+
+test('prefers the official X embed through the authenticated relay', () => {
+  const target = 'https://x.com/rohanpaul_ai/status/2079465855797334131';
+  assert.deepEqual(captureEgressPlan(target, true).map((route) => route.mode), [
+    'foreign-proxy-x-embed',
+    'foreign-proxy',
+    'direct-x-embed',
+    'direct'
+  ]);
+  assert.deepEqual(captureEgressPlan(target, false).map((route) => route.mode), [
+    'direct',
+    'direct-x-embed'
+  ]);
+  assert.deepEqual(captureEgressPlan('https://example.com/article', true).map((route) => route.mode), [
+    'direct',
+    'foreign-proxy'
+  ]);
+});
+
+test('keeps the direct relay probe single-shot and reloads the selected route', () => {
+  assert.deepEqual(captureRouteOptions({ proxied: false }, true), {
+    allowQualityReload: false
+  });
+  assert.deepEqual(captureRouteOptions({ proxied: true }, true), {
+    allowQualityReload: true
+  });
+  assert.deepEqual(captureRouteOptions({ proxied: false }, false), {
+    allowQualityReload: true
+  });
+});
+
+test('uses the relay first only for confirmed region-sensitive editorial hosts', () => {
+  assert.equal(shouldPreferForeignProxy(
+    'https://techcrunch.com/2026/07/22/example'
+  ), true);
+  assert.equal(shouldPreferForeignProxy('https://www.ithome.com/0/980/150.htm'), false);
+  assert.deepEqual(captureEgressPlan(
+    'https://techcrunch.com/2026/07/22/example',
+    true
+  ).map((route) => route.mode), ['foreign-proxy', 'direct']);
+  assert.deepEqual(captureEgressPlan(
+    'https://www.ithome.com/0/980/150.htm',
+    true
+  ).map((route) => route.mode), ['direct', 'foreign-proxy']);
+});
+
+test('uses reviewed Open Graph media before a known registration wall', () => {
+  const target = 'https://www.marktechpost.com/2026/07/22/example';
+  assert.equal(shouldPreferOpenGraph(target), true);
+  assert.deepEqual(captureEgressPlan(target, true).map((route) => route.mode), [
+    'foreign-proxy-open-graph',
+    'foreign-proxy',
+    'direct-open-graph',
+    'direct'
+  ]);
+  assert.equal(
+    normalizeOpenGraphImageUrl('/media/hero.png', target),
+    'https://www.marktechpost.com/media/hero.png'
+  );
+  assert.equal(normalizeOpenGraphImageUrl('http://example.com/hero.png', target), '');
+  assert.equal(normalizeOpenGraphImageUrl('https://user:secret@example.com/hero.png', target), '');
 });
 
 test('captures consecutive page segments beyond three while enforcing the safety ceiling', () => {
@@ -190,6 +586,125 @@ test('focuses the matching X status and crops the selected article into bounded 
   assert.ok(plan.clips.every((clip) => clip.width === 676 && clip.height <= VIEWPORT.height));
 });
 
+test('rejects a focused box that no longer intersects the latest document', () => {
+  assert.equal(createFocusCapturePlan(
+    { x: 4000, y: 9000, width: 620, height: 1960 },
+    { width: 1080, height: 2400 },
+    12
+  ), null);
+  assert.equal(createFocusCapturePlan(
+    { x: Number.NaN, y: 20, width: 620, height: 400 },
+    { width: 1080, height: 2400 },
+    12
+  ), null);
+});
+
+test('keeps only a useful intersection when a focused box is partly stale', () => {
+  const plan = createFocusCapturePlan(
+    { x: 980, y: 2250, width: 620, height: 1960 },
+    { width: 1080, height: 2400 },
+    12
+  );
+  assert.equal(plan.x, 952);
+  assert.equal(plan.y, 2222);
+  assert.ok(plan.clips.every((clip) => (
+    clip.x >= 0
+    && clip.y >= 0
+    && clip.x + clip.width <= 1080
+    && clip.y + clip.height <= 2400
+  )));
+});
+
+test('falls back to a page capture for a recoverable focused clip error', async () => {
+  const calls = [];
+  const result = await captureFocusedOrPage(
+    {},
+    { x: 1, y: 1, width: 500, height: 500 },
+    12,
+    async () => {
+      calls.push('focus');
+      throw new Error('page.screenshot: Clipped area is either empty or outside the resulting image');
+    },
+    async () => {
+      calls.push('page');
+      return { segmentCount: 1, screenshots: [{}] };
+    }
+  );
+  assert.deepEqual(calls, ['focus', 'page']);
+  assert.equal(result.segmentCount, 1);
+  assert.equal(isRecoverableFocusCaptureError(new Error('Target page, context or browser has been closed')), false);
+});
+
+test('relaunches Chromium once when a thawed CloudBase browser handle is stale', async () => {
+  const jpeg = Buffer.from('ffd8ffe000104a4649460001ffd9', 'hex');
+  let launches = 0;
+  let staleClosed = 0;
+  const observedLaunchOptions = [];
+  const workingContext = {
+    route: async () => {},
+    routeWebSocket: async () => {},
+    newPage: async () => ({
+      setDefaultTimeout() {},
+      setContent: async () => {},
+      evaluate: async () => {},
+      waitForFunction: async () => {},
+      screenshot: async () => jpeg
+    }),
+    close: async () => {}
+  };
+  const service = createCaptureService({
+    launch: async (options) => {
+      observedLaunchOptions.push(options);
+      launches += 1;
+      if (launches === 1) {
+        return {
+          isConnected: () => true,
+          once() {},
+          close: async () => { staleClosed += 1; },
+          newContext: async () => ({
+            route: async () => {},
+            routeWebSocket: async () => {},
+            newPage: async () => { throw new Error('Target page, context or browser has been closed'); },
+            close: async () => {}
+          })
+        };
+      }
+      return {
+        isConnected: () => true,
+        once() {},
+        close: async () => {},
+        newContext: async () => workingContext
+      };
+    },
+    guard: {
+      assertPublicUrl: async (url) => url,
+      allowBrowserRequest: async () => true,
+      resolvePublicHost: async () => [{ address: '8.8.8.8', family: 4 }]
+    },
+    fixedIpProxyFactory: () => ({
+      listen: async () => 'http://127.0.0.1:18791',
+      close: async () => {}
+    }),
+    allowDirectEgress: true
+  });
+
+  const result = await service.thumbnail({
+    version: 1,
+    url: 'https://storage.example/source.jpg'
+  });
+  assert.equal(result.mimeType, 'image/jpeg');
+  assert.equal(launches, 2);
+  assert.equal(staleClosed, 1);
+  assert.equal(
+    observedLaunchOptions.every((options) => (
+      options.proxy && options.proxy.server === 'http://127.0.0.1:18791'
+    )),
+    true
+  );
+  assert.equal(isBrowserLifecycleError(new Error('Target page, context or browser has been closed')), true);
+  await service.close();
+});
+
 test('keeps visual generation forward-only when a release cutoff is configured', () => {
   const cutoff = '2026-07-18T04:43:08.568Z';
   assert.equal(isNewVisualItem({ firstStoredAt: '2026-07-18T04:43:08.567Z' }, cutoff), false);
@@ -240,9 +755,68 @@ test('allows only public HTTPS targets for the browser renderer', async () => {
   assert.equal(isPrivateIp('100.100.100.200'), true);
   assert.equal(isPrivateIp('192.0.66.108'), false);
   assert.equal(isPrivateIp('::1'), true);
+  assert.equal(isPrivateIp('0:0:0:0:0:0:0:1'), true);
+  assert.equal(isPrivateIp('0:0:0:0:0:ffff:7f00:1'), true);
   assert.equal(isPrivateIp('64:ff9b::7f00:1'), true);
   assert.equal(isPrivateIp('ff02::1'), true);
   assert.equal(isPrivateIp('2001:4860:4860::8888'), false);
+});
+
+test('guards every browser-context request and secure WebSocket before connection', async () => {
+  let httpHandler = null;
+  let webSocketHandler = null;
+  await installGuardedContextRoutes({
+    route: async (_pattern, handler) => { httpHandler = handler; },
+    routeWebSocket: async (_pattern, handler) => { webSocketHandler = handler; }
+  }, {
+    allowBrowserRequest: async (url) => url === 'https://public.example/path'
+  });
+
+  let continued = 0;
+  let aborted = 0;
+  await httpHandler({
+    request: () => ({ url: () => 'https://public.example/path' }),
+    continue: async () => { continued += 1; },
+    abort: async () => { aborted += 1; }
+  });
+  await httpHandler({
+    request: () => ({ url: () => 'https://127.0.0.1/private' }),
+    continue: async () => { continued += 1; },
+    abort: async (reason) => {
+      assert.equal(reason, 'blockedbyclient');
+      aborted += 1;
+    }
+  });
+  assert.equal(continued, 1);
+  assert.equal(aborted, 1);
+
+  let connected = 0;
+  let closed = 0;
+  await webSocketHandler({
+    url: () => 'wss://public.example/path',
+    connectToServer: () => { connected += 1; },
+    close: async () => { closed += 1; }
+  });
+  await webSocketHandler({
+    url: () => 'ws://public.example/path',
+    connectToServer: () => { connected += 1; },
+    close: async (options) => {
+      assert.equal(options.code, 1008);
+      closed += 1;
+    }
+  });
+  await webSocketHandler({
+    url: () => 'wss://127.0.0.1/private',
+    connectToServer: () => { connected += 1; },
+    close: async (options) => {
+      assert.equal(options.code, 1008);
+      closed += 1;
+    }
+  });
+  assert.equal(guardedWebSocketUrl('wss://public.example/path#fragment'), 'https://public.example/path');
+  assert.equal(guardedWebSocketUrl('ws://public.example/path'), '');
+  assert.equal(connected, 1);
+  assert.equal(closed, 2);
 });
 
 test('revalidates an expired DNS result before allowing another browser request', async () => {
@@ -258,17 +832,30 @@ test('revalidates an expired DNS result before allowing another browser request'
   await assert.rejects(() => guard.assertPublicUrl('https://changing.example/article'), /PRIVATE_HOST/);
 });
 
-test('accepts only an authenticated-service local browser proxy', () => {
+test('accepts only a renderer-owned fixed-IP browser proxy', () => {
   assert.equal(normalizeLoopbackProxyUrl('http://127.0.0.1:7890'), 'http://127.0.0.1:7890');
-  assert.deepEqual(browserLaunchOptions('socks5://localhost:7891').proxy, {
-    server: 'socks5://localhost:7891'
+  const launchOptions = browserLaunchOptions('http://127.0.0.1:7890');
+  assert.deepEqual(launchOptions.proxy, {
+    server: 'http://127.0.0.1:7890',
+    bypass: '<-loopback>'
   });
+  assert.equal(
+    BROWSER_NETWORK_HARDENING_ARGS.every((argument) => launchOptions.args.includes(argument)),
+    true
+  );
+  assert.throws(() => normalizeLoopbackProxyUrl('socks5://localhost:7891'), /INVALID_PROXY_URL/);
+  assert.throws(() => normalizeLoopbackProxyUrl('https://127.0.0.1:7890'), /INVALID_PROXY_URL/);
   assert.throws(() => normalizeLoopbackProxyUrl('http://0.0.0.0:7890'), /INVALID_PROXY_URL/);
   assert.throws(() => normalizeLoopbackProxyUrl('http://proxy.example:7890'), /INVALID_PROXY_URL/);
   assert.throws(() => normalizeLoopbackProxyUrl('http://user:pass@127.0.0.1:7890'), /INVALID_PROXY_URL/);
   assert.throws(() => browserLaunchOptions(''), /LOOPBACK_PROXY_REQUIRED/);
-  assert.equal(browserLaunchOptions('', { allowDirectEgress: true }).proxy, undefined);
-  assert.equal(browserLaunchOptions('', { allowDirectEgress: true }).args.includes('--no-sandbox'), false);
+  assert.throws(() => createCaptureService({
+    externalProxyUrl: 'http://127.0.0.1:7890'
+  }), /EXTERNAL_BROWSER_PROXY_UNSUPPORTED/);
+  assert.equal(
+    launchOptions.args.includes('--no-sandbox'),
+    false
+  );
 });
 
 test('rejects error pages before storing a source screenshot', () => {

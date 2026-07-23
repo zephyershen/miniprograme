@@ -1,32 +1,36 @@
 page {
-  /* Luma: quiet content surfaces with one focused iris accent. */
-  --ui-canvas: #f3f4f8;
-  --ui-canvas-deep: #eceef4;
-  --ui-surface: rgba(255, 255, 255, 0.92);
+  /* Modern editorial: soft canvas, elevated white cards, restrained accent. */
+  --ui-canvas: #f6f8fa;
+  --ui-canvas-deep: #eceff3;
+  --ui-surface: #ffffff;
   --ui-surface-solid: #ffffff;
-  --ui-surface-muted: #f0f1f6;
-  --ui-ink: #17181d;
-  --ui-muted: #686d7a;
-  --ui-faint: #9a9fac;
-  --ui-hairline: rgba(24, 27, 36, 0.08);
-  --ui-accent: #5b5ce2;
-  --ui-accent-strong: #4146c9;
-  --ui-accent-soft: #ececff;
-  --ui-violet: #8a6cf1;
-  --ui-coral: #e86661;
+  --ui-surface-muted: #f3f5f7;
+  --ui-ink: #10151b;
+  --ui-muted: #5a6672;
+  --ui-faint: #93a0ac;
+  --ui-hairline: #ecf0f3;
+  --ui-accent: #1d9bf0;
+  --ui-accent-strong: #1478c4;
+  --ui-accent-soft: #e9f4fd;
+  --ui-violet: #1d9bf0;
+  --ui-like: #f91880;
+  --ui-like-soft: #fdeaf2;
+  --ui-repost: #00ba7c;
+  --ui-coral: #f4212e;
   --ui-amber: #b68016;
-  --ui-lime: #527f52;
-  --ui-cyan: #2681a0;
-  --ui-danger: #b64c4b;
-  --ui-danger-soft: #fff0ef;
+  --ui-lime: #00ba7c;
+  --ui-cyan: #1d9bf0;
+  --ui-danger: #f4212e;
+  --ui-danger-soft: #fdeff0;
   --ui-gutter: 30rpx;
-  --ui-radius-sm: 16rpx;
-  --ui-radius-md: 24rpx;
-  --ui-radius-lg: 34rpx;
-  --ui-radius-xl: 44rpx;
-  --ui-shadow-soft: 0 8rpx 28rpx rgba(36, 39, 52, 0.07);
-  --ui-shadow-raised: 0 18rpx 56rpx rgba(36, 39, 52, 0.11);
-  --ui-shadow-accent: 0 14rpx 34rpx rgba(83, 83, 215, 0.22);
+  --ui-radius-sm: 12rpx;
+  --ui-radius-md: 18rpx;
+  --ui-radius-lg: 28rpx;
+  --ui-radius-xl: 32rpx;
+  --ui-shadow-soft: 0 1rpx 2rpx rgba(16, 24, 40, 0.04);
+  --ui-shadow-raised: 0 6rpx 24rpx rgba(15, 20, 25, 0.08);
+  --ui-shadow-accent: 0 8rpx 22rpx rgba(29, 155, 240, 0.28);
+  --ui-shadow-card: 0 1rpx 2rpx rgba(16, 24, 40, 0.04), 0 14rpx 30rpx rgba(16, 24, 40, 0.05);
 
   /* Compatibility aliases keep feature pages decoupled from theme naming. */
   --editorial-paper: var(--ui-canvas);

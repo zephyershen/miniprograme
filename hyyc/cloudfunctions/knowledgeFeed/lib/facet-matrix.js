@@ -2,12 +2,10 @@ const { TIME_WINDOWS } = require('./feed-page');
 
 const DEFAULT_CHANNEL_KEYS = Object.freeze([
   'all',
-  'ai',
-  'tech',
-  'entertainment',
-  'society',
-  'games',
-  'english'
+  'firstParty',
+  'news',
+  'x',
+  'openSource'
 ]);
 
 function uniqueKeys(values, prefix = '') {
@@ -53,7 +51,9 @@ function buildFacetMatrix(entries, { timeKeys, now = Date.now() } = {}) {
     const publishedAt = new Date(entry && entry.publishedAt).getTime();
     if (!Number.isFinite(publishedAt)) continue;
     const channelKeys = ['all'];
-    if (channelIndexes.has(entry.channelKey) && entry.channelKey !== 'all') channelKeys.push(entry.channelKey);
+    if (channelIndexes.has(entry.sourceChannelKey) && entry.sourceChannelKey !== 'all') {
+      channelKeys.push(entry.sourceChannelKey);
+    }
     const companyKeys = entryDimensionKeys(entry, 'company:');
     const directionKeys = entryDimensionKeys(entry, 'direction:');
     for (let timeIndex = 0; timeIndex < keys.timeKeys.length; timeIndex += 1) {

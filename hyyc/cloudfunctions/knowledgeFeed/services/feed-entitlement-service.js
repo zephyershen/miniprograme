@@ -1,3 +1,4 @@
+const crypto = require('node:crypto');
 const { AppError } = require('../lib/errors');
 const { normalizeMembership, membershipActive } = require('./membership-service');
 const {
@@ -5,7 +6,7 @@ const {
   previewRoleForGrant
 } = require('../policies/role-preview');
 
-const FREE_TIME_KEYS = Object.freeze(['1d', '3d', '7d']);
+const FREE_TIME_KEYS = Object.freeze(['1d']);
 const MEMBER_TIME_KEYS = Object.freeze(['1d', '3d', '7d', '30d']);
 const ADMIN_TIME_KEYS = Object.freeze(['1d', '3d', '7d', '30d', 'all']);
 const DIGEST_FEATURES = Object.freeze({
@@ -13,6 +14,14 @@ const DIGEST_FEATURES = Object.freeze({
   '7d': 'digest_7d',
   '30d': 'digest_30d'
 });
+
+function clientCachePartition(ownerKey) {
+  return crypto
+    .createHash('sha256')
+    .update('knowledge-client-cache:v1:')
+    .update(String(ownerKey || ''))
+    .digest('hex');
+}
 
 function roleAccess(role, config) {
   if (role === 'admin') {
@@ -27,13 +36,13 @@ function roleAccess(role, config) {
   const member = role === 'member';
   const historyDays = member
     ? Math.max(1, Number(config.memberWindowDays) || 30)
-    : Math.max(1, Number(config.freeWindowDays) || 7);
+    : Math.max(1, Number(config.freeWindowDays) || 1);
   return {
     history: { mode: 'rolling', days: historyDays },
     historyDays,
     allowedTimeKeys: member ? [...MEMBER_TIME_KEYS] : [...FREE_TIME_KEYS],
-    defaultTimeKey: member ? '30d' : '7d',
-    label: `可查看近 ${historyDays} 天`
+    defaultTimeKey: member ? '30d' : '1d',
+    label: member ? `可查看近 ${historyDays} 天` : '可查看最近 24 小时'
   };
 }
 
@@ -63,6 +72,8 @@ function entitlementView(
       history: access.history,
       allowedTimeRanges: [...access.allowedTimeKeys],
       curatedFeed: paid,
+      aiColumn: paid,
+      comments: paid,
       digests: paid ? ['24h', '7d', '30d'] : []
     },
     features: {
@@ -85,6 +96,8 @@ function entitlementView(
 function featureEnabled(entitlement, featureKey) {
   if (!entitlement || !entitlement.entitlements) return false;
   if (featureKey === 'curated_feed') return entitlement.entitlements.curatedFeed === true;
+  if (featureKey === 'ai_column') return entitlement.entitlements.aiColumn === true;
+  if (featureKey === 'comments') return entitlement.entitlements.comments === true;
   if (featureKey === 'history_30d') {
     const history = entitlement.entitlements.history || {};
     return history.mode === 'all' || Number(history.days) >= 30;
@@ -131,6 +144,7 @@ function createFeedEntitlementService({
       ...entitlement,
       viewer: {
         ...entitlement.viewer,
+        cachePartition: clientCachePartition(actor.ownerKey),
         membershipStatus: actualRole === 'admin' && role === 'member'
           ? 'active'
           : entitlement.viewer.membershipStatus,
@@ -153,6 +167,7 @@ module.exports = {
   DIGEST_FEATURES,
   activeAdminGrant,
   roleAccess,
+  clientCachePartition,
   entitlementView,
   featureEnabled,
   requireFeature,

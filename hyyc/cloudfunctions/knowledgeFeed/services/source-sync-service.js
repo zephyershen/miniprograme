@@ -3,6 +3,7 @@ const { toDate } = require('../lib/dates');
 const { isScheduledTrigger } = require('../policies/timer-trigger');
 const { visualFileIds: cachedVisualFileIds } = require('../repositories/feed-cache');
 const { isNewVisualItem } = require('../policies/new-visuals');
+const { sourceMetadataFields } = require('../lib/source-metadata');
 
 function mergeCachedVisuals(items, previous, observedAt = new Date()) {
   const previousById = new Map(((previous && previous.items) || []).map((item) => [item.id, item]));
@@ -20,7 +21,11 @@ function mergeCachedVisuals(items, previous, observedAt = new Date()) {
       previewFileIds: (reusable && Array.isArray(reusable.previewFileIds) && reusable.previewFileIds) || [],
       previewCheckedAt: (reusable && reusable.previewCheckedAt) || null,
       previewStatus: (reusable && reusable.previewStatus) || '',
-      previewCaptureVersion: (reusable && reusable.previewCaptureVersion) || null
+      previewCaptureVersion: (reusable && reusable.previewCaptureVersion) || null,
+      ...((reusable && reusable.previewQualityAudit)
+        ? { previewQualityAudit: reusable.previewQualityAudit }
+        : {}),
+      ...sourceMetadataFields(reusable || {})
     };
   });
 }
@@ -195,13 +200,24 @@ function createSourceSyncService({
       new Date(currentTime + config.leaseMs)
     );
     if (!leaseResult.acquired) {
+      const cached = leaseResult.document || null;
       return {
         status: 'busy',
         changed: false,
-        itemsChecked: false
+        itemsChecked: false,
+        cacheDocument: cached,
+        ...(cached && cached.sourceObservedAllFingerprint ? {
+          fingerprintObservation: {
+            notModified: true,
+            etag: cached.fingerprintEtag || '',
+            selected: cached.sourceObservedFingerprint || '',
+            all: cached.sourceObservedAllFingerprint
+          }
+        } : {})
       };
     }
     let current = leaseResult.document;
+    let fingerprintObservation = null;
     const lease = () => ({ owner: leaseOwner, now: new Date(now()) });
 
     try {
@@ -233,8 +249,12 @@ function createSourceSyncService({
         sourceObservedFingerprint: observedFingerprint,
         sourceObservedAllFingerprint: observedAllFingerprint
       };
-
-      current = await repository.patchSourceState(fingerprintState, lease());
+      fingerprintObservation = {
+        notModified: Boolean(fingerprint.notModified),
+        etag: fingerprintState.fingerprintEtag,
+        selected: observedFingerprint || '',
+        all: observedAllFingerprint || ''
+      };
 
       const appliedFingerprint = (current && current.sourceAppliedFingerprint) || '';
       const fingerprintChanged = Boolean(observedFingerprint && observedFingerprint !== appliedFingerprint);
@@ -250,15 +270,26 @@ function createSourceSyncService({
           sourceNextPollAt: null,
           sourceLastErrorCode: ''
         };
-        current = await repository.patchSourceState(successState, lease());
+        const needsStatePatch = !fingerprint.notModified
+          || Number(current && current.sourcePollFailures) > 0
+          || Boolean(current && (current.sourceNextPollAt || current.sourceLastErrorCode));
+        if (needsStatePatch) {
+          current = await repository.patchSourceState({
+            ...fingerprintState,
+            ...successState
+          }, lease());
+        }
         return {
           status: fingerprint.notModified ? 'not-modified' : 'unchanged',
           changed: false,
           itemsChecked: false,
-          fingerprintCheckedAt: checkedAt
+          fingerprintCheckedAt: checkedAt,
+          fingerprintObservation,
+          cacheDocument: current
         };
       }
 
+      current = await repository.patchSourceState(fingerprintState, lease());
       const sourceState = {
         ...fingerprintState,
         sourceAppliedFingerprint: observedFingerprint || appliedFingerprint
@@ -275,17 +306,35 @@ function createSourceSyncService({
         fingerprintChanged,
         itemsChecked: true,
         updatedAt: result.document.fetchedAt,
-        pendingVisualItemIds: result.pendingVisualItemIds
+        pendingVisualItemIds: result.pendingVisualItemIds,
+        fingerprintObservation,
+        cacheDocument: result.document
       };
     } catch (error) {
       if (isLeaseLost(error)) {
-        return { status: 'superseded', changed: false, itemsChecked: false };
+        return {
+          status: 'superseded',
+          changed: false,
+          itemsChecked: false,
+          cacheDocument: current || null,
+          ...(fingerprintObservation ? { fingerprintObservation } : {})
+        };
       }
       try {
-        return await recordFailure(current, error, lease());
+        return {
+          ...(await recordFailure(current, error, lease())),
+          cacheDocument: current || null,
+          ...(fingerprintObservation ? { fingerprintObservation } : {})
+        };
       } catch (recordError) {
         if (isLeaseLost(recordError)) {
-          return { status: 'superseded', changed: false, itemsChecked: false };
+          return {
+            status: 'superseded',
+            changed: false,
+            itemsChecked: false,
+            cacheDocument: current || null,
+            ...(fingerprintObservation ? { fingerprintObservation } : {})
+          };
         }
         throw recordError;
       }
@@ -319,7 +368,10 @@ function createSourceSyncService({
       throw new Error('SOURCE_SYNC_REQUIRES_TIMER');
     }
     const result = await poll();
-    logger.info('Knowledge feed source sync completed', result);
+    const logResult = { ...result };
+    delete logResult.cacheDocument;
+    delete logResult.fingerprintObservation;
+    logger.info('Knowledge feed source sync completed', logResult);
     return { triggerName: config.triggerName, ...result };
   }
 

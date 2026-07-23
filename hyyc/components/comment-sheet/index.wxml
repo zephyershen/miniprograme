@@ -1,0 +1,87 @@
+<view wx:if="{{visible}}" class="comments-mask" bindtap="close">
+  <view class="comments-sheet {{keyboardOpen ? 'comments-sheet-keyboard' : ''}}" style="{{sheetStyle}}" catchtap="noop">
+    <view class="comments-head">
+      <view class="comments-title">评论 {{commentCount || ''}}</view>
+      <view class="comments-close" bindtap="close">关闭</view>
+    </view>
+    <scroll-view scroll-y enhanced show-scrollbar="{{false}}" class="comments-list">
+      <view wx:if="{{commentsLoading}}" class="comments-state">正在读取评论…</view>
+      <view wx:elif="{{!comments.length}}" class="comments-state"><view class="comments-empty-title">还没有评论</view><view>从一个具体判断开始，会更容易聊下去。</view></view>
+      <block wx:else>
+        <view wx:for="{{comments}}" wx:key="id" class="comment-row">
+          <view class="comment-avatar-wrap">
+            <image wx:if="{{item.author.avatarUrl}}" class="comment-avatar" src="{{item.author.avatarUrl}}" mode="aspectFill" lazy-load="{{true}}" />
+            <view wx:else class="comment-avatar comment-avatar-empty">{{item.author.initial}}</view>
+          </view>
+          <view class="comment-body">
+            <view class="comment-meta">
+              <view class="comment-author"><text>{{item.author.nickname}}</text><text wx:if="{{item.isMine}}" class="comment-mine">我</text></view>
+              <text>{{item.createdLabel}}</text>
+            </view>
+            <view wx:if="{{item.content}}" class="comment-copy">{{item.content}}</view>
+            <view wx:if="{{item.attachmentMediaCount}}" class="comment-media-grid count-{{item.attachmentMediaCount}}">
+              <block wx:for="{{item.attachments}}" wx:for-item="attachment" wx:key="fileId">
+                <image
+                  wx:if="{{attachment.url}}"
+                  class="comment-media"
+                  src="{{attachment.url}}"
+                  mode="aspectFill"
+                  lazy-load="{{true}}"
+                  data-comment-id="{{item.id}}"
+                  data-file-id="{{attachment.fileId}}"
+                  bindtap="previewCommentImage"
+                />
+              </block>
+            </view>
+          </view>
+        </view>
+      </block>
+    </scroll-view>
+    <view class="comment-compose">
+      <view wx:if="{{composerExpanded && !viewerProfile.isComplete}}" class="comment-profile-reminder" bindtap="openProfileEditor">
+        <view class="reminder-avatar">{{viewerProfile.initial}}</view>
+        <view><view class="reminder-title">先设置头像和昵称</view><view class="reminder-copy">发布时会显示在你的评论旁边</view></view>
+        <text>→</text>
+      </view>
+      <view wx:if="{{commentDraftImages.length}}" class="comment-draft-media">
+        <view wx:for="{{commentDraftImages}}" wx:key="tempFilePath" class="comment-draft-image-wrap">
+          <image class="comment-draft-image" src="{{item.tempFilePath}}" mode="aspectFill" data-path="{{item.tempFilePath}}" bindtap="previewDraftImage" />
+          <view class="comment-image-remove" data-index="{{index}}" catchtap="removeCommentImage">×</view>
+        </view>
+      </view>
+      <textarea
+        class="comment-input"
+        maxlength="280"
+        auto-height="{{true}}"
+        focus="{{commentInputFocus}}"
+        adjust-position="{{false}}"
+        cursor-spacing="24"
+        show-confirm-bar="{{false}}"
+        value="{{commentDraft}}"
+        placeholder="写下你看到的变化或判断…"
+        bindinput="onCommentInput"
+        bindfocus="onCommentFocus"
+        bindblur="onCommentBlur"
+        bindkeyboardheightchange="onKeyboardHeightChange"
+      />
+      <view wx:if="{{composerExpanded}}" class="comment-compose-foot">
+        <view class="comment-tools">
+          <view class="comment-tool" bindtap="chooseCommentImages"><view class="comment-photo-icon"></view><text>图片</text></view>
+          <view class="comment-tool {{emojiOpen ? 'is-active' : ''}}" bindtap="toggleEmojiPanel"><text class="comment-emoji-icon">☺</text><text>表情</text></view>
+        </view>
+        <text class="comment-count {{commentSubmitting ? 'is-reviewing' : ''}}">{{commentSubmitting ? commentSubmitStatus : (commentDraft.length + ' / 280')}}</text>
+        <button
+          class="comment-submit"
+          disabled="{{(!commentDraft.length && !commentDraftImages.length) || commentSubmitting}}"
+          loading="{{commentSubmitting}}"
+          bindtap="submitComment"
+        >发送</button>
+      </view>
+      <scroll-view wx:if="{{composerExpanded && emojiOpen}}" scroll-y enhanced show-scrollbar="{{false}}" class="comment-emojis">
+        <view class="comment-emoji-grid">
+          <view wx:for="{{emojiOptions}}" wx:key="*this" class="comment-emoji" data-emoji="{{item}}" bindtap="insertEmoji">{{item}}</view>
+        </view>
+      </scroll-view>
+    </view>
+  </view>
+</view>

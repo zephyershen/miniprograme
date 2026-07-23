@@ -4,8 +4,8 @@ type: decision
 tags: [knowledge-feed, all-mode, entitlement, admin, pagination]
 sources: [../sources/2026-07-17-full-feed-admin-and-capacity.md]
 date: 2026-07-17
-last_updated: 2026-07-17
-status: accepted
+last_updated: 2026-07-21
+status: partially_superseded
 confidence: high
 ---
 
@@ -44,6 +44,12 @@ confidence: high
 - 本决策取代“每 15 分钟校验正文、每 6 小时完整刷新”的旧频率，收敛为 6 小时条件校验和 24 小时完整刷新。
 - [资讯历史归档与视觉就绪发布](2026-07-17-feed-history-and-visual-publication.md) 保留为旧阶段证据，但其公开门禁结论已 `superseded`。
 
+## 2026-07-21 局部替代
+
+- 全量条目继续入库，时间窗、管理员权限和原文/直接详情可寻址规则不变。
+- “无图也直接出现在列表”的卡片级发布规则已被 [资讯按视觉就绪发布，专栏收敛为基础课与动手课](2026-07-21-visual-ready-feed-and-practical-column.md) 局部取代：首页、精选、更新页和相关阅读只返回已有真实视觉的条目；缺图条目留在库内和恢复队列，视觉成功后再进入列表。
+- 该门禁不生成假图，也不删除资讯；它只避免上线后继续出现用户可见的空白资讯卡片。
+
 ## 状态
 
-`accepted`。2026-07-17 已部署、迁移并在线核验；当前 7 天全量 1,949 条、60 天索引 2,995 条、资讯文档 3,034 条，同步无错误。
+`partially_superseded`。2026-07-17 的全量存储和角色权益仍有效；2026-07-21 起卡片发布改为视觉就绪门禁。

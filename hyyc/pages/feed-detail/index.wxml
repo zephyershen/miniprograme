@@ -1,3 +1,4 @@
+<page-meta page-style="{{commentsOpen || membershipPromptVisible ? 'overflow: hidden;' : ''}}" />
 <view class="detail-page">
   <view wx:if="{{loading}}" class="detail-loading">正在读取资讯…</view>
 
@@ -9,16 +10,23 @@
   </view>
 
   <block wx:elif="{{item}}">
-    <view class="detail-kicker"><text class="detail-rule"></text>{{item.categoryLabel}}</view>
+    <view class="detail-author">
+      <view class="detail-author-avatar" aria-hidden="true">
+        <text class="detail-author-initial">{{item.sourceAuthor.avatarInitial}}</text>
+        <image wx:if="{{item.sourceAuthor.avatarUrl || item.sourceAuthor.fallbackAvatarUrl}}" class="detail-author-image" src="{{item.sourceAuthor.avatarUrl || item.sourceAuthor.fallbackAvatarUrl}}" mode="aspectFill" data-media-key="detail:{{item.id}}:avatar" data-file-id="{{item.sourceAuthor.avatarFileId}}" data-media-url="{{item.sourceAuthor.avatarUrl || item.sourceAuthor.fallbackAvatarUrl}}" data-media-fallback="{{item.sourceAuthor.fallbackAvatarUrl}}" data-media-path="item.sourceAuthor.avatarUrl" binderror="handleMediaError" />
+      </view>
+      <view class="detail-author-copy">
+        <view wx:if="{{item.sourceAuthor.hasIdentity}}" class="detail-author-line">
+          <text class="detail-author-name">{{item.sourceAuthor.displayName}}</text>
+          <text wx:if="{{item.sourceAuthor.handleLabel}}" class="detail-author-handle">{{item.sourceAuthor.handleLabel}}</text>
+        </view>
+        <text wx:else class="detail-author-fallback">{{item.sourceAuthor.fallbackLabel}}</text>
+        <text class="detail-time">{{item.publishedLabel}}</text>
+      </view>
+    </view>
     <view class="detail-title">{{item.title}}</view>
 
-    <view class="detail-byline">
-      <text class="byline-source">{{item.source}}</text>
-      <text class="byline-separator">·</text>
-      <text>{{item.publishedLabel}}</text>
-    </view>
-
-    <image wx:if="{{item.coverFileId}}" class="detail-cover" src="{{item.coverFileId}}" mode="aspectFill" />
+    <image wx:if="{{item.coverUrl}}" class="detail-cover" src="{{item.coverUrl}}" mode="aspectFill" data-media-key="detail:{{item.id}}:cover" data-file-id="{{item.coverFileId}}" data-media-url="{{item.coverUrl}}" data-media-path="item.coverUrl" binderror="handleMediaError" />
     <view wx:elif="{{item.previewFileIds.length}}" class="source-preview">
       <swiper
         class="source-preview-swiper"
@@ -35,13 +43,18 @@
             wx:key="fileId"
         >
           <image
-            wx:if="{{previewSlide.shouldLoad}}"
+            wx:if="{{previewSlide.shouldLoad && previewSlide.url}}"
             class="source-preview-image"
-            src="{{previewSlide.fileId}}"
+            src="{{previewSlide.url}}"
             mode="aspectFit"
             lazy-load="{{true}}"
             data-index="{{previewImageIndex}}"
+            data-media-key="detail:{{item.id}}:preview:{{previewImageIndex}}"
+            data-file-id="{{previewSlide.fileId}}"
+            data-media-url="{{previewSlide.url}}"
+            data-media-path="item.previewSlides[{{previewImageIndex}}].url"
             bindtap="previewSourceScreenshots"
+            binderror="handleMediaError"
           />
           <view wx:else class="source-preview-image source-preview-placeholder"></view>
         </swiper-item>
@@ -53,6 +66,17 @@
           class="source-preview-dot {{previewIndex === index ? 'source-preview-dot-active' : ''}}"
         ></view>
       </view>
+    </view>
+
+    <view wx:if="{{item.sourceTags.length}}" class="detail-tags" aria-label="来源标签">
+      <text wx:for="{{item.sourceTags}}" wx:for-item="sourceTag" wx:key="*this" class="detail-source-tag">{{sourceTag}}</text>
+    </view>
+
+    <view class="detail-actions">
+      <view class="detail-action {{item.engagement.canComment ? '' : 'detail-action-disabled'}}" bindtap="openComments"><view class="action-icon icon-comment"></view><text class="detail-action-label">评论{{item.engagement.commentLabel ? ' ' + item.engagement.commentLabel : ''}}</text></view>
+      <view class="detail-action" bindtap="handleLike"><view class="action-icon icon-like {{item.engagement.liked ? 'icon-like-active' : ''}}"></view><text class="detail-action-label">喜欢{{item.engagement.likeLabel ? ' ' + item.engagement.likeLabel : ''}}</text></view>
+      <view class="detail-action" bindtap="handleFavorite"><view class="action-icon icon-bookmark {{item.engagement.favorited ? 'icon-bookmark-active' : ''}}"></view><text class="detail-action-label">收藏</text></view>
+      <button class="detail-action detail-share" open-type="share"><view class="action-icon icon-share"></view><text class="detail-action-label">分享</text></button>
     </view>
 
     <view wx:if="{{item.readingGuide.brief}}" class="quick-read">
@@ -81,7 +105,19 @@
       </view>
       <view class="source-line">
         <view class="source-copy">
-          <view class="source-name">{{item.source}}</view>
+          <view class="source-profile">
+            <view class="source-profile-avatar" aria-hidden="true">
+              <text class="source-profile-initial">{{item.sourceAuthor.avatarInitial}}</text>
+              <image wx:if="{{item.sourceAuthor.avatarUrl || item.sourceAuthor.fallbackAvatarUrl}}" class="source-profile-image" src="{{item.sourceAuthor.avatarUrl || item.sourceAuthor.fallbackAvatarUrl}}" mode="aspectFill" data-media-key="detail:{{item.id}}:avatar" data-file-id="{{item.sourceAuthor.avatarFileId}}" data-media-url="{{item.sourceAuthor.avatarUrl || item.sourceAuthor.fallbackAvatarUrl}}" data-media-fallback="{{item.sourceAuthor.fallbackAvatarUrl}}" data-media-path="item.sourceAuthor.avatarUrl" binderror="handleMediaError" />
+            </view>
+            <view class="source-profile-copy">
+              <view wx:if="{{item.sourceAuthor.hasIdentity}}" class="source-profile-line">
+                <text class="source-name">{{item.sourceAuthor.displayName}}</text>
+                <text wx:if="{{item.sourceAuthor.handleLabel}}" class="source-handle">{{item.sourceAuthor.handleLabel}}</text>
+              </view>
+              <view wx:else class="source-name">{{item.sourceAuthor.fallbackLabel}}</view>
+            </view>
+          </view>
           <view class="source-url-row {{sourceUrlExpanded ? 'source-url-row-expanded' : ''}}">
             <view
               class="source-url {{sourceUrlExpanded ? 'source-url-expanded' : ''}}"
@@ -110,18 +146,49 @@
       </view>
       <view
         wx:for="{{item.relatedItems}}"
+        wx:for-index="relatedIndex"
         wx:key="id"
-        class="related-row {{item.listVisualFileId ? '' : 'related-row-no-image'}}"
+        class="related-row {{item.listVisualUrl ? '' : 'related-row-no-image'}}"
         data-id="{{item.id}}"
         bindtap="openRelated"
       >
         <view class="related-copy">
-          <view class="related-meta">{{item.categoryLabel}} · {{item.publishedLabel}}</view>
+          <view class="related-author">
+            <view class="related-avatar" aria-hidden="true">
+              <text class="related-avatar-initial">{{item.sourceAuthor.avatarInitial}}</text>
+              <image wx:if="{{item.sourceAuthor.avatarUrl || item.sourceAuthor.fallbackAvatarUrl}}" class="related-avatar-image" src="{{item.sourceAuthor.avatarUrl || item.sourceAuthor.fallbackAvatarUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="related:{{item.id}}:avatar" data-file-id="{{item.sourceAuthor.avatarFileId}}" data-media-url="{{item.sourceAuthor.avatarUrl || item.sourceAuthor.fallbackAvatarUrl}}" data-media-fallback="{{item.sourceAuthor.fallbackAvatarUrl}}" data-media-path="item.relatedItems[{{relatedIndex}}].sourceAuthor.avatarUrl" binderror="handleMediaError" />
+            </view>
+            <view class="related-author-copy">
+              <view class="related-author-line">
+                <text class="related-author-name">{{item.sourceAuthor.hasIdentity ? item.sourceAuthor.displayName : item.sourceAuthor.fallbackLabel}}</text>
+                <text wx:if="{{item.sourceAuthor.handleLabel}}" class="related-handle">{{item.sourceAuthor.handleLabel}}</text>
+              </view>
+              <text class="related-time">{{item.publishedLabel}}</text>
+            </view>
+          </view>
           <view class="related-title">{{item.title}}</view>
-          <view class="related-source">{{item.source}} →</view>
+          <view wx:if="{{item.sourceTags.length}}" class="related-tags" aria-label="来源标签">
+            <text wx:for="{{item.sourceTags}}" wx:for-item="sourceTag" wx:key="*this" class="related-tag">{{sourceTag}}</text>
+          </view>
         </view>
-        <image wx:if="{{item.listVisualFileId}}" class="related-image" src="{{item.listVisualFileId}}" mode="aspectFill" lazy-load="{{true}}" />
+        <image wx:if="{{item.listVisualUrl}}" class="related-image" src="{{item.listVisualUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="related:{{item.id}}:list" data-file-id="{{item.listVisualFileId || item.visualFileId}}" data-media-url="{{item.listVisualUrl}}" data-media-path="item.relatedItems[{{relatedIndex}}].listVisualUrl" binderror="handleMediaError" />
       </view>
     </view>
   </block>
+
+  <comment-sheet
+    visible="{{commentsOpen}}"
+    item-id="{{item.id}}"
+    comment-count="{{item.engagement.commentCount}}"
+    bindclose="closeComments"
+    bindlocked="handleCommentsLocked"
+    bindpublished="onCommentPublished"
+  />
+
+  <membership-prompt
+    visible="{{membershipPromptVisible}}"
+    feature-key="{{membershipPromptFeature}}"
+    bindclose="closeMembershipPrompt"
+    bindviewbenefits="openMembershipFromPrompt"
+  />
 </view>

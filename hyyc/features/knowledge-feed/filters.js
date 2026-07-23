@@ -26,7 +26,7 @@ function optionLabel(options, key, fallback) {
 }
 
 function filterSummary(filters, options) {
-  const parts = [optionLabel(options.time, filters.time, '近 7 天')];
+  const parts = [optionLabel(options.time, filters.time, '24 小时')];
   if (filters.company !== 'all') parts.push(optionLabel(options.company, filters.company, '全部公司'));
   if (filters.direction !== 'all') parts.push(optionLabel(options.direction, filters.direction, '全部方向'));
   if (parts.length === 1) parts.push('全部主题');

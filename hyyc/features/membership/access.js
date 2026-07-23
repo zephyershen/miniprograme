@@ -1,5 +1,5 @@
 const ROLE_ORDER = Object.freeze({ free: 0, member: 1, admin: 2 });
-const FREE_TIME_KEYS = Object.freeze(['1d', '3d', '7d']);
+const FREE_TIME_KEYS = Object.freeze(['1d']);
 const MEMBER_TIME_KEYS = Object.freeze(['1d', '3d', '7d', '30d']);
 const ADMIN_TIME_KEYS = Object.freeze(['1d', '3d', '7d', '30d', 'all']);
 
@@ -25,9 +25,9 @@ function normalizeHistory(role, entitlements = {}, access = {}) {
   const raw = entitlements.history || access.history;
   if (!raw && role === 'admin') return { mode: 'all' };
   if (raw && raw.mode === 'all' && role === 'admin') return { mode: 'all' };
-  const fallbackDays = role === 'member' ? 30 : 7;
+  const fallbackDays = role === 'member' ? 30 : 1;
   const days = Math.max(1, Number(raw && raw.days) || Number(access.maxHistoryDays) || fallbackDays);
-  return { mode: 'rolling', days: role === 'admin' ? days : Math.min(role === 'member' ? 30 : 7, days) };
+  return { mode: 'rolling', days: role === 'admin' ? days : Math.min(role === 'member' ? 30 : 1, days) };
 }
 
 function normalizeMembershipAccess(raw = {}) {
@@ -42,7 +42,7 @@ function normalizeMembershipAccess(raw = {}) {
   );
   const allowedTimeRanges = explicitKeys.length ? explicitKeys : defaultTimeKeys(role);
   const preferredDefault = legacyAccess.defaultTimeKey || legacyAccess.defaultTime;
-  const roleDefault = role === 'admin' ? 'all' : role === 'member' ? '30d' : '7d';
+  const roleDefault = role === 'admin' ? 'all' : role === 'member' ? '30d' : '1d';
   const defaultTimeRange = allowedTimeRanges.includes(preferredDefault)
     ? preferredDefault
     : (allowedTimeRanges.includes(roleDefault) ? roleDefault : allowedTimeRanges[allowedTimeRanges.length - 1]);
@@ -63,13 +63,15 @@ function normalizeMembershipAccess(raw = {}) {
     history,
     allowedTimeRanges,
     curatedFeed: role === 'admin' || entitlements.curatedFeed === true,
+    aiColumn: role === 'admin' || entitlements.aiColumn === true,
+    comments: role === 'admin' || entitlements.comments === true,
     digests: role === 'admin'
       ? ['24h', '7d', '30d']
       : Array.isArray(entitlements.digests) ? entitlements.digests : []
   };
   const label = role === 'admin'
     ? '可查看全部已归档资讯'
-    : `可查看近 ${history.days || 7} 天`;
+    : role === 'free' ? '可查看最近 24 小时' : `可查看近 ${history.days || 30} 天`;
   return {
     viewer: normalizedViewer,
     entitlements: normalizedEntitlements,
@@ -102,6 +104,9 @@ function canUseFeature(access, featureKey) {
   const normalized = normalizeMembershipAccess(access);
   if (normalized.viewer.role === 'admin') return true;
   if (featureKey === 'curated_feed') return normalized.entitlements.curatedFeed === true;
+  if (featureKey === 'ai_column') return normalized.entitlements.aiColumn === true;
+  if (featureKey === 'comments') return normalized.entitlements.comments === true;
+  if (featureKey === 'digests') return normalized.entitlements.digests.length > 0;
   if (featureKey.startsWith('digest_')) {
     return normalized.entitlements.digests.includes(featureKey.replace('digest_', ''));
   }

@@ -5,6 +5,12 @@ const {
   mapWithConcurrency
 } = require('./collection-support');
 const { storedDocumentId } = require('../lib/stored-feed-item');
+const {
+  sourceMetadataFields,
+  sourceMetadataHash,
+  hasSourceMetadataPatch,
+  mergeSourceMetadata
+} = require('../lib/source-metadata');
 
 function hasVisual(document) {
   return Boolean(document && (
@@ -23,8 +29,30 @@ function needsVisualWork(document) {
   return !hasVisual(document) || !hasListThumbnail(document);
 }
 
+function withInitialVisualPublicationState(document, { holdWithoutVisuals = true } = {}) {
+  const ready = hasVisual(document);
+  const held = holdWithoutVisuals && !ready;
+  return {
+    ...document,
+    visualPublicationHeld: held,
+    visualPublicationReleasedAt: held ? null : (document.firstStoredAt || document.updatedAt || null),
+    visualPublicationReleaseReason: ready ? 'visual-ready' : (held ? '' : 'source-backfill')
+  };
+}
+
+function storedTime(value) {
+  if (!value) return Number.NaN;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value.toDate === 'function') return value.toDate().getTime();
+  return new Date(value).getTime();
+}
+
 function itemDocumentId(provider, itemId) {
   return storedDocumentId(provider, itemId);
+}
+
+function engagementCount(value) {
+  return Math.max(0, Math.floor(Number(value) || 0));
 }
 
 function cursorSortValue(item, sort) {
@@ -76,6 +104,9 @@ function visualFields(document) {
     fields.previewCheckedAt = document.previewCheckedAt || null;
     fields.previewStatus = document.previewStatus || 'ready';
     fields.previewCaptureVersion = document.previewCaptureVersion || 1;
+    if (document.previewQualityAudit && typeof document.previewQualityAudit === 'object') {
+      fields.previewQualityAudit = document.previewQualityAudit;
+    }
   }
   if (hasListThumbnail(document)) {
     fields.listThumbnailFileId = document.listThumbnailFileId;
@@ -105,7 +136,18 @@ function createFeedItemRepository(db, config) {
           coverFileId: true,
           previewFileIds: true,
           listThumbnailFileId: true,
-          listThumbnailVersion: true
+          listThumbnailVersion: true,
+          baseScore: true,
+          score: true,
+          likeCount: true,
+          commentCount: true,
+          favoriteCount: true,
+          sourceIdentity: true,
+          sourceTags: true,
+          sourceChannelKeys: true,
+          sourceChannelKey: true,
+          sourceAvatarFileId: true,
+          sourceMetadataHash: true
         })
         .limit(batch.length)
         .get();
@@ -114,7 +156,7 @@ function createFeedItemRepository(db, config) {
     return new Map(records.map((record) => [record._id, record]));
   }
 
-  async function upsertMany(documents, { mergeVisuals = false } = {}) {
+  async function upsertMany(documents, { mergeVisuals = false, holdNewItems = true } = {}) {
     await ensureCollection();
     const unique = new Map();
     for (const document of (Array.isArray(documents) ? documents : [])) {
@@ -123,7 +165,10 @@ function createFeedItemRepository(db, config) {
     const values = [...unique.values()];
     const existing = await metadataByIds(values.map((document) => document._id));
     const inserted = values.filter((document) => !existing.has(document._id));
-    for (const batch of chunks(inserted, 50)) {
+    const initialDocuments = inserted.map((document) => withInitialVisualPublicationState(document, {
+      holdWithoutVisuals: holdNewItems
+    }));
+    for (const batch of chunks(initialDocuments, 50)) {
       if (batch.length) await collection().add({ data: batch });
     }
 
@@ -135,16 +180,51 @@ function createFeedItemRepository(db, config) {
         || (incomingVisual.previewFileIds && !(current.previewFileIds || []).length)
         || (incomingVisual.listThumbnailFileId && !current.listThumbnailFileId);
       const missingVisualState = !hasVisual(current) && !current.visualState;
+      const mergedMetadata = hasSourceMetadataPatch(document)
+        ? mergeSourceMetadata(current, document)
+        : null;
+      const currentMetadataHash = current.sourceMetadataHash
+        || sourceMetadataHash(sourceMetadataFields(current));
+      const metadataChanged = Boolean(mergedMetadata
+        && (mergedMetadata.sourceMetadataHash || '') !== currentMetadataHash);
       return current.contentHash !== document.contentHash
         || current.publicState !== document.publicState
+        || metadataChanged
         || (mergeVisuals && missingIncomingVisual)
         || missingVisualState;
     });
     await mapWithConcurrency(updates, 8, async (document) => {
       const current = existing.get(document._id) || {};
       const data = { ...document };
+      if (current.analysisInputHash !== document.analysisInputHash) {
+        data.qualityTier = 'standard';
+        data.analysisStatus = 'pending';
+        data.analysisPolicyVersion = 0;
+        data.editorialReviewStatus = 'pending';
+      }
+      const baseScore = Number.isFinite(Number(document.baseScore))
+        ? Number(document.baseScore)
+        : (Number.isFinite(Number(document.score)) ? Number(document.score) : 0);
+      const likeCount = engagementCount(current.likeCount);
       delete data._id;
       delete data.firstStoredAt;
+      delete data.visualPublicationHeld;
+      delete data.visualPublicationReleasedAt;
+      delete data.visualPublicationReleaseReason;
+      delete data.sourceIdentity;
+      delete data.sourceTags;
+      delete data.sourceChannelKeys;
+      delete data.sourceChannelKey;
+      delete data.sourceAvatarFileId;
+      delete data.sourceMetadataHash;
+      if (hasSourceMetadataPatch(document)) {
+        Object.assign(data, mergeSourceMetadata(current, document));
+      }
+      data.baseScore = baseScore;
+      data.likeCount = likeCount;
+      data.commentCount = engagementCount(current.commentCount);
+      data.favoriteCount = engagementCount(current.favoriteCount);
+      data.score = baseScore + likeCount;
       if (!mergeVisuals) {
         delete data.coverFileId;
         delete data.coverCheckedAt;
@@ -153,6 +233,7 @@ function createFeedItemRepository(db, config) {
         delete data.previewCheckedAt;
         delete data.previewStatus;
         delete data.previewCaptureVersion;
+        delete data.previewQualityAudit;
         delete data.listThumbnailFileId;
         delete data.listThumbnailVersion;
       } else {
@@ -272,6 +353,37 @@ function createFeedItemRepository(db, config) {
     return appliedIds;
   }
 
+  async function releaseExpiredVisualPublicationHolds(cutoff, releasedAt = new Date()) {
+    await ensureCollection();
+    const cutoffDate = cutoff instanceof Date ? cutoff : new Date(cutoff);
+    const releaseDate = releasedAt instanceof Date ? releasedAt : new Date(releasedAt);
+    if (Number.isNaN(cutoffDate.getTime()) || Number.isNaN(releaseDate.getTime())) return [];
+
+    // Held rows are transient and few. Query only the marker so this rollout
+    // does not depend on a new compound index, then evaluate the existing
+    // immutable firstStoredAt timestamp in-process.
+    const response = await collection().where({ visualPublicationHeld: true })
+      .field({ _id: true, publicState: true, firstStoredAt: true })
+      .limit(500)
+      .get();
+    const documents = ((response && response.data) || []).filter((document) => (
+      document.publicState === 'active'
+      && storedTime(document.firstStoredAt) <= cutoffDate.getTime()
+    ));
+    await mapWithConcurrency(documents, 8, async (document) => {
+      await collection().doc(document._id).update({
+        data: {
+          visualPublicationHeld: false,
+          visualPublicationReleasedAt: releaseDate,
+          visualPublicationReleaseReason: 'grace-expired',
+          updatedAt: releaseDate
+        }
+      });
+    });
+    const releasedIds = documents.map((document) => document._id);
+    return releasedIds;
+  }
+
   async function visualStats(since = null) {
     await ensureCollection();
     const values = [];
@@ -316,18 +428,33 @@ function createFeedItemRepository(db, config) {
 
   function buildWhere({
     since,
-    channel = 'all',
+    until,
+    sourceChannel = 'all',
+    contentChannel = '',
     topicKeys = [],
+    sourceTags = [],
     includeWithdrawn = false,
-    qualityTier = ''
+    qualityTier = '',
+    excludeVisualPublicationHolds = false
   }) {
     const where = {};
     const command = db.command;
     if (!includeWithdrawn) where.publicState = 'active';
-    if (since) where.publishedAt = command.gte(since);
-    if (channel && channel !== 'all') where.channelKey = channel;
+    if (since && until) where.publishedAt = command.gte(since).and(command.lt(until));
+    else if (since) where.publishedAt = command.gte(since);
+    else if (until) where.publishedAt = command.lt(until);
+    if (sourceChannel && sourceChannel !== 'all') {
+      where.sourceChannelKey = sourceChannel;
+    }
+    if (contentChannel) where.channelKey = contentChannel;
     if (topicKeys.length) where.topicKeys = command.all(topicKeys);
+    if (sourceTags.length) where.sourceTags = command.all(sourceTags);
     if (qualityTier) where.qualityTier = qualityTier;
+    if (excludeVisualPublicationHolds) {
+      // $ne also includes documents created before this rollout, so existing
+      // text-only news remains public without a migration.
+      where.visualPublicationHeld = command.neq(true);
+    }
     return where;
   }
 
@@ -422,7 +549,17 @@ function createFeedItemRepository(db, config) {
     const batchSize = Math.min(1000, Math.max(1, limit));
     while (items.length < limit) {
       const response = await collection().where(where)
-        .field({ _id: true, id: true, publishedAt: true, channelKey: true, topicKeys: true })
+        .field({
+          _id: true,
+          id: true,
+          publishedAt: true,
+          channelKey: true,
+          sourceChannelKeys: true,
+          sourceChannelKey: true,
+          topicKeys: true,
+          sourceTags: true,
+          qualityTier: true
+        })
         .orderBy('publishedAt', 'desc')
         .skip(items.length)
         .limit(Math.min(batchSize, limit - items.length))
@@ -446,6 +583,23 @@ function createFeedItemRepository(db, config) {
     return { itemCount: Number(result && result.total) || 0 };
   }
 
+  async function analysisCoverage(since = null, until = null) {
+    await ensureCollection();
+    const where = buildWhere({ since, until });
+    const [totalResult, readyResult] = await Promise.all([
+      collection().where(where).count(),
+      collection().where({ ...where, analysisStatus: 'ready' }).count()
+    ]);
+    const total = Number(totalResult && totalResult.total) || 0;
+    const ready = Number(readyResult && readyResult.total) || 0;
+    return {
+      total,
+      ready,
+      ratio: total ? Math.round((ready / total) * 10000) / 10000 : 0,
+      truncated: false
+    };
+  }
+
   return {
     ensureCollection,
     upsertMany,
@@ -454,6 +608,7 @@ function createFeedItemRepository(db, config) {
     getManyByItemIds,
     listByIdCursor,
     markVisualQueued,
+    releaseExpiredVisualPublicationHolds,
     visualStats,
     queryPage,
     latestCursor,
@@ -461,7 +616,8 @@ function createFeedItemRepository(db, config) {
     count,
     listFacets,
     hasItems,
-    stats
+    stats,
+    analysisCoverage
   };
 }
 
@@ -472,5 +628,6 @@ module.exports = {
   decodePageCursor,
   hasVisual,
   hasListThumbnail,
-  needsVisualWork
+  needsVisualWork,
+  withInitialVisualPublicationState
 };

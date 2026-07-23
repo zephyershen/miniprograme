@@ -51,24 +51,33 @@ function createVisualMaintenanceService({
     }
   }
 
-  async function preparePendingPublication(itemIds = []) {
+  async function preparePendingPublication(itemIds = [], options = {}) {
+    const pendingIds = Array.isArray(itemIds) ? itemIds.filter(Boolean) : [];
+    if (!pendingIds.length) {
+      return {
+        status: 'idle',
+        reason: 'no-pending-publication',
+        covers: { attempted: 0, resolved: 0, missing: 0, skipped: true },
+        previews: { attempted: 0, resolved: 0, failed: 0, skipped: true }
+      };
+    }
     return withVisualLease('pending-publication', async () => {
-      const cache = await sourceSyncService.ensureCache();
-      const options = {
-        itemIds: Array.isArray(itemIds) ? itemIds : [],
+      const cache = options.cache || await sourceSyncService.ensureCache();
+      const hydrationOptions = {
+        itemIds: pendingIds,
         untriedOnly: true
       };
       const covers = await coverService.hydrateCovers(
         config.immediateCoverBatchSize || 3,
         false,
         true,
-        options
+        hydrationOptions
       );
       const previews = await previewService.hydratePreviews(
         config.immediatePreviewBatchSize || 1,
         false,
         previewMaintenanceToken,
-        options
+        hydrationOptions
       );
       const status = await previewService.maintenanceStatus(previewMaintenanceToken);
       const result = {
@@ -110,7 +119,7 @@ function createVisualMaintenanceService({
 
   async function runMaintenance(options = {}) {
     return withVisualLease('scheduled-maintenance', async () => {
-      const cache = await sourceSyncService.ensureCache();
+      const cache = options.cache || await sourceSyncService.ensureCache();
       const covers = {
         attempted: 0,
         resolved: 0,

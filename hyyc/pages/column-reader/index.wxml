@@ -1,0 +1,176 @@
+<page-meta page-style="{{membershipPromptVisible ? 'overflow: hidden;' : ''}}" />
+<view class="reader-page">
+  <view wx:if="{{loading}}" class="reader-state">
+    <view class="state-rule state-rule-strong"></view><view class="state-rule"></view><view class="state-rule state-rule-short"></view>
+  </view>
+
+  <view wx:elif="{{error}}" class="reader-state">
+    <view class="state-title">这页暂时无法打开</view>
+    <view class="state-copy">{{error}}</view>
+    <view wx:if="{{!membershipPromptVisible}}" class="state-action" bindtap="retry">重新读取 →</view>
+  </view>
+
+  <block wx:elif="{{article}}">
+    <view class="reader-head">
+      <view class="reader-kicker">{{article.eyebrow}}</view>
+      <view class="reader-title">{{article.title}}</view>
+      <view class="reader-subtitle">{{article.subtitle}}</view>
+      <view class="reader-meta">{{article.metaLabel}}</view>
+    </view>
+
+    <view class="reader-lead">
+      <view class="reader-label">{{article.leadLabel}}</view>
+      <view class="reader-lead-copy">{{article.lead}}</view>
+    </view>
+
+    <view wx:if="{{article.posters.length}}" class="reader-posters">
+      <view class="poster-head">
+        <view><view class="reader-label">HAND-DRAWN NOTES</view><view class="poster-title">手绘讲解</view></view>
+        <view class="poster-hint">左右滑动 · 点开看高清</view>
+      </view>
+      <swiper
+        class="poster-swiper"
+        current="{{activePosterIndex}}"
+        indicator-dots="{{true}}"
+        indicator-color="rgba(22, 34, 44, .22)"
+        indicator-active-color="#1d9bf0"
+        duration="320"
+        bindchange="handlePosterChange"
+      >
+        <swiper-item wx:for="{{article.posters}}" wx:for-item="poster" wx:for-index="posterIndex" wx:key="key">
+          <view class="poster-frame">
+            <view class="poster-fallback">{{posterError === poster.key ? '手绘图加载失败，请重新读取' : '正在加载手绘图…'}}</view>
+            <image
+              wx:if="{{posterLoads[posterIndex]}}"
+              class="poster-image"
+              src="{{poster.image}}"
+              mode="aspectFit"
+              lazy-load="{{true}}"
+              fade-in="{{false}}"
+              aria-label="{{poster.alt}}，点击查看高清大图"
+              data-key="{{poster.key}}"
+              data-index="{{posterIndex}}"
+              bindtap="previewPoster"
+              binderror="handlePosterError"
+            />
+            <view class="poster-page">{{poster.position}}</view>
+            <view class="poster-hd" data-index="{{posterIndex}}" bindtap="previewPoster">高清查看 ↗</view>
+          </view>
+        </swiper-item>
+      </swiper>
+    </view>
+
+    <view wx:if="{{article.visual.mode !== 'none'}}" class="reader-visual">
+      <image wx:if="{{article.visual.mode === 'image'}}" class="reader-image" src="{{article.visual.imageUrl}}" mode="widthFix" bindtap="previewIllustration" />
+      <view wx:else class="blueprint">
+        <view class="blueprint-core">{{article.visual.center}}</view>
+        <view class="blueprint-rail"></view>
+        <view class="blueprint-nodes">
+          <view wx:for="{{article.visual.nodes}}" wx:key="id" class="blueprint-node">
+            <view class="blueprint-node-title">{{item.label}}</view>
+            <view wx:if="{{item.note}}" class="blueprint-node-note">{{item.note}}</view>
+          </view>
+        </view>
+        <view wx:if="{{article.visual.connections.length}}" class="blueprint-links">
+          <view wx:for="{{article.visual.connections}}" wx:key="id" class="blueprint-link">{{item.label || (item.from + ' → ' + item.to)}}</view>
+        </view>
+      </view>
+      <view class="visual-caption">{{article.visual.note || '一页示意 · 用关系理解概念'}}</view>
+    </view>
+
+    <view wx:if="{{article.platformGuides.length}}" class="platform-guides">
+      <view class="command-head">
+        <view><view class="reader-label">INSTALL BY SYSTEM</view><view class="command-title">按你的电脑安装</view></view>
+        <view class="command-hint">只选一组，按顺序完成</view>
+      </view>
+      <view
+        wx:for="{{article.platformGuides}}"
+        wx:for-item="guide"
+        wx:for-index="guideIndex"
+        wx:key="id"
+        class="platform-guide"
+      >
+        <view class="platform-guide-head">
+          <view class="platform-guide-title">{{guide.label}}</view>
+          <view wx:if="{{guide.terminal}}" class="platform-guide-terminal">{{guide.terminal}}</view>
+        </view>
+        <view wx:if="{{guide.commands.length}}" class="platform-command-list">
+          <view
+            wx:for="{{guide.commands}}"
+            wx:for-item="guideCommand"
+            wx:for-index="commandIndex"
+            wx:key="id"
+            class="command-card command-card-compact"
+          >
+            <view class="command-meta"><text>{{guideCommand.label}}</text><text wx:if="{{guideCommand.platform}}">{{guideCommand.platform}}</text></view>
+            <view class="command-row">
+              <text class="command-value" selectable="{{true}}" user-select="{{true}}">{{guideCommand.value}}</text>
+              <view class="command-copy" data-guide-index="{{guideIndex}}" data-command-index="{{commandIndex}}" bindtap="copyPlatformCommand">复制</view>
+            </view>
+          </view>
+        </view>
+        <view class="platform-steps">
+          <view wx:for="{{guide.steps}}" wx:for-item="step" wx:for-index="stepIndex" wx:key="*this" class="platform-step">
+            <text class="platform-step-index">{{stepIndex + 1}}</text><text>{{step}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{article.commands.length}}" class="reader-commands">
+      <view class="command-head">
+        <view><view class="reader-label">COPY & RUN</view><view class="command-title">操作命令</view></view>
+        <view class="command-hint">先看用途，再复制运行</view>
+      </view>
+      <view wx:for="{{article.commands}}" wx:key="id" class="command-card">
+        <view class="command-meta"><text>{{item.label}}</text><text wx:if="{{item.platform}}">{{item.platform}}</text></view>
+        <view class="command-row">
+          <text class="command-value" selectable="{{true}}" user-select="{{true}}">{{item.value}}</text>
+          <view class="command-copy" data-index="{{index}}" bindtap="copyCommand">复制</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="reader-sections">
+      <view wx:for="{{article.sections}}" wx:key="key" class="article-section article-section-{{item.tone}}">
+        <view class="article-title">{{item.label}}</view>
+        <view wx:if="{{item.body}}" class="article-body">{{item.body}}</view>
+        <view wx:if="{{item.items.length}}" class="article-list">
+          <view wx:for="{{item.items}}" wx:for-item="point" wx:key="*this" class="article-item">
+            <text class="article-item-index">{{index + 1 < 10 ? '0' + (index + 1) : index + 1}}</text><text>{{point}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{article.relatedLessons.length}}" class="reader-block">
+      <view class="block-head"><view class="block-title">相关基础课</view><view class="block-note">把前面的概念补齐</view></view>
+      <view wx:for="{{article.relatedLessons}}" wx:key="id" class="related-row" data-id="{{item.id}}" bindtap="openRelatedLesson">
+        <view class="related-mark">基础</view><view class="related-copy"><view class="related-title">{{item.title}}</view><view wx:if="{{item.subtitle}}" class="related-subtitle">{{item.subtitle}}</view></view><view class="related-arrow">↗</view>
+      </view>
+    </view>
+
+    <view wx:if="{{article.relatedPracticals.length}}" class="reader-block">
+      <view class="block-head"><view class="block-title">接着动手</view><view class="block-note">把方法真正用起来</view></view>
+      <view wx:for="{{article.relatedPracticals}}" wx:key="id" class="related-row" data-id="{{item.id}}" bindtap="openRelatedPractical">
+        <view class="related-mark">实操</view><view class="related-copy"><view class="related-title">{{item.title}}</view><view wx:if="{{item.subtitle}}" class="related-subtitle">{{item.subtitle}}</view></view><view class="related-arrow">↗</view>
+      </view>
+    </view>
+
+    <view wx:if="{{article.relatedTrends.length}}" class="reader-block">
+      <view class="block-head"><view class="block-title">相关趋势</view><view class="block-note">回到持续跟踪的趋势档案</view></view>
+      <view wx:for="{{article.relatedTrends}}" wx:key="id" class="related-row" data-id="{{item.id}}" bindtap="openRelatedTrend">
+        <view class="related-mark">趋势</view><view class="related-copy"><view class="related-title">{{item.title}}</view><view wx:if="{{item.subtitle}}" class="related-subtitle">{{item.subtitle}}</view></view><view class="related-arrow">↗</view>
+      </view>
+    </view>
+
+    <view wx:if="{{article.sources.length}}" class="reader-block">
+      <view class="block-head"><view class="block-title">原始来源</view><view class="block-note">需要时可以回去核对</view></view>
+      <view wx:for="{{article.sources}}" wx:key="id" class="related-row" data-index="{{index}}" bindtap="openSource">
+        <view class="related-mark">来源</view><view class="related-copy"><view class="related-title">{{item.title}}</view><view wx:if="{{item.subtitle}}" class="related-subtitle">{{item.subtitle}}</view></view><view class="related-arrow">{{item.itemId || item.url ? '↗' : ''}}</view>
+      </view>
+    </view>
+  </block>
+
+  <membership-prompt visible="{{membershipPromptVisible}}" feature-key="{{membershipPromptFeature}}" bindclose="closeMembershipPrompt" bindviewbenefits="openMembershipFromPrompt" />
+</view>
