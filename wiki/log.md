@@ -859,3 +859,19 @@
 - Verification: 集合专项 9/9、全量 Node 515/515、30 JSON/277 JavaScript/11 pages/0.43 MiB 项目检查、真实 plan/readback、无确认 apply 拒绝和差异空白检查通过。
 - Release order: 先集合 apply/readback，再由数据库规则 apply/check 最终确认 22 个集合全部 `ADMINONLY`，之后应用索引/存储规则并运行隔离媒体 canary。
 - Sensitive handling: 未记录数据库文档、未知集合名、用户数据、Cloud File ID、短期签名地址、函数环境变量值、登录凭据或原始 TCB 响应。
+
+## [2026-07-23] production-release-candidate | 生产收敛并上传微信 1.0.0
+
+- Session: local Codex task
+- Snapshot: `1bf9fb8cc7bf01ba54108ca089e02b621b400cda`，标签
+  `release-candidate-2026-07-23`；GitHub Actions 10/10，本地 515/515。
+- Production: 22 个合同集合全部 `ADMINONLY`，34 个合同索引收敛，用户媒体
+  客户端直写关闭；四个正式函数及九个触发器精确回读，两个旧 digest 函数退休。
+- Canaries: GitHub 1,728 条/528 标签/不限时间，截图真实 X 捕获，隔离媒体
+  上传、跨身份不可见和立即清理均通过；临时函数及 canary 数据全部清理。
+- Upload boundary: 没有用户次数或累计上传配额；6MB 只是单次请求体技术上限，
+  头像 1 MiB、评论图片 3 MiB 为单文件安全边界。
+- WeChat: 版本 `1.0.0` 已上传体验版，包体 397,154 bytes。正式审核与发布、
+  真机验收、后台类目/隐私配置和开售前支付退款矩阵仍由管理员完成。
+- Sensitive handling: 未在仓库或普通 Wiki 记录凭据、环境变量值、用户标识、
+  Cloud File ID 或短期签名地址。

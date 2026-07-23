@@ -3,11 +3,16 @@ title: "2026-07-23 全项目生产就绪审计"
 type: report
 tags: [production-readiness, audit, security, reliability, release]
 last_updated: 2026-07-23
-status: confirmed
+status: superseded
 confidence: high
 ---
 
 # 2026-07-23 全项目生产就绪审计
+
+> 此报告保留修复前快照。其中 P1/P2 代码与生产控制面问题已由发布提交
+> `1bf9fb8` 修复并完成生产回读，当前结论以
+> [生产发布候选部署与微信体验版上传](../sources/2026-07-23-production-release-candidate.md)
+> 为准。
 
 ## 结论
 

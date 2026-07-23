@@ -12,7 +12,8 @@ confidence: high
 ## 项目入口
 
 - [项目总览](overview.md) — 当前产品、代码、云端状态、验证结果和剩余工作
-- [2026-07-23 全项目生产就绪审计](reports/production-readiness-audit-2026-07-23.md) — 当前发布门禁、P1/P2 问题、线上规则核对和修复顺序
+- [生产发布候选部署与微信体验版上传](sources/2026-07-23-production-release-candidate.md) — 当前可复现 SHA、生产收敛、冒烟、微信上传与剩余人工边界
+- [2026-07-23 全项目生产就绪审计](reports/production-readiness-audit-2026-07-23.md) — 已被发布候选修复结果取代的审计前快照
 - [微信小程序实体](entities/WeChatMiniProgram.md) — AppID、云环境、运行依赖和部署边界
 - [里程碑时间线](timeline.md) — 从旧项目审计到真实微信端到端验证
 
@@ -99,10 +100,11 @@ confidence: high
 - [生产中继单端点与旧节点角色复核](sources/2026-07-23-relay-single-endpoint-audit.md) — 线上仅配置当前中继；旧公网服务器不在生产路径，也不是自动备用机
 - [新公网节点个人 Clash 代理部署与 Mihomo 验证](sources/2026-07-23-personal-clash-proxy.md) — 复用 Nginx 443 的独立 VLESS/WebSocket 服务、受限订阅与真实 Mihomo 出口验证
 - [来源头像资料延迟回填修复](sources/2026-07-23-source-avatar-profile-join-repair.md) — 正文与作者资料传播错位的根因、作者档案回填、线上强制刷新与头像 HTTP 200 证据
-- [GitHub 开源库接入与生产验证](sources/2026-07-23-aigclink-open-source-library-integration.md) — 分段全量契约、官方头像、1,727 条生产同步、528 个标签、447 项回归和微信预览证据
+- [GitHub 开源库接入与生产验证](sources/2026-07-23-aigclink-open-source-library-integration.md) — 分段全量契约、官方头像、1,728 条生产同步、528 个标签、515 项回归和微信上传证据
 - [CloudBase 数据库、存储与函数发布门禁](sources/2026-07-23-cloudbase-access-control-release-controls.md) — ADMINONLY/存储规则、四函数精确 manifest、退休计划与白名单回读
-- [CloudBase 数据库索引合同与生产漂移](sources/2026-07-23-cloudbase-database-index-controls.md) — 34 项增量合同、11 项线上漂移、媒体集合前置门禁与无删除回读/apply 控制
-- [CloudBase 数据库集合创建控制](sources/2026-07-23-cloudbase-database-collection-controls.md) — 复用 22 集合合同、CreateTable + ADMINONLY、线上 21/22 漂移与无删表白名单回读
+- [CloudBase 数据库索引合同与生产漂移](sources/2026-07-23-cloudbase-database-index-controls.md) — 34 项增量合同、发布前 11 项漂移、无删除 apply 与后续生产收敛
+- [CloudBase 数据库集合创建控制](sources/2026-07-23-cloudbase-database-collection-controls.md) — 复用 22 集合合同、发布前 21/22 漂移、CreateTable + ADMINONLY 与后续生产收敛
+- [生产发布候选部署与微信体验版上传](sources/2026-07-23-production-release-candidate.md) — 22 集合、34 索引、四函数、生产 canary、版本 1.0.0 与 397,154-byte 包体
 - [2026-07-16 模块化架构评审](reports/architecture-2026-07-16.md) — 历史评分，已被 2026-07-17 复审取代
 - [2026-07-17 模块化架构评审](reports/architecture-2026-07-17.md) — 当前整体 8.9/10、移动端性能 8.8/10，记录规模边界和付费上线前改造项
 - [2026-07-17 会员与知识智能模块化复审](reports/architecture-2026-07-17-membership.md) — 当前整体 8.8/10、会员/智能边界和 AI/支付上线缺口
@@ -111,20 +113,30 @@ confidence: high
 - [2026-07-19 Packy/Grok 知识智能模块化复审](reports/architecture-2026-07-19-intelligence.md) — 本轮范围 9.2/10、Provider 可替换性、成本控制与人工审核缺口
 - [2026-07-19 自动知识智能与评论审核模块化复审](reports/architecture-2026-07-19-automatic-intelligence.md) — 本轮 9.3/10、整体约 9.1/10，记录自动发布边界与上线治理缺口
 - [2026-07-20 实用会员专栏模块化复审](reports/architecture-2026-07-20-practical-column.md) — 本轮 9.2/10，记录付费边界、自动周案例可靠性与后续拆分阈值
-- [2026-07-23 全项目生产就绪审计](reports/production-readiness-audit-2026-07-23.md) — 450 项测试和微信预览通过，但媒体所有权、权益缓存、截图 SSRF 与发布快照使当前发布门禁为 Fail
+- [2026-07-23 全项目生产就绪审计](reports/production-readiness-audit-2026-07-23.md) — 已被 `1bf9fb8` 修复和生产回读取代的历史 Fail 快照
 
 ## 当前模块
 
 - 小程序页面：资讯、专栏、简报、我的四个原生 Tab，资讯顶部另有会员精选入口；以及资讯详情、专栏阅读器、个人资料编辑、条件式原始出处和我的收藏，共 10 个当前产品页面。`trend-detail` 仍注册为第 11 个兼容路由，但当前没有趋势入口。评论由独立 `comment-sheet` 组件承载，页面逻辑由 `features/knowledge-feed`、`engagement`、`user-profile`、`membership`、`billing`、`curated-feed`、`ai-column` 与 `briefing` 承载
-- 云函数：`digestIngest`、`digestStore`、`knowledgeFeed`、`sourcePreviewWorker`、`knowledgeOps`、`membershipBilling`
+- 云函数：`knowledgeFeed`、`sourcePreviewWorker`、`knowledgeOps`、`membershipBilling`
 - 数据：资讯为独立条目 + 按日索引 + 服务端权益，并有独立视觉任务、用户互动、会员评论、审核资料、会员、订单、分析、简报和模型预算表；历史周案例与趋势档案表只为兼容保留。服务端专用集合均为 `ADMINONLY`
 
-## 当前风险与下一入口
+## 当前发布边界与下一入口
 
-- 2026-07-23 生产就绪审计确认当前版本不应直接发布：生产 `user-media/` 规则与服务端删除缺少对象级所有权，资讯详情缓存可在会员降级后短时保留付费内容，截图浏览器存在 DNS rebinding 边界，当前工作树也无法由单一 Git SHA 精确重建。完整分级、验证与修复顺序见 [全项目生产就绪审计](reports/production-readiness-audit-2026-07-23.md)。
-- 旧云业务已清理，当前会员、订单、智能、互动、评论与资料集合均为 `ADMINONLY`，6 个云函数已部署；互动目标状态、会员评论读取与空资料接口的真实微信上下文往返已通过。
+- 2026-07-23 审计中的代码与生产控制面阻塞项已由发布提交
+  `1bf9fb8` 修复并完成白名单回读；当前 22 个合同集合全部
+  `ADMINONLY`、34 个合同索引收敛、客户端用户媒体直写关闭，四个正式函数
+  精确可用。完整证据见
+  [生产发布候选部署与微信体验版上传](sources/2026-07-23-production-release-candidate.md)。
+- 旧云业务及两个退休 digest 函数已清理；互动、评论、资料、截图、GitHub
+  全量读取和媒体隔离生产 canary 已通过。微信版本 `1.0.0` 已上传体验版，
+  正式审核与发布仍由小程序管理员完成。
 - 环境已不可逆切换到资源点计费，标准版每账期 330,000 点共享池；超限按量关闭。`qwen3.5-flash` 与 `qwen3.5-plus` 已启用，CloudBase 承担主分析/简报/图文与资料审核，Packy/Grok 在超时、限流、结构失败或 60,000 点内部模型预算耗尽时自动兜底。共享池瞬时已用量必须以 CloudBase 控制台为准，Wiki 不再把某次快照写成当前余额；分析/简报/审核阈值为 90/180/30 秒。
-- AI 资讯全量持续入库。来源范围为“全部 / 一手信源 / 资讯 / 推文”，使用 AIHOT 上游成员关系而不是本地关键词分类；普通用户服务端限制为滚动 24 小时，Pro 为 30 天，当前唯一微信账号以管理员身份查看全部已归档数据。首页、精选、更新页、相关阅读和详情均允许无图条目，来源自带媒体优先完整落云，截图只做异步兜底增强。
+- AI 资讯全量持续入库。来源范围为“全部 / 官方动态 / 资讯 / 推文 /
+  GitHub”；前四个使用 AIHOT 上游成员关系，GitHub 使用 AIGCLINK 原生标签
+  与全部历史。普通用户服务端限制为滚动 24 小时，Pro 为 30 天，管理员查看
+  全部已归档数据。首页、精选、更新页、相关阅读和详情均允许无图条目，来源
+  自带媒体优先完整落云，截图只做异步兜底增强。
 - AIHOT 正文与来源资料已拆为显式双接口合同：正文同步不依赖增强接口，作者头像、昵称、账号和原始标签可失败重试且不清空旧值。正文先到而作者资料尚未传播时，会按精确 X 原帖账号复用已有作者档案。页面只显示上游标签；内部频道、主题和 `categoryLabel` 不再冒充标签。
 - 首页支持时间、公司与模型、技术方向组合筛选；筛选项附结果数，空选项不可选。“最新”对全部资讯按发布时间倒序，“热度”对全部资讯按热度倒序，不再单独处理放大主稿。
 - 资讯详情提供原文截图自动/手动轮播、图片下方圆点、点击后整组全屏滑动、30 秒导读、完整上游摘要分段和三条相关阅读；长页最多连续截取 12 张，列表只传首图、详情再取全部。“来源与原文”位于“接着看”之前，URL 可展开/收起并可复制。当前没有已验证的外部业务域名，微信也不能直接唤起任意系统浏览器，因此外部原文点击会复制链接并提示到手机浏览器粘贴。
