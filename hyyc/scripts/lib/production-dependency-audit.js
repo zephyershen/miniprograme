@@ -28,8 +28,8 @@ function auditCommand(
     };
   }
   if (platform === 'win32') {
-    const bundledNpmCli = path.join(
-      path.dirname(execPath),
+    const bundledNpmCli = path.win32.join(
+      path.win32.dirname(execPath),
       'node_modules',
       'npm',
       'bin',
