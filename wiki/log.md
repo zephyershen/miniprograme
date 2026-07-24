@@ -1067,3 +1067,39 @@
   更新导航、总览、微信小程序实体和时间线；旧同步超时记录保留为历史证据。
 - Sensitive handling: 未记录用户标识、订单号、头像 File ID、昵称、支付签名、
   请求 ID、原始日志、环境变量值或回调密钥。
+
+## [2026-07-24] async-comments-message-center-stable-loading | 异步评论与消息中心上线
+
+- Session: local Codex task
+- Scope: 评论审核生命周期、资料/评论/会员站内消息、消息已读并发语义、主要页面
+  懒加载与稳定刷新、会员微信身份绑定、虚拟商品价格合同、AI 推理强度、数据库
+  集合/索引、双函数生产部署、开发预览与项目 Wiki。
+- Comments: 新评论以作者可见的 `pending` 状态幂等入库，后台 worker 通过租约、
+  版本和 claim 审核；允许结果事务公开，拒绝结果擦除正文与附件引用。同资讯
+  30 秒冷却，滚动 24 小时每人最多 30 条。
+- Messages: 新增 `knowledge_message_events` 与 `knowledge_user_messages`，
+  统一承载会员成功、资料结果、评论结果和收到评论通知。分批 checkpoint、聚合
+  版本、严格 cutoff 已读、超过 1000 条全部已读、客户端全局串行与查看者隔离
+  防止重复、丢失、旧响应覆盖或跨账号缓存。
+- UX: 新增全局加载组件并覆盖全部、专栏、简报、精选、详情、收藏、资料与消息；
+  媒体壳保留高度，后台轮询/换签和喜爱/收藏只更新叶子数据，阅读中的列表与轮播
+  不再整页刷新或闪白。
+- AI/payment: 所有 CloudBase Qwen 请求显式关闭思考模式，Packy/Grok 固定最低
+  `low`；支付前重新 `wx.login` 并服务端校验身份。微信登录不自动提供头像昵称。
+  `pro_30d` 原价/现价均为 590 分，1090 分只作界面比较价；`-15013` 解释为商品
+  后台原价不一致。
+- Verification: 业务提交 `2db8dce`；完整 `npm.cmd run verify` 为 617/617，
+  32 JSON/300 JavaScript/12 pages，覆盖率行 80.37%/分支 68.89%/函数 77.27%，
+  生产依赖审计和 `git diff --check` 通过。
+- Production: 25 个合同集合、43 个合同索引、25 份规则、四函数 manifest 0 漂移；
+  `knowledgeFeed` 与 `membershipBilling` 已部署。计划冒烟为可售、590 分当前价/
+  原价与 1090 分比较价；最新开发预览 457,142 bytes。
+- Remaining: 真实新账号资料/评论状态、多账号收到评论、弱网无闪动及 iOS 真机支付/
+  退款仍需人工 canary；`env=0` 会真实扣款。终态 outbox/checkpoint 保留策略为
+  后续规模化事项。
+- Memory: 新增
+  `wiki/decisions/2026-07-24-async-comments-and-message-center.md` 与
+  `wiki/sources/2026-07-24-async-comments-message-center-and-stable-loading.md`，
+  更新导航、总览、微信小程序实体和时间线。
+- Sensitive handling: 未记录用户标识、订单号、评论正文、昵称、头像/附件 File ID、
+  支付签名、请求 ID、原始日志、环境变量值或回调密钥。

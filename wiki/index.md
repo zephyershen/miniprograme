@@ -14,6 +14,7 @@ confidence: high
 - [项目总览](overview.md) — 当前产品、代码、云端状态、验证结果和剩余工作
 - [上线前接手清单、CI 边界与剩余风险](syntheses/2026-07-23-release-readiness-handoff.md) — 新会话优先读取；记录精确版本锚点、旧审计关闭状态、P2 日志残余、依赖复审、真机与发布顺序
 - [生产发布候选部署与微信体验版上传](sources/2026-07-23-production-release-candidate.md) — 当前可复现 SHA、生产收敛、冒烟、微信上传与剩余人工边界
+- [异步评论、站内消息、稳定加载与会员绑定上线](sources/2026-07-24-async-comments-message-center-and-stable-loading.md) — 评论/资料后台审核、我的消息、全页懒加载、无闪屏互动、微信身份与商品价格边界
 - [资料异步审核、预览支付诊断与微信消息回调上线](sources/2026-07-24-async-profile-review-and-preview-payment-diagnostics.md) — “审核中”队列、真机支付故障边界、入站消息 webhook 与生产收敛
 - [资料保存审核超时修复与生产部署](sources/2026-07-24-profile-moderation-timeout-repair.md) — 预览版资料保存失败根因、模型无思考修复、代码-only 发布与真实 canary 边界
 - [2026-07-23 全项目生产就绪审计](reports/production-readiness-audit-2026-07-23.md) — 已被发布候选修复结果取代的审计前快照
@@ -32,6 +33,7 @@ confidence: high
 - [采用资讯社交动作与编辑蓝会员转化界面](decisions/2026-07-18-engagement-and-editorial-social-ui.md) — 评论/喜爱/收藏/分享、会员转化卡和当前视觉基线
 - [评论采用主动资料身份与原图附件，资讯互动使用乐观目标状态](decisions/2026-07-19-profiled-media-comments-and-optimistic-engagement.md) — 即时按钮反馈、幂等事务、头像昵称、表情与手机原图评论
 - [精选与简报采用 AI 自动发布，评论采用多模态 AI 先审后发](decisions/2026-07-19-automatic-ai-curation-and-comment-moderation.md) — 自动资讯分析、精选/简报发布、评论图文 fail-closed 审核与治理风险
+- [评论与资料采用后台 AI 审核，结果统一进入站内消息](decisions/2026-07-24-async-comments-and-message-center.md) — 取代评论同步等待；后台审核、可靠 outbox、消息中心、稳定加载与会员身份绑定
 - [采用微信小程序虚拟支付销售一次性 30 天会员](decisions/2026-07-19-wechat-virtual-payment-membership.md) — 道具直购、官方查单/发货、幂等权益、退款回收与服务端内容保护；取代斗拱支付决策
 - [CloudBase 主模型与 Packy 自动兜底方案](decisions/2026-07-20-cloudbase-ai-primary-packy-fallback.md) — 已切换资源点计费；CloudBase 为主、Packy 做预算与故障兜底
 - [资讯采用四分钟有界等图，Pro 转化使用简约完整权益卡](decisions/2026-07-21-bounded-visual-publication-and-pro-access-pass.md) — 正常图文一起出现，失败或超时仍公开文字；简报动态计数，七项权益与折扣共用单一模型，会员界面采用无侧轨的白底平铺结构
@@ -84,6 +86,7 @@ confidence: high
 - [PackyAPI Grok 知识分析接入、生产自动化与图文审核](sources/2026-07-19-packy-grok-intelligence.md) — 严格结构、低推理、分析合批、自动精选/简报、评论多模态审核和生产状态
 - [资料审核、付费内容保护与斗拱会员支付实施证据](sources/2026-07-19-profile-moderation-and-huifu-payment.md) — 昵称/头像审核、包内正文移除、云存储规则、支付部署与剩余商户配置
 - [资料保存审核超时修复与生产部署](sources/2026-07-24-profile-moderation-timeout-repair.md) — 主模型 30 秒超时、Packy 网络失败、`enable_thinking:false` 修复及线上代码回读
+- [异步评论、站内消息、稳定加载与会员绑定上线](sources/2026-07-24-async-comments-message-center-and-stable-loading.md) — 617 项回归、25 集合/43 索引、双函数部署、支付计划冒烟与 457,142-byte 开发预览
 - [生产基础设施、斗拱模式与会员定价复核](sources/2026-07-19-infrastructure-pricing-and-huifu-mode.md) — 公网截图机与 CloudBase 实时容量、直连/间联判断规则和冷启动价格建议
 - [微信虚拟支付会员实现与部署证据](sources/2026-07-19-wechat-virtual-payment.md) — 官方虚拟商品边界、签名/查单/发货实现、测试与安全关闭的云端部署
 - [CloudBase 模型成本、共享资源点与 Packy 混合路由测算](sources/2026-07-20-cloudbase-ai-cost-and-hybrid-routing.md) — 当前真实资源曲线、模型预算、分钟任务浪费与切换阈值
@@ -121,30 +124,32 @@ confidence: high
 
 ## 当前模块
 
-- 小程序页面：资讯、专栏、简报、我的四个原生 Tab，资讯顶部另有会员精选入口；以及资讯详情、专栏阅读器、个人资料编辑、条件式原始出处和我的收藏，共 10 个当前产品页面。`trend-detail` 仍注册为第 11 个兼容路由，但当前没有趋势入口。评论由独立 `comment-sheet` 组件承载，页面逻辑由 `features/knowledge-feed`、`engagement`、`user-profile`、`membership`、`billing`、`curated-feed`、`ai-column` 与 `briefing` 承载
+- 小程序页面：资讯、专栏、简报、我的四个原生 Tab，资讯顶部另有会员精选入口；以及资讯详情、专栏阅读器、个人资料编辑、条件式原始出处、我的收藏和“我的消息”，共 11 个当前产品页面。`trend-detail` 仍注册为第 12 个兼容路由，但当前没有趋势入口。评论由独立 `comment-sheet` 组件承载，页面逻辑由 `features/knowledge-feed`、`engagement`、`user-profile`、`messages`、`membership`、`billing`、`curated-feed`、`ai-column` 与 `briefing` 承载
 - 云函数：`knowledgeFeed`、`sourcePreviewWorker`、`knowledgeOps`、`membershipBilling`
-- 数据：资讯为独立条目 + 按日索引 + 服务端权益，并有独立视觉任务、用户互动、会员评论、公开资料、资料审核队列、会员、订单、分析、简报和模型预算表；历史周案例与趋势档案表只为兼容保留。服务端专用集合均为 `ADMINONLY`
+- 数据：资讯为独立条目 + 按日索引 + 服务端权益，并有独立视觉任务、用户互动、会员评论及审核状态、公开资料、资料审核队列、消息 outbox、用户收件箱、会员、订单、分析、简报和模型预算表；历史周案例与趋势档案表只为兼容保留。服务端专用集合均为 `ADMINONLY`
 
 ## 当前发布边界与下一入口
 
-- 2026-07-23 审计中的代码与生产控制面阻塞项已完成整改；当前 23 个合同集合全部
-  `ADMINONLY`、37 个合同索引收敛、客户端用户媒体直写关闭，四个正式函数及其
-  触发器精确可用。当前代码与生产锚点为 `38d05c8`，GitHub Actions 已通过。
+- 2026-07-23 审计中的代码与生产控制面阻塞项已完成整改；当前 25 个合同集合全部
+  `ADMINONLY`、43 个合同索引收敛、客户端用户媒体直写关闭，四个正式函数及其
+  触发器精确可用。当前业务代码与生产锚点为 `2db8dce`；617/617 本地验证通过。
 - 旧云业务及两个退休 digest 函数已清理；互动、评论、资料、截图、GitHub
   全量读取和媒体隔离生产 canary 已通过。微信版本 `2.3.1` 已上传并进入审核；
   当天开发者工具“预览”包与该业务树一致，`develop`/`trial`/`release` 都可发起
   已登记写请求，服务端权限和业务校验不变。
 - 原同步资料审核超时方案已被异步队列取代：保存候选后立即返回，头像显示
   “审核中”，后台 worker 租约处理并 fail-closed；旧已通过资料在新候选通过前
-  继续公开。新的开发预览包已生成，真实账号扫码保存仍是最终产品 canary。完整
-  证据见[资料异步审核、预览支付诊断与微信消息回调上线](sources/2026-07-24-async-profile-review-and-preview-payment-diagnostics.md)。
+  继续公开。评论也已迁移为私有 pending 后台审核；我的消息统一承载资料、评论、
+  会员和收到评论结果。新的 457,142-byte 开发预览包已生成，真实账号扫码仍是
+  最终产品 canary。完整证据见[异步评论、站内消息、稳定加载与会员绑定上线](sources/2026-07-24-async-comments-message-center-and-stable-loading.md)。
 - 预览支付已确认服务端建单成功，故障边界在客户端
   `wx.requestVirtualPayment` 拉起收银台。当前预览使用 `env=0`，只能按真实扣款
-  谨慎测试；开发者工具模拟器不作为支付验收环境。
-- 截图执行层仍有四处
-  原始 `error.message` 日志，依赖风险登记到期日为 2026-08-06；完整交接见
+  谨慎测试；开发者工具模拟器不作为支付验收环境。支付前会重新执行微信登录并由
+  服务端校验身份；`-15013` 表示商品后台原价不一致，当前代码按 590 分传入，
+  1090 分只作界面比较价。
+- 截图执行层日志脱敏已完成；依赖风险登记到期日为 2026-08-06，完整历史交接见
   [上线前接手清单](syntheses/2026-07-23-release-readiness-handoff.md)。
-- 环境已不可逆切换到资源点计费，标准版每账期 330,000 点共享池；超限按量关闭。`qwen3.5-flash` 与 `qwen3.5-plus` 已启用，CloudBase 承担主分析/简报/图文与资料审核，Packy/Grok 在超时、限流、结构失败或 60,000 点内部模型预算耗尽时自动兜底。共享池瞬时已用量必须以 CloudBase 控制台为准，Wiki 不再把某次快照写成当前余额；分析/简报/审核阈值为 90/180/30 秒。
+- 环境已不可逆切换到资源点计费，标准版每账期 330,000 点共享池；超限按量关闭。`qwen3.5-flash` 与 `qwen3.5-plus` 已启用，全部 CloudBase Qwen 请求关闭思考模式；CloudBase 承担主分析/简报/图文、评论与资料审核，Packy/Grok 以最低 `low` 推理强度在超时、限流、结构失败或 60,000 点内部模型预算耗尽时自动兜底。共享池瞬时已用量必须以 CloudBase 控制台为准，Wiki 不再把某次快照写成当前余额；分析/简报/审核阈值为 90/180/30 秒。
 - AI 资讯全量持续入库。来源范围为“全部 / 官方动态 / 资讯 / 推文 /
   GitHub”；前四个使用 AIHOT 上游成员关系，GitHub 使用 AIGCLINK 原生标签
   与全部历史。普通用户服务端限制为滚动 24 小时，Pro 为 30 天，管理员查看
