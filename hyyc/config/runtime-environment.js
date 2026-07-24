@@ -7,6 +7,8 @@ const MUTATING_ACTIONS = Object.freeze({
     'addComment',
     'appealComment',
     'deleteComment',
+    'markAllMessagesRead',
+    'markMessageRead',
     'reportComment',
     'restoreComment',
     'uploadMedia',

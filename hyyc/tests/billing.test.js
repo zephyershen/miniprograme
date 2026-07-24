@@ -43,6 +43,7 @@ const PLAN = Object.freeze({
   name: '30 天会员',
   durationDays: 30,
   priceCents: 590,
+  goodsPriceCents: 590,
   compareAtPriceCents: 1090
 });
 
@@ -115,6 +116,42 @@ test('requires the product purchase flag for plans and new orders without blocki
       openId: 'openid'
     })).order.status,
     'closed'
+  );
+});
+
+test('requires a valid goods price at least as high as the charged price', async () => {
+  assert.deepEqual(missingPaymentConfig(CONFIG, PLAN), []);
+  assert.ok(missingPaymentConfig(CONFIG, {
+    ...PLAN,
+    goodsPriceCents: undefined
+  }).includes('WECHAT_VIRTUAL_PAY_PRO_30D_GOODS_PRICE_CENTS'));
+  assert.ok(missingPaymentConfig(CONFIG, {
+    ...PLAN,
+    goodsPriceCents: PLAN.priceCents - 1
+  }).includes('WECHAT_VIRTUAL_PAY_PRO_30D_GOODS_PRICE_CENTS'));
+  assert.ok(missingPaymentConfig(CONFIG, {
+    ...PLAN,
+    goodsPriceCents: 590.5
+  }).includes('WECHAT_VIRTUAL_PAY_PRO_30D_GOODS_PRICE_CENTS'));
+  assert.deepEqual(missingPaymentConfig(CONFIG, {
+    ...PLAN,
+    compareAtPriceCents: 9999
+  }), []);
+
+  const service = createBillingService({
+    repository: {},
+    paymentClient: {},
+    config: CONFIG,
+    plan: { ...PLAN, goodsPriceCents: PLAN.priceCents - 1 },
+    missingConfig: missingPaymentConfig
+  });
+  assert.equal(service.getPlans().available, false);
+  await assert.rejects(
+    () => service.createPayment(PLAN.key, 'login-code', {
+      ownerKey: 'owner',
+      openId: 'openid'
+    }),
+    (error) => error && error.code === 'PAYMENT_NOT_READY'
   );
 });
 
@@ -295,12 +332,15 @@ test('exchanges a fresh login code and refuses a mismatched WeChat account', asy
     id: 'MP20260719120000abcdefabcdefabcd',
     openId: 'open-id',
     amountCents: 590,
+    goodsPriceCents: 590,
     planKey: 'pro_30d'
   };
   const payment = await client.createPayment(order, 'login_code_123');
   assert.match(requestedUrl, /\/sns\/jscode2session/);
   assert.equal(new URL(requestedUrl).searchParams.get('js_code'), 'login_code_123');
   assert.equal(JSON.stringify(payment).includes('open-id'), false);
+  assert.equal(JSON.parse(payment.signData).goodsPrice, 590);
+  assert.equal('activitySellingPrice' in JSON.parse(payment.signData), false);
   await assert.rejects(
     () => client.createPayment({ ...order, openId: 'another-open-id' }, 'login_code_123'),
     /支付账号与登录账号不一致/
@@ -412,7 +452,7 @@ test('only grants membership after an official paid query with an exact amount',
     config: CONFIG,
     plan: {
       key: 'pro_30d', name: '30 天会员', durationDays: 30,
-      priceCents: 590, compareAtPriceCents: 1090
+      priceCents: 590, goodsPriceCents: 590, compareAtPriceCents: 1090
     },
     missingConfig: () => [],
     now: () => new Date('2026-07-19T12:00:00.000Z')
@@ -434,7 +474,7 @@ test('only grants membership after an official paid query with an exact amount',
   const created = await service.createPayment('pro_30d', 'login_code_123', actor);
   assert.equal(created.order.status, 'payment_pending');
   assert.equal(created.order.amountCents, 590);
-  assert.equal(signedOrder.goodsPriceCents, 1090);
+  assert.equal(signedOrder.goodsPriceCents, 590);
   assert.equal(signedOrder.amountCents, 590);
   assert.equal(JSON.stringify(created).includes('1090'), false);
   assert.equal(fulfilled, 0);
@@ -472,7 +512,7 @@ test('hides a crossed-out comparison price unless it is above the charged price'
     config: CONFIG,
     plan: {
       key: 'pro_30d', name: '30 天会员', durationDays: 30,
-      priceCents: 590, compareAtPriceCents: 590
+      priceCents: 590, goodsPriceCents: 590, compareAtPriceCents: 590
     },
     missingConfig: () => []
   });
@@ -591,7 +631,13 @@ test('backs off failed reconciliation orders so they cannot starve the due queue
     repository,
     paymentClient: { async queryPayment() { throw failure; } },
     config: CONFIG,
-    plan: { key: 'pro_30d', name: '30 天会员', durationDays: 30, priceCents: 590 },
+    plan: {
+      key: 'pro_30d',
+      name: '30 天会员',
+      durationDays: 30,
+      priceCents: 590,
+      goodsPriceCents: 590
+    },
     missingConfig: () => [],
     now: () => now
   });

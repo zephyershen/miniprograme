@@ -1,6 +1,6 @@
 <page-meta page-style="{{commentsOpen || membershipPromptVisible ? 'overflow: hidden;' : ''}}" />
 <view class="detail-page">
-  <view wx:if="{{loading}}" class="detail-loading">正在读取资讯…</view>
+  <view wx:if="{{loading}}" class="detail-loading"><loading-state label="正在读取资讯" /></view>
 
   <view wx:elif="{{error}}" class="detail-error">
     <view class="error-code">内容暂不可用</view>
@@ -26,7 +26,10 @@
     </view>
     <view class="detail-title">{{item.title}}</view>
 
-    <image wx:if="{{item.coverUrl}}" class="detail-cover" src="{{item.coverUrl}}" mode="aspectFill" data-media-key="detail:{{item.id}}:cover" data-file-id="{{item.coverFileId}}" data-media-url="{{item.coverUrl}}" data-media-path="item.coverUrl" binderror="handleMediaError" />
+    <view wx:if="{{item.coverFileId || item.coverUrl}}" class="detail-cover-shell">
+      <image wx:if="{{item.coverUrl}}" class="detail-cover" src="{{item.coverUrl}}" mode="aspectFill" data-media-key="detail:{{item.id}}:cover" data-file-id="{{item.coverFileId}}" data-media-url="{{item.coverUrl}}" data-media-path="item.coverUrl" binderror="handleMediaError" />
+      <view wx:else class="detail-media-spinner"></view>
+    </view>
     <view wx:elif="{{item.previewFileIds.length}}" class="source-preview">
       <swiper
         class="source-preview-swiper"
@@ -148,7 +151,7 @@
         wx:for="{{item.relatedItems}}"
         wx:for-index="relatedIndex"
         wx:key="id"
-        class="related-row {{item.listVisualUrl ? '' : 'related-row-no-image'}}"
+        class="related-row {{item.listVisualFileId || item.visualFileId || item.listVisualUrl ? '' : 'related-row-no-image'}}"
         data-id="{{item.id}}"
         bindtap="openRelated"
       >
@@ -171,7 +174,10 @@
             <text wx:for="{{item.sourceTags}}" wx:for-item="sourceTag" wx:key="*this" class="related-tag">{{sourceTag}}</text>
           </view>
         </view>
-        <image wx:if="{{item.listVisualUrl}}" class="related-image" src="{{item.listVisualUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="related:{{item.id}}:list" data-file-id="{{item.listVisualFileId || item.visualFileId}}" data-media-url="{{item.listVisualUrl}}" data-media-path="item.relatedItems[{{relatedIndex}}].listVisualUrl" binderror="handleMediaError" />
+        <view wx:if="{{item.listVisualFileId || item.visualFileId || item.listVisualUrl}}" class="related-image-shell">
+          <image wx:if="{{item.listVisualUrl}}" class="related-image" src="{{item.listVisualUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="related:{{item.id}}:list" data-file-id="{{item.listVisualFileId || item.visualFileId}}" data-media-url="{{item.listVisualUrl}}" data-media-path="item.relatedItems[{{relatedIndex}}].listVisualUrl" binderror="handleMediaError" />
+          <view wx:else class="detail-media-spinner detail-media-spinner-small"></view>
+        </view>
       </view>
     </view>
   </block>

@@ -33,6 +33,7 @@
   </view>
 
   <view wx:elif="{{loading}}" class="curated-loading">
+    <loading-state compact="{{true}}" label="正在加载精选" />
     <view class="loading-rule"></view><view class="loading-rule loading-rule-wide"></view><view class="loading-rule"></view>
   </view>
 
@@ -78,7 +79,10 @@
         </view>
         <view class="curated-lead-title">{{view.leadItem.title}}</view>
         <view wx:if="{{view.leadItem.summaryPreview}}" class="curated-summary">{{view.leadItem.summaryPreview}}</view>
-        <image wx:if="{{view.leadItem.listVisualUrl}}" class="curated-lead-image" src="{{view.leadItem.listVisualUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="curated:{{view.leadItem.id}}:list" data-file-id="{{view.leadItem.listVisualFileId || view.leadItem.visualFileId}}" data-media-url="{{view.leadItem.listVisualUrl}}" data-media-path="view.leadItem.listVisualUrl" binderror="handleMediaError" />
+        <view wx:if="{{view.leadItem.listVisualFileId || view.leadItem.visualFileId || view.leadItem.listVisualUrl}}" class="curated-lead-image-shell">
+          <image wx:if="{{view.leadItem.listVisualUrl}}" class="curated-lead-image" src="{{view.leadItem.listVisualUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="curated:{{view.leadItem.id}}:list" data-file-id="{{view.leadItem.listVisualFileId || view.leadItem.visualFileId}}" data-media-url="{{view.leadItem.listVisualUrl}}" data-media-path="view.leadItem.listVisualUrl" binderror="handleMediaError" />
+          <view wx:else class="curated-media-spinner"></view>
+        </view>
         <view class="curated-meta"><text>{{view.leadItem.source}}</text><text>{{view.leadItem.publishedLabel}}</text></view>
       </view>
       <view class="curated-list">
@@ -88,7 +92,10 @@
             <view class="curated-row-title">{{item.title}}</view>
             <view class="curated-meta"><text>{{item.source}}</text><text>{{item.publishedLabel}}</text></view>
           </view>
-          <image wx:if="{{item.listVisualUrl}}" class="curated-thumbnail" src="{{item.listVisualUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="curated:{{item.id}}:list" data-file-id="{{item.listVisualFileId || item.visualFileId}}" data-media-url="{{item.listVisualUrl}}" data-media-path="view.remainingItems[{{index}}].listVisualUrl" binderror="handleMediaError" />
+          <view wx:if="{{item.listVisualFileId || item.visualFileId || item.listVisualUrl}}" class="curated-thumbnail-shell">
+            <image wx:if="{{item.listVisualUrl}}" class="curated-thumbnail" src="{{item.listVisualUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="curated:{{item.id}}:list" data-file-id="{{item.listVisualFileId || item.visualFileId}}" data-media-url="{{item.listVisualUrl}}" data-media-path="view.remainingItems[{{index}}].listVisualUrl" binderror="handleMediaError" />
+            <view wx:else class="curated-media-spinner curated-media-spinner-small"></view>
+          </view>
         </view>
       </view>
       <view wx:if="{{loadingMore}}" class="load-more"><view class="load-spinner"></view><text>正在加载更多精选</text></view>

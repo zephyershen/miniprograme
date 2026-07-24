@@ -33,11 +33,11 @@ Page({
   },
 
   onShow() {
-    this.resolveAccess({ force: true });
+    this.resolveAccess({ force: true, preserveCurrent: this.contentLoaded === true });
   },
 
-  async resolveAccess({ force = false } = {}) {
-    this.setData({ loading: true, error: '' });
+  async resolveAccess({ force = false, preserveCurrent = false } = {}) {
+    this.setData(preserveCurrent ? { error: '' } : { loading: true, error: '' });
     try {
       const access = await refreshMembershipAccess({ force });
       const membership = membershipPresentation(access);
@@ -58,6 +58,7 @@ Page({
       }
       this.columnAccessScope = scope;
       this.accessResolvedAt = Date.now();
+      this.contentLoaded = true;
       this.setData({
         loading: false,
         locked,
@@ -66,7 +67,9 @@ Page({
         homeNotice: usedFallback ? '当前先展示课程目录，稍后可以重新读取完整目录。' : ''
       });
     } catch (error) {
-      this.setData({ loading: false, error: error.message || '专栏暂时无法加载' });
+      if (!preserveCurrent) {
+        this.setData({ loading: false, error: error.message || '专栏暂时无法加载' });
+      }
     }
   },
 

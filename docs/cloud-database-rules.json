@@ -24,9 +24,11 @@
     "knowledge_feed_visual_jobs",
     "knowledge_membership_orders",
     "knowledge_memberships",
+    "knowledge_message_events",
     "knowledge_trend_dossiers",
     "knowledge_trend_events",
     "knowledge_user_media",
+    "knowledge_user_messages",
     "knowledge_user_profile_reviews",
     "knowledge_user_profiles"
   ]

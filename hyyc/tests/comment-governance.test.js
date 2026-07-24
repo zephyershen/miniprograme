@@ -338,6 +338,43 @@ test('lets only the author or an administrator delete and decrements a visible c
   assert.equal(db.stores.get('items').get(itemDocumentId).commentCount, 0);
 });
 
+test('cancels a pending review when its author deletes the queued comment', async () => {
+  const itemDocumentId = storedDocumentId(CONFIG.provider, ITEM_ID);
+  const db = createMemoryDb({
+    comments: {
+      [COMMENT_ID]: activeComment({
+        status: 'pending',
+        reviewState: 'processing',
+        claimId: 'old-claim',
+        claimedAt: new Date(NOW - 1000),
+        claimExpiresAt: new Date(NOW + 60000),
+        nextAttemptAt: new Date(NOW + 60000),
+        moderation: { status: 'pending' }
+      })
+    },
+    items: { [itemDocumentId]: activeItem({ commentCount: 0 }) },
+    engagements: {}
+  });
+  const repository = createFeedEngagementRepository(db, CONFIG);
+
+  const result = await repository.deleteComment(
+    OWNER,
+    ITEM_ID,
+    COMMENT_ID,
+    new Date(NOW),
+    false
+  );
+  const stored = db.stores.get('comments').get(COMMENT_ID);
+
+  assert.equal(result.commentCount, 0);
+  assert.equal(stored.status, 'deleted');
+  assert.equal(stored.reviewState, 'canceled');
+  assert.equal(stored.claimId, '');
+  assert.equal(stored.claimedAt, null);
+  assert.equal(stored.claimExpiresAt, null);
+  assert.equal(stored.nextAttemptAt, null);
+});
+
 test('keeps hidden lifecycle records private to their author and real administrators', async () => {
   const hiddenId = '4'.repeat(64);
   const appealedId = '5'.repeat(64);
@@ -423,6 +460,7 @@ test('queries an author private lifecycle exactly without scanning active or oth
   assert.deepEqual(
     db.queryLog.map((query) => query.filters),
     [
+      { itemId: ITEM_ID, status: 'pending', authorKey: OWNER },
       { itemId: ITEM_ID, status: 'hidden', authorKey: OWNER },
       { itemId: ITEM_ID, status: 'appealed', authorKey: OWNER }
     ]
@@ -772,6 +810,8 @@ test('routes the full governance lifecycle through the API and mutation gate', a
   assert.equal(MUTATING_ACTIONS.knowledgeFeed.has('reportComment'), true);
   assert.equal(MUTATING_ACTIONS.knowledgeFeed.has('appealComment'), true);
   assert.equal(MUTATING_ACTIONS.knowledgeFeed.has('restoreComment'), true);
+  assert.equal(MUTATING_ACTIONS.knowledgeFeed.has('markMessageRead'), true);
+  assert.equal(MUTATING_ACTIONS.knowledgeFeed.has('markAllMessagesRead'), true);
 });
 
 test('renders the governance lifecycle with confirmations, ARIA, and count synchronization', () => {

@@ -1,3 +1,5 @@
+const crypto = require('node:crypto');
+
 function alreadyExists(error) {
   return /already exists|exist|DATABASE_COLLECTION_EXIST/i.test(
     `${error && error.errCode || ''} ${error && error.code || ''} ${error && error.message || ''}`
@@ -8,6 +10,15 @@ function notFound(error) {
   return Boolean(error && (
     error.errCode === -1 || /not exist|not found|DOCUMENT_NOT_FOUND/i.test(error.message || '')
   ));
+}
+
+async function documentOrNull(reference) {
+  try {
+    return (await reference.get()).data;
+  } catch (error) {
+    if (notFound(error)) return null;
+    throw error;
+  }
 }
 
 const RECONCILABLE_STATUS_VALUES = Object.freeze(['payment_pending', 'paid']);
@@ -26,25 +37,64 @@ function compareReconciliationOrders(left, right) {
     .localeCompare(String(right && (right.id || right._id) || ''));
 }
 
-function createBillingRepository(db, collections) {
-  let ready = null;
-  async function ensureCollections() {
-    if (!ready) {
-      ready = Promise.all(Object.values(collections).map((name) => db.createCollection(name)
-        .catch((error) => { if (!alreadyExists(error)) throw error; })))
-        .catch((error) => { ready = null; throw error; });
+function membershipMessageEvent(order, createdAt) {
+  const type = 'membership_succeeded';
+  const sourceId = order.id || order._id;
+  const id = crypto.createHash('sha256').update(`${type}:${sourceId}`).digest('hex');
+  return {
+    id,
+    data: {
+      type,
+      sourceId,
+      ownerKey: order.ownerKey,
+      itemId: '',
+      itemTitle: '',
+      commentId: '',
+      planKey: order.planKey || '',
+      status: 'pending',
+      attemptCount: 0,
+      nextAttemptAt: createdAt,
+      claimId: '',
+      claimedAt: null,
+      claimExpiresAt: null,
+      createdAt,
+      updatedAt: createdAt
     }
-    return ready;
+  };
+}
+
+function createBillingRepository(db, collections) {
+  const readiness = new Map();
+
+  async function ensureCollection(name) {
+    if (!name) return null;
+    if (!readiness.has(name)) {
+      const pending = db.createCollection(name)
+        .catch((error) => {
+          if (!alreadyExists(error)) throw error;
+          return null;
+        })
+        .catch((error) => {
+          readiness.delete(name);
+          throw error;
+        });
+      readiness.set(name, pending);
+    }
+    return readiness.get(name);
+  }
+
+  async function ensureCollections(names = Object.values(collections)) {
+    return Promise.all([...new Set(names.filter(Boolean))].map(ensureCollection));
   }
 
   async function createOrder(order) {
-    await ensureCollections();
+    await ensureCollections([collections.orders]);
     await db.collection(collections.orders).doc(order.id).set({ data: order });
     return order;
   }
 
   async function getOrder(orderId) {
-    await ensureCollections();
+    await ensureCollections([collections.orders]);
     try {
       return (await db.collection(collections.orders).doc(orderId).get()).data;
     } catch (error) {
@@ -54,13 +104,13 @@ function createBillingRepository(db, collections) {
   }
 
   async function updateOrder(orderId, fields) {
-    await ensureCollections();
+    await ensureCollections([collections.orders]);
     await db.collection(collections.orders).doc(orderId).update({ data: fields });
     return getOrder(orderId);
   }
 
   async function findOrderByPaymentId(paymentId) {
-    await ensureCollections();
+    await ensureCollections([collections.orders]);
     const normalized = String(paymentId || '').trim();
     if (!normalized || normalized.length > 128) return null;
 
@@ -85,12 +135,35 @@ function createBillingRepository(db, collections) {
   }
 
   async function fulfill(orderId, payment, plan, now = new Date()) {
-    await ensureCollections();
+    await ensureCollections([
+      collections.orders,
+      collections.memberships,
+      collections.messageEvents
+    ]);
     const transactionResult = await db.runTransaction(async (transaction) => {
       const orderRef = transaction.collection(collections.orders).doc(orderId);
       const currentOrder = (await orderRef.get()).data;
       if (!currentOrder) throw new Error('ORDER_NOT_FOUND');
-      if (currentOrder.status === 'paid') return { order: currentOrder, alreadyPaid: true };
+      const messageEvent = collections.messageEvents
+        ? membershipMessageEvent(
+          currentOrder,
+          currentOrder.status === 'paid'
+            ? (currentOrder.paidAt || currentOrder.updatedAt || now)
+            : now
+        )
+        : null;
+      const messageEventRef = messageEvent
+        ? transaction.collection(collections.messageEvents).doc(messageEvent.id)
+        : null;
+      const currentMessageEvent = messageEventRef
+        ? await documentOrNull(messageEventRef)
+        : null;
+      if (currentOrder.status === 'paid') {
+        if (messageEventRef && !currentMessageEvent) {
+          await messageEventRef.set({ data: messageEvent.data });
+        }
+        return { order: currentOrder, alreadyPaid: true };
+      }
       const membershipRef = transaction.collection(collections.memberships).doc(currentOrder.ownerKey);
       let currentMembership = null;
       try {
@@ -133,6 +206,9 @@ function createBillingRepository(db, collections) {
       };
       await membershipRef.set({ data: membership });
       await orderRef.set({ data: paidOrder });
+      if (messageEventRef && !currentMessageEvent) {
+        await messageEventRef.set({ data: messageEvent.data });
+      }
       return { order: paidOrder, membership, alreadyPaid: false };
     });
     return transactionResult && Object.prototype.hasOwnProperty.call(transactionResult, 'result')
@@ -141,7 +217,7 @@ function createBillingRepository(db, collections) {
   }
 
   async function markRefunded(orderId, payment, plan, now = new Date()) {
-    await ensureCollections();
+    await ensureCollections([collections.orders, collections.memberships]);
     const transactionResult = await db.runTransaction(async (transaction) => {
       const orderRef = transaction.collection(collections.orders).doc(orderId);
       const currentOrder = (await orderRef.get()).data;
@@ -199,7 +275,7 @@ function createBillingRepository(db, collections) {
   }
 
   async function listReconciliationOrders(limit = 20, referenceNow = new Date()) {
-    await ensureCollections();
+    await ensureCollections([collections.orders]);
     const safeLimit = Math.max(1, Math.min(50, Number(limit) || 20));
     const response = await db.collection(collections.orders)
       .where({
@@ -232,6 +308,7 @@ module.exports = {
   RECONCILABLE_STATUSES,
   reconciliationTimestamp,
   compareReconciliationOrders,
+  membershipMessageEvent,
   alreadyExists,
   notFound,
   createBillingRepository

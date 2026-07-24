@@ -11,6 +11,7 @@
   </view>
 
   <view wx:elif="{{loading}}" class="loading-editorial">
+    <loading-state compact="{{true}}" label="正在加载资讯" />
     <view class="loading-media"></view>
     <view class="loading-line loading-line-strong"></view>
     <view class="loading-line"></view>
@@ -30,7 +31,7 @@
   </view>
 
   <block wx:else>
-    <view class="post-list {{newItemsVisible ? 'post-list-noticed' : ''}} {{flatFeedMode ? (libraryMode ? 'post-list-library' : 'post-list-flat') : 'post-list-timeline'}}">
+    <view class="post-list {{flatFeedMode ? (libraryMode ? 'post-list-library' : 'post-list-flat') : 'post-list-timeline'}}">
       <block wx:if="{{!flatFeedMode}}">
         <view wx:for="{{feed.dayGroups}}" wx:for-item="dayGroup" wx:for-index="dayIndex" wx:key="dateKey" class="timeline-day-group">
           <view class="timeline-day {{dayGroup.collapsed ? 'timeline-day-collapsed' : ''}}" data-date-key="{{dayGroup.dateKey}}" bindtap="toggleTimelineDay" aria-role="button" aria-label="{{dayGroup.dayLabel}} {{dayGroup.metaLabel}}">
@@ -39,7 +40,7 @@
             <view class="timeline-day-chevron"></view>
           </view>
           <view wx:if="{{!dayGroup.collapsed}}" class="timeline-day-body">
-            <view wx:if="{{dayGroup.loading && !dayGroup.items.length}}" class="timeline-day-state">正在加载这一天的资讯…</view>
+            <view wx:if="{{dayGroup.loading && !dayGroup.items.length}}" class="timeline-day-state"><loading-state compact="{{true}}" label="正在加载这一天的资讯" /></view>
             <view wx:elif="{{dayGroup.error && !dayGroup.items.length}}" class="timeline-day-state timeline-day-state-action" data-date-key="{{dayGroup.dateKey}}" bindtap="loadMoreTimelineDay">{{dayGroup.error}} · 点击重试</view>
             <view wx:elif="{{!dayGroup.count}}" class="timeline-day-state">这一天暂无符合条件的资讯</view>
             <view wx:for="{{dayGroup.items}}" wx:for-item="dayItem" wx:for-index="itemIndex" wx:key="id" class="timeline-entry timeline-entry-active {{itemIndex === 0 ? 'timeline-entry-start' : ''}} {{itemIndex === dayGroup.items.length - 1 ? 'timeline-entry-end' : ''}}">
@@ -67,7 +68,10 @@
                   <view class="post-summary-head"><view class="post-summary-icon"></view><text class="post-summary-tag">速览</text></view>
                   <text class="post-summary-text">{{dayItem.summaryPreview}}</text>
                 </view>
-                <image wx:if="{{dayItem.listVisualUrl}}" class="post-media" src="{{dayItem.listVisualUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="feed:{{dayItem.id}}:list" data-file-id="{{dayItem.listVisualFileId || dayItem.visualFileId}}" data-media-url="{{dayItem.listVisualUrl}}" data-media-path="feed.dayGroups[{{dayIndex}}].items[{{itemIndex}}].listVisualUrl" binderror="handleMediaError" />
+                <view wx:if="{{dayItem.listVisualFileId || dayItem.visualFileId || dayItem.listVisualUrl}}" class="post-media-shell" aria-hidden="{{!dayItem.listVisualUrl}}">
+                  <image wx:if="{{dayItem.listVisualUrl}}" class="post-media" src="{{dayItem.listVisualUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="feed:{{dayItem.id}}:list" data-file-id="{{dayItem.listVisualFileId || dayItem.visualFileId}}" data-media-url="{{dayItem.listVisualUrl}}" data-media-path="feed.dayGroups[{{dayIndex}}].items[{{itemIndex}}].listVisualUrl" binderror="handleMediaError" />
+                  <view wx:else class="post-media-placeholder"></view>
+                </view>
                 <view wx:if="{{dayItem.sourceTags.length}}" class="post-tags" aria-label="来源标签">
                   <text wx:for="{{dayItem.sourceTags}}" wx:for-item="sourceTag" wx:key="*this" class="post-source-tag">{{sourceTag}}</text>
                 </view>
@@ -79,7 +83,10 @@
                 </view></view>
               </view>
             </view>
-            <view wx:if="{{dayGroup.hasMore}}" class="timeline-day-more" data-date-key="{{dayGroup.dateKey}}" bindtap="loadMoreTimelineDay">{{dayGroup.loading ? '正在加载…' : '加载这一天的更多资讯'}}</view>
+            <view wx:if="{{dayGroup.hasMore}}" class="timeline-day-more" data-date-key="{{dayGroup.dateKey}}" bindtap="loadMoreTimelineDay">
+              <loading-state wx:if="{{dayGroup.loading}}" compact="{{true}}" label="正在加载更多资讯" />
+              <text wx:else>加载这一天的更多资讯</text>
+            </view>
             <view wx:elif="{{dayGroup.error}}" class="timeline-day-more timeline-day-state-action" data-date-key="{{dayGroup.dateKey}}" bindtap="loadMoreTimelineDay">{{dayGroup.error}} · 重试</view>
           </view>
         </view>
@@ -109,7 +116,10 @@
               </view>
               <text class="post-summary-text">{{feed.leadItem.summaryPreview}}</text>
             </view>
-            <image wx:if="{{feed.leadItem.listVisualUrl}}" class="post-media" src="{{feed.leadItem.listVisualUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="feed:{{feed.leadItem.id}}:list" data-file-id="{{feed.leadItem.listVisualFileId || feed.leadItem.visualFileId}}" data-media-url="{{feed.leadItem.listVisualUrl}}" data-media-path="feed.leadItem.listVisualUrl" binderror="handleMediaError" />
+            <view wx:if="{{feed.leadItem.listVisualFileId || feed.leadItem.visualFileId || feed.leadItem.listVisualUrl}}" class="post-media-shell" aria-hidden="{{!feed.leadItem.listVisualUrl}}">
+              <image wx:if="{{feed.leadItem.listVisualUrl}}" class="post-media" src="{{feed.leadItem.listVisualUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="feed:{{feed.leadItem.id}}:list" data-file-id="{{feed.leadItem.listVisualFileId || feed.leadItem.visualFileId}}" data-media-url="{{feed.leadItem.listVisualUrl}}" data-media-path="feed.leadItem.listVisualUrl" binderror="handleMediaError" />
+              <view wx:else class="post-media-placeholder"></view>
+            </view>
             <view wx:if="{{feed.leadItem.sourceTags.length}}" class="post-tags" aria-label="来源标签">
               <text wx:for="{{feed.leadItem.sourceTags}}" wx:for-item="sourceTag" wx:key="*this" class="post-source-tag">{{sourceTag}}</text>
             </view>
@@ -149,7 +159,10 @@
               </view>
               <text class="post-summary-text">{{item.summaryPreview}}</text>
             </view>
-            <image wx:if="{{item.listVisualUrl}}" class="post-media" src="{{item.listVisualUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="feed:{{item.id}}:list" data-file-id="{{item.listVisualFileId || item.visualFileId}}" data-media-url="{{item.listVisualUrl}}" data-media-path="feed.remainingItems[{{index}}].listVisualUrl" binderror="handleMediaError" />
+            <view wx:if="{{item.listVisualFileId || item.visualFileId || item.listVisualUrl}}" class="post-media-shell" aria-hidden="{{!item.listVisualUrl}}">
+              <image wx:if="{{item.listVisualUrl}}" class="post-media" src="{{item.listVisualUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="feed:{{item.id}}:list" data-file-id="{{item.listVisualFileId || item.visualFileId}}" data-media-url="{{item.listVisualUrl}}" data-media-path="feed.remainingItems[{{index}}].listVisualUrl" binderror="handleMediaError" />
+              <view wx:else class="post-media-placeholder"></view>
+            </view>
             <view wx:if="{{item.sourceTags.length}}" class="post-tags" aria-label="来源标签">
               <text wx:for="{{item.sourceTags}}" wx:for-item="sourceTag" wx:key="*this" class="post-source-tag">{{sourceTag}}</text>
             </view>

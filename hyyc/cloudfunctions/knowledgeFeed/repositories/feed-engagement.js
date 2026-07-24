@@ -255,6 +255,12 @@ function createFeedEngagementRepository(db, config) {
     const privateScanLimit = isAdmin ? scanLimit : Number.MAX_SAFE_INTEGER;
     const exactAuthorFilter = isAdmin ? {} : { authorKey: ownerKey };
     const privateComments = newestComments([
+      ...await listStatus(
+        'pending',
+        () => true,
+        privateScanLimit,
+        exactAuthorFilter
+      ),
       ...await listStatus('hidden', canReadPrivate, privateScanLimit, exactAuthorFilter),
       ...await listStatus('appealed', canReadPrivate, privateScanLimit, exactAuthorFilter)
     ]).slice(0, size);
@@ -367,6 +373,14 @@ function createFeedEngagementRepository(db, config) {
         : {
             ...currentComment,
             status: 'deleted',
+            ...(currentComment.status === 'pending' ? {
+              reviewState: 'canceled',
+              claimId: '',
+              claimedAt: null,
+              claimExpiresAt: null,
+              nextAttemptAt: null,
+              completedAt: deletedAt
+            } : {}),
             deletedAt,
             deletedByRole: currentComment.authorKey === ownerKey ? 'author' : 'admin',
             updatedAt: deletedAt
@@ -375,6 +389,14 @@ function createFeedEngagementRepository(db, config) {
         await commentReference.update({
           data: {
             status: comment.status,
+            ...(currentComment.status === 'pending' ? {
+              reviewState: comment.reviewState,
+              claimId: comment.claimId,
+              claimedAt: comment.claimedAt,
+              claimExpiresAt: comment.claimExpiresAt,
+              nextAttemptAt: comment.nextAttemptAt,
+              completedAt: comment.completedAt
+            } : {}),
             deletedAt: comment.deletedAt,
             deletedByRole: comment.deletedByRole,
             updatedAt: comment.updatedAt

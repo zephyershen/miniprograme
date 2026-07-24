@@ -342,16 +342,21 @@ function createUserProfileService({
       );
       if (!approved || approved.applied !== true) return { status: 'stale' };
 
-      if (userMediaService.isOwnedPublishedFileId(avatarFileId)) {
-        await userMediaService.bindPublished(actor, 'avatar', [avatarFileId], {
-          kind: 'profile',
-          id: claimed.ownerKey
-        }).catch((error) => {
+      const managedAvatar = userMediaService.isOwnedPublishedFileId(avatarFileId);
+      let avatarReady = !managedAvatar;
+      if (managedAvatar) {
+        try {
+          await userMediaService.bindPublished(actor, 'avatar', [avatarFileId], {
+            kind: 'profile',
+            id: claimed.ownerKey
+          });
+          avatarReady = true;
+        } catch (error) {
           logger.warn('Approved profile avatar binding deferred', {
             code: error && error.code || 'UNKNOWN'
           });
-        });
-        if (typeof userMediaService.cleanupPublishedCopies === 'function') {
+        }
+        if (avatarReady && typeof userMediaService.cleanupPublishedCopies === 'function') {
           await userMediaService.cleanupPublishedCopies(
             actor,
             'avatar',
@@ -390,7 +395,7 @@ function createUserProfileService({
       reviewRepository.listStaleClaims(dueAt, reviewBatchSize)
     ]);
     const candidatesByOwner = new Map();
-    [...due, ...stale].forEach((review) => {
+    [...stale, ...due].forEach((review) => {
       if (review && review.ownerKey && !candidatesByOwner.has(review.ownerKey)) {
         candidatesByOwner.set(review.ownerKey, review);
       }

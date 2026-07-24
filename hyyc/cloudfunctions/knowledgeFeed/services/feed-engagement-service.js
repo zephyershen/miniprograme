@@ -56,6 +56,7 @@ function commentView(comment, ownerKey, profile = null, options = {}) {
   const createdAt = comment && comment.createdAt;
   const author = profileView(profile);
   const isMine = Boolean(comment && comment.authorKey === ownerKey);
+  const reviewPending = Boolean(comment && comment.status === 'pending');
   const privateStatus = ['hidden', 'appealed'].includes(comment && comment.status);
   const appealPending = comment && comment.status === 'appealed';
   return {
@@ -70,10 +71,13 @@ function commentView(comment, ownerKey, profile = null, options = {}) {
     authorLabel: author.nickname || '读者',
     isMine,
     isHidden: privateStatus,
+    reviewPending,
     appealPending,
-    statusLabel: appealPending ? '申诉处理中' : (privateStatus ? '已隐藏' : ''),
+    statusLabel: reviewPending
+      ? '审核中'
+      : (appealPending ? '申诉处理中' : (privateStatus ? '已隐藏' : '')),
     canDelete: isMine || options.isAdmin === true,
-    canReport: !privateStatus && !isMine,
+    canReport: !reviewPending && !privateStatus && !isMine,
     canAppeal: privateStatus && !appealPending && isMine && options.isAdmin !== true,
     canRestore: privateStatus && options.isAdmin === true,
     reported: !privateStatus && options.reported === true,
@@ -103,6 +107,7 @@ function favoriteAvailable(snapshot, entitlement, now) {
 
 function createFeedEngagementService({
   repository,
+  commentReviewRepository,
   profileRepository,
   itemLoader,
   commentModerationService,
@@ -258,14 +263,47 @@ function createFeedEngagementService({
         fileId: reviewFileIds[index]
       }));
     }
-    let moderation;
+    if (attachments.length) {
+      await userMediaService.holdForReview(
+        actor,
+        'comment',
+        attachments.map((attachment) => attachment.fileId),
+        config.commentReviewMediaTtlMs
+      );
+    }
+    const reviewRepository = commentReviewRepository || repository;
+    let result;
     try {
-      moderation = await commentModerationService.review({
-        content,
-        attachments: reviewAttachments
-      });
+      if (typeof reviewRepository.enqueue === 'function') {
+        result = await reviewRepository.enqueue(
+          actor.ownerKey,
+          itemId,
+          commentId,
+          {
+            content,
+            attachments,
+            reviewAttachments,
+            reviewRevision: mutationId
+          },
+          new Date(now())
+        );
+      } else {
+        result = await reviewRepository.addComment(
+          actor.ownerKey,
+          itemId,
+          {
+            content,
+            attachments,
+            reviewAttachments,
+            reviewRevision: mutationId,
+            moderation: { status: 'pending' }
+          },
+          new Date(now()),
+          commentId
+        );
+      }
     } catch (error) {
-      if (attachments.length && error && error.code === 'CONTENT_REJECTED') {
+      if (attachments.length) {
         await userMediaService.discardUnpublished(
           actor,
           'comment',
@@ -273,34 +311,6 @@ function createFeedEngagementService({
         ).catch(() => null);
       }
       throw error;
-    }
-    let publishedAttachments = attachments;
-    if (attachments.length) {
-      const publishedFileIds = await userMediaService.publishOwned(
-        actor,
-        'comment',
-        attachments.map((attachment) => attachment.fileId),
-        { kind: 'comment', id: commentId, itemId }
-      );
-      publishedAttachments = attachments.map((attachment, index) => ({
-        ...attachment,
-        fileId: publishedFileIds[index]
-      }));
-    }
-    const result = await repository.addComment(
-      actor.ownerKey,
-      itemId,
-      { content, attachments: publishedAttachments, moderation },
-      new Date(now()),
-      commentId
-    );
-    if (publishedAttachments.length) {
-      await userMediaService.bindPublished(
-        actor,
-        'comment',
-        publishedAttachments.map((attachment) => attachment.fileId),
-        { kind: 'comment', id: commentId, itemId }
-      );
     }
     return {
       comment: commentView(result.comment, actor.ownerKey, profile, {

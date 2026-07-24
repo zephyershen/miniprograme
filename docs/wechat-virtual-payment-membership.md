@@ -13,13 +13,15 @@
 7. 收银台异常退出时，订单号仍保存在本机；再次打开小程序会向服务端恢复查单。
 8. `/hyyc/membership/notify` 接收微信安全模式消息：GET 完成地址验证，POST 处理支付成功发货、iOS 退款询问和退款通知。发货和退款都必须再次通过官方查单确认，通知字段本身不能直接授予或回收权益。
 
+购买按钮会先调用 `wx.login`，会员权益绑定当前微信账号。`wx.login` 只提供临时登录凭证，不会自动返回微信头像或昵称；评论资料继续由用户通过 `chooseAvatar` 和昵称输入组件主动选择。
+
 生产环境当前已发布道具 `pro_30d`，购买开关已经开启；真实支付与退款仍需完成真机闭环验收。开发版、体验版和正式版是小程序版本，虚拟支付的 `env=0/1` 是另一套环境概念：当前服务端使用 `env=0`，因此预览码发起的也是会真实扣款的正式支付，不是沙箱。
 
 ## 开通步骤
 
 1. 小程序必须已认证，主体和类目满足虚拟支付准入要求。
 2. 在小程序管理后台左侧进入“虚拟支付”，签署协议并开通新的虚拟支付商户配置。
-3. 先在沙箱创建并发布一个“30 天会员”道具：道具 ID 建议 `pro_30d`，后台道具价格设为 1090 分，记录 `offerId`、沙箱 AppKey 和道具 ID。
+3. 先在沙箱创建并发布一个“30 天会员”道具：道具 ID 建议 `pro_30d`，后台道具价格设为 590 分，记录 `offerId`、沙箱 AppKey 和道具 ID。
 4. 沙箱通过后，再发布同价的正式道具，切换为正式 AppKey 和 `env=0`。
 5. 如小程序后台启用了接口 IP 白名单，把云开发标准版的固定出口 IP 加入白名单。
 6. 为 `knowledge_membership_orders` 创建 `status + nextCheckAt` 复合升序索引，供 15 分钟一次的有界对账扫描使用。
@@ -39,8 +41,9 @@
 | `WECHAT_VIRTUAL_PAY_OFFER_ID` | 虚拟支付“基本配置”中的 offerId |
 | `WECHAT_VIRTUAL_PAY_APP_KEY` | 与 env 对应的沙箱/正式 AppKey |
 | `WECHAT_VIRTUAL_PAY_PRODUCT_ID` | 已发布的 30 天会员道具 ID |
-| `WECHAT_VIRTUAL_PAY_PRO_30D_PRICE_CENTS` | 实际活动成交价，单位分；首发 `590` |
-| `WECHAT_VIRTUAL_PAY_PRO_30D_COMPARE_AT_PRICE_CENTS` | 后台道具价格与划线价，单位分；当前 `1090` |
+| `WECHAT_VIRTUAL_PAY_PRO_30D_PRICE_CENTS` | 实际成交价，单位分；当前 `590` |
+| `WECHAT_VIRTUAL_PAY_PRO_30D_GOODS_PRICE_CENTS` | 必须与微信后台道具单价完全一致，单位分；当前 `590` |
+| `WECHAT_VIRTUAL_PAY_PRO_30D_COMPARE_AT_PRICE_CENTS` | 仅用于页面划线价展示，不参与支付签名；当前 `1090` |
 | `WECHAT_MINIPROGRAM_APP_ID` | 当前小程序 AppID |
 | `WECHAT_MINIPROGRAM_APP_SECRET` | 当前小程序 AppSecret，仅服务端使用 |
 | `WECHAT_VIRTUAL_PAY_TIMEOUT_MS` | 可选，微信接口超时，默认 8000ms |
@@ -66,7 +69,7 @@
 - 用真实手机分别验证 Android 和 iOS；开发者工具模拟器不能代替真机支付验收。Windows 需使用开发者工具“真机调试”连接 Windows 微信客户端。
 - iOS 需另外确认 iOS 虚拟支付已开通、小程序简称已配置、iOS 15 及以上、微信 8.0.68 及以上和中国大陆 App Store 账号；iOS 不支持沙箱。
 - 测试取消支付、重复点击、支付后立即退出微信、弱网、支付成功但前端回调丢失、重复查单、重复发货。
-- 确认签名中的道具价为 1090 分、活动成交价为 590 分；5.90 元订单只能增加一次 30 天，金额不一致时绝不发放权益。
+- 确认签名中的道具价与微信后台完全一致，当前为 590 分；因为它与成交价相同，不传 `activitySellingPrice`。以后只有后台道具价高于实际成交价时才同时传活动成交价；5.90 元订单只能增加一次 30 天，金额不一致时绝不发放权益。
 - `cloudbaserc.json` 已注册每 15 分钟执行一次的 `membership-billing-reconcile`；部署后确认触发器为启用状态。消息推送已接入，低频任务继续作为前端回调丢失、发货和退款的兜底。
 - 配置退款和投诉处理。Android 等渠道可调用虚拟支付退款接口；iOS 退款由用户从 App Store 发起，应消费退款通知并回收对应权益。
 - 验证 `xpay_goods_deliver_notify` 的幂等发货、`xpay_subscribe_ios_refund_query_notify` 的退款建议应答和 `xpay_refund_notify` 的权益回收；重复通知不得重复发放或扣减会员时长。

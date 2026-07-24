@@ -11,6 +11,7 @@ const {
   reportMembershipPaymentFailure
 } = require('../../features/billing/api.js');
 const { loadBillingPlans } = require('../../features/billing/session.js');
+const { loadMessages } = require('../../features/messages/session.js');
 const {
   recoverPendingMembershipOrder: recoverPendingMembershipOrderSession
 } = require('../../features/billing/recovery.js');
@@ -52,6 +53,7 @@ Page({
     error: '',
     membership: membershipPresentation(null),
     userProfile: decorateUserProfile(null),
+    messageCenter: { unreadCount: 0, hasUnread: false, loading: true },
     billing: { ...EMPTY_BILLING }
   },
 
@@ -66,7 +68,6 @@ Page({
     this.profileReviewPollCount = 0;
     this.profileLoadRequestId = (this.profileLoadRequestId || 0) + 1;
     this.billingLoadRequestId = (this.billingLoadRequestId || 0) + 1;
-    this.setData({ userProfile: decorateUserProfile(null) });
     this.refreshProfilePage({ force: true });
   },
 
@@ -78,6 +79,7 @@ Page({
     this.membershipLoadRequestId = (this.membershipLoadRequestId || 0) + 1;
     this.profileLoadRequestId = (this.profileLoadRequestId || 0) + 1;
     this.billingLoadRequestId = (this.billingLoadRequestId || 0) + 1;
+    this.messageLoadRequestId = (this.messageLoadRequestId || 0) + 1;
   },
 
   onHide() {
@@ -113,7 +115,10 @@ Page({
     if (this.pageDisposed) return false;
     const access = await this.loadMembership({ force });
     if (this.pageDisposed) return false;
-    const tasks = [this.loadBilling({ force, access })];
+    const tasks = [
+      this.loadBilling({ force, access }),
+      this.loadMessageCenter({ force })
+    ];
     if (access) tasks.push(this.loadProfile({ force }));
     await Promise.all(tasks);
     return Boolean(access);
@@ -156,6 +161,28 @@ Page({
     } catch (error) {
       if (this.pageDisposed || requestId !== this.profileLoadRequestId) return false;
       console.warn('个人资料暂时未刷新', error && error.code ? error.code : error);
+      return false;
+    }
+  },
+
+  async loadMessageCenter({ force = false } = {}) {
+    if (this.pageDisposed) return false;
+    const requestId = (this.messageLoadRequestId || 0) + 1;
+    this.messageLoadRequestId = requestId;
+    try {
+      const result = await loadMessages({ force });
+      if (this.pageDisposed || requestId !== this.messageLoadRequestId) return false;
+      this.setData({
+        messageCenter: {
+          unreadCount: Math.max(0, Number(result && result.unreadCount) || 0),
+          hasUnread: Boolean(result && result.hasUnread),
+          loading: false
+        }
+      });
+      return true;
+    } catch (error) {
+      if (this.pageDisposed || requestId !== this.messageLoadRequestId) return false;
+      this.setData({ 'messageCenter.loading': false });
       return false;
     }
   },
@@ -319,6 +346,10 @@ Page({
 
   openCards() {
     wx.navigateTo({ url: '/pages/cards/index' });
+  },
+
+  openMessages() {
+    wx.navigateTo({ url: '/pages/messages/index' });
   },
 
   openProfileEditor() {

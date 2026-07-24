@@ -20,6 +20,7 @@
   </view>
 
   <view wx:if="{{loading}}" class="briefing-loading">
+    <loading-state compact="{{true}}" label="正在加载简报" />
     <view class="loading-line loading-line-strong"></view><view class="loading-line"></view><view class="loading-line loading-line-short"></view>
   </view>
   <view wx:elif="{{error}}" class="briefing-empty">

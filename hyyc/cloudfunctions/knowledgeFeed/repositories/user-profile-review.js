@@ -3,6 +3,7 @@ const {
   isNotFound
 } = require('./collection-support');
 const { runBusyTransaction } = require('./transaction-support');
+const { messageEventDocument, writableDocument } = require('../lib/message-event');
 
 function timestamp(value) {
   const result = new Date(value).getTime();
@@ -12,9 +13,11 @@ function timestamp(value) {
 function createUserProfileReviewRepository(db, config) {
   const collectionName = config.userProfileReviewsCollectionName;
   const profilesCollectionName = config.userProfilesCollectionName;
+  const eventsCollectionName = config.messageEventsCollectionName || 'knowledge_message_events';
   const collection = () => db.collection(collectionName);
   const ensureCollection = createCollectionEnsurer(db, collectionName);
   const ensureProfilesCollection = createCollectionEnsurer(db, profilesCollectionName);
+  const ensureEventsCollection = createCollectionEnsurer(db, eventsCollectionName);
 
   async function transactionDocumentOrNull(reference) {
     try {
@@ -98,7 +101,7 @@ function createUserProfileReviewRepository(db, config) {
   }
 
   async function transitionClaimed(ownerKey, revision, claimId, patch) {
-    await ensureCollection();
+    await Promise.all([ensureCollection(), ensureEventsCollection()]);
     return runBusyTransaction(db, async (transaction) => {
       const reference = transaction.collection(collectionName).doc(ownerKey);
       const current = await transactionDocumentOrNull(reference);
@@ -106,13 +109,37 @@ function createUserProfileReviewRepository(db, config) {
         || current.revision !== revision
         || current.status !== 'processing'
         || current.claimId !== claimId) return null;
-      await reference.update({ data: patch });
-      return { ...current, ...patch };
+      const terminal = ['rejected', 'failed'].includes(patch.status);
+      const storedPatch = terminal
+        ? {
+            ...patch,
+            nickname: '',
+            requestedAvatarFileId: '',
+            reviewAvatarFileId: '',
+            avatarChanged: false
+          }
+        : patch;
+      await reference.update({ data: storedPatch });
+      if (terminal) {
+        const event = messageEventDocument(
+          storedPatch.status === 'failed' ? 'profile_review_failed' : 'profile_rejected',
+          `${ownerKey}:${revision}`,
+          { ownerKey },
+          storedPatch.completedAt || storedPatch.updatedAt || new Date()
+        );
+        await transaction.collection(eventsCollectionName).doc(event._id)
+          .set({ data: writableDocument(event) });
+      }
+      return { ...current, ...storedPatch };
     });
   }
 
   async function approveAndSave(ownerKey, revision, claimId, approved, updatedAt) {
-    await Promise.all([ensureCollection(), ensureProfilesCollection()]);
+    await Promise.all([
+      ensureCollection(),
+      ensureProfilesCollection(),
+      ensureEventsCollection()
+    ]);
     return runBusyTransaction(db, async (transaction) => {
       const reviewReference = transaction.collection(collectionName).doc(ownerKey);
       const profileReference = transaction.collection(profilesCollectionName).doc(ownerKey);
@@ -134,6 +161,10 @@ function createUserProfileReviewRepository(db, config) {
       };
       const finishedReview = {
         ...review,
+        nickname: '',
+        requestedAvatarFileId: '',
+        reviewAvatarFileId: '',
+        avatarChanged: false,
         status: 'approved',
         claimId: '',
         claimedAt: null,
@@ -144,6 +175,14 @@ function createUserProfileReviewRepository(db, config) {
       };
       await profileReference.set({ data: profile });
       await reviewReference.set({ data: finishedReview });
+      const event = messageEventDocument(
+        'profile_approved',
+        `${ownerKey}:${revision}`,
+        { ownerKey },
+        updatedAt
+      );
+      await transaction.collection(eventsCollectionName).doc(event._id)
+        .set({ data: writableDocument(event) });
       return { applied: true, currentProfile, profile, review: finishedReview };
     });
   }

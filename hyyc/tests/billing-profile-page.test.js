@@ -215,7 +215,7 @@ test('records a strict diagnostic only after the one-shot recovery remains unpai
     'request-payment',
     'query-once',
     'report-failure',
-    'toast:会员商品价格配置不一致'
+    'toast:商品原价与微信后台道具价格不一致，请联系管理员'
   ]);
   assert.deepEqual(reports, [{
     orderId,

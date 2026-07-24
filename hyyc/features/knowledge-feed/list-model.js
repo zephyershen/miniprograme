@@ -447,6 +447,70 @@ function createFeedAppendPatch(currentFeed, nextFeed, previousLoadedCount) {
   return patch;
 }
 
+function feedItemDataPath(feed = {}, itemId, { timeline = false } = {}) {
+  if (!itemId) return '';
+  if (timeline) {
+    const groups = Array.isArray(feed.dayGroups) ? feed.dayGroups : [];
+    for (let groupIndex = 0; groupIndex < groups.length; groupIndex += 1) {
+      const items = Array.isArray(groups[groupIndex].items) ? groups[groupIndex].items : [];
+      const itemIndex = items.findIndex((item) => item && item.id === itemId);
+      if (itemIndex >= 0) return `feed.dayGroups[${groupIndex}].items[${itemIndex}]`;
+    }
+    return '';
+  }
+  if (feed.leadItem && feed.leadItem.id === itemId) return 'feed.leadItem';
+  const itemIndex = (Array.isArray(feed.remainingItems) ? feed.remainingItems : [])
+    .findIndex((item) => item && item.id === itemId);
+  return itemIndex >= 0 ? `feed.remainingItems[${itemIndex}]` : '';
+}
+
+function timelineDayDataPath(feed = {}, dateKey) {
+  if (!dateKey) return '';
+  const groupIndex = (Array.isArray(feed.dayGroups) ? feed.dayGroups : [])
+    .findIndex((group) => group && group.dateKey === dateKey);
+  return groupIndex >= 0 ? `feed.dayGroups[${groupIndex}]` : '';
+}
+
+function createTimelineDayStatePatch(feed, dateKey, state = {}) {
+  const basePath = timelineDayDataPath(feed, dateKey);
+  if (!basePath) return {};
+  return Object.keys(state).reduce((patch, key) => {
+    patch[`${basePath}.${key}`] = state[key];
+    return patch;
+  }, {});
+}
+
+function createTimelineDayResultPatch(currentFeed, nextFeed, dateKey, { append = false } = {}) {
+  const basePath = timelineDayDataPath(currentFeed, dateKey);
+  const nextGroup = (Array.isArray(nextFeed && nextFeed.dayGroups) ? nextFeed.dayGroups : [])
+    .find((group) => group && group.dateKey === dateKey);
+  if (!basePath || !nextGroup) return null;
+  const currentGroup = (currentFeed.dayGroups || [])
+    .find((group) => group && group.dateKey === dateKey) || {};
+  const currentItems = Array.isArray(currentGroup.items) ? currentGroup.items : [];
+  const nextItems = Array.isArray(nextGroup.items) ? nextGroup.items : [];
+  const patch = {
+    [`${basePath}.loading`]: nextGroup.loading === true,
+    [`${basePath}.error`]: nextGroup.error || '',
+    [`${basePath}.pageInitialized`]: nextGroup.pageInitialized === true,
+    [`${basePath}.hasMore`]: nextGroup.hasMore === true,
+    [`${basePath}.nextCursor`]: nextGroup.nextCursor || '',
+    [`${basePath}.loadedCount`]: nextItems.length,
+    'feed.loadedCount': nextFeed.loadedCount
+  };
+  const canAppend = append
+    && currentItems.length <= nextItems.length
+    && currentItems.every((item, index) => item && nextItems[index] && item.id === nextItems[index].id);
+  if (canAppend) {
+    nextItems.slice(currentItems.length).forEach((item, offset) => {
+      patch[`${basePath}.items[${currentItems.length + offset}]`] = item;
+    });
+  } else {
+    patch[`${basePath}.items`] = nextItems;
+  }
+  return patch;
+}
+
 function decorateFeed(raw = { items: [], facets: [] }, activeChannel = 'all', filters = DEFAULT_FEED_FILTERS, loadedItems = []) {
   const accessState = normalizeFeedAccess(raw);
   const filterOptions = filterOptionsForFeed(raw);
@@ -542,6 +606,10 @@ module.exports = {
   mergeUniqueItems,
   mergeFeedPage,
   createFeedAppendPatch,
+  feedItemDataPath,
+  timelineDayDataPath,
+  createTimelineDayStatePatch,
+  createTimelineDayResultPatch,
   timelineParts,
   decorateFeedTimeline,
   applyTimelineCollapse,

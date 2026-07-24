@@ -158,6 +158,45 @@ test('publishes and atomically swaps an approved claimed profile review', async 
   assert.deepEqual(calls.at(-1), ['delete', [OLD_AVATAR]]);
 });
 
+test('keeps private copies while retiring the superseded avatar when binding is deferred', async () => {
+  const review = pendingReview();
+  let cleanupCalls = 0;
+  let deleteCalls = 0;
+  const service = serviceFor({
+    reviewRepository: {
+      listDue: async () => [review],
+      listStaleClaims: async () => [],
+      claim: async () => ({ ...review, status: 'processing', attemptCount: 1 }),
+      approveAndSave: async (ownerKey, revision, claimId, approved) => ({
+        applied: true,
+        currentProfile: approvedProfile(),
+        profile: approved
+      })
+    },
+    userMediaService: {
+      publishOwned: async () => [PUBLISHED_AVATAR],
+      bindPublished: async () => {
+        const error = new Error('binding unavailable');
+        error.code = 'TEMPORARY_FAILURE';
+        throw error;
+      },
+      cleanupPublishedCopies: async () => {
+        cleanupCalls += 1;
+      },
+      deleteOwned: async () => {
+        deleteCalls += 1;
+      },
+      isOwnedPublishedFileId: () => true
+    }
+  });
+
+  const result = await service.processDue();
+
+  assert.equal(result.approved, 1);
+  assert.equal(cleanupCalls, 0);
+  assert.equal(deleteCalls, 1);
+});
+
 test('rejects unsafe profile candidates without replacing the approved profile', async () => {
   const review = pendingReview();
   const deleted = [];

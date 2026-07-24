@@ -171,9 +171,7 @@ function createBillingService({ repository, paymentClient, config, plan, missing
     if (Number.isInteger(order && order.goodsPriceCents) && order.goodsPriceCents > 0) {
       return order.goodsPriceCents;
     }
-    return Number(plan.compareAtPriceCents) > Number(plan.priceCents)
-      ? Number(plan.compareAtPriceCents)
-      : Number(plan.priceCents);
+    return Number(plan.goodsPriceCents);
   }
 
   function assertGoodsDeliveryNotification(notification, order) {
@@ -410,9 +408,7 @@ function createBillingService({ repository, paymentClient, config, plan, missing
       openId: actor.openId,
       planKey: plan.key,
       amountCents: plan.priceCents,
-      goodsPriceCents: Number(plan.compareAtPriceCents) > Number(plan.priceCents)
-        ? Number(plan.compareAtPriceCents)
-        : plan.priceCents,
+      goodsPriceCents: plan.goodsPriceCents,
       goodsDescription: plan.name,
       productId: config.productId,
       environment: config.environment,

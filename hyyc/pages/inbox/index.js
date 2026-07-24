@@ -14,6 +14,9 @@ const {
   mergeUniqueItems,
   mergeFeedPage,
   createFeedAppendPatch,
+  feedItemDataPath,
+  createTimelineDayStatePatch,
+  createTimelineDayResultPatch,
   decorateFeed,
   applyTimelineCollapse,
   applyTimelineDayStates,
@@ -45,7 +48,7 @@ const {
   recordUpdatePollFailure
 } = require('../../features/knowledge-feed/update-polling.js');
 const {
-  applyResolvedFeedMedia,
+  createResolvedFeedMediaPatch,
   collectFeedMediaFileIds,
   knowledgeMediaSession
 } = require('../../features/knowledge-feed/cloud-media-session.js');
@@ -84,6 +87,71 @@ function settleTimelineDayStates(states = {}) {
     result[dateKey] = { ...states[dateKey], loading: false };
     return result;
   }, {});
+}
+
+function hasPatch(patch) {
+  return patch && Object.keys(patch).length > 0;
+}
+
+function timelineLayoutActive(page) {
+  return Boolean(page && page.data
+    && page.data.sortMode === 'latest'
+    && page.data.activeChannel !== 'openSource'
+    && page.data.flatFeedMode !== true);
+}
+
+function engagementDataPath(page, itemId, loadedIndex) {
+  const feed = page && page.data && page.data.feed;
+  const timeline = timelineLayoutActive(page);
+  const path = feedItemDataPath(feed, itemId, { timeline });
+  if (path || timeline) return path;
+  return loadedIndex === 0
+    ? 'feed.leadItem'
+    : `feed.remainingItems[${Math.max(0, loadedIndex - 1)}]`;
+}
+
+function updateEngagementSources(page, itemId, engagement) {
+  const index = (page.loadedItems || []).findIndex((item) => item && item.id === itemId);
+  if (index < 0) return -1;
+  page.loadedItems[index] = { ...page.loadedItems[index], engagement };
+  if (page.rawFeed && Array.isArray(page.rawFeed.items)) {
+    const rawIndex = page.rawFeed.items.findIndex((item) => item && item.id === itemId);
+    if (rawIndex >= 0) {
+      page.rawFeed.items[rawIndex] = { ...page.rawFeed.items[rawIndex], engagement };
+    }
+  }
+  return index;
+}
+
+function cacheLoadedFeed(page) {
+  if (typeof getApp !== 'function') return;
+  const app = getApp();
+  if (!app || !app.globalData) return;
+  app.globalData.knowledgeFeed = {
+    items: page.loadedItems || [],
+    viewer: page.rawFeed && page.rawFeed.viewer,
+    access: page.rawFeed && page.rawFeed.access,
+    entitlements: page.rawFeed && page.rawFeed.entitlements,
+    coverage: page.rawFeed && page.rawFeed.coverage,
+    updatedAt: page.rawFeed && page.rawFeed.updatedAt
+  };
+}
+
+function applyResolvedMediaPatch(page, resolvedUrls) {
+  const feed = page && page.data && page.data.feed;
+  if (!feed) return false;
+  const patch = createResolvedFeedMediaPatch(feed, resolvedUrls);
+  if (!hasPatch(patch)) return false;
+  page.setData(patch);
+  return true;
+}
+
+function trackVisibleFeedMedia(page, requestId) {
+  if (!page.mediaRecovery || !page.data || !page.data.feed) return;
+  page.mediaRecovery.track(collectFeedMediaFileIds(page.data.feed), (freshUrls) => {
+    if (requestId !== page.feedMediaRequestId || !page.data.feed) return;
+    applyResolvedMediaPatch(page, freshUrls);
+  });
 }
 
 Page({
@@ -351,14 +419,7 @@ Page({
       ),
       this.collapsedTimelineDays
     ), this.timelineDayStates);
-    getApp().globalData.knowledgeFeed = {
-      items: this.loadedItems || [],
-      viewer: this.rawFeed && this.rawFeed.viewer,
-      access: this.rawFeed && this.rawFeed.access,
-      entitlements: this.rawFeed && this.rawFeed.entitlements,
-      coverage: this.rawFeed && this.rawFeed.coverage,
-      updatedAt: this.rawFeed && this.rawFeed.updatedAt
-    };
+    cacheLoadedFeed(this);
     const appendPatch = Number.isInteger(appendFrom)
       ? createFeedAppendPatch(this.data.feed, feed, appendFrom)
       : null;
@@ -386,13 +447,28 @@ Page({
     if (requestId !== this.feedMediaRequestId) return false;
     const currentFeed = this.data && this.data.feed;
     if (!currentFeed) return false;
-    this.setData({ feed: applyResolvedFeedMedia(currentFeed, resolvedUrls) });
-    if (this.mediaRecovery) {
-      this.mediaRecovery.track(collectFeedMediaFileIds(this.data.feed), (freshUrls) => {
-        if (requestId !== this.feedMediaRequestId || !this.data.feed) return;
-        this.setData({ feed: applyResolvedFeedMedia(this.data.feed, freshUrls) });
-      });
+    applyResolvedMediaPatch(this, resolvedUrls);
+    trackVisibleFeedMedia(this, requestId);
+    return true;
+  },
+
+  async resolveTimelineDayMedia(dateKey, items, requestToken) {
+    const values = Array.isArray(items) ? items.filter(Boolean) : [];
+    if (!values.length) {
+      trackVisibleFeedMedia(this, this.feedMediaRequestId);
+      return false;
     }
+    const mediaRequestId = this.feedMediaRequestId;
+    const feedRequestId = this.feedRequestId;
+    const resolvedUrls = await knowledgeMediaSession.resolveForFeed({
+      dayGroups: [{ dateKey, items: values }]
+    });
+    const state = this.timelineDayStates && this.timelineDayStates[dateKey];
+    if (this.pageDisposed || mediaRequestId !== this.feedMediaRequestId
+      || feedRequestId !== this.feedRequestId || !state
+      || state.requestToken !== requestToken) return false;
+    applyResolvedMediaPatch(this, resolvedUrls);
+    trackVisibleFeedMedia(this, mediaRequestId);
     return true;
   },
 
@@ -466,7 +542,12 @@ Page({
       ...this.timelineDayStates,
       [dateKey]: { ...previous, loading: true, error: '', requestToken: token }
     };
-    this.present();
+    const loadingPatch = createTimelineDayStatePatch(this.data.feed, dateKey, {
+      loading: true,
+      error: ''
+    });
+    if (hasPatch(loadingPatch)) this.setData(loadingPatch);
+    let loaded = false;
     try {
       const page = await getKnowledgeFeedDay({
         dateKey,
@@ -499,6 +580,7 @@ Page({
           requestToken: token
         }
       };
+      loaded = true;
     } catch (error) {
       if (!isCurrentTimelineRequest(this, scope, token, dateKey)) return false;
       this.timelineDayStates = {
@@ -512,7 +594,42 @@ Page({
       };
     }
     if (!isCurrentTimelineRequest(this, scope, token, dateKey)) return false;
-    this.present();
+    if (!loaded) {
+      const errorPatch = createTimelineDayStatePatch(
+        this.data.feed,
+        dateKey,
+        this.timelineDayStates[dateKey]
+      );
+      if (hasPatch(errorPatch)) this.setData(errorPatch);
+      return true;
+    }
+    const rememberedItems = applyRememberedEngagement(this.loadedItems || []);
+    if (rememberedItems.changed) this.loadedItems = rememberedItems.items;
+    const nextFeed = applyTimelineDayStates(applyTimelineCollapse(
+      decorateFeed(
+        this.rawFeed || { items: [], facets: [] },
+        this.data.activeChannel,
+        this.data.filters,
+        this.loadedItems || []
+      ),
+      this.collapsedTimelineDays
+    ), this.timelineDayStates);
+    const currentGroup = (this.data.feed.dayGroups || [])
+      .find((group) => group.dateKey === dateKey);
+    const currentIds = new Set(((currentGroup && currentGroup.items) || [])
+      .map((item) => item && item.id).filter(Boolean));
+    const resultPatch = createTimelineDayResultPatch(
+      this.data.feed,
+      nextFeed,
+      dateKey,
+      { append }
+    );
+    if (hasPatch(resultPatch)) this.setData(resultPatch);
+    cacheLoadedFeed(this);
+    const nextGroup = (nextFeed.dayGroups || []).find((group) => group.dateKey === dateKey);
+    const mediaItems = ((nextGroup && nextGroup.items) || [])
+      .filter((item) => !append || !currentIds.has(item.id));
+    this.resolveTimelineDayMedia(dateKey, mediaItems, token);
     return true;
   },
 
@@ -591,10 +708,16 @@ Page({
 
   syncRememberedEngagement() {
     if (!this.loadedItems || !this.loadedItems.length) return;
+    const patch = {};
     this.loadedItems.forEach((item) => {
       const remembered = item && engagementPatch(item.id);
-      if (remembered) this.applyEngagementResult({ itemId: item.id, engagement: remembered });
+      if (!remembered) return;
+      const engagement = decorateEngagement(remembered);
+      const index = updateEngagementSources(this, item.id, engagement);
+      const path = engagementDataPath(this, item.id, index);
+      if (path) patch[`${path}.engagement`] = engagement;
     });
+    if (hasPatch(patch)) this.setData(patch);
   },
 
   findFeedItem(id) {
@@ -603,21 +726,12 @@ Page({
 
   applyEngagementResult(result) {
     if (!result || !result.itemId || !result.engagement) return;
-    const index = (this.loadedItems || []).findIndex((item) => item && item.id === result.itemId);
-    if (index < 0) return;
     const engagement = decorateEngagement(result.engagement);
+    const index = updateEngagementSources(this, result.itemId, engagement);
+    if (index < 0) return;
     rememberEngagement(result.itemId, engagement);
-    this.loadedItems[index] = { ...this.loadedItems[index], engagement };
-    if (this.rawFeed && Array.isArray(this.rawFeed.items)) {
-      const rawIndex = this.rawFeed.items.findIndex((item) => item && item.id === result.itemId);
-      if (rawIndex >= 0) this.rawFeed.items[rawIndex] = { ...this.rawFeed.items[rawIndex], engagement };
-    }
-    if (this.data && this.data.sortMode === 'latest') {
-      this.present();
-      return;
-    }
-    const path = index === 0 ? 'feed.leadItem.engagement' : `feed.remainingItems[${index - 1}].engagement`;
-    this.setData({ [path]: engagement });
+    const path = engagementDataPath(this, result.itemId, index);
+    if (path) this.setData({ [`${path}.engagement`]: engagement });
   },
 
   engagementSyncFor(item) {

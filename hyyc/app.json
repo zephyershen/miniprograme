@@ -7,6 +7,7 @@
     "pages/trend-detail/index",
     "pages/briefing/index",
     "pages/profile/index",
+    "pages/messages/index",
     "pages/profile-edit/index",
     "pages/feed-detail/index",
     "pages/source-view/index",
@@ -21,7 +22,8 @@
   },
   "usingComponents": {
     "membership-prompt": "/components/membership-prompt/index",
-    "comment-sheet": "/components/comment-sheet/index"
+    "comment-sheet": "/components/comment-sheet/index",
+    "loading-state": "/components/loading-state/index"
   },
   "tabBar": {
     "color": "#536471",

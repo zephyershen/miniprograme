@@ -22,6 +22,7 @@
   </view>
 
   <view wx:if="{{loading}}" class="manual-state">
+    <loading-state compact="{{true}}" label="正在加载专栏" />
     <view class="state-rule state-rule-wide"></view>
     <view class="state-rule"></view>
     <view class="state-rule state-rule-short"></view>

@@ -40,6 +40,7 @@ const PLAN = Object.freeze({
   name: '30 天会员',
   durationDays: 30,
   priceCents: 590,
+  goodsPriceCents: 590,
   compareAtPriceCents: 1090
 });
 
@@ -54,6 +55,7 @@ const ORDER = Object.freeze({
   planKey: PLAN.key,
   productId: PAYMENT_CONFIG.productId,
   amountCents: PLAN.priceCents,
+  goodsPriceCents: PLAN.goodsPriceCents,
   status: 'paid',
   deliveryStatus: 'delivered'
 });
@@ -122,7 +124,7 @@ function goodsDeliveryNotification(overrides = {}) {
     GoodsInfo: {
       ProductId: PAYMENT_CONFIG.productId,
       Quantity: 1,
-      OrigPrice: PLAN.compareAtPriceCents,
+      OrigPrice: PLAN.goodsPriceCents,
       ActualPrice: PLAN.priceCents,
       Attach: `membership:${PLAN.key}`
     },
@@ -341,7 +343,7 @@ test('binds an iOS refund inquiry to one paid product and payment record', async
 test('queries the official order before idempotent goods fulfillment and delivery confirmation', async () => {
   const pendingOrder = {
     ...ORDER,
-    goodsPriceCents: PLAN.compareAtPriceCents,
+    goodsPriceCents: PLAN.goodsPriceCents,
     status: 'payment_pending',
     deliveryStatus: 'not_paid'
   };
@@ -418,7 +420,7 @@ test('queries the official order before idempotent goods fulfillment and deliver
 test('rejects mismatched goods delivery fields before querying or granting membership', async () => {
   const pendingOrder = {
     ...ORDER,
-    goodsPriceCents: PLAN.compareAtPriceCents,
+    goodsPriceCents: PLAN.goodsPriceCents,
     status: 'payment_pending',
     deliveryStatus: 'not_paid'
   };
@@ -457,7 +459,7 @@ test('rejects mismatched goods delivery fields before querying or granting membe
       GoodsInfo: {
         ProductId: PAYMENT_CONFIG.productId,
         Quantity: 1,
-        OrigPrice: PLAN.compareAtPriceCents,
+        OrigPrice: PLAN.goodsPriceCents,
         ActualPrice: 1090
       }
     })),
@@ -470,7 +472,7 @@ test('rejects mismatched goods delivery fields before querying or granting membe
 test('requests goods-delivery retry when the official order is not yet paid', async () => {
   const pendingOrder = {
     ...ORDER,
-    goodsPriceCents: PLAN.compareAtPriceCents,
+    goodsPriceCents: PLAN.goodsPriceCents,
     status: 'payment_pending',
     deliveryStatus: 'not_paid'
   };
@@ -516,7 +518,7 @@ test('requests goods-delivery retry when the official order is not yet paid', as
 test('surfaces a delivery-confirmation failure so the encrypted handler can request retry', async () => {
   const pendingOrder = {
     ...ORDER,
-    goodsPriceCents: PLAN.compareAtPriceCents,
+    goodsPriceCents: PLAN.goodsPriceCents,
     status: 'payment_pending',
     deliveryStatus: 'not_paid'
   };

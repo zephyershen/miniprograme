@@ -19,10 +19,11 @@ const {
 } = require('../../features/engagement/session.js');
 const { createLatestTargetSync } = require('../../features/engagement/latest-target-sync.js');
 const {
-  applyResolvedItemMedia,
   collectItemMediaFileIds,
+  createResolvedItemMediaPatch,
   knowledgeMediaSession,
-  mediaUrl
+  mediaUrl,
+  preserveResolvedItemMedia
 } = require('../../features/knowledge-feed/cloud-media-session.js');
 const {
   createPageMediaRecovery
@@ -125,7 +126,7 @@ Page({
         : await loadKnowledgeItem(this.itemId);
       if (this.pageDisposed || requestId !== this.detailLoadRequestId) return false;
       const item = response && response.item ? response.item : response;
-      this.showItem(item, feedItems);
+      this.showItem(item, feedItems, { preserveCurrent });
       this.authorizedDetailScope = membershipCacheScope();
       return true;
     } catch (error) {
@@ -150,33 +151,42 @@ Page({
     }
   },
 
-  showItem(item, feedItems = []) {
+  showItem(item, feedItems = [], { preserveCurrent = false } = {}) {
     const decoratedItem = decorateKnowledgeItem(item, feedItems);
     const remembered = decoratedItem.id && engagementPatch(decoratedItem.id);
     const hydratedItem = remembered
       ? { ...decoratedItem, engagement: decorateEngagement(remembered) }
       : decoratedItem;
-    const sourceUrl = typeof hydratedItem.url === 'string' ? hydratedItem.url : '';
-    this.previewAutoplaySteps = 0;
+    const currentItem = preserveCurrent && this.data.item
+      && this.data.item.id === hydratedItem.id
+      ? this.data.item
+      : null;
+    const stableItem = currentItem
+      ? preserveResolvedItemMedia(hydratedItem, currentItem)
+      : hydratedItem;
+    const sourceUrl = typeof stableItem.url === 'string' ? stableItem.url : '';
+    if (!currentItem) this.previewAutoplaySteps = 0;
     const mediaRequestId = (this.detailMediaRequestId || 0) + 1;
     this.detailMediaRequestId = mediaRequestId;
     if (this.mediaRecovery) this.mediaRecovery.reset();
     this.setData({
-      item: hydratedItem,
+      item: stableItem,
       error: '',
       entitlementRequired: false,
       loading: false,
-      previewIndex: 0,
-      previewAutoplay: true,
+      previewIndex: currentItem ? this.data.previewIndex : 0,
+      previewAutoplay: currentItem ? this.data.previewAutoplay : true,
       sourceUrlCanExpand: sourceUrl.length > SOURCE_URL_EXPAND_THRESHOLD,
-      sourceUrlExpanded: false
+      sourceUrlExpanded: Boolean(currentItem
+        && currentItem.url === stableItem.url
+        && this.data.sourceUrlExpanded)
     }, () => {
       if (this.openCommentsAfterLoad) {
         this.openCommentsAfterLoad = false;
         this.openComments();
       }
     });
-    this.resolveVisibleItemMedia(hydratedItem, mediaRequestId);
+    this.resolveVisibleItemMedia(stableItem, mediaRequestId);
   },
 
   async resolveVisibleItemMedia(item, requestId) {
@@ -184,12 +194,14 @@ Page({
     if (requestId !== this.detailMediaRequestId) return false;
     const currentItem = this.data && this.data.item;
     if (!currentItem || currentItem.id !== item.id) return false;
-    this.setData({ item: applyResolvedItemMedia(currentItem, resolvedUrls) });
+    const patch = createResolvedItemMediaPatch(currentItem, resolvedUrls, 'item');
+    if (Object.keys(patch).length) this.setData(patch);
     if (this.mediaRecovery) {
       this.mediaRecovery.track(collectItemMediaFileIds(this.data.item), (freshUrls) => {
         if (requestId !== this.detailMediaRequestId || !this.data.item
           || this.data.item.id !== item.id) return;
-        this.setData({ item: applyResolvedItemMedia(this.data.item, freshUrls) });
+        const freshPatch = createResolvedItemMediaPatch(this.data.item, freshUrls, 'item');
+        if (Object.keys(freshPatch).length) this.setData(freshPatch);
       });
     }
     return true;

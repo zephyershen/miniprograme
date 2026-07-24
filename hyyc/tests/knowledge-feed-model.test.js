@@ -14,6 +14,9 @@ const {
   mergeUniqueItems,
   mergeFeedPage,
   createFeedAppendPatch,
+  feedItemDataPath,
+  createTimelineDayStatePatch,
+  createTimelineDayResultPatch,
   createFilterDraftState,
   applyTimelineCollapse,
   applyTimelineDayStates,
@@ -81,6 +84,55 @@ test('formats the passive new-items notice without mutating the visible feed', (
   });
   assert.equal(createNewItemsNotice(120).newItemsLabel, '99+ 条新资讯');
   assert.equal(createNewItemsNotice(-1).newItemsVisible, false);
+});
+
+test('locates feed rows and patches one timeline day without replacing the feed', () => {
+  const current = {
+    loadedCount: 1,
+    leadItem: { id: 'first' },
+    remainingItems: [{ id: 'second' }],
+    dayGroups: [{
+      dateKey: '2026-07-23',
+      items: [{ id: 'first' }],
+      loading: false,
+      error: '',
+      pageInitialized: true,
+      hasMore: true,
+      nextCursor: 'cursor-1'
+    }]
+  };
+  assert.equal(feedItemDataPath(current, 'second'), 'feed.remainingItems[0]');
+  assert.equal(
+    feedItemDataPath(current, 'first', { timeline: true }),
+    'feed.dayGroups[0].items[0]'
+  );
+  assert.deepEqual(createTimelineDayStatePatch(current, '2026-07-23', {
+    loading: true,
+    error: ''
+  }), {
+    'feed.dayGroups[0].loading': true,
+    'feed.dayGroups[0].error': ''
+  });
+
+  const next = {
+    ...current,
+    loadedCount: 2,
+    dayGroups: [{
+      ...current.dayGroups[0],
+      items: [{ id: 'first' }, { id: 'older' }],
+      loadedCount: 2,
+      loading: false,
+      pageInitialized: true,
+      hasMore: false,
+      nextCursor: ''
+    }]
+  };
+  const patch = createTimelineDayResultPatch(current, next, '2026-07-23', { append: true });
+  assert.equal(patch['feed.dayGroups[0].items[1]'].id, 'older');
+  assert.equal(patch['feed.dayGroups[0].hasMore'], false);
+  assert.equal(patch['feed.loadedCount'], 2);
+  assert.equal(Object.prototype.hasOwnProperty.call(patch, 'feed'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(patch, 'feed.dayGroups[0].items'), false);
 });
 
 test('merges paginated items without duplicates and builds the page view model', () => {

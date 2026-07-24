@@ -344,7 +344,7 @@ Component({
       }
       this.setData({
         commentSubmitting: true,
-        commentSubmitStatus: draftImages.some((image) => !image.fileId) ? '正在上传图片…' : '正在发布…'
+        commentSubmitStatus: draftImages.some((image) => !image.fileId) ? '正在上传图片…' : '正在提交审核…'
       });
       try {
         const pendingImages = draftImages.filter((image) => !image.fileId);
@@ -357,7 +357,7 @@ Component({
           return { ...image, ...attachment };
         });
         this.setData({ commentDraftImages: imagesWithFileIds });
-        this.setData({ commentSubmitStatus: '正在发布…' });
+        this.setData({ commentSubmitStatus: '正在提交审核…' });
         this.commentMutationId = this.commentMutationId || mutationId();
         const result = await addComment(this.data.itemId, {
           content,
@@ -374,7 +374,7 @@ Component({
         this.resolveVisibleCommentMedia(comments);
         this.resetComposer();
         this.triggerEvent('published', { commentCount: result.commentCount });
-        wx.showToast({ title: '已发布', icon: 'success' });
+        wx.showToast({ title: '已提交，后台审核中', icon: 'none', duration: 2200 });
       } catch (error) {
         if (error.code === 'PROFILE_REQUIRED') {
           this.openProfileEditor();

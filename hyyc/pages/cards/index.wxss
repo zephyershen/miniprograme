@@ -7,7 +7,10 @@
 .favorite-row { display: flex; min-height: 118rpx; align-items: center; gap: 18rpx; padding: 18rpx 20rpx; border-bottom: 1rpx solid var(--ui-hairline); }
 .favorite-row:last-child { border-bottom: 0; }
 .favorite-row-locked { background: #fafbfc; }
-.favorite-thumb { width: 104rpx; height: 76rpx; flex: none; border-radius: 14rpx; background: var(--ui-surface-muted); }
+.favorite-thumb-shell { position: relative; display: flex; width: 104rpx; height: 76rpx; flex: none; align-items: center; justify-content: center; overflow: hidden; border-radius: 14rpx; background: var(--ui-surface-muted); }
+.favorite-thumb { width: 100%; height: 100%; }
+.favorite-thumb-spinner { box-sizing: border-box; width: 24rpx; height: 24rpx; border: 3rpx solid rgba(29, 155, 240, .18); border-top-color: var(--ui-accent); border-radius: 50%; animation: favorite-thumb-spin .75s linear infinite; }
+@keyframes favorite-thumb-spin { to { transform: rotate(360deg); } }
 .favorite-copy { flex: 1; min-width: 0; }
 .favorite-title { overflow: hidden; color: var(--ui-ink); font-size: 24rpx; font-weight: 700; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
 .favorite-meta { overflow: hidden; margin-top: 8rpx; color: var(--ui-faint); font-size: 18rpx; text-overflow: ellipsis; white-space: nowrap; }

@@ -956,7 +956,8 @@ test('cleanup repairs a publication when the business write succeeded before bin
       isAttached: async (record) => (
         record.publicationIntent.kind === 'profile'
         && record.publicationIntent.referenceId === OWNER
-      )
+      ),
+      canRead: async () => true
     }
   });
   const { cloudPath } = await runtime.service.reserveUpload(

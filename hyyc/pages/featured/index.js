@@ -13,8 +13,9 @@ const {
 } = require('../../features/membership/session.js');
 const { membershipPresentation } = require('../../features/membership/presentation.js');
 const {
-  applyResolvedFeedMedia,
+  applyResolvedItemMedia,
   collectFeedMediaFileIds,
+  createResolvedFeedMediaPatch,
   knowledgeMediaSession
 } = require('../../features/knowledge-feed/cloud-media-session.js');
 const {
@@ -53,7 +54,7 @@ Page({
 
   onShow() {
     if (this.mediaRecovery) this.mediaRecovery.resume();
-    this.resolveAccess({ force: true });
+    this.resolveAccess({ force: true, preserveCurrent: this.contentLoaded === true });
   },
 
   onHide() {
@@ -64,8 +65,8 @@ Page({
     this.loadMore();
   },
 
-  async resolveAccess({ force = false } = {}) {
-    this.setData({ loading: true, error: '' });
+  async resolveAccess({ force = false, preserveCurrent = false } = {}) {
+    this.setData(preserveCurrent ? { error: '' } : { loading: true, error: '' });
     try {
       const access = await refreshMembershipAccess({ force });
       const membership = membershipPresentation(access);
@@ -77,16 +78,18 @@ Page({
         return;
       }
       this.setData({ locked: false, membership });
-      await this.loadFeed(true);
+      await this.loadFeed(true, { preserveCurrent });
     } catch (error) {
-      this.setData({ loading: false, error: error.message || '精选暂时无法加载' });
+      if (!preserveCurrent) {
+        this.setData({ loading: false, error: error.message || '精选暂时无法加载' });
+      }
     }
   },
 
-  async loadFeed(reset) {
+  async loadFeed(reset, { preserveCurrent = false } = {}) {
     const requestId = (this.requestId || 0) + 1;
     this.requestId = requestId;
-    if (reset) {
+    if (reset && !preserveCurrent) {
       this.rawItems = [];
       this.nextCursor = '';
       this.nextOffset = 0;
@@ -103,7 +106,10 @@ Page({
         filters
       });
       if (requestId !== this.requestId) return;
-      this.rawItems = mergeUnique(reset ? [] : this.rawItems, raw.items || []);
+      this.rawItems = reset && preserveCurrent
+        ? mergeUnique(raw.items || [], this.rawItems)
+        : mergeUnique(reset ? [] : this.rawItems, raw.items || []);
+      this.contentLoaded = true;
       this.nextCursor = raw.nextCursor || '';
       this.nextOffset = Number(raw.nextOffset) || this.rawItems.length;
       const merged = { ...raw, items: this.rawItems };
@@ -126,11 +132,13 @@ Page({
         this.setData({ loading: false, loadingMore: false, locked: true });
         return;
       }
-      this.setData({
-        loading: false,
-        loadingMore: false,
-        error: error.message || '精选暂时无法加载'
-      });
+      if (!preserveCurrent) {
+        this.setData({
+          loading: false,
+          loadingMore: false,
+          error: error.message || '精选暂时无法加载'
+        });
+      }
     }
   },
 
@@ -139,15 +147,19 @@ Page({
     if (requestId !== this.curatedMediaRequestId) return false;
     const currentView = this.data && this.data.view;
     if (!currentView) return false;
-    const hydrated = applyResolvedFeedMedia(currentView, resolvedUrls);
-    hydrated.items = [hydrated.leadItem, ...(hydrated.remainingItems || [])].filter(Boolean);
-    this.setData({ view: hydrated });
+    this.rawItems = (this.rawItems || []).map((item) => (
+      applyResolvedItemMedia(item, resolvedUrls, { includeRelated: false })
+    ));
+    const patch = createResolvedFeedMediaPatch(currentView, resolvedUrls, 'view');
+    if (Object.keys(patch).length) this.setData(patch);
     if (this.mediaRecovery) {
       this.mediaRecovery.track(collectFeedMediaFileIds(this.data.view), (freshUrls) => {
         if (requestId !== this.curatedMediaRequestId || !this.data.view) return;
-        const refreshed = applyResolvedFeedMedia(this.data.view, freshUrls);
-        refreshed.items = [refreshed.leadItem, ...(refreshed.remainingItems || [])].filter(Boolean);
-        this.setData({ view: refreshed });
+        this.rawItems = (this.rawItems || []).map((item) => (
+          applyResolvedItemMedia(item, freshUrls, { includeRelated: false })
+        ));
+        const freshPatch = createResolvedFeedMediaPatch(this.data.view, freshUrls, 'view');
+        if (Object.keys(freshPatch).length) this.setData(freshPatch);
       });
     }
     return true;

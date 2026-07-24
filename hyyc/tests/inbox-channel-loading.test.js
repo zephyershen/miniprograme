@@ -71,3 +71,28 @@ test('renders the spinner in the content area without visible loading copy', () 
   assert.doesNotMatch(markup,
     /channel-tab[^"]*(?:loading|spinner)|(?:loading|spinner)[^"]*channel-tab/);
 });
+
+test('keeps the new-items notice as a fixed overlay without shifting the list', () => {
+  const markup = read('../pages/inbox/index.wxml');
+  const styles = read('../pages/inbox/index.wxss');
+  assert.match(styles, /\.new-items-float\s*\{[^}]*position:\s*fixed;/s);
+  assert.doesNotMatch(markup, /post-list-noticed/);
+  assert.doesNotMatch(styles, /\.post-list-noticed\b/);
+});
+
+test('reserves feed media height while durable cloud files resolve', () => {
+  const markup = read('../pages/inbox/index.wxml');
+  const styles = read('../pages/inbox/index.wxss');
+  assert.equal((markup.match(/class="post-media-shell"/g) || []).length, 3);
+  assert.equal((markup.match(/class="post-media-placeholder"/g) || []).length, 3);
+  assert.match(markup,
+    /wx:if="\{\{dayItem\.listVisualFileId \|\| dayItem\.visualFileId \|\| dayItem\.listVisualUrl\}\}" class="post-media-shell"/);
+  assert.match(markup,
+    /wx:if="\{\{feed\.leadItem\.listVisualFileId \|\| feed\.leadItem\.visualFileId \|\| feed\.leadItem\.listVisualUrl\}\}" class="post-media-shell"/);
+  assert.match(markup,
+    /wx:if="\{\{item\.listVisualFileId \|\| item\.visualFileId \|\| item\.listVisualUrl\}\}" class="post-media-shell"/);
+  assert.match(styles,
+    /\.post-media-shell\s*\{[^}]*overflow:\s*hidden;[^}]*height:\s*340rpx;/s);
+  assert.match(styles,
+    /\.post-media,\s*\.post-media-placeholder\s*\{[^}]*height:\s*100%;/s);
+});

@@ -451,7 +451,7 @@ test('uses CloudBase managed models by task and records measured resource usage'
 
   assert.equal(requests[0].group, 'cloudbase');
   assert.equal(requests[0].input.model, 'qwen3.5-flash');
-  assert.equal(requests[0].input.enable_thinking, undefined);
+  assert.equal(requests[0].input.enable_thinking, false);
   assert.equal(requests[0].options.timeout, 90000);
   assert.equal(requests[1].input.model, 'qwen3.5-plus');
   assert.equal(requests[1].input.enable_thinking, false);

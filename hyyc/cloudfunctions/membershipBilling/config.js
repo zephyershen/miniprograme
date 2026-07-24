@@ -15,6 +15,11 @@ function integer(value, fallback = 0) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function positiveInteger(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 function paymentEnvironment(value) {
   const parsed = Number(value);
   return [0, 1].includes(parsed) ? parsed : -1;
@@ -32,6 +37,11 @@ const PLAN = Object.freeze({
   priceCents: integer(value(
     'WECHAT_VIRTUAL_PAY_PRO_30D_PRICE_CENTS',
     'wechatVirtualPayPro30dPriceCents',
+    590
+  )),
+  goodsPriceCents: positiveInteger(value(
+    'WECHAT_VIRTUAL_PAY_PRO_30D_GOODS_PRICE_CENTS',
+    'wechatVirtualPayPro30dGoodsPriceCents',
     590
   )),
   compareAtPriceCents: integer(value(
@@ -95,7 +105,12 @@ function missingPaymentConfig(
     WECHAT_VIRTUAL_PAY_PRODUCT_ID: config.productId,
     WECHAT_MINIPROGRAM_APP_ID: config.miniProgramAppId,
     WECHAT_MINIPROGRAM_APP_SECRET: config.miniProgramAppSecret,
-    WECHAT_VIRTUAL_PAY_PRO_30D_PRICE_CENTS: plan.priceCents
+    WECHAT_VIRTUAL_PAY_PRO_30D_PRICE_CENTS: plan.priceCents,
+    WECHAT_VIRTUAL_PAY_PRO_30D_GOODS_PRICE_CENTS:
+      Number.isInteger(plan.goodsPriceCents)
+        && plan.goodsPriceCents >= plan.priceCents
+        ? plan.goodsPriceCents
+        : 0
   };
   if (![0, 1].includes(config.environment)) required.WECHAT_VIRTUAL_PAY_ENV = config.environment;
   return Object.entries(required).filter(([, item]) => !item).map(([key]) => key);
@@ -112,7 +127,8 @@ function missingMessagePushConfig(config = WECHAT_MESSAGE_PUSH_CONFIG) {
 
 const COLLECTIONS = Object.freeze({
   orders: 'knowledge_membership_orders',
-  memberships: 'knowledge_memberships'
+  memberships: 'knowledge_memberships',
+  messageEvents: 'knowledge_message_events'
 });
 
 module.exports = {

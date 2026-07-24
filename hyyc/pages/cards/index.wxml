@@ -8,7 +8,7 @@
     </view>
   </view>
 
-  <view wx:if="{{loading}}" class="loading-copy">正在读取保存的内容…</view>
+  <view wx:if="{{loading}}" class="loading-copy"><loading-state label="正在读取保存的内容" /></view>
 
   <block wx:else>
     <view class="saved-section-head"><view><view class="saved-section-title">资讯收藏</view><view class="saved-section-copy">{{favorites.length}} 条阅读线索</view></view></view>
@@ -22,7 +22,10 @@
         data-available="{{item.available ? '1' : '0'}}"
         bindtap="openFavorite"
       >
-        <image wx:if="{{item.listVisualUrl}}" class="favorite-thumb" src="{{item.listVisualUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="favorite:{{item.id}}:list" data-file-id="{{item.listVisualFileId || item.visualFileId}}" data-media-url="{{item.listVisualUrl}}" data-media-path="favorites[{{index}}].listVisualUrl" binderror="handleMediaError" />
+        <view wx:if="{{item.listVisualFileId || item.visualFileId || item.listVisualUrl}}" class="favorite-thumb-shell">
+          <image wx:if="{{item.listVisualUrl}}" class="favorite-thumb" src="{{item.listVisualUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="favorite:{{item.id}}:list" data-file-id="{{item.listVisualFileId || item.visualFileId}}" data-media-url="{{item.listVisualUrl}}" data-media-path="favorites[{{index}}].listVisualUrl" binderror="handleMediaError" />
+          <view wx:else class="favorite-thumb-spinner"></view>
+        </view>
         <view class="favorite-copy">
           <view class="favorite-title">{{item.title}}</view>
           <view class="favorite-meta">{{item.source}} · {{item.savedLabel}}{{item.available ? '' : ' · 需会员回看'}}</view>

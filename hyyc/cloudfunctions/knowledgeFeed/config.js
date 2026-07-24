@@ -120,6 +120,8 @@ const ENGAGEMENT_CONFIG = Object.freeze({
   userProfilesCollectionName: 'knowledge_user_profiles',
   userProfileReviewsCollectionName: 'knowledge_user_profile_reviews',
   userMediaCollectionName: 'knowledge_user_media',
+  messageEventsCollectionName: 'knowledge_message_events',
+  userMessagesCollectionName: 'knowledge_user_messages',
   commentMaxLength: 280,
   commentPageSize: 30,
   commentImageLimit: 3,
@@ -140,6 +142,22 @@ const ENGAGEMENT_CONFIG = Object.freeze({
   userProfileReviewLeaseMs: 2 * 60 * 1000,
   userProfileReviewMaxAttempts: 8,
   userProfileReviewMediaTtlMs: 7 * 24 * 60 * 60 * 1000,
+  commentReviewBatchSize: 8,
+  commentReviewConcurrency: 3,
+  commentReviewLeaseMs: 2 * 60 * 1000,
+  commentReviewMaxAttempts: 8,
+  commentReviewMediaTtlMs: 7 * 24 * 60 * 60 * 1000,
+  commentSubmissionCooldownMs: 30 * 1000,
+  commentSubmissionWindowMs: 24 * 60 * 60 * 1000,
+  commentSubmissionWindowLimit: 30,
+  messageEventBatchSize: 12,
+  messageEventConcurrency: 3,
+  messageEventLeaseMs: 2 * 60 * 1000,
+  messageEventMaxAttempts: 8,
+    messageParticipantLimit: 200,
+    messageParticipantScanLimit: 1000,
+    userMessagePageSize: 50,
+    userMessageMarkAllBudgetMs: 15 * 1000,
   userMediaFileIdRoot: 'cloud://hyyc-1gi3f5sqc5becabf.6879-hyyc-1gi3f5sqc5becabf-1395663220/',
   userMediaStagingPathPrefix: 'user-media/staging/',
   userMediaReviewPathPrefix: 'user-media/review/',
@@ -238,9 +256,9 @@ const INTELLIGENCE_CONFIG = Object.freeze({
     || 'https://www.packyapi.com/v1',
   apiKey: process.env.PACKY_API_KEY || runtime.packyApiKey || '',
   model: process.env.PACKY_MODEL || runtime.packyModel || 'grok-4.5',
-  reasoningEffort: process.env.PACKY_REASONING_EFFORT
-    || runtime.packyReasoningEffort
-    || 'low',
+  // Grok 4.5 does not support disabling reasoning. Keep its fallback at the
+  // minimum supported effort while every Qwen request explicitly disables it.
+  reasoningEffort: 'low',
   cloudbaseEnabled: enabledDefault(
     process.env.KNOWLEDGE_CLOUDBASE_AI_ENABLED ?? runtime.knowledgeCloudbaseAiEnabled,
     true

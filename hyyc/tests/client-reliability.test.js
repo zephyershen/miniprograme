@@ -612,17 +612,27 @@ test('drops a timeline-day response when channel, sort, filters, or request gene
     }
   ]]);
   let presentCalls = 0;
+  const patches = [];
   const originalItem = { id: 'current', publishedAt: '2026-07-23T02:00:00.000Z' };
   const context = {
     data: {
       activeChannel: 'news',
       sortMode: 'latest',
-      filters: { time: '30d', company: 'all', direction: 'all', sourceTag: 'all' }
+      filters: { time: '30d', company: 'all', direction: 'all', sourceTag: 'all' },
+      feed: {
+        dayGroups: [{
+          dateKey: '2026-07-22',
+          items: [],
+          loading: false,
+          error: ''
+        }]
+      }
     },
     feedRequestId: 4,
     timelineDayStates: {},
     timelineDayRequestToken: 0,
     loadedItems: [originalItem],
+    setData(patch) { patches.push(patch); },
     present() { presentCalls += 1; }
   };
 
@@ -641,7 +651,98 @@ test('drops a timeline-day response when channel, sort, filters, or request gene
   assert.equal(await pending, false);
   assert.deepEqual(context.loadedItems, [originalItem]);
   assert.deepEqual(context.timelineDayStates, {});
-  assert.equal(presentCalls, 1);
+  assert.equal(presentCalls, 0);
+  assert.deepEqual(patches, [{
+    'feed.dayGroups[0].loading': true,
+    'feed.dayGroups[0].error': ''
+  }]);
+});
+
+test('appends a loaded timeline day with leaf patches and no full presentation', async () => {
+  const dateKey = '2026-07-22';
+  const existing = {
+    id: 'existing',
+    title: 'Existing',
+    summary: '',
+    publishedAt: '2026-07-22T02:00:00.000Z'
+  };
+  const incoming = {
+    id: 'incoming',
+    title: 'Incoming',
+    summary: '',
+    publishedAt: '2026-07-22T01:00:00.000Z',
+    listVisualFileId: 'cloud://incoming'
+  };
+  const page = loadPage('../pages/inbox/index', [[
+    '../features/knowledge-feed/api',
+    {
+      getKnowledgeFeed: async () => ({ items: [] }),
+      getKnowledgeFeedUpdates: async () => ({ newCount: 0 }),
+      getKnowledgeFeedDay: async () => ({
+        items: [incoming],
+        hasMore: false,
+        nextCursor: ''
+      })
+    }
+  ]]);
+  const patches = [];
+  const mediaLoads = [];
+  let presentCalls = 0;
+  const context = {
+    data: {
+      activeChannel: 'news',
+      sortMode: 'latest',
+      filters: { time: '30d', company: 'all', direction: 'all', sourceTag: 'all' },
+      feed: {
+        loadedCount: 1,
+        dayGroups: [{
+          dateKey,
+          items: [{ ...existing }],
+          loading: false,
+          error: '',
+          pageInitialized: true,
+          hasMore: true,
+          nextCursor: 'cursor-1'
+        }]
+      }
+    },
+    rawFeed: {
+      items: [existing],
+      facets: [],
+      dayBuckets: [{ dateKey, count: 2 }]
+    },
+    loadedItems: [existing],
+    feedRequestId: 4,
+    timelineDayStates: {
+      [dateKey]: {
+        loading: false,
+        pageInitialized: true,
+        hasMore: true,
+        nextCursor: 'cursor-1',
+        requestToken: 0
+      }
+    },
+    timelineDayRequestToken: 0,
+    collapsedTimelineDays: new Set(),
+    setData(patch) { patches.push(patch); },
+    present() { presentCalls += 1; },
+    resolveTimelineDayMedia(loadedDateKey, items, token) {
+      mediaLoads.push({ loadedDateKey, items, token });
+    }
+  };
+
+  assert.equal(await page.loadTimelineDay.call(context, dateKey, { append: true }), true);
+  assert.equal(presentCalls, 0);
+  assert.deepEqual(patches[0], {
+    'feed.dayGroups[0].loading': true,
+    'feed.dayGroups[0].error': ''
+  });
+  assert.equal(patches[1]['feed.dayGroups[0].items[1]'].id, 'incoming');
+  assert.equal(patches[1]['feed.dayGroups[0].loading'], false);
+  assert.equal(patches[1]['feed.dayGroups[0].hasMore'], false);
+  assert.equal(Object.prototype.hasOwnProperty.call(patches[1], 'feed'), false);
+  assert.equal(mediaLoads.length, 1);
+  assert.deepEqual(mediaLoads[0].items.map((item) => item.id), ['incoming']);
 });
 
 test('a first-page refresh reapplies locally confirmed engagement over an older response', async () => {

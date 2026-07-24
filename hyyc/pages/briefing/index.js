@@ -27,17 +27,18 @@ Page({
   },
 
   onShow() {
-    this.resolveAccess({ force: true });
+    this.resolveAccess({ force: true, preserveCurrent: this.contentLoaded === true });
   },
 
-  async resolveAccess({ force = false } = {}) {
-    this.setData({ loading: true, error: '' });
+  async resolveAccess({ force = false, preserveCurrent = false } = {}) {
+    this.setData(preserveCurrent ? { error: '' } : { loading: true, error: '' });
     try {
       const access = await refreshMembershipAccess({ force });
       const membership = membershipPresentation(access);
       this.accessResolvedAt = Date.now();
       if (!membership.isPrivileged) {
         this.rawBriefing = null;
+        this.contentLoaded = true;
         this.setData({
           loading: false,
           locked: true,
@@ -48,22 +49,29 @@ Page({
         return;
       }
       this.setData({ locked: false, membership });
-      await this.loadBriefing(force, membershipCacheScope(access));
+      await this.loadBriefing(force, membershipCacheScope(access), { preserveCurrent });
     } catch (error) {
-      this.setData({ loading: false, error: error.message || '简报暂时无法加载' });
+      if (!preserveCurrent) {
+        this.setData({ loading: false, error: error.message || '简报暂时无法加载' });
+      }
     }
   },
 
-  async loadBriefing(force = false, scope = membershipCacheScope()) {
+  async loadBriefing(
+    force = false,
+    scope = membershipCacheScope(),
+    { preserveCurrent = false } = {}
+  ) {
     const requestId = (this.requestId || 0) + 1;
     this.requestId = requestId;
-    this.setData({ loading: true, error: '' });
+    this.setData(preserveCurrent ? { error: '' } : { loading: true, error: '' });
     try {
       const raw = await loadBriefingContent(this.data.windowKey, { force, scope });
       if (requestId !== this.requestId) return;
       const payload = raw && (raw.digest || raw.briefing) || raw || {};
       const briefing = normalizeBriefing(payload);
       this.rawBriefing = briefing;
+      this.contentLoaded = true;
       const providerPending = briefing.status !== 'ready' && !briefing.conclusion;
       this.setData({
         loading: false,
@@ -77,7 +85,9 @@ Page({
         this.setData({ loading: false, locked: true });
         return;
       }
-      this.setData({ loading: false, error: error.message || '简报暂时无法加载' });
+      if (!preserveCurrent) {
+        this.setData({ loading: false, error: error.message || '简报暂时无法加载' });
+      }
     }
   },
 

@@ -2,8 +2,8 @@ const { loadFavorites, updateFavorite } = require('../../features/engagement/fav
 const { decorateFavorites } = require('../../features/engagement/model.js');
 const { refreshMembershipAccess } = require('../../features/membership/session.js');
 const {
-  applyResolvedItemMedia,
   collectItemMediaFileIds,
+  createResolvedItemListMediaPatch,
   knowledgeMediaSession
 } = require('../../features/knowledge-feed/cloud-media-session.js');
 const {
@@ -22,7 +22,7 @@ Page({
     if (this.mediaRecovery) this.mediaRecovery.resume();
     this.favoriteLoadRequestId = (this.favoriteLoadRequestId || 0) + 1;
     this.favoriteMediaRequestId = (this.favoriteMediaRequestId || 0) + 1;
-    this.setData({ favorites: [], loading: true });
+    if (!this.favoritesLoaded) this.setData({ loading: true });
     this.refreshFavoritesPage({ force: true });
   },
 
@@ -71,7 +71,15 @@ Page({
     try {
       const favorites = await loadFavorites({ force });
       if (this.pageDisposed || loadRequestId !== this.favoriteLoadRequestId) return false;
-      const decorated = decorateFavorites(favorites.items || []);
+      const currentById = new Map((this.data.favorites || []).map((item) => [item.id, item]));
+      const decorated = decorateFavorites(favorites.items || []).map((item) => {
+        const current = currentById.get(item.id);
+        const nextFileId = item.listVisualFileId || item.visualFileId || '';
+        const currentFileId = current && (current.listVisualFileId || current.visualFileId || '');
+        return current && nextFileId && nextFileId === currentFileId && current.listVisualUrl
+          ? { ...item, listVisualUrl: current.listVisualUrl }
+          : item;
+      });
       const mediaRequestId = (this.favoriteMediaRequestId || 0) + 1;
       this.favoriteMediaRequestId = mediaRequestId;
       if (this.mediaRecovery) this.mediaRecovery.reset();
@@ -106,19 +114,23 @@ Page({
     ));
     const resolvedUrls = await knowledgeMediaSession.resolveFileIds(fileIds);
     if (this.pageDisposed || requestId !== this.favoriteMediaRequestId) return false;
-    this.setData({
-      favorites: (this.data.favorites || []).map((item) => (
-        applyResolvedItemMedia(item, resolvedUrls, { includeRelated: false })
-      ))
-    });
+    const patch = createResolvedItemListMediaPatch(
+      this.data.favorites,
+      resolvedUrls,
+      'favorites',
+      { includeRelated: false }
+    );
+    if (Object.keys(patch).length) this.setData(patch);
     if (this.mediaRecovery) {
       this.mediaRecovery.track(fileIds, (freshUrls) => {
         if (requestId !== this.favoriteMediaRequestId) return;
-        this.setData({
-          favorites: (this.data.favorites || []).map((item) => (
-            applyResolvedItemMedia(item, freshUrls, { includeRelated: false })
-          ))
-        });
+        const freshPatch = createResolvedItemListMediaPatch(
+          this.data.favorites,
+          freshUrls,
+          'favorites',
+          { includeRelated: false }
+        );
+        if (Object.keys(freshPatch).length) this.setData(freshPatch);
       });
     }
     return true;

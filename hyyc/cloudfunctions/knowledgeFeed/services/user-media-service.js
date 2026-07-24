@@ -851,18 +851,13 @@ function createUserMediaService({
         || record.status !== 'published'
         || record.publishedFileId !== fileId
         || !record.businessBinding
-        || record.businessBinding.state !== 'attached'
-        || (record.businessBinding.kind === 'profile'
-          && access.comments !== true
-          && record.ownerKey !== access.ownerKey)) continue;
-      if (record.businessBinding.kind === 'comment') {
-        try {
-          if (!publicationVerifier
-            || typeof publicationVerifier.canRead !== 'function'
-            || !await publicationVerifier.canRead(record, access)) continue;
-        } catch (error) {
-          continue;
-        }
+        || record.businessBinding.state !== 'attached') continue;
+      try {
+        if (!publicationVerifier
+          || typeof publicationVerifier.canRead !== 'function'
+          || !await publicationVerifier.canRead(record, access)) continue;
+      } catch (error) {
+        continue;
       }
       visible.push(fileId);
     }

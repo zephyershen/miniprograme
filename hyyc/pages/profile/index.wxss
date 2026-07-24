@@ -176,6 +176,7 @@
 .pro-purchase-button::after { border: 0; }
 .pro-purchase-button[disabled] { opacity: .72; }
 .pro-purchase-footnote { margin-top: 20rpx; color: var(--ui-muted); font-size: 19rpx; line-height: 1.55; text-align: center; }
+.pro-account-note { margin-top: 15rpx; color: var(--ui-muted); font-size: 17rpx; line-height: 1.55; text-align: center; }
 .pro-renewal-note { margin-top: 15rpx; color: var(--ui-faint); font-size: 17rpx; text-align: center; }
 
 .profile-section { padding-bottom: 18rpx; }
@@ -195,6 +196,8 @@
 .profile-link > view { flex: 1; min-width: 0; }
 .profile-link > text { color: var(--ui-accent); font-size: 24rpx; }
 .link-title { font-size: 27rpx; font-weight: 710; }
+.link-title-with-badge { display: flex; align-items: center; gap: 12rpx; }
+.message-count-badge { display: inline-flex; min-width: 34rpx; height: 34rpx; box-sizing: border-box; align-items: center; justify-content: center; padding: 0 9rpx; border-radius: 999rpx; background: var(--ui-accent); color: #fff; font-size: 17rpx; font-weight: 760; line-height: 34rpx; }
 .link-copy { margin-top: 8rpx; color: var(--ui-muted); font-size: 20rpx; line-height: 1.55; }
 
 .admin-note {

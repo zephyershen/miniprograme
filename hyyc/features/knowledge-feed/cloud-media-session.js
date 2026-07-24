@@ -142,6 +142,40 @@ function applyResolvedItemMedia(item = {}, resolvedUrls = new Map(), { includeRe
   };
 }
 
+function collectResolvedItemMedia(item = {}, resolvedUrls = new Map(), { includeRelated = true } = {}) {
+  if (!item) return resolvedUrls;
+  const remember = (fileId, url) => {
+    if (isCloudFileId(fileId) && typeof url === 'string' && url) {
+      resolvedUrls.set(fileId, url);
+    }
+  };
+  const author = item.sourceAuthor;
+  remember(author && author.avatarFileId, author && author.avatarUrl);
+  remember(item.listVisualFileId || item.visualFileId, item.listVisualUrl);
+  remember(item.coverFileId, item.coverUrl);
+  (Array.isArray(item.previewSlides) ? item.previewSlides : []).forEach((slide) => {
+    remember(slide && slide.fileId, slide && slide.url);
+  });
+  (Array.isArray(item.previewFileIds) ? item.previewFileIds : []).forEach((fileId, index) => {
+    remember(fileId, Array.isArray(item.previewFileUrls) ? item.previewFileUrls[index] : '');
+  });
+  if (includeRelated) {
+    (Array.isArray(item.relatedItems) ? item.relatedItems : []).forEach((related) => {
+      collectResolvedItemMedia(related, resolvedUrls, { includeRelated: false });
+    });
+  }
+  return resolvedUrls;
+}
+
+function preserveResolvedItemMedia(nextItem, currentItem, options = {}) {
+  if (!nextItem || !currentItem) return nextItem;
+  return applyResolvedItemMedia(
+    nextItem,
+    collectResolvedItemMedia(currentItem, new Map(), options),
+    options
+  );
+}
+
 function applyResolvedFeedMedia(feed = {}, resolvedUrls = new Map()) {
   return {
     ...feed,
@@ -156,6 +190,104 @@ function applyResolvedFeedMedia(feed = {}, resolvedUrls = new Map()) {
         .map((item) => applyResolvedItemMedia(item, resolvedUrls, { includeRelated: false }))
     }))
   };
+}
+
+function createResolvedItemMediaPatch(
+  item = {},
+  resolvedUrls = new Map(),
+  basePath = 'item',
+  { includeRelated = true } = {}
+) {
+  if (!item || !basePath) return {};
+  const hydrated = applyResolvedItemMedia(item, resolvedUrls, { includeRelated });
+  const patch = {};
+  const currentAuthor = item.sourceAuthor;
+  const nextAuthor = hydrated.sourceAuthor;
+  if (currentAuthor && nextAuthor
+    && (currentAuthor.avatarFileId || typeof currentAuthor.avatarUrl === 'string')
+    && currentAuthor.avatarUrl !== nextAuthor.avatarUrl) {
+    patch[`${basePath}.sourceAuthor.avatarUrl`] = nextAuthor.avatarUrl;
+  }
+  if ((item.listVisualFileId || item.visualFileId || typeof item.listVisualUrl === 'string')
+    && item.listVisualUrl !== hydrated.listVisualUrl) {
+    patch[`${basePath}.listVisualUrl`] = hydrated.listVisualUrl;
+  }
+  if ((item.coverFileId || typeof item.coverUrl === 'string')
+    && item.coverUrl !== hydrated.coverUrl) {
+    patch[`${basePath}.coverUrl`] = hydrated.coverUrl;
+  }
+  const currentSlides = Array.isArray(item.previewSlides) ? item.previewSlides : [];
+  const nextSlides = Array.isArray(hydrated.previewSlides) ? hydrated.previewSlides : [];
+  nextSlides.forEach((slide, index) => {
+    if (!currentSlides[index] || currentSlides[index].url === slide.url) return;
+    patch[`${basePath}.previewSlides[${index}].url`] = slide.url;
+  });
+  const currentPreviewUrls = Array.isArray(item.previewFileUrls) ? item.previewFileUrls : [];
+  const nextPreviewUrls = Array.isArray(hydrated.previewFileUrls) ? hydrated.previewFileUrls : [];
+  nextPreviewUrls.forEach((url, index) => {
+    if (currentPreviewUrls[index] === url) return;
+    patch[`${basePath}.previewFileUrls[${index}]`] = url;
+  });
+  if (includeRelated) {
+    const currentRelated = Array.isArray(item.relatedItems) ? item.relatedItems : [];
+    currentRelated.forEach((related, index) => {
+      Object.assign(patch, createResolvedItemMediaPatch(
+        related,
+        resolvedUrls,
+        `${basePath}.relatedItems[${index}]`,
+        { includeRelated: false }
+      ));
+    });
+  }
+  return patch;
+}
+
+function createResolvedFeedMediaPatch(feed = {}, resolvedUrls = new Map(), rootPath = 'feed') {
+  const patch = {};
+  if (feed.leadItem) {
+    Object.assign(patch, createResolvedItemMediaPatch(
+      feed.leadItem,
+      resolvedUrls,
+      `${rootPath}.leadItem`,
+      { includeRelated: false }
+    ));
+  }
+  (Array.isArray(feed.remainingItems) ? feed.remainingItems : []).forEach((item, index) => {
+    Object.assign(patch, createResolvedItemMediaPatch(
+      item,
+      resolvedUrls,
+      `${rootPath}.remainingItems[${index}]`,
+      { includeRelated: false }
+    ));
+  });
+  (Array.isArray(feed.dayGroups) ? feed.dayGroups : []).forEach((group, groupIndex) => {
+    (Array.isArray(group.items) ? group.items : []).forEach((item, itemIndex) => {
+      Object.assign(patch, createResolvedItemMediaPatch(
+        item,
+        resolvedUrls,
+        `${rootPath}.dayGroups[${groupIndex}].items[${itemIndex}]`,
+        { includeRelated: false }
+      ));
+    });
+  });
+  return patch;
+}
+
+function createResolvedItemListMediaPatch(
+  items = [],
+  resolvedUrls = new Map(),
+  rootPath = 'items',
+  options = {}
+) {
+  return (Array.isArray(items) ? items : []).reduce((patch, item, index) => {
+    Object.assign(patch, createResolvedItemMediaPatch(
+      item,
+      resolvedUrls,
+      `${rootPath}[${index}]`,
+      options
+    ));
+    return patch;
+  }, {});
 }
 
 function createKnowledgeMediaSession({
@@ -323,9 +455,14 @@ module.exports = {
   uniqueCloudFileIds,
   mediaUrl,
   collectItemMediaFileIds,
+  collectResolvedItemMedia,
   collectFeedMediaFileIds,
   applyResolvedItemMedia,
   applyResolvedFeedMedia,
+  preserveResolvedItemMedia,
+  createResolvedItemMediaPatch,
+  createResolvedItemListMediaPatch,
+  createResolvedFeedMediaPatch,
   resolvedUrlExpiresAt,
   createKnowledgeMediaSession,
   knowledgeMediaSession

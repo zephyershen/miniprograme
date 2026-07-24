@@ -1,0 +1,41 @@
+.loading-state {
+  display: flex;
+  min-height: 180rpx;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18rpx;
+  color: #72808b;
+  font-size: 21rpx;
+  line-height: 1.5;
+}
+
+.loading-state-compact {
+  min-height: 72rpx;
+  flex-direction: row;
+  gap: 12rpx;
+}
+
+.loading-state-spinner {
+  box-sizing: border-box;
+  width: 46rpx;
+  height: 46rpx;
+  border: 4rpx solid rgba(29, 155, 240, 0.18);
+  border-top-color: #1d9bf0;
+  border-radius: 50%;
+  animation: loading-state-spin 0.76s linear infinite;
+}
+
+.loading-state-compact .loading-state-spinner {
+  width: 28rpx;
+  height: 28rpx;
+  border-width: 3rpx;
+}
+
+@keyframes loading-state-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-state-spinner { animation-duration: 1.5s; }
+}

@@ -19,6 +19,7 @@ Page({
     loading: true,
     error: '',
     dossier: null,
+    visualLoading: false,
     membershipPromptVisible: false,
     membershipPromptFeature: 'ai_column'
   },
@@ -36,7 +37,7 @@ Page({
       this.skipNextDossierRevalidation = false;
       return;
     }
-    return this.loadDossier({ force: true });
+    return this.loadDossier({ force: true, preserveCurrent: true });
   },
 
   onUnload() {
@@ -56,24 +57,39 @@ Page({
     return membershipCacheScope(access);
   },
 
-  async loadDossier({ force = false } = {}) {
+  async loadDossier({ force = false, preserveCurrent = false } = {}) {
     if (!this.dossierId) {
       this.setData({ loading: false, error: '没有找到这份趋势档案' });
       return;
     }
     const requestId = (this.dossierRequestId || 0) + 1;
     this.dossierRequestId = requestId;
-    this.setData({ loading: true, error: '' });
+    const currentDossier = preserveCurrent ? this.data.dossier : null;
+    this.setData(currentDossier ? { error: '' } : { loading: true, error: '' });
     try {
       const scope = await this.resolveProtectedScope({ force: true });
       if (this.pageDisposed || requestId !== this.dossierRequestId) return false;
       const payload = await loadTrendDossier(this.dossierId, { force, scope });
       if (this.pageDisposed || requestId !== this.dossierRequestId) return false;
-      this.setData({ loading: false, dossier: normalizeTrendDossier(payload) });
+      const dossier = normalizeTrendDossier(payload);
+      const dossierChanged = !currentDossier
+        || JSON.stringify(currentDossier) !== JSON.stringify(dossier);
+      this.setData({
+        loading: false,
+        error: '',
+        ...(dossierChanged ? {
+          dossier,
+          visualLoading: dossier.visual.mode === 'image'
+        } : {})
+      });
       return true;
     } catch (error) {
       if (this.pageDisposed || requestId !== this.dossierRequestId) return false;
       const locked = error && error.code === 'ENTITLEMENT_REQUIRED';
+      if (currentDossier && !locked) {
+        this.setData({ loading: false, error: '' });
+        return false;
+      }
       this.setData({
         loading: false,
         dossier: null,
@@ -92,6 +108,15 @@ Page({
     const visual = this.data.dossier && this.data.dossier.visual;
     if (!visual || visual.mode !== 'image' || !visual.imageUrl) return;
     wx.previewImage({ current: visual.imageUrl, urls: [visual.imageUrl] });
+  },
+
+  handleVisualLoad() {
+    if (this.data.visualLoading) this.setData({ visualLoading: false });
+  },
+
+  handleVisualError() {
+    this.setData({ visualLoading: false });
+    wx.showToast({ title: '示意图暂时无法加载', icon: 'none' });
   },
 
   openLesson(event) {

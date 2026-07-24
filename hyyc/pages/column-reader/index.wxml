@@ -1,6 +1,7 @@
 <page-meta page-style="{{membershipPromptVisible ? 'overflow: hidden;' : ''}}" />
 <view class="reader-page">
   <view wx:if="{{loading}}" class="reader-state">
+    <loading-state compact="{{true}}" label="正在加载专栏内容" />
     <view class="state-rule state-rule-strong"></view><view class="state-rule"></view><view class="state-rule state-rule-short"></view>
   </view>
 
@@ -61,7 +62,10 @@
     </view>
 
     <view wx:if="{{article.visual.mode !== 'none'}}" class="reader-visual">
-      <image wx:if="{{article.visual.mode === 'image'}}" class="reader-image" src="{{article.visual.imageUrl}}" mode="widthFix" bindtap="previewIllustration" />
+      <view wx:if="{{article.visual.mode === 'image'}}" class="reader-image-shell">
+        <image class="reader-image" src="{{article.visual.imageUrl}}" mode="aspectFit" bindload="handleVisualLoad" binderror="handleVisualError" bindtap="previewIllustration" />
+        <loading-state wx:if="{{visualLoading}}" compact="{{true}}" label="" />
+      </view>
       <view wx:else class="blueprint">
         <view class="blueprint-core">{{article.visual.center}}</view>
         <view class="blueprint-rail"></view>

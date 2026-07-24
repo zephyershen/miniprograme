@@ -5,7 +5,7 @@
     <view class="editor-copy">头像和昵称会显示在你发布的评论旁边，之后可以随时修改。</view>
   </view>
 
-  <view wx:if="{{loading}}" class="editor-loading">正在读取资料…</view>
+  <view wx:if="{{loading}}" class="editor-loading"><loading-state label="正在读取资料" /></view>
   <view wx:else class="editor-card">
     <button class="avatar-picker" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
       <view class="avatar-preview">

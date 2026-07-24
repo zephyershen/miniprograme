@@ -11,6 +11,7 @@ module.exports = {
   wechatVirtualPayApiBaseUrl: 'https://api.weixin.qq.com',
   wechatVirtualPayTimeoutMs: 8000,
   wechatVirtualPayPro30dPriceCents: 590,
+  wechatVirtualPayPro30dGoodsPriceCents: 590,
   wechatVirtualPayPro30dCompareAtPriceCents: 1090,
   wechatMessagePushToken: '微信公众平台消息推送配置中的 Token',
   wechatMessagePushEncodingAesKey: '微信公众平台消息推送配置中的 43 位 EncodingAESKey'

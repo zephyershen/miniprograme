@@ -31,13 +31,8 @@ function getComments(id) {
 }
 
 function addComment(id, payload) {
-  const work = () => callCloudFunction('knowledgeFeed', {
+  return callCloudFunction('knowledgeFeed', {
     action: 'addComment', id, ...(payload || {})
-  });
-  return work().catch(async (error) => {
-    if (!error || error.code !== 'CONTENT_REVIEW_UNAVAILABLE') throw error;
-    await wait(400);
-    return work();
   });
 }
 

@@ -142,7 +142,7 @@ function createWechatVirtualPayClient({ config, fetchImpl = globalThis.fetch, no
       offerId: config.offerId,
       environment: config.environment,
       productId: config.productId,
-      goodsPrice: order.goodsPriceCents || order.amountCents,
+      goodsPrice: order.goodsPriceCents,
       activitySellingPrice: order.goodsPriceCents > order.amountCents
         ? order.amountCents
         : undefined,

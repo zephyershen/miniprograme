@@ -47,6 +47,8 @@ const { createUserProfileRepository } = require('./repositories/user-profile');
 const {
   createUserProfileReviewRepository
 } = require('./repositories/user-profile-review');
+const { createCommentReviewRepository } = require('./repositories/comment-review');
+const { createUserMessageRepository } = require('./repositories/user-message');
 const { createUserMediaRepository } = require('./repositories/user-media');
 const { createFeedVisualJobRepository } = require('./repositories/feed-visual-job');
 const { createFeedAnalysisRepository } = require('./repositories/feed-analysis');
@@ -95,6 +97,8 @@ const {
 const { createCloudbaseMediaUploader } = require('./services/cloudbase-media-uploader');
 const { createCommentModerationService } = require('./services/comment-moderation-service');
 const { createProfileModerationService } = require('./services/profile-moderation-service');
+const { createCommentReviewService } = require('./services/comment-review-service');
+const { createUserMessageService } = require('./services/user-message-service');
 const { createColumnContentService } = require('./services/column-content-service');
 const { createColumnEditorialService } = require('./services/column-editorial-service');
 const { createScheduledWorkService } = require('./services/scheduled-work-service');
@@ -120,6 +124,11 @@ const userProfileReviewRepository = createUserProfileReviewRepository(
   database,
   ENGAGEMENT_CONFIG
 );
+const commentReviewRepository = createCommentReviewRepository(database, {
+  ...ENGAGEMENT_CONFIG,
+  ensureItems: itemRepository.ensureCollection
+});
+const userMessageRepository = createUserMessageRepository(database, ENGAGEMENT_CONFIG);
 const userMediaRepository = createUserMediaRepository(database, ENGAGEMENT_CONFIG);
 const dayIndexRepository = createFeedDayIndexRepository(database, ITEM_STORE_CONFIG);
 const syncStateRepository = createFeedSyncStateRepository(database, ITEM_STORE_CONFIG);
@@ -264,6 +273,18 @@ const userProfileService = createUserProfileService({
   userMediaService,
   logger
 });
+const commentReviewService = createCommentReviewService({
+  repository: commentReviewRepository,
+  moderationService: commentModerationService,
+  userMediaService,
+  config: ENGAGEMENT_CONFIG,
+  logger
+});
+const userMessageService = createUserMessageService({
+  repository: userMessageRepository,
+  config: ENGAGEMENT_CONFIG,
+  logger
+});
 const columnContentService = createColumnContentService({
   repository: columnEditorialRepository,
   getTempFileURL: (options) => cloud.getTempFileURL(options)
@@ -312,6 +333,7 @@ const itemFeedQueryService = createItemFeedQueryService({
 });
 const engagementService = createFeedEngagementService({
   repository: engagementRepository,
+  commentReviewRepository,
   profileRepository: userProfileRepository,
   itemLoader: (itemId, entitlement) => itemFeedQueryService.getItem(itemId, entitlement),
   commentModerationService,
@@ -398,7 +420,10 @@ const scheduledWorkService = createScheduledWorkService({
   digestGenerationService,
   columnEditorialService,
   userMediaService,
-  userProfileService
+  userProfileService,
+  commentReviewService,
+  userMessageService,
+  logger
 });
 
 const SCHEDULED_HANDLERS = Object.freeze({
@@ -581,6 +606,13 @@ const ACTION_HANDLERS = Object.freeze({
     const actor = actorService.resolve();
     return userProfileService.save(event.profile, actor);
   },
+    messages: async () => userMessageService.list(actorService.resolve()),
+    markMessageRead: async (event) => userMessageService.markRead(
+      event.messageId,
+      event.messageVersion,
+      actorService.resolve()
+    ),
+  markAllMessagesRead: async () => userMessageService.markAllRead(actorService.resolve()),
   columnContent: async () => {
     const actor = actorService.resolve();
     return columnContentService.get(await resolveEntitlement(actor));

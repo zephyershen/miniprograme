@@ -73,6 +73,28 @@
       "reason": "Page active comments newest-first before applying fail-closed moderation checks."
     },
     {
+      "collection": "knowledge_feed_comments",
+      "name": "review_state_claim_expires",
+      "unique": false,
+      "keys": [
+        { "field": "reviewState", "direction": "1" },
+        { "field": "claimExpiresAt", "direction": "1" }
+      ],
+      "owner": "comment-review-worker",
+      "reason": "Recover asynchronous comment moderation jobs with expired leases."
+    },
+    {
+      "collection": "knowledge_feed_comments",
+      "name": "review_state_next_attempt",
+      "unique": false,
+      "keys": [
+        { "field": "reviewState", "direction": "1" },
+        { "field": "nextAttemptAt", "direction": "1" }
+      ],
+      "owner": "comment-review-worker",
+      "reason": "Claim due asynchronous comment moderation jobs."
+    },
+    {
       "collection": "knowledge_feed_digests",
       "name": "window_status_generated",
       "unique": false,
@@ -390,6 +412,28 @@
       "reason": "Resolve a payment notification by WeChat transaction id."
     },
     {
+      "collection": "knowledge_message_events",
+      "name": "status_claim_expires_at",
+      "unique": false,
+      "keys": [
+        { "field": "status", "direction": "1" },
+        { "field": "claimExpiresAt", "direction": "1" }
+      ],
+      "owner": "user-message-worker",
+      "reason": "Recover user-message outbox events with expired leases."
+    },
+    {
+      "collection": "knowledge_message_events",
+      "name": "status_next_attempt_at",
+      "unique": false,
+      "keys": [
+        { "field": "status", "direction": "1" },
+        { "field": "nextAttemptAt", "direction": "1" }
+      ],
+      "owner": "user-message-worker",
+      "reason": "Claim due user-message outbox events."
+    },
+    {
       "collection": "knowledge_user_media",
       "name": "cleanup_after_1",
       "unique": false,
@@ -408,6 +452,30 @@
       ],
       "owner": "user-media-cleanup",
       "reason": "Recover stale cleanup claims in deadline order."
+    },
+    {
+      "collection": "knowledge_user_messages",
+      "name": "owner_created_at",
+      "unique": false,
+      "keys": [
+        { "field": "ownerKey", "direction": "1" },
+        { "field": "createdAt", "direction": "-1" },
+        { "field": "_id", "direction": "-1" }
+      ],
+      "owner": "user-message-center",
+      "reason": "List one user's newest message-center entries without read-state reordering."
+    },
+    {
+      "collection": "knowledge_user_messages",
+      "name": "owner_unread_delivered_at",
+      "unique": false,
+      "keys": [
+        { "field": "ownerKey", "direction": "1" },
+        { "field": "unread", "direction": "1" },
+        { "field": "deliveredAt", "direction": "1" }
+      ],
+      "owner": "user-message-center",
+      "reason": "Count unread entries and mark only message versions delivered before the user's action."
     },
     {
       "collection": "knowledge_user_profile_reviews",

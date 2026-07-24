@@ -28,6 +28,7 @@ Page({
     loading: true,
     error: '',
     article: null,
+    visualLoading: false,
     activePosterIndex: 0,
     posterLoads: [],
     posterError: '',
@@ -53,7 +54,7 @@ Page({
       this.skipNextContentRevalidation = false;
       return;
     }
-    return this.loadContent({ force: true });
+    return this.loadContent({ force: true, preserveCurrent: true });
   },
 
   onUnload() {
@@ -73,14 +74,15 @@ Page({
     return membershipCacheScope(access);
   },
 
-  async loadContent({ force = false } = {}) {
+  async loadContent({ force = false, preserveCurrent = false } = {}) {
     if (!this.articleId) {
       this.setData({ loading: false, error: '没有找到这篇内容' });
       return;
     }
     const requestId = (this.contentRequestId || 0) + 1;
     this.contentRequestId = requestId;
-    this.setData({ loading: true, error: '' });
+    const currentArticle = preserveCurrent ? this.data.article : null;
+    this.setData(currentArticle ? { error: '' } : { loading: true, error: '' });
     try {
       const scope = await this.resolveProtectedScope({ force: true });
       if (this.pageDisposed || requestId !== this.contentRequestId) return false;
@@ -91,17 +93,30 @@ Page({
           : await loadColumnLesson(this.articleId, { force, scope });
       if (this.pageDisposed || requestId !== this.contentRequestId) return false;
       const article = normalizeReader(this.articleType, payload);
+      const articleChanged = !currentArticle
+        || JSON.stringify(currentArticle) !== JSON.stringify(article);
+      const activePosterIndex = currentArticle
+        ? Math.min(this.data.activePosterIndex, Math.max(0, article.posters.length - 1))
+        : 0;
       this.setData({
         loading: false,
-        article,
-        activePosterIndex: 0,
-        posterLoads: posterLoadWindow(0, article.posters.length),
-        posterError: ''
+        error: '',
+        ...(articleChanged ? {
+          article,
+          activePosterIndex,
+          posterLoads: posterLoadWindow(activePosterIndex, article.posters.length),
+          posterError: '',
+          visualLoading: article.visual.mode === 'image'
+        } : {})
       });
       return true;
     } catch (error) {
       if (this.pageDisposed || requestId !== this.contentRequestId) return false;
       const locked = error && error.code === 'ENTITLEMENT_REQUIRED';
+      if (currentArticle && !locked) {
+        this.setData({ loading: false, error: '' });
+        return false;
+      }
       this.setData({
         loading: false,
         article: null,
@@ -120,6 +135,15 @@ Page({
     const visual = this.data.article && this.data.article.visual;
     if (!visual || visual.mode !== 'image' || !visual.imageUrl) return;
     wx.previewImage({ current: visual.imageUrl, urls: [visual.imageUrl] });
+  },
+
+  handleVisualLoad() {
+    if (this.data.visualLoading) this.setData({ visualLoading: false });
+  },
+
+  handleVisualError() {
+    this.setData({ visualLoading: false });
+    wx.showToast({ title: '示意图暂时无法加载', icon: 'none' });
   },
 
   handlePosterChange(event) {

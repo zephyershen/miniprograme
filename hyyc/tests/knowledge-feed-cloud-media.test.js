@@ -7,6 +7,7 @@ const {
   applyResolvedFeedMedia,
   applyResolvedItemMedia,
   collectFeedMediaFileIds,
+  createResolvedFeedMediaPatch,
   createKnowledgeMediaSession,
   knowledgeMediaSession,
   resolvedUrlExpiresAt
@@ -261,6 +262,40 @@ test('hydrates all feed and detail media without mutating durable cloud ids', ()
     'https://temp.example/list');
 });
 
+test('builds leaf-only feed media patches for stable list nodes', () => {
+  const feed = {
+    leadItem: {
+      id: 'lead',
+      listVisualFileId: 'cloud://lead',
+      listVisualUrl: ''
+    },
+    remainingItems: [],
+    dayGroups: [{
+      dateKey: '2026-07-23',
+      items: [{
+        id: 'row',
+        listVisualFileId: 'cloud://row',
+        listVisualUrl: '',
+        sourceAuthor: {
+          avatarFileId: 'cloud://avatar',
+          avatarUrl: ''
+        }
+      }]
+    }]
+  };
+  const patch = createResolvedFeedMediaPatch(feed, new Map([
+    ['cloud://lead', 'https://temp.example/lead'],
+    ['cloud://row', 'https://temp.example/row'],
+    ['cloud://avatar', 'https://temp.example/avatar']
+  ]));
+  assert.deepEqual(patch, {
+    'feed.leadItem.listVisualUrl': 'https://temp.example/lead',
+    'feed.dayGroups[0].items[0].sourceAuthor.avatarUrl': 'https://temp.example/avatar',
+    'feed.dayGroups[0].items[0].listVisualUrl': 'https://temp.example/row'
+  });
+  assert.equal(Object.prototype.hasOwnProperty.call(patch, 'feed'), false);
+});
+
 test('fails open when cloud media resolution throws', async () => {
   const session = createKnowledgeMediaSession({
     logger: { warn() {} },
@@ -480,6 +515,43 @@ test('cards ignores an older favorites response that completes last', async () =
   first.resolve({ items: [{ id: 'stale', title: 'Stale' }] });
   assert.equal(await older, false);
   assert.deepEqual(context.data.favorites.map((item) => item.id), ['newest']);
+});
+
+test('inbox applies resolved media as leaf patches without replacing the feed', async () => {
+  const inbox = loadPage('../pages/inbox/index');
+  const originalResolveForFeed = knowledgeMediaSession.resolveForFeed;
+  knowledgeMediaSession.resolveForFeed = async () => new Map([
+    ['cloud://lead', 'https://temp.example/lead']
+  ]);
+  const patches = [];
+  let tracked = 0;
+  const context = {
+    feedMediaRequestId: 1,
+    data: {
+      feed: {
+        leadItem: {
+          id: 'lead',
+          listVisualFileId: 'cloud://lead',
+          listVisualUrl: ''
+        },
+        remainingItems: [],
+        dayGroups: []
+      }
+    },
+    mediaRecovery: {
+      track() { tracked += 1; }
+    },
+    setData(patch) { patches.push(patch); }
+  };
+  try {
+    assert.equal(await inbox.resolveVisibleFeedMedia.call(context, context.data.feed, 1), true);
+  } finally {
+    knowledgeMediaSession.resolveForFeed = originalResolveForFeed;
+  }
+  assert.deepEqual(patches, [{
+    'feed.leadItem.listVisualUrl': 'https://temp.example/lead'
+  }]);
+  assert.equal(tracked, 1);
 });
 
 test('list and detail pages discard stale asynchronous media results', async () => {

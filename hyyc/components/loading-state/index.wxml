@@ -1,0 +1,4 @@
+<view class="loading-state {{compact ? 'loading-state-compact' : ''}}" aria-role="progressbar" aria-label="{{label}}">
+  <view class="loading-state-spinner"></view>
+  <text wx:if="{{label}}">{{label}}</text>
+</view>

@@ -11,7 +11,7 @@
         <view>{{canParticipate ? '从一个具体判断开始，会更容易聊下去。' : '会员到期后，你仍可在这里查看、申诉或删除自己被隐藏的评论。'}}</view>
       </view>
       <block wx:else>
-        <view wx:for="{{comments}}" wx:key="id" class="comment-row {{item.isHidden ? 'is-hidden' : ''}}">
+        <view wx:for="{{comments}}" wx:key="id" class="comment-row {{item.isHidden ? 'is-hidden' : ''}} {{item.reviewPending ? 'is-reviewing' : ''}}">
           <view class="comment-avatar-wrap">
             <image wx:if="{{item.author.avatarUrl}}" class="comment-avatar" src="{{item.author.avatarUrl}}" mode="aspectFill" lazy-load="{{true}}" />
             <view wx:else class="comment-avatar comment-avatar-empty">{{item.author.initial}}</view>

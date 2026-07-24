@@ -130,17 +130,28 @@ function memoryRepository() {
     },
     listFavorites: async (ownerKey) => [...reactions.values()]
       .filter((entry) => entry.ownerKey === ownerKey && entry.favorited),
-    listComments: async () => comments,
+    listComments: async (itemId, limit, access = {}) => comments.filter((comment) => (
+      comment.status !== 'pending' || comment.authorKey === access.ownerKey
+    )),
     getComment: async (commentId, itemId) => {
       const comment = comments.find((entry) => entry._id === commentId && entry.itemId === itemId);
-      return comment ? { comment, commentCount: comments.length } : null;
+      return comment ? { comment, commentCount: ITEM.commentCount } : null;
     },
     addComment: async (ownerKey, itemId, input, createdAt, id) => {
       const existing = comments.find((comment) => comment._id === id);
-      if (existing) return { comment: existing, commentCount: comments.length };
-      const comment = { _id: id, itemId, authorKey: ownerKey, ...input, createdAt };
+      if (existing) return { comment: existing, commentCount: ITEM.commentCount };
+      const comment = {
+        _id: id,
+        itemId,
+        authorKey: ownerKey,
+        ...input,
+        status: 'pending',
+        reviewState: 'pending',
+        moderation: { status: 'pending' },
+        createdAt
+      };
       comments.unshift(comment);
-      return { comment, commentCount: comments.length };
+      return { comment, commentCount: ITEM.commentCount };
     }
   };
 }
@@ -277,6 +288,7 @@ test('lets every signed-in viewer like, favorite, and manage private history whi
   ]);
   let reviewCount = 0;
   let publishCount = 0;
+  let holdCount = 0;
   const service = createFeedEngagementService({
     repository,
     profileRepository: {
@@ -294,6 +306,9 @@ test('lets every signed-in viewer like, favorite, and manage private history whi
     },
     userMediaService: {
       filesForReview: async (actor, kind, fileIds) => fileIds,
+      holdForReview: async () => {
+        holdCount += 1;
+      },
       publishOwned: async (actor, kind, fileIds) => {
         publishCount += 1;
         return fileIds.map((fileId) => fileId.replace(
@@ -355,9 +370,12 @@ test('lets every signed-in viewer like, favorite, and manage private history whi
   assert.equal(added.comment.authorLabel, '果冻卡哇伊');
   assert.equal(added.comment.attachments[0].width, 1200);
   assert.equal((await service.addComment(ITEM.id, payload, actor, member)).commentCount, 1);
-  assert.equal(reviewCount, 1);
-  assert.equal(publishCount, 1);
-  assert.equal((await service.listComments(ITEM.id, { ownerKey: OTHER }, member)).comments[0].authorLabel, '果冻卡哇伊');
+  assert.equal(added.comment.reviewPending, true);
+  assert.equal(reviewCount, 0);
+  assert.equal(publishCount, 0);
+  assert.equal(holdCount, 1);
+  assert.equal((await service.listComments(ITEM.id, { ownerKey: OTHER }, member)).comments.length, 0);
+  assert.equal((await service.listComments(ITEM.id, actor, member)).comments[0].reviewPending, true);
   profiles.delete(OWNER);
   await assert.rejects(() => service.addComment(ITEM.id, {
     content: '没有资料不能发布',

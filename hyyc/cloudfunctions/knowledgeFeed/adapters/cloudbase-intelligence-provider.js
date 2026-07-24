@@ -171,7 +171,6 @@ function createCloudbaseIntelligenceProvider({
     schema,
     maxOutputTokens,
     imageUrls = [],
-    enableThinking,
     operationTimeoutMs = timeoutMs
   }) {
     const inputText = `${instructions.trim()}\n\n只返回一个符合以下 JSON Schema 的 JSON 对象，不要输出解释或 Markdown：\n${JSON.stringify(schema)}\n\n<untrusted_input>\n${JSON.stringify(payload)}\n</untrusted_input>`;
@@ -206,9 +205,7 @@ function createCloudbaseIntelligenceProvider({
         messages,
         temperature: 0.1,
         max_tokens: maxOutputTokens,
-        ...(typeof enableThinking === 'boolean'
-          ? { enable_thinking: enableThinking }
-          : {})
+        enable_thinking: false
       }, { timeout: operationTimeoutMs });
       requestStarted = true;
       const result = await Promise.race([
@@ -331,7 +328,6 @@ function createCloudbaseIntelligenceProvider({
       imageUrls: images,
       schema: COMMENT_MODERATION_SCHEMA,
       maxOutputTokens: 450,
-      enableThinking: false,
       operationTimeoutMs: moderationTimeoutMs
     });
     return {
@@ -352,7 +348,6 @@ function createCloudbaseIntelligenceProvider({
       imageUrls: images,
       schema: COMMENT_MODERATION_SCHEMA,
       maxOutputTokens: 450,
-      enableThinking: false,
       operationTimeoutMs: moderationTimeoutMs
     });
     return {

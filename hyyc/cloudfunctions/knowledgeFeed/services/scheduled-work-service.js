@@ -17,8 +17,29 @@ function createScheduledWorkService({
   digestGenerationService,
   columnEditorialService,
   userMediaService,
-  userProfileService
+  userProfileService,
+  commentReviewService,
+  userMessageService,
+  logger = { warn: () => {} }
 }) {
+  async function settle(worker, work) {
+    try {
+      return await work();
+    } catch (error) {
+      const result = {
+        status: 'deferred',
+        errorCode: error && /^[A-Z0-9_]{3,80}$/.test(error.code || '')
+          ? error.code
+          : 'TEMPORARY_FAILURE'
+      };
+      logger.warn('Scheduled background worker deferred', {
+        worker,
+        errorCode: result.errorCode
+      });
+      return result;
+    }
+  }
+
   async function syncSource(event) {
     const mediaCleanupPromise = userMediaService
       && typeof userMediaService.cleanupExpired === 'function'
@@ -65,7 +86,26 @@ function createScheduledWorkService({
   }
 
   async function processProfileReviews() {
-    return { profileReviews: await userProfileService.processDue() };
+    const messagesBeforeReviews = await settle(
+      'user-messages-before-reviews',
+      () => userMessageService.processDue()
+    );
+    const [profileReviews, commentReviews] = await Promise.all([
+      settle('profile-reviews', () => userProfileService.processDue()),
+      settle('comment-reviews', () => commentReviewService.processDue())
+    ]);
+    const messagesAfterReviews = await settle(
+      'user-messages-after-reviews',
+      () => userMessageService.processDue()
+    );
+    return {
+      profileReviews,
+      commentReviews,
+      userMessages: {
+        beforeReviews: messagesBeforeReviews,
+        afterReviews: messagesAfterReviews
+      }
+    };
   }
 
   async function generateDigest(windowKey) {

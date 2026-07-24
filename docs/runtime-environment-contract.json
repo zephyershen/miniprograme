@@ -63,7 +63,6 @@
         "PACKY_API_BASE_URL",
         "PACKY_MODEL",
         "PACKY_MODERATION_TIMEOUT_MS",
-        "PACKY_REASONING_EFFORT",
         "PACKY_TIMEOUT_MS"
       ]
     },
@@ -123,7 +122,7 @@
       "name": "wechat-payment",
       "owner": "product and application maintainer",
       "secret": false,
-      "required": "new sales require the shared KNOWLEDGE_MEMBER_PURCHASES_ENABLED product gate, ENABLED, RELEASE_APPROVED, and all provider fields; RELEASE_APPROVED stays false until the real-device matrix is complete",
+      "required": "new sales require the shared KNOWLEDGE_MEMBER_PURCHASES_ENABLED product gate, ENABLED, RELEASE_APPROVED, and all provider fields; GOODS_PRICE_CENTS must be an integer at least as high as PRICE_CENTS and exactly match the WeChat product price; RELEASE_APPROVED stays false until the real-device matrix is complete",
       "variables": [
         "WECHAT_MINIPROGRAM_APP_ID",
         "WECHAT_VIRTUAL_PAY_API_BASE_URL",
@@ -131,6 +130,7 @@
         "WECHAT_VIRTUAL_PAY_ENV",
         "WECHAT_VIRTUAL_PAY_PRODUCT_ID",
         "WECHAT_VIRTUAL_PAY_PRO_30D_COMPARE_AT_PRICE_CENTS",
+        "WECHAT_VIRTUAL_PAY_PRO_30D_GOODS_PRICE_CENTS",
         "WECHAT_VIRTUAL_PAY_PRO_30D_PRICE_CENTS",
         "WECHAT_VIRTUAL_PAY_RELEASE_APPROVED",
         "WECHAT_VIRTUAL_PAY_TIMEOUT_MS"

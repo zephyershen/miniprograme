@@ -1,0 +1,65 @@
+<view class="messages-page">
+  <view class="messages-header">
+    <view class="messages-heading">
+      <view class="messages-kicker"><text></text>MY UPDATES</view>
+      <view class="messages-title">消息</view>
+      <view class="messages-deck">会员开通、审核结果和你参与的讨论动态，都会留在这里。</view>
+    </view>
+    <button
+      class="read-all-action"
+      disabled="{{!hasUnread || markingAll || loading}}"
+      loading="{{markingAll}}"
+      bindtap="markAllMessages"
+    >全部已读</button>
+  </view>
+
+  <view wx:if="{{loading}}" class="messages-state-card">
+    <view class="messages-spinner"></view>
+    <view class="state-title">正在整理消息</view>
+    <view class="state-copy">审核结果和讨论动态马上就好。</view>
+  </view>
+
+  <view wx:elif="{{error}}" class="messages-state-card messages-error-card">
+    <view class="state-mark">!</view>
+    <view class="state-title">消息暂时无法加载</view>
+    <view class="state-copy">{{error}}</view>
+    <button class="state-action" bindtap="retryLoadMessages">重新加载</button>
+  </view>
+
+  <view wx:elif="{{!messages.length}}" class="messages-state-card messages-empty-card">
+    <view class="state-mark state-mark-empty">✓</view>
+    <view class="state-title">暂时没有消息</view>
+    <view class="state-copy">会员开通、资料或评论审核结果，以及你参与资讯的新评论，会出现在这里。</view>
+  </view>
+
+  <block wx:else>
+    <view class="messages-summary">
+      <view class="summary-title">全部消息</view>
+      <view class="summary-count">{{hasUnread ? unreadCount + ' 条未读' : '已全部读完'}}</view>
+    </view>
+    <view class="message-list">
+      <view
+        wx:for="{{messages}}"
+        wx:key="id"
+        class="message-row {{item.unread ? 'message-row-unread' : ''}}"
+        hover-class="message-row-pressed"
+        data-message-id="{{item.id}}"
+        bindtap="openMessage"
+      >
+        <view class="message-signal message-signal-{{item.tone}}">
+          <text>{{item.glyph}}</text>
+          <view wx:if="{{item.unread}}" class="message-unread-dot"></view>
+        </view>
+        <view class="message-copy">
+          <view class="message-meta">
+            <text>{{item.kindLabel}}</text>
+            <text class="message-time">{{item.occurredLabel}}</text>
+          </view>
+          <view class="message-title">{{item.title}}</view>
+          <view class="message-body">{{item.body}}</view>
+          <view wx:if="{{item.canOpenItem}}" class="message-link">查看相关资讯 <text>→</text></view>
+        </view>
+      </view>
+    </view>
+  </block>
+</view>
