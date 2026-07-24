@@ -16,7 +16,8 @@ function createScheduledWorkService({
   analysisWorkerService,
   digestGenerationService,
   columnEditorialService,
-  userMediaService
+  userMediaService,
+  userProfileService
 }) {
   async function syncSource(event) {
     const mediaCleanupPromise = userMediaService
@@ -63,6 +64,10 @@ function createScheduledWorkService({
     return { intelligence: await analysisWorkerService.run() };
   }
 
+  async function processProfileReviews() {
+    return { profileReviews: await userProfileService.processDue() };
+  }
+
   async function generateDigest(windowKey) {
     return {
       digests: await digestGenerationService.runDue({ windowKeys: [windowKey] })
@@ -79,6 +84,7 @@ function createScheduledWorkService({
     maintainLegacyVisuals,
     processVisuals,
     processIntelligence,
+    processProfileReviews,
     generateDigest,
     generateWeeklyColumn
   };

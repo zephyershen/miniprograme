@@ -129,6 +129,23 @@ test('keeps profile and comment text placeholders usable before or after media r
   assert.equal(comment.attachments[0].url, '');
 });
 
+test('shows the pending profile candidate without treating it as approved for comments', () => {
+  const pendingAvatar = `cloud://env/user-media/review/avatars/${OWNER}/${UPLOAD}.jpg`;
+  const profile = decorateUserProfile({
+    nickname: '',
+    avatarFileId: '',
+    review: {
+      status: 'pending',
+      nickname: '待审昵称',
+      avatarFileId: pendingAvatar
+    }
+  });
+  assert.equal(profile.displayNickname, '待审昵称');
+  assert.equal(profile.displayAvatarFileId, pendingAvatar);
+  assert.equal(profile.reviewPending, true);
+  assert.equal(profile.isComplete, false);
+});
+
 test('batches comment avatars and attachments and maps resolved URLs back to their owners', async () => {
   const comments = Array.from({ length: 26 }, (_, index) => ({
     id: `comment-${index}`,

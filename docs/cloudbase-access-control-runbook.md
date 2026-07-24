@@ -66,7 +66,7 @@ node scripts/cloudbase-retired-functions.js apply `
 
 数据库脚本先读取全部集合，只修改不是 `ADMINONLY` 的集合，再分批回读。存储脚本只在当前规则与版本化合同不一致时更新为 `CUSTOM`，随后回读。两者重复执行都是幂等的；控制面尚未收敛时默认最多回读 6 次、每次间隔 5 秒。
 
-集合脚本以现有 `docs/cloud-database-rules.json` 的 22 个集合为唯一创建
+集合脚本以现有 `docs/cloud-database-rules.json` 的 23 个集合为唯一创建
 允许列表。apply 在任何写入前完整调用 `ListTables`，只通过 TCB
 `CreateTable` 创建缺失合同集合，从不调用 `DeleteTable`、读取文档、删除或
 重命名未知集合。创建请求同时设置 `PermissionInfo.AclTag=ADMINONLY` 和目标
@@ -99,7 +99,7 @@ canary。索引脚本本身不会创建集合或读取任何媒体记录。
 4. 完成服务端正向冒烟，再运行退休 plan；确认只列出两个固定历史函数后，显式执行退休 apply。
 5. 再运行函数 check，线上清单必须精确为四个函数且配置全部收敛。
 6. 运行集合 plan/check 保存变更前差异，再执行带环境确认的集合 apply；
-   readback 必须确认合同中的 22 个集合全部存在。
+   readback 必须确认合同中的 23 个集合全部存在。
 7. 立即运行数据库规则 check/apply/check，确认所有合同集合均为
    `ADMINONLY`。
 8. 运行索引和存储的 `check`，保存变更前差异，再逐项执行带环境确认的

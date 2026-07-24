@@ -18,4 +18,21 @@ function getMembershipOrderStatus(orderId) {
   return callCloudFunction('membershipBilling', { action: 'orderStatus', orderId });
 }
 
-module.exports = { getBillingPlans, createMembershipPayment, getMembershipOrderStatus };
+function reportMembershipPaymentFailure(orderId, diagnostic) {
+  const source = diagnostic && typeof diagnostic === 'object' ? diagnostic : {};
+  return callCloudFunction('membershipBilling', {
+    action: 'paymentFailure',
+    orderId,
+    errCode: source.errCode,
+    platform: source.platform,
+    envVersion: source.envVersion,
+    sdkVersion: source.sdkVersion
+  });
+}
+
+module.exports = {
+  getBillingPlans,
+  createMembershipPayment,
+  getMembershipOrderStatus,
+  reportMembershipPaymentFailure
+};

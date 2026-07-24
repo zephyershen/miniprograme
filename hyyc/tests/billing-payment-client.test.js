@@ -5,13 +5,16 @@ const {
   loginForPayment,
   requestMiniProgramVirtualPayment,
   paymentCancelled,
+  paymentFailureMessage,
+  virtualPaymentFailureDiagnostic,
   rememberPendingMembershipOrder,
   pendingMembershipOrderId,
   forgetPendingMembershipOrder,
   virtualPaymentAvailable
 } = require('../features/billing/payment.js');
 const {
-  createMembershipPayment
+  createMembershipPayment,
+  reportMembershipPaymentFailure
 } = require('../features/billing/api.js');
 const {
   loadBillingPlans
@@ -46,6 +49,78 @@ test('checks the virtual-payment capability and minimum base-library version', (
 
   global.wx = supportedWx({ getSystemInfoSync: () => ({ SDKVersion: '2.19.1' }) });
   assert.equal(virtualPaymentAvailable(), true);
+});
+
+test('rejects the developer-tools simulator with a true-device payment instruction', () => {
+  global.wx = supportedWx({
+    getDeviceInfo: () => ({ platform: 'devtools' })
+  });
+  assert.throws(
+    () => assertVirtualPaymentAvailable(),
+    (error) => error
+      && error.code === 'VIRTUAL_PAYMENT_DEVTOOLS_UNSUPPORTED'
+      && /真机预览或真机调试/.test(error.message)
+  );
+});
+
+test('maps every documented virtual-payment error code to an actionable message', () => {
+  const expectedMessages = new Map([
+    [1001, '参数校验'],
+    [-1, '支付失败'],
+    [-2, '取消支付'],
+    [-4, '安全保护'],
+    [-5, '开通状态'],
+    [-15001, '参数校验'],
+    [-15002, '订单已失效'],
+    [-15003, '系统暂时繁忙'],
+    [-15004, '币种配置'],
+    [-15005, '登录签名'],
+    [-15006, '支付签名'],
+    [-15007, '登录状态'],
+    [-15008, '商户支付配置'],
+    [-15009, '支付商品尚未发布'],
+    [-15010, '会员商品尚未发布'],
+    [-15011, '正式版本不能使用沙箱'],
+    [-15012, '订单创建失败'],
+    [-15013, '商品价格配置不一致'],
+    [-15014, '约 10 分钟'],
+    [-15016, '订单格式'],
+    [-15017, '收款功能当前受限'],
+    [-15018, '未通过平台审核'],
+    [-15019, '收款功能当前受限'],
+    [-15020, '操作过快'],
+    [-15021, '请求过于频繁']
+  ]);
+  expectedMessages.forEach((fragment, errCode) => {
+    assert.match(paymentFailureMessage({ errCode }), new RegExp(fragment));
+  });
+  assert.equal(
+    paymentFailureMessage({ errCode: -99999 }),
+    '支付暂时无法完成，请稍后重试'
+  );
+});
+
+test('builds a strict non-sensitive diagnostic only for official payment errors', () => {
+  global.wx = supportedWx({
+    getDeviceInfo: () => ({ platform: 'ios', model: 'must-not-leak' }),
+    getAccountInfoSync: () => ({
+      miniProgram: { envVersion: 'develop', appId: 'must-not-leak' }
+    })
+  });
+  assert.deepEqual(
+    virtualPaymentFailureDiagnostic({
+      errCode: -15013,
+      errMsg: 'must-not-leak',
+      signature: 'must-not-leak'
+    }),
+    {
+      errCode: -15013,
+      platform: 'ios',
+      envVersion: 'develop',
+      sdkVersion: '3.8.12'
+    }
+  );
+  assert.equal(virtualPaymentFailureDiagnostic({ errCode: -99999 }), null);
 });
 
 test('gets a fresh login code before a payment order is created', async () => {
@@ -187,4 +262,40 @@ test('shows and invokes purchasing only when product, provider and runtime gates
     (await loadBillingPlans({ force: true, access: enabledAccess, wxApi: global.wx })).available,
     false
   );
+});
+
+test('reports only the owner-bound payment diagnostic allowlist fields', async () => {
+  let received;
+  global.wx = supportedWx({
+    getAccountInfoSync: () => ({ miniProgram: { envVersion: 'develop' } }),
+    cloud: {
+      async callFunction(request) {
+        received = request;
+        return { result: { ok: true, data: { recorded: true } } };
+      }
+    }
+  });
+  assert.deepEqual(
+    await reportMembershipPaymentFailure('MP20260724081033aaaaaaaaaaaaaaaa', {
+      errCode: -15013,
+      platform: 'ios',
+      envVersion: 'develop',
+      sdkVersion: '3.8.12',
+      errMsg: 'must-not-leak',
+      openId: 'must-not-leak',
+      signature: 'must-not-leak'
+    }),
+    { recorded: true }
+  );
+  assert.deepEqual(received, {
+    name: 'membershipBilling',
+    data: {
+      action: 'paymentFailure',
+      orderId: 'MP20260724081033aaaaaaaaaaaaaaaa',
+      errCode: -15013,
+      platform: 'ios',
+      envVersion: 'develop',
+      sdkVersion: '3.8.12'
+    }
+  });
 });

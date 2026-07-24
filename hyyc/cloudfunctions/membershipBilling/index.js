@@ -52,6 +52,16 @@ const ACTIONS = Object.freeze({
   orderStatus: async (event) => billingService.queryOrder(
     event.orderId,
     resolveActor(() => cloud.getWXContext())
+  ),
+  paymentFailure: async (event) => billingService.recordPaymentFailure(
+    event.orderId,
+    {
+      errCode: event.errCode,
+      platform: event.platform,
+      envVersion: event.envVersion,
+      sdkVersion: event.sdkVersion
+    },
+    resolveActor(() => cloud.getWXContext())
   )
 });
 

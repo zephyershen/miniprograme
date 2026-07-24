@@ -8,8 +8,11 @@
   <view wx:if="{{loading}}" class="editor-loading">正在读取资料…</view>
   <view wx:else class="editor-card">
     <button class="avatar-picker" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
-      <image wx:if="{{avatarUrl}}" class="avatar-image" src="{{avatarUrl}}" mode="aspectFill" />
-      <view wx:else class="avatar-empty">+</view>
+      <view class="avatar-preview">
+        <image wx:if="{{avatarUrl}}" class="avatar-image" src="{{avatarUrl}}" mode="aspectFill" />
+        <view wx:else class="avatar-empty">+</view>
+        <view wx:if="{{reviewPending}}" class="avatar-review-badge">审核中</view>
+      </view>
       <view class="avatar-action">{{avatarUrl ? '更换头像' : '选择微信头像'}}</view>
     </button>
 
@@ -32,6 +35,10 @@
       loading="{{saving}}"
       bindtap="saveProfile"
     >保存资料</button>
+    <view wx:if="{{reviewPending}}" class="review-note">
+      {{avatarFileId ? '审核通过前，评论区继续使用原资料；首次设置则需审核通过后才能评论。' : '审核通过后即可参与评论。'}}
+    </view>
+    <view wx:elif="{{reviewMessage}}" class="review-note review-note-rejected">{{reviewMessage}}</view>
   </view>
 
   <view class="privacy-note">这里只保存你主动确认的头像与昵称，用于站内评论展示。</view>

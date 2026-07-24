@@ -27,6 +27,7 @@
     "knowledge_trend_dossiers",
     "knowledge_trend_events",
     "knowledge_user_media",
+    "knowledge_user_profile_reviews",
     "knowledge_user_profiles"
   ]
 }

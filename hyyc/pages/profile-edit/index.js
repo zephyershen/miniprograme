@@ -9,6 +9,8 @@ Page({
     avatarUrl: '',
     avatarFileId: '',
     avatarChanged: false,
+    reviewPending: false,
+    reviewMessage: '',
     canSave: false
   },
 
@@ -31,10 +33,12 @@ Page({
       const profile = await loadUserProfile();
       this.setData({
         loading: false,
-        nickname: profile.nickname,
-        avatarUrl: profile.avatarUrl,
-        avatarFileId: profile.avatarFileId,
-        avatarChanged: false
+        nickname: profile.displayNickname,
+        avatarUrl: profile.displayAvatarUrl,
+        avatarFileId: profile.displayAvatarFileId,
+        avatarChanged: false,
+        reviewPending: profile.reviewPending,
+        reviewMessage: profile.review && profile.review.message || ''
       }, () => this.updateCanSave());
     } catch (error) {
       this.setData({ loading: false });
@@ -45,7 +49,12 @@ Page({
   onChooseAvatar(event) {
     const avatarUrl = event && event.detail && event.detail.avatarUrl;
     if (!avatarUrl) return;
-    this.setData({ avatarUrl, avatarChanged: true }, () => this.updateCanSave());
+    this.setData({
+      avatarUrl,
+      avatarChanged: true,
+      reviewPending: false,
+      reviewMessage: ''
+    }, () => this.updateCanSave());
   },
 
   onNicknameInput(event) {
@@ -66,7 +75,7 @@ Page({
       await updateUserProfile({ nickname: this.data.nickname.trim(), avatarFileId });
       this.saveCompleted = true;
       if (this.pageDisposed) return;
-      wx.showToast({ title: '资料已保存', icon: 'success' });
+      wx.showToast({ title: '已提交审核', icon: 'success' });
       this.returnTimer = setTimeout(() => {
         this.returnTimer = null;
         if (!this.pageDisposed) wx.navigateBack();

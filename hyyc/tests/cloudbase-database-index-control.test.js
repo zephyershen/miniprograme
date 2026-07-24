@@ -55,6 +55,8 @@ test('versioned index contract covers media, feed, engagement, and billing hot p
   [
     'knowledge_user_media/cleanup_after_1',
     'knowledge_user_media/cleanup_claim_expires_at_1',
+    'knowledge_user_profile_reviews/status_next_attempt_at_1',
+    'knowledge_user_profile_reviews/status_claim_expires_at_1',
     'knowledge_user_profiles/avatar_file_id_1',
     'knowledge_feed_comments/attachments_file_id_1',
     'knowledge_feed_comments/itemId_1',

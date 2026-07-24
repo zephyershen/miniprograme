@@ -4,6 +4,44 @@ const { compactShanghaiDateTime } = require('../lib/time');
 const { safeEqualText } = require('../lib/wechat-message-crypto');
 
 const ORDER_ID_PATTERN = /^MP\d{14}[a-f0-9]{16}$/;
+const OFFICIAL_VIRTUAL_PAYMENT_ERROR_CODES = new Set([
+  1001,
+  -1,
+  -2,
+  -4,
+  -5,
+  -15001,
+  -15002,
+  -15003,
+  -15004,
+  -15005,
+  -15006,
+  -15007,
+  -15008,
+  -15009,
+  -15010,
+  -15011,
+  -15012,
+  -15013,
+  -15014,
+  -15016,
+  -15017,
+  -15018,
+  -15019,
+  -15020,
+  -15021
+]);
+const PAYMENT_FAILURE_PLATFORMS = new Set([
+  'android',
+  'devtools',
+  'harmony',
+  'ios',
+  'mac',
+  'ohos',
+  'unknown',
+  'windows'
+]);
+const PAYMENT_FAILURE_ENVIRONMENTS = new Set(['develop', 'trial', 'release', 'unknown']);
 
 function centsToAmount(cents) {
   return (Math.max(0, Number(cents) || 0) / 100).toFixed(2);
@@ -32,6 +70,22 @@ function boundedText(value, maximum = 128, { required = true } = {}) {
 function positiveIntegerString(value) {
   const normalized = boundedText(value, 20);
   return /^\d+$/.test(normalized) && Number(normalized) > 0 ? Number(normalized) : 0;
+}
+
+function normalizePaymentFailureDiagnostic(value = {}) {
+  const errCode = Number(value.errCode);
+  const platform = boundedText(value.platform, 24);
+  const envVersion = boundedText(value.envVersion, 12);
+  const sdkVersion = boundedText(value.sdkVersion, 20, { required: false });
+  const valid = Number.isInteger(errCode)
+    && OFFICIAL_VIRTUAL_PAYMENT_ERROR_CODES.has(errCode)
+    && PAYMENT_FAILURE_PLATFORMS.has(platform)
+    && PAYMENT_FAILURE_ENVIRONMENTS.has(envVersion)
+    && (!sdkVersion || /^\d{1,3}(?:\.\d{1,3}){1,3}$/.test(sdkVersion));
+  if (!valid) {
+    throw new BillingError('PAYMENT_FAILURE_REPORT_INVALID', '支付诊断信息无效', 400);
+  }
+  return { errCode, platform, envVersion, sdkVersion };
 }
 
 function publicOrder(order) {
@@ -113,6 +167,38 @@ function createBillingService({ repository, paymentClient, config, plan, missing
     ].some((value) => value && safeEqualText(value, normalized));
   }
 
+  function expectedGoodsPrice(order) {
+    if (Number.isInteger(order && order.goodsPriceCents) && order.goodsPriceCents > 0) {
+      return order.goodsPriceCents;
+    }
+    return Number(plan.compareAtPriceCents) > Number(plan.priceCents)
+      ? Number(plan.compareAtPriceCents)
+      : Number(plan.priceCents);
+  }
+
+  function assertGoodsDeliveryNotification(notification, order) {
+    const openId = boundedText(notification.OpenId, 128);
+    const goodsInfo = notification.GoodsInfo;
+    const productId = goodsInfo && !Array.isArray(goodsInfo)
+      ? boundedText(goodsInfo.ProductId, 128)
+      : '';
+    const validShape = orderMatchesPlan(order)
+      && openId
+      && safeEqualText(order.openId, openId)
+      && Number.isInteger(notification.Env)
+      && notification.Env === config.environment
+      && goodsInfo
+      && typeof goodsInfo === 'object'
+      && !Array.isArray(goodsInfo)
+      && safeEqualText(productId, config.productId)
+      && goodsInfo.Quantity === 1
+      && goodsInfo.OrigPrice === expectedGoodsPrice(order)
+      && goodsInfo.ActualPrice === order.amountCents;
+    if (!validShape) {
+      throw new BillingError('GOODS_DELIVERY_NOTIFICATION_MISMATCH', '发货通知与订单不匹配', 409);
+    }
+  }
+
   async function evaluateIosRefundQuery(notification = {}) {
     const payOrderId = boundedText(notification.pay_order_id, 128);
     const channelBill = boundedText(notification.channel_bill, 512);
@@ -160,6 +246,35 @@ function createBillingService({ repository, paymentClient, config, plan, missing
       result_info: '建议退款',
       evidence: '订单已核验；退款完成通知到达后将幂等回收对应30天权益'
     };
+  }
+
+  async function processGoodsDeliveryNotification(notification = {}) {
+    assertProviderReady();
+    const merchantOrderId = boundedText(notification.OutTradeNo, 64);
+    if (!ORDER_ID_PATTERN.test(merchantOrderId)) {
+      throw new BillingError('GOODS_DELIVERY_NOTIFICATION_INVALID', '发货通知无效', 400);
+    }
+    const order = await repository.getOrder(merchantOrderId);
+    if (!order) {
+      throw new BillingError('GOODS_DELIVERY_ORDER_NOT_FOUND', '没有找到这笔支付订单', 404);
+    }
+    assertGoodsDeliveryNotification(notification, order);
+
+    const providerResult = await paymentClient.queryPayment(order);
+    validateProviderResult(order, providerResult);
+    if (providerResult.state !== 'S') {
+      await applyProviderResult(order, providerResult);
+      if (['F', 'R'].includes(providerResult.state)) {
+        return { acknowledged: true, delivered: false };
+      }
+      throw new BillingError('GOODS_DELIVERY_NOT_CONFIRMED', '支付结果尚未确认', 409);
+    }
+
+    const deliveredOrder = await fulfillProviderOrder(order, providerResult);
+    if (!deliveredOrder || deliveredOrder.deliveryStatus !== 'delivered') {
+      throw new BillingError('GOODS_DELIVERY_CONFIRM_FAILED', '发货状态尚未确认', 503);
+    }
+    return { acknowledged: true, delivered: true };
   }
 
   async function processRefundNotification(notification = {}) {
@@ -242,12 +357,15 @@ function createBillingService({ repository, paymentClient, config, plan, missing
     }
   }
 
+  async function fulfillProviderOrder(order, providerResult) {
+    const fulfilled = await repository.fulfill(order.id, providerResult, plan, now());
+    return markDelivery(fulfilled.order, providerResult.delivered);
+  }
+
   async function applyProviderResult(order, providerResult) {
     validateProviderResult(order, providerResult);
     if (providerResult.state === 'S') {
-      const fulfilled = await repository.fulfill(order.id, providerResult, plan, now());
-      const deliveredOrder = await markDelivery(fulfilled.order, providerResult.delivered);
-      return { order: publicOrder(deliveredOrder || fulfilled.order) };
+      return { order: publicOrder(await fulfillProviderOrder(order, providerResult)) };
     }
     if (providerResult.state === 'R') {
       const refunded = await repository.markRefunded(order.id, providerResult, plan, now());
@@ -329,6 +447,24 @@ function createBillingService({ repository, paymentClient, config, plan, missing
     return order;
   }
 
+  async function recordPaymentFailure(orderId, diagnostic, actor) {
+    const normalized = normalizePaymentFailureDiagnostic(diagnostic);
+    const order = await getOwnedOrder(orderId, actor);
+    const reportedAt = now();
+    await repository.updateOrder(order.id, {
+      clientFailureCode: normalized.errCode,
+      clientFailurePlatform: normalized.platform,
+      clientFailureEnvVersion: normalized.envVersion,
+      clientFailureSdkVersion: normalized.sdkVersion,
+      clientFailureReportedAt: reportedAt,
+      clientFailureReportCount: Math.min(
+        10,
+        Math.max(0, Number(order.clientFailureReportCount) || 0) + 1
+      )
+    });
+    return { recorded: true };
+  }
+
   async function queryOrder(orderId, actor) {
     assertProviderReady();
     const order = await getOwnedOrder(orderId, actor);
@@ -392,8 +528,10 @@ function createBillingService({ repository, paymentClient, config, plan, missing
     queryOrder,
     reconcileOrder,
     reconcilePending,
+    recordPaymentFailure,
     validateProviderResult,
     evaluateIosRefundQuery,
+    processGoodsDeliveryNotification,
     processRefundNotification
   };
 }
@@ -406,5 +544,6 @@ module.exports = {
   publicOrder,
   boundedText,
   positiveIntegerString,
+  normalizePaymentFailureDiagnostic,
   createBillingService
 };

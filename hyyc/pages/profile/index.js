@@ -7,7 +7,8 @@ const { loadUserProfile } = require('../../features/user-profile/session.js');
 const { decorateUserProfile } = require('../../features/user-profile/model.js');
 const {
   createMembershipPayment,
-  getMembershipOrderStatus
+  getMembershipOrderStatus,
+  reportMembershipPaymentFailure
 } = require('../../features/billing/api.js');
 const { loadBillingPlans } = require('../../features/billing/session.js');
 const {
@@ -19,6 +20,7 @@ const {
   requestMiniProgramVirtualPayment,
   paymentCancelled,
   paymentFailureMessage,
+  virtualPaymentFailureDiagnostic,
   rememberPendingMembershipOrder,
   forgetPendingMembershipOrder
 } = require('../../features/billing/payment.js');
@@ -58,6 +60,10 @@ Page({
   },
 
   onShow() {
+    if (typeof this.stopProfileReviewPolling === 'function') {
+      this.stopProfileReviewPolling();
+    }
+    this.profileReviewPollCount = 0;
     this.profileLoadRequestId = (this.profileLoadRequestId || 0) + 1;
     this.billingLoadRequestId = (this.billingLoadRequestId || 0) + 1;
     this.setData({ userProfile: decorateUserProfile(null) });
@@ -66,9 +72,36 @@ Page({
 
   onUnload() {
     this.pageDisposed = true;
+    if (typeof this.stopProfileReviewPolling === 'function') {
+      this.stopProfileReviewPolling();
+    }
     this.membershipLoadRequestId = (this.membershipLoadRequestId || 0) + 1;
     this.profileLoadRequestId = (this.profileLoadRequestId || 0) + 1;
     this.billingLoadRequestId = (this.billingLoadRequestId || 0) + 1;
+  },
+
+  onHide() {
+    if (typeof this.stopProfileReviewPolling === 'function') {
+      this.stopProfileReviewPolling();
+    }
+  },
+
+  stopProfileReviewPolling() {
+    if (this.profileReviewPollTimer) clearTimeout(this.profileReviewPollTimer);
+    this.profileReviewPollTimer = null;
+  },
+
+  scheduleProfileReviewPolling(profile) {
+    this.stopProfileReviewPolling();
+    if (this.pageDisposed
+      || !profile
+      || profile.reviewPending !== true
+      || (this.profileReviewPollCount || 0) >= 15) return;
+    this.profileReviewPollTimer = setTimeout(() => {
+      this.profileReviewPollTimer = null;
+      this.profileReviewPollCount = (this.profileReviewPollCount || 0) + 1;
+      this.loadProfile({ force: true });
+    }, 8000);
   },
 
   onPullDownRefresh() {
@@ -116,6 +149,9 @@ Page({
       const userProfile = await loadUserProfile({ force });
       if (this.pageDisposed || requestId !== this.profileLoadRequestId) return false;
       this.setData({ userProfile });
+      if (typeof this.scheduleProfileReviewPolling === 'function') {
+        this.scheduleProfileReviewPolling(userProfile);
+      }
       return true;
     } catch (error) {
       if (this.pageDisposed || requestId !== this.profileLoadRequestId) return false;
@@ -188,6 +224,27 @@ Page({
     return latest && latest.order || null;
   },
 
+  async queryMembershipOrderOnce(orderId) {
+    try {
+      const latest = await getMembershipOrderStatus(orderId);
+      return latest && latest.order || null;
+    } catch (error) {
+      return null;
+    }
+  },
+
+  async recordMembershipPaymentFailure(orderId, error) {
+    if (!orderId || paymentCancelled(error)) return false;
+    const diagnostic = virtualPaymentFailureDiagnostic(error);
+    if (!diagnostic) return false;
+    try {
+      await reportMembershipPaymentFailure(orderId, diagnostic);
+      return true;
+    } catch (reportError) {
+      return false;
+    }
+  },
+
   async purchaseMembership() {
     if (this.data.billing.purchasing || !this.data.billing.available) return;
     this.setData({ 'billing.purchasing': true });
@@ -203,10 +260,19 @@ Page({
       orderId = created && created.order && created.order.id || '';
       if (!orderId) throw new Error('支付订单创建失败');
       rememberPendingMembershipOrder(orderId);
+      let order = created.order.status === 'paid' ? created.order : null;
       if (created.order.status !== 'paid') {
-        await requestMiniProgramVirtualPayment(created.payment);
+        try {
+          await requestMiniProgramVirtualPayment(created.payment);
+        } catch (paymentError) {
+          order = await this.queryMembershipOrderOnce(orderId);
+          if (!order || order.status !== 'paid') {
+            await this.recordMembershipPaymentFailure(orderId, paymentError);
+            throw paymentError;
+          }
+        }
       }
-      const order = await this.confirmMembershipOrder(orderId);
+      if (!order) order = await this.confirmMembershipOrder(orderId);
       if (order && order.status === 'paid') {
         forgetPendingMembershipOrder(orderId);
         await this.loadMembership({ force: true });

@@ -27,6 +27,11 @@
           "config": "30 */10 * * * * *"
         },
         {
+          "name": "knowledge-feed-profile-review-worker",
+          "type": "timer",
+          "config": "20 * * * * * *"
+        },
+        {
           "name": "knowledge-feed-archive-maintenance",
           "type": "timer",
           "config": "0 15 * * * * *"
@@ -56,7 +61,7 @@
         "node_modules/**",
         "config.local.js"
       ],
-      "description": "Runs isolated source, archive, visual, intelligence, and calendar digest schedules."
+      "description": "Runs isolated source, profile review, archive, visual, intelligence, and calendar digest schedules."
     },
     {
       "name": "sourcePreviewWorker",

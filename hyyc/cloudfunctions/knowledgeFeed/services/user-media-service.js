@@ -40,6 +40,11 @@ function uploadIdFromFileId(fileId, config) {
     const match = relative.match(/^(?:avatars|comments)\/[a-f0-9]{64}\/([a-f0-9]{48})\.[a-z0-9]{2,5}$/);
     return match ? match[1] : '';
   }
+  if (fileId.startsWith(config.userMediaReviewFileIdPrefix)) {
+    const relative = fileId.slice(config.userMediaReviewFileIdPrefix.length);
+    const match = relative.match(/^(?:avatars|comments)\/[a-f0-9]{64}\/([a-f0-9]{48})\.[a-z0-9]{2,5}$/);
+    return match ? match[1] : '';
+  }
   return '';
 }
 
@@ -353,6 +358,32 @@ function createUserMediaService({
     return records.map(immutableFileId);
   }
 
+  async function holdForReview(actor, kind, fileIds = [], ttlMs) {
+    const duration = positiveDuration(
+      ttlMs,
+      positiveDuration(config.userProfileReviewMediaTtlMs, 7 * 24 * 60 * 60 * 1000)
+    );
+    const cleanupAfter = new Date(now() + duration);
+    for (const fileId of fileIds) {
+      const record = await ownedRecord(actor, kind, fileId);
+      if (record.status === 'published'
+        && record.businessBinding
+        && record.businessBinding.state === 'attached') continue;
+      const held = await repository.scheduleCleanup(record.uploadId, actor.ownerKey, {
+        cleanupPending: true,
+        cleanupAfter,
+        expiresAt: cleanupAfter,
+        cleanupState: 'pending',
+        cleanupClaimId: '',
+        cleanupClaimedAt: null,
+        cleanupClaimExpiresAt: null,
+        updatedAt: new Date(now())
+      });
+      if (!held) throw new AppError('TEMPORARY_FAILURE', TEMPORARY_MEDIA_MESSAGE);
+    }
+    return { cleanupAfter: cleanupAfter.toISOString() };
+  }
+
   async function ensurePublishedCopy(record) {
     let copied = false;
     try {
@@ -387,11 +418,16 @@ function createUserMediaService({
       throw new AppError('TEMPORARY_FAILURE', TEMPORARY_MEDIA_MESSAGE);
     }
     const updatedAt = new Date(now());
+    const attached = record.businessBinding
+      && record.businessBinding.state === 'attached';
     const updated = await repository.markPublished(record.uploadId, actor.ownerKey, {
       privateCopiesCleanupPending: false,
       privateCopiesDeletedAt: updatedAt,
       stagingDeletedAt: updatedAt,
       reviewDeletedAt: updatedAt,
+      cleanupPending: attached ? false : record.cleanupPending,
+      cleanupAfter: attached ? null : record.cleanupAfter,
+      cleanupState: attached ? 'attached' : record.cleanupState,
       updatedAt
     });
     if (!updated) throw new AppError('TEMPORARY_FAILURE', TEMPORARY_MEDIA_MESSAGE);
@@ -422,7 +458,7 @@ function createUserMediaService({
     return intended;
   }
 
-  async function publishOwned(actor, kind, fileIds = [], reference = {}) {
+  async function publishOwned(actor, kind, fileIds = [], reference = {}, options = {}) {
     const intendedAt = new Date(now());
     const intent = assertPublicationOwner(actor, normalizePublicationReference(
       reference,
@@ -434,8 +470,12 @@ function createUserMediaService({
       const record = await ownedRecord(actor, kind, fileId);
       if (record.status === 'published') {
         const intended = await ensurePublicationIntent(record, actor, intent);
-        const cleaned = await cleanupPublishedPrivateCopies(intended, actor);
-        results.push(cleaned.publishedFileId);
+        if (options.keepPrivateCopies === true) {
+          results.push(intended.publishedFileId);
+        } else {
+          const cleaned = await cleanupPublishedPrivateCopies(intended, actor);
+          results.push(cleaned.publishedFileId);
+        }
         continue;
       }
       if (record.status !== 'reviewing') {
@@ -451,10 +491,26 @@ function createUserMediaService({
       });
       if (!published) throw new AppError('TEMPORARY_FAILURE', TEMPORARY_MEDIA_MESSAGE);
       const intended = await ensurePublicationIntent(published, actor, intent);
-      const cleaned = await cleanupPublishedPrivateCopies(intended, actor);
-      results.push(cleaned.publishedFileId);
+      if (options.keepPrivateCopies === true) {
+        results.push(intended.publishedFileId);
+      } else {
+        const cleaned = await cleanupPublishedPrivateCopies(intended, actor);
+        results.push(cleaned.publishedFileId);
+      }
     }
     return results;
+  }
+
+  async function cleanupPublishedCopies(actor, kind, fileIds = []) {
+    const cleaned = [];
+    for (const fileId of fileIds) {
+      const record = await ownedRecord(actor, kind, fileId);
+      if (record.status !== 'published') {
+        throw new AppError('TEMPORARY_FAILURE', TEMPORARY_MEDIA_MESSAGE);
+      }
+      cleaned.push((await cleanupPublishedPrivateCopies(record, actor)).publishedFileId);
+    }
+    return cleaned;
   }
 
   async function bindPublished(actor, kind, fileIds = [], reference = {}) {
@@ -471,11 +527,12 @@ function createUserMediaService({
       }
       record = await ensurePublicationIntent(record, actor, bindingReference);
       const updatedAt = new Date(now());
+      const privateCopiesPending = record.privateCopiesCleanupPending === true;
       const updated = await repository.markBound(record.uploadId, actor.ownerKey, {
         businessBinding: attachedBinding(bindingReference, updatedAt),
-        cleanupPending: false,
-        cleanupAfter: null,
-        cleanupState: 'attached',
+        cleanupPending: privateCopiesPending,
+        cleanupAfter: privateCopiesPending ? updatedAt : null,
+        cleanupState: privateCopiesPending ? 'private-copies' : 'attached',
         updatedAt
       });
       if (!updated) throw new AppError('TEMPORARY_FAILURE', TEMPORARY_MEDIA_MESSAGE);
@@ -634,6 +691,46 @@ function createUserMediaService({
       const existingBinding = claimed.businessBinding;
       if (claimed.status === 'published'
         && existingBinding
+        && existingBinding.state === 'attached'
+        && claimed.privateCopiesCleanupPending === true) {
+        const privateIds = [claimed.reviewFileId, claimed.stagingFileId].filter(Boolean);
+        let result;
+        try {
+          result = await deleteFiles(privateIds);
+        } catch (error) {
+          await releaseCleanupClaim(claimed, claimId);
+          retry += 1;
+          continue;
+        }
+        const removed = new Set(result && result.deletedFileIds || []);
+        if (privateIds.some((fileId) => !removed.has(fileId))) {
+          await releaseCleanupClaim(claimed, claimId);
+          retry += 1;
+          continue;
+        }
+        const cleanedAt = new Date(now());
+        const completed = await repository.bindClaimed(
+          claimed.uploadId,
+          claimed.ownerKey,
+          claimId,
+          {
+            businessBinding: existingBinding,
+            privateCopiesCleanupPending: false,
+            privateCopiesDeletedAt: cleanedAt,
+            stagingDeletedAt: cleanedAt,
+            reviewDeletedAt: cleanedAt,
+            updatedAt: cleanedAt
+          }
+        ).catch(() => null);
+        if (completed) repaired += 1;
+        else {
+          await releaseCleanupClaim(claimed, claimId);
+          retry += 1;
+        }
+        continue;
+      }
+      if (claimed.status === 'published'
+        && existingBinding
         && existingBinding.state === 'attached') {
         const restored = await repairClaimedBinding(claimed, claimId, existingBinding);
         if (restored) repaired += 1;
@@ -718,6 +815,7 @@ function createUserMediaService({
   async function resolveVisible(fileIds = [], access = {}) {
     const allowedPrefixes = [
       config.userMediaPublishedFileIdPrefix,
+      config.userMediaReviewFileIdPrefix,
       config.avatarFileIdPrefix,
       config.commentImageFileIdPrefix
     ].filter((prefix) => typeof prefix === 'string' && prefix);
@@ -728,6 +826,20 @@ function createUserMediaService({
           && allowedPrefixes.some((prefix) => fileId.startsWith(prefix)))
     )].slice(0, 50);
     const visible = [];
+    const privateReview = requested.filter((fileId) => (
+      fileId.startsWith(config.userMediaReviewFileIdPrefix)
+    ));
+    for (const fileId of privateReview) {
+      const uploadId = uploadIdFromFileId(fileId, config);
+      if (!uploadId || !access.ownerKey) continue;
+      const record = await repository.get(uploadId);
+      if (!record
+        || record.ownerKey !== access.ownerKey
+        || record.kind !== 'avatar'
+        || !['reviewing', 'published'].includes(record.status)
+        || record.reviewFileId !== fileId) continue;
+      visible.push(fileId);
+    }
     const managed = requested.filter((fileId) => (
       fileId.startsWith(config.userMediaPublishedFileIdPrefix)
     ));
@@ -754,7 +866,9 @@ function createUserMediaService({
       }
       visible.push(fileId);
     }
-    const legacy = requested.filter((fileId) => !managed.includes(fileId));
+    const legacy = requested.filter((fileId) => (
+      !managed.includes(fileId) && !privateReview.includes(fileId)
+    ));
     if (legacy.length
       && publicationVerifier
       && typeof publicationVerifier.authorizedLegacyFileIds === 'function') {
@@ -791,7 +905,9 @@ function createUserMediaService({
   return {
     reserveUpload,
     filesForReview,
+    holdForReview,
     publishOwned,
+    cleanupPublishedCopies,
     bindPublished,
     discardUnpublished,
     deleteOwned,

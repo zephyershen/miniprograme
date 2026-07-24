@@ -17,7 +17,8 @@ const MUTATING_ACTIONS = Object.freeze({
   ]),
   membershipBilling: new Set([
     'createPayment',
-    'orderStatus'
+    'orderStatus',
+    'paymentFailure'
   ])
 });
 

@@ -89,7 +89,8 @@
     <view wx:if="{{canParticipate}}" class="comment-compose">
       <view wx:if="{{composerExpanded && !viewerProfile.isComplete}}" class="comment-profile-reminder" bindtap="openProfileEditor">
         <view class="reminder-avatar">{{viewerProfile.initial}}</view>
-        <view><view class="reminder-title">先设置头像和昵称</view><view class="reminder-copy">发布时会显示在你的评论旁边</view></view>
+        <view wx:if="{{viewerProfile.reviewPending}}"><view class="reminder-title">资料审核中</view><view class="reminder-copy">审核通过后即可发布评论</view></view>
+        <view wx:else><view class="reminder-title">先设置头像和昵称</view><view class="reminder-copy">发布时会显示在你的评论旁边</view></view>
         <text>→</text>
       </view>
       <view wx:if="{{commentDraftImages.length}}" class="comment-draft-media">

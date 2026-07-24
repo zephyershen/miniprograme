@@ -9,6 +9,7 @@ const {
 } = require('../cloudfunctions/membershipBilling/lib/wechat-message-crypto');
 const {
   IOS_REFUND_QUERY_EVENT,
+  GOODS_DELIVERY_EVENT,
   REFUND_NOTIFY_EVENT,
   createWechatMessagePushHandler
 } = require('../cloudfunctions/membershipBilling/adapters/wechat-message-push-handler');
@@ -102,6 +103,29 @@ function refundQuery(overrides = {}) {
     refund_request_reason: '用户申请退款',
     provide_status: '1',
     pay_order_id: ORDER.providerTransactionId,
+    ...overrides
+  };
+}
+
+function goodsDeliveryNotification(overrides = {}) {
+  return {
+    MsgType: 'event',
+    Event: GOODS_DELIVERY_EVENT,
+    OpenId: ORDER.openId,
+    OutTradeNo: ORDER.id,
+    Env: PAYMENT_CONFIG.environment,
+    WeChatPayInfo: {
+      MchOrderNo: 'wechat-merchant-order',
+      TransactionId: ORDER.wechatPayTransactionId,
+      PaidTime: 1784534400
+    },
+    GoodsInfo: {
+      ProductId: PAYMENT_CONFIG.productId,
+      Quantity: 1,
+      OrigPrice: PLAN.compareAtPriceCents,
+      ActualPrice: PLAN.priceCents,
+      Attach: `membership:${PLAN.key}`
+    },
     ...overrides
   };
 }
@@ -222,6 +246,31 @@ test('returns an encrypted iOS refund recommendation only after service validati
   assert.deepEqual(decryptHandlerResponse(await handler(encryptedEvent(refundQuery()))), decision);
 });
 
+test('acknowledges verified goods delivery only after service processing and requests retry on failure', async () => {
+  let shouldFail = false;
+  const handler = createWechatMessagePushHandler({
+    config: MESSAGE_CONFIG,
+    missingConfig: () => [],
+    now: () => 1713424427000,
+    randomBytes: () => Buffer.from('707722b803182950'),
+    billingService: {
+      async processGoodsDeliveryNotification(message) {
+        assert.equal(message.OutTradeNo, ORDER.id);
+        if (shouldFail) throw new Error('temporary');
+      }
+    }
+  });
+  assert.deepEqual(
+    decryptHandlerResponse(await handler(encryptedEvent(goodsDeliveryNotification()))),
+    { ErrCode: 0, ErrMsg: 'success' }
+  );
+  shouldFail = true;
+  assert.deepEqual(
+    decryptHandlerResponse(await handler(encryptedEvent(goodsDeliveryNotification()))),
+    { ErrCode: 1, ErrMsg: 'retry' }
+  );
+});
+
 test('acknowledges a verified refund event in the encrypted response and requests retry on failure', async () => {
   let shouldFail = false;
   const handler = createWechatMessagePushHandler({
@@ -287,6 +336,236 @@ test('binds an iOS refund inquiry to one paid product and payment record', async
   assert.equal((await service.evaluateIosRefundQuery(refundQuery())).result_code, 0);
   assert.equal((await service.evaluateIosRefundQuery(refundQuery({ product_id: 'another-product' }))).result_code, 1);
   assert.equal((await service.evaluateIosRefundQuery(refundQuery({ p_count: '2' }))).result_code, 1);
+});
+
+test('queries the official order before idempotent goods fulfillment and delivery confirmation', async () => {
+  const pendingOrder = {
+    ...ORDER,
+    goodsPriceCents: PLAN.compareAtPriceCents,
+    status: 'payment_pending',
+    deliveryStatus: 'not_paid'
+  };
+  const calls = [];
+  const repository = {
+    async getOrder(orderId) {
+      calls.push('get-order');
+      return orderId === pendingOrder.id ? pendingOrder : null;
+    },
+    async fulfill(orderId) {
+      calls.push('fulfill');
+      return {
+        order: {
+          ...pendingOrder,
+          id: orderId,
+          status: 'paid',
+          deliveryStatus: 'pending'
+        }
+      };
+    },
+    async updateOrder(orderId, fields) {
+      calls.push('update-delivery');
+      return {
+        ...pendingOrder,
+        ...fields,
+        id: orderId,
+        status: 'paid'
+      };
+    }
+  };
+  const paymentClient = {
+    async queryPayment(order) {
+      calls.push('query-order');
+      assert.equal(order.id, pendingOrder.id);
+      return {
+        state: 'S',
+        orderId: pendingOrder.id,
+        amountCents: PLAN.priceCents,
+        paidAmountCents: PLAN.priceCents,
+        providerStatus: 3,
+        orderType: 7,
+        environmentType: 1,
+        providerTransactionId: ORDER.providerTransactionId,
+        delivered: false
+      };
+    },
+    async confirmDelivery(order) {
+      calls.push('confirm-delivery');
+      assert.equal(order.status, 'paid');
+      return true;
+    }
+  };
+  const service = createBillingService({
+    repository,
+    paymentClient,
+    config: PAYMENT_CONFIG,
+    plan: PLAN,
+    missingConfig: () => []
+  });
+
+  assert.deepEqual(
+    await service.processGoodsDeliveryNotification(goodsDeliveryNotification()),
+    { acknowledged: true, delivered: true }
+  );
+  assert.deepEqual(calls, [
+    'get-order',
+    'query-order',
+    'fulfill',
+    'confirm-delivery',
+    'update-delivery'
+  ]);
+});
+
+test('rejects mismatched goods delivery fields before querying or granting membership', async () => {
+  const pendingOrder = {
+    ...ORDER,
+    goodsPriceCents: PLAN.compareAtPriceCents,
+    status: 'payment_pending',
+    deliveryStatus: 'not_paid'
+  };
+  let queryCalls = 0;
+  let fulfillCalls = 0;
+  const service = createBillingService({
+    repository: {
+      async getOrder() { return pendingOrder; },
+      async fulfill() { fulfillCalls += 1; }
+    },
+    paymentClient: {
+      async queryPayment() {
+        queryCalls += 1;
+        return {};
+      }
+    },
+    config: PAYMENT_CONFIG,
+    plan: PLAN,
+    missingConfig: () => []
+  });
+
+  await assert.rejects(
+    () => service.processGoodsDeliveryNotification(goodsDeliveryNotification({
+      OutTradeNo: 'invalid-order'
+    })),
+    /发货通知无效/
+  );
+  await assert.rejects(
+    () => service.processGoodsDeliveryNotification(goodsDeliveryNotification({
+      OpenId: 'another-user'
+    })),
+    /发货通知与订单不匹配/
+  );
+  await assert.rejects(
+    () => service.processGoodsDeliveryNotification(goodsDeliveryNotification({
+      GoodsInfo: {
+        ProductId: PAYMENT_CONFIG.productId,
+        Quantity: 1,
+        OrigPrice: PLAN.compareAtPriceCents,
+        ActualPrice: 1090
+      }
+    })),
+    /发货通知与订单不匹配/
+  );
+  assert.equal(queryCalls, 0);
+  assert.equal(fulfillCalls, 0);
+});
+
+test('requests goods-delivery retry when the official order is not yet paid', async () => {
+  const pendingOrder = {
+    ...ORDER,
+    goodsPriceCents: PLAN.compareAtPriceCents,
+    status: 'payment_pending',
+    deliveryStatus: 'not_paid'
+  };
+  let fulfillCalls = 0;
+  let updatedStatus = '';
+  const service = createBillingService({
+    repository: {
+      async getOrder() { return pendingOrder; },
+      async fulfill() { fulfillCalls += 1; },
+      async updateOrder(orderId, fields) {
+        updatedStatus = fields.status;
+        return { ...pendingOrder, ...fields, id: orderId };
+      }
+    },
+    paymentClient: {
+      async queryPayment() {
+        return {
+          state: 'P',
+          orderId: pendingOrder.id,
+          amountCents: PLAN.priceCents,
+          paidAmountCents: 0,
+          providerStatus: 1,
+          orderType: 7,
+          environmentType: 1,
+          providerTransactionId: ORDER.providerTransactionId,
+          delivered: false
+        };
+      }
+    },
+    config: PAYMENT_CONFIG,
+    plan: PLAN,
+    missingConfig: () => []
+  });
+
+  await assert.rejects(
+    () => service.processGoodsDeliveryNotification(goodsDeliveryNotification()),
+    /支付结果尚未确认/
+  );
+  assert.equal(updatedStatus, 'payment_pending');
+  assert.equal(fulfillCalls, 0);
+});
+
+test('surfaces a delivery-confirmation failure so the encrypted handler can request retry', async () => {
+  const pendingOrder = {
+    ...ORDER,
+    goodsPriceCents: PLAN.compareAtPriceCents,
+    status: 'payment_pending',
+    deliveryStatus: 'not_paid'
+  };
+  let retryPersisted = false;
+  const service = createBillingService({
+    repository: {
+      async getOrder() { return pendingOrder; },
+      async fulfill() {
+        return {
+          order: {
+            ...pendingOrder,
+            status: 'paid',
+            deliveryStatus: 'pending'
+          }
+        };
+      },
+      async updateOrder(orderId, fields) {
+        retryPersisted = orderId === pendingOrder.id && fields.deliveryStatus === 'retry';
+        return { ...pendingOrder, ...fields, id: orderId, status: 'paid' };
+      }
+    },
+    paymentClient: {
+      async queryPayment() {
+        return {
+          state: 'S',
+          orderId: pendingOrder.id,
+          amountCents: PLAN.priceCents,
+          paidAmountCents: PLAN.priceCents,
+          providerStatus: 3,
+          orderType: 7,
+          environmentType: 1,
+          providerTransactionId: ORDER.providerTransactionId,
+          delivered: false
+        };
+      },
+      async confirmDelivery() {
+        throw new Error('temporary');
+      }
+    },
+    config: PAYMENT_CONFIG,
+    plan: PLAN,
+    missingConfig: () => []
+  });
+
+  await assert.rejects(
+    () => service.processGoodsDeliveryNotification(goodsDeliveryNotification()),
+    /发货状态尚未确认/
+  );
+  assert.equal(retryPersisted, true);
 });
 
 test('confirms a refund with the official order API before idempotent entitlement recovery', async () => {

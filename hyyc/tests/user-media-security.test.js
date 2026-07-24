@@ -562,6 +562,39 @@ test('rejects missing, oversized, or non-image uploads before moderation', async
   );
 });
 
+test('keeps a pending avatar alive and resolves its review copy only for its owner', async () => {
+  const { repository, service } = harness();
+  const { cloudPath } = await service.reserveUpload(
+    { ownerKey: OWNER },
+    mediaInput('avatar', 'jpg')
+  );
+  const stagingFileId = `cloud://env/${cloudPath}`;
+  const [reviewFileId] = await service.filesForReview(
+    { ownerKey: OWNER },
+    'avatar',
+    [stagingFileId]
+  );
+
+  await service.holdForReview(
+    { ownerKey: OWNER },
+    'avatar',
+    [stagingFileId],
+    7 * 24 * 60 * 60 * 1000
+  );
+
+  const record = repository.records.get(UPLOAD_ID);
+  assert.ok(new Date(record.expiresAt).getTime() > NOW + (6 * 24 * 60 * 60 * 1000));
+  assert.equal((await service.resolveVisible(
+    [reviewFileId],
+    { ownerKey: OWNER }
+  )).length, 1);
+  assert.deepEqual(await service.resolveVisible(
+    [reviewFileId],
+    { ownerKey: OTHER }
+  ), []);
+  assert.deepEqual(await service.resolveVisible([reviewFileId]), []);
+});
+
 test('does not issue a media URL until a successful business write binds the publication', async () => {
   const { service } = harness();
   const { cloudPath } = await service.reserveUpload(
@@ -588,6 +621,41 @@ test('does not issue a media URL until a successful business write binds the pub
   );
   assert.equal(visible.fileId, publishedFileId);
   assert.match(visible.url, /^https:\/\//);
+});
+
+test('durably retries private-copy cleanup after an async profile publication is bound', async () => {
+  const { repository, service, deleteCalls } = harness();
+  const { cloudPath } = await service.reserveUpload(
+    { ownerKey: OWNER },
+    mediaInput('avatar', 'jpg')
+  );
+  const stagingFileId = `cloud://env/${cloudPath}`;
+  await service.filesForReview({ ownerKey: OWNER }, 'avatar', [stagingFileId]);
+  const [publishedFileId] = await service.publishOwned(
+    { ownerKey: OWNER },
+    'avatar',
+    [stagingFileId],
+    PROFILE_REFERENCE,
+    { keepPrivateCopies: true }
+  );
+  await service.bindPublished(
+    { ownerKey: OWNER },
+    'avatar',
+    [publishedFileId],
+    PROFILE_REFERENCE
+  );
+
+  assert.equal(repository.records.get(UPLOAD_ID).cleanupState, 'private-copies');
+  assert.equal(repository.records.get(UPLOAD_ID).privateCopiesCleanupPending, true);
+  assert.equal((await service.cleanupExpired()).repaired, 1);
+  const cleaned = repository.records.get(UPLOAD_ID);
+  assert.equal(cleaned.status, 'published');
+  assert.equal(cleaned.cleanupPending, false);
+  assert.equal(cleaned.privateCopiesCleanupPending, false);
+  assert.deepEqual(deleteCalls.at(-1), [
+    `cloud://env/user-media/review/avatars/${OWNER}/${UPLOAD_ID}.jpg`,
+    stagingFileId
+  ]);
 });
 
 test('a rejected retry cannot delete a publication already attached to the business record', async () => {

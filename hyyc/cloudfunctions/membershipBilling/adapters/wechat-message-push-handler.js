@@ -7,6 +7,7 @@ const {
 } = require('../lib/wechat-message-crypto');
 
 const IOS_REFUND_QUERY_EVENT = 'xpay_subscribe_ios_refund_query_notify';
+const GOODS_DELIVERY_EVENT = 'xpay_goods_deliver_notify';
 const REFUND_NOTIFY_EVENT = 'xpay_refund_notify';
 
 function httpResponse(statusCode, body, contentType = 'text/plain; charset=utf-8') {
@@ -128,6 +129,14 @@ function createWechatMessagePushHandler({
       const decision = await billingService.evaluateIosRefundQuery(message);
       return encryptedResponse(decision, config, query, responseOptions);
     }
+    if (message.Event === GOODS_DELIVERY_EVENT) {
+      try {
+        await billingService.processGoodsDeliveryNotification(message);
+        return encryptedResponse({ ErrCode: 0, ErrMsg: 'success' }, config, query, responseOptions);
+      } catch (error) {
+        return encryptedResponse({ ErrCode: 1, ErrMsg: 'retry' }, config, query, responseOptions);
+      }
+    }
     if (message.Event === REFUND_NOTIFY_EVENT) {
       try {
         await billingService.processRefundNotification(message);
@@ -156,6 +165,7 @@ function createWechatMessagePushHandler({
 
 module.exports = {
   IOS_REFUND_QUERY_EVENT,
+  GOODS_DELIVERY_EVENT,
   REFUND_NOTIFY_EVENT,
   httpResponse,
   requestMethod,

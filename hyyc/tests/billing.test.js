@@ -607,3 +607,74 @@ test('backs off failed reconciliation orders so they cannot starve the due queue
   assert.equal(reconciliationRetryDelay(10), 6 * 60 * 60 * 1000);
   assert.equal(JSON.stringify(updates).includes('upstream details'), false);
 });
+
+test('records only allowlisted owner-bound client payment diagnostics', async () => {
+  const order = {
+    id: 'MP20260724081033aaaaaaaaaaaaaaaa',
+    ownerKey: 'owner-a',
+    openId: 'openid-a',
+    status: 'payment_pending',
+    clientFailureReportCount: 2
+  };
+  let update = null;
+  const service = createBillingService({
+    repository: {
+      async getOrder(orderId) {
+        return orderId === order.id ? order : null;
+      },
+      async updateOrder(orderId, fields) {
+        update = { orderId, fields };
+        return { ...order, ...fields };
+      }
+    },
+    paymentClient: {},
+    config: CONFIG,
+    plan: PLAN,
+    missingConfig: () => [],
+    now: () => new Date('2026-07-24T00:11:00.000Z')
+  });
+  const actor = { ownerKey: 'owner-a', openId: 'openid-a' };
+
+  assert.deepEqual(
+    await service.recordPaymentFailure(order.id, {
+      errCode: -15013,
+      platform: 'ios',
+      envVersion: 'develop',
+      sdkVersion: '3.8.12',
+      errMsg: 'must-not-be-persisted',
+      signature: 'must-not-be-persisted'
+    }, actor),
+    { recorded: true }
+  );
+  assert.deepEqual(update, {
+    orderId: order.id,
+    fields: {
+      clientFailureCode: -15013,
+      clientFailurePlatform: 'ios',
+      clientFailureEnvVersion: 'develop',
+      clientFailureSdkVersion: '3.8.12',
+      clientFailureReportedAt: new Date('2026-07-24T00:11:00.000Z'),
+      clientFailureReportCount: 3
+    }
+  });
+  assert.equal(JSON.stringify(update).includes('must-not-be-persisted'), false);
+
+  await assert.rejects(
+    () => service.recordPaymentFailure(order.id, {
+      errCode: -99999,
+      platform: 'ios',
+      envVersion: 'develop',
+      sdkVersion: '3.8.12'
+    }, actor),
+    (error) => error && error.code === 'PAYMENT_FAILURE_REPORT_INVALID'
+  );
+  await assert.rejects(
+    () => service.recordPaymentFailure(order.id, {
+      errCode: -15013,
+      platform: 'ios',
+      envVersion: 'develop',
+      sdkVersion: '3.8.12'
+    }, { ownerKey: 'owner-b', openId: 'openid-b' }),
+    (error) => error && error.code === 'ORDER_NOT_FOUND'
+  );
+});

@@ -410,6 +410,28 @@
       "reason": "Recover stale cleanup claims in deadline order."
     },
     {
+      "collection": "knowledge_user_profile_reviews",
+      "name": "status_claim_expires_at_1",
+      "unique": false,
+      "keys": [
+        { "field": "status", "direction": "1" },
+        { "field": "claimExpiresAt", "direction": "1" }
+      ],
+      "owner": "profile-review-worker",
+      "reason": "Recover profile moderation claims whose worker lease expired."
+    },
+    {
+      "collection": "knowledge_user_profile_reviews",
+      "name": "status_next_attempt_at_1",
+      "unique": false,
+      "keys": [
+        { "field": "status", "direction": "1" },
+        { "field": "nextAttemptAt", "direction": "1" }
+      ],
+      "owner": "profile-review-worker",
+      "reason": "Claim due profile moderation jobs without scanning approved profiles."
+    },
+    {
       "collection": "knowledge_user_profiles",
       "name": "avatar_file_id_1",
       "unique": false,

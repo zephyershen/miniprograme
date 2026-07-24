@@ -10,7 +10,11 @@ const profileCache = createQueryCache({ ttlMs: 5 * 60 * 1000, maxEntries: 1 });
 async function presentUserProfile(profile) {
   const decorated = decorateUserProfile(profile);
   try {
-    return applyUserProfileAvatar(decorated, await resolveAvatarUrl(decorated.avatarFileId));
+    const avatarUrl = await resolveAvatarUrl(decorated.avatarFileId);
+    const displayAvatarUrl = decorated.displayAvatarFileId === decorated.avatarFileId
+      ? avatarUrl
+      : await resolveAvatarUrl(decorated.displayAvatarFileId);
+    return applyUserProfileAvatar(decorated, avatarUrl, displayAvatarUrl);
   } catch (error) {
     return decorated;
   }
@@ -31,7 +35,14 @@ async function updateUserProfile(profile) {
 
 async function rememberUserProfile(profile) {
   const scope = membershipCacheScope();
-  return profileCache.remember(scope, await presentUserProfile(profile));
+  const current = profileCache.peek(scope, { allowStale: true });
+  const merged = profile && profile.review
+    ? profile
+    : {
+        ...(profile || {}),
+        ...(current && current.review ? { review: current.review } : {})
+      };
+  return profileCache.remember(scope, await presentUserProfile(merged));
 }
 
 function clearUserProfile() {

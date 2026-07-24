@@ -1,0 +1,231 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+
+function installModuleMock(request, exports) {
+  const filename = require.resolve(request);
+  const previous = require.cache[filename];
+  require.cache[filename] = {
+    id: filename,
+    filename,
+    loaded: true,
+    exports
+  };
+  return () => {
+    if (previous) require.cache[filename] = previous;
+    else delete require.cache[filename];
+  };
+}
+
+function loadProfilePage(billingApi) {
+  const mocks = [
+    ['../features/membership/session', {
+      refreshMembershipAccess: async () => ({}),
+      changeMembershipRolePreview: async () => ({})
+    }],
+    ['../features/membership/presentation', {
+      membershipPresentation: () => ({})
+    }],
+    ['../features/user-profile/session', {
+      loadUserProfile: async () => ({})
+    }],
+    ['../features/user-profile/model', {
+      decorateUserProfile: () => ({})
+    }],
+    ['../features/billing/api', billingApi],
+    ['../features/billing/session', {
+      loadBillingPlans: async () => ({})
+    }],
+    ['../features/billing/recovery', {
+      recoverPendingMembershipOrder: async () => null
+    }]
+  ];
+  const restores = mocks.map(([request, exports]) => installModuleMock(request, exports));
+  const filename = require.resolve('../pages/profile/index');
+  const previousModule = require.cache[filename];
+  const previousPage = global.Page;
+  let definition;
+  global.Page = (value) => { definition = value; };
+  delete require.cache[filename];
+  try {
+    require(filename);
+  } finally {
+    if (previousModule) require.cache[filename] = previousModule;
+    else delete require.cache[filename];
+    restores.reverse().forEach((restore) => restore());
+    if (previousPage) global.Page = previousPage;
+    else delete global.Page;
+  }
+  return definition;
+}
+
+function paymentWx(events, paymentError) {
+  const storage = new Map();
+  return {
+    canIUse: (capability) => capability === 'requestVirtualPayment',
+    getAccountInfoSync: () => ({ miniProgram: { envVersion: 'develop' } }),
+    getDeviceInfo: () => ({ platform: 'ios' }),
+    getSystemInfoSync: () => ({ SDKVersion: '3.8.12', platform: 'ios' }),
+    login(options) {
+      events.push('login');
+      options.success({ code: 'login-code' });
+    },
+    requestVirtualPayment(options) {
+      events.push('request-payment');
+      options.fail(paymentError);
+    },
+    setStorageSync(key, value) {
+      storage.set(key, value);
+      events.push('remember-order');
+    },
+    getStorageSync(key) {
+      return storage.get(key);
+    },
+    removeStorageSync(key) {
+      storage.delete(key);
+      events.push('forget-order');
+    },
+    showToast(options) {
+      events.push(`toast:${options.title}`);
+    }
+  };
+}
+
+function purchaseContext(page, events) {
+  return {
+    data: {
+      billing: {
+        purchasing: false,
+        available: true,
+        plan: { key: 'pro_30d' }
+      }
+    },
+    membershipAccess: {
+      viewer: { role: 'free' },
+      features: { memberPurchases: true }
+    },
+    setData(patch) {
+      if (Object.prototype.hasOwnProperty.call(patch, 'billing.purchasing')) {
+        this.data.billing.purchasing = patch['billing.purchasing'];
+      }
+    },
+    queryMembershipOrderOnce: page.queryMembershipOrderOnce,
+    recordMembershipPaymentFailure: page.recordMembershipPaymentFailure,
+    confirmMembershipOrder() {
+      events.push('confirm-loop');
+      throw new Error('confirmation loop must not run after recovered payment');
+    },
+    async loadMembership() {
+      events.push('refresh-membership');
+    }
+  };
+}
+
+test('queries once after a cashier failure and honors a server-confirmed paid order', async () => {
+  const events = [];
+  const paymentError = { errCode: -15003, errMsg: 'must-not-be-shown' };
+  const orderId = 'MP20260724081033aaaaaaaaaaaaaaaa';
+  const page = loadProfilePage({
+    async createMembershipPayment() {
+      events.push('create-order');
+      return {
+        order: { id: orderId, status: 'payment_pending' },
+        payment: {
+          signData: '{}',
+          paySig: 'pay',
+          signature: 'user',
+          mode: 'short_series_goods'
+        }
+      };
+    },
+    async getMembershipOrderStatus(receivedOrderId) {
+      events.push('query-once');
+      assert.equal(receivedOrderId, orderId);
+      return { order: { id: orderId, status: 'paid' } };
+    },
+    async reportMembershipPaymentFailure() {
+      events.push('report-failure');
+    }
+  });
+  const previousWx = global.wx;
+  global.wx = paymentWx(events, paymentError);
+  try {
+    await page.purchaseMembership.call(purchaseContext(page, events));
+  } finally {
+    if (previousWx) global.wx = previousWx;
+    else delete global.wx;
+  }
+
+  assert.deepEqual(events, [
+    'login',
+    'create-order',
+    'remember-order',
+    'request-payment',
+    'query-once',
+    'forget-order',
+    'refresh-membership',
+    'toast:Pro 已开通'
+  ]);
+});
+
+test('records a strict diagnostic only after the one-shot recovery remains unpaid', async () => {
+  const events = [];
+  const reports = [];
+  const paymentError = {
+    errCode: -15013,
+    errMsg: 'price details must not leave the device',
+    signature: 'must-not-leak'
+  };
+  const orderId = 'MP20260724081033bbbbbbbbbbbbbbbb';
+  const page = loadProfilePage({
+    async createMembershipPayment() {
+      events.push('create-order');
+      return {
+        order: { id: orderId, status: 'payment_pending' },
+        payment: {
+          signData: '{}',
+          paySig: 'pay',
+          signature: 'user',
+          mode: 'short_series_goods'
+        }
+      };
+    },
+    async getMembershipOrderStatus() {
+      events.push('query-once');
+      throw new Error('provider order not found');
+    },
+    async reportMembershipPaymentFailure(receivedOrderId, diagnostic) {
+      events.push('report-failure');
+      reports.push({ orderId: receivedOrderId, diagnostic });
+      return { recorded: true };
+    }
+  });
+  const previousWx = global.wx;
+  global.wx = paymentWx(events, paymentError);
+  try {
+    await page.purchaseMembership.call(purchaseContext(page, events));
+  } finally {
+    if (previousWx) global.wx = previousWx;
+    else delete global.wx;
+  }
+
+  assert.deepEqual(events, [
+    'login',
+    'create-order',
+    'remember-order',
+    'request-payment',
+    'query-once',
+    'report-failure',
+    'toast:会员商品价格配置不一致'
+  ]);
+  assert.deepEqual(reports, [{
+    orderId,
+    diagnostic: {
+      errCode: -15013,
+      platform: 'ios',
+      envVersion: 'develop',
+      sdkVersion: '3.8.12'
+    }
+  }]);
+  assert.equal(JSON.stringify(reports).includes('price details'), false);
+  assert.equal(JSON.stringify(reports).includes('signature'), false);
+});

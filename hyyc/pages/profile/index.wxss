@@ -36,11 +36,14 @@
   box-shadow: var(--ui-shadow-soft);
 }
 
-.user-avatar { flex: none; width: 88rpx; height: 88rpx; border-radius: 50%; background: var(--ui-accent-soft); }
+.user-avatar-wrap { position: relative; flex: none; width: 88rpx; height: 88rpx; }
+.user-avatar { width: 88rpx; height: 88rpx; border-radius: 50%; background: var(--ui-accent-soft); }
 .user-avatar-empty { display: flex; align-items: center; justify-content: center; color: var(--ui-accent-strong); font-size: 30rpx; font-weight: 760; }
+.user-avatar-review { position: absolute; right: -15rpx; bottom: -7rpx; padding: 5rpx 10rpx; border: 3rpx solid var(--ui-surface-solid); border-radius: 999rpx; background: #f2a83b; color: #fff; font-size: 16rpx; font-weight: 750; line-height: 1.2; white-space: nowrap; }
 .user-profile-copy { flex: 1; min-width: 0; }
 .user-profile-name { overflow: hidden; color: var(--ui-ink); font-size: 29rpx; font-weight: 740; text-overflow: ellipsis; white-space: nowrap; }
 .user-profile-hint { margin-top: 7rpx; color: var(--ui-muted); font-size: 20rpx; line-height: 1.5; }
+.user-profile-rejected { color: #a34c45; }
 .user-profile-arrow { color: var(--ui-accent); font-size: 25rpx; }
 
 .identity-block {

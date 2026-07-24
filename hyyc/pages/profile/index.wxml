@@ -9,11 +9,18 @@
   <view wx:elif="{{error}}" class="profile-error"><view>{{error}}</view><view class="text-action" bindtap="loadMembership">重新加载 →</view></view>
   <block wx:else>
     <view class="user-profile-card" bindtap="openProfileEditor">
-      <image wx:if="{{userProfile.avatarUrl}}" class="user-avatar" src="{{userProfile.avatarUrl}}" mode="aspectFill" />
-      <view wx:else class="user-avatar user-avatar-empty">{{userProfile.initial}}</view>
+      <view class="user-avatar-wrap">
+        <image wx:if="{{userProfile.displayAvatarUrl}}" class="user-avatar" src="{{userProfile.displayAvatarUrl}}" mode="aspectFill" />
+        <view wx:else class="user-avatar user-avatar-empty">{{userProfile.initial}}</view>
+        <view wx:if="{{userProfile.reviewPending}}" class="user-avatar-review">审核中</view>
+      </view>
       <view class="user-profile-copy">
-        <view class="user-profile-name">{{userProfile.nickname || '设置头像和昵称'}}</view>
-        <view class="user-profile-hint">{{userProfile.isComplete ? '用于评论区展示，点击可修改' : '发布评论前需要完成个人资料'}}</view>
+        <view class="user-profile-name">{{userProfile.displayNickname || '设置头像和昵称'}}</view>
+        <view wx:if="{{userProfile.reviewPending}}" class="user-profile-hint">
+          {{userProfile.isComplete ? '审核通过前，评论仍使用原资料' : '资料审核中，通过后即可评论'}}
+        </view>
+        <view wx:elif="{{userProfile.review.status === 'rejected'}}" class="user-profile-hint user-profile-rejected">{{userProfile.review.message}}</view>
+        <view wx:else class="user-profile-hint">{{userProfile.isComplete ? '用于评论区展示，点击可修改' : '发布评论前需要完成个人资料'}}</view>
       </view>
       <text class="user-profile-arrow">→</text>
     </view>

@@ -74,13 +74,14 @@ test('polls AIGCLINK before the heavier AI HOT source chain', async () => {
 });
 
 test('declares isolated timer names and schedules instead of one serial minute chain', () => {
-  assert.equal(new Set(Object.values(TIMER_CONFIG)).size, 9);
+  assert.equal(new Set(Object.values(TIMER_CONFIG)).size, 10);
   const cloudbase = JSON.parse(fs.readFileSync(path.join(__dirname, '../../cloudbaserc.json'), 'utf8'));
   const knowledgeFeed = cloudbase.functions.find((entry) => entry.name === 'knowledgeFeed');
   const schedules = new Map(knowledgeFeed.triggers.map((trigger) => [trigger.name, trigger.config]));
   assert.equal(schedules.get(TIMER_CONFIG.source), '0 * * * * * *');
   assert.equal(schedules.get(TIMER_CONFIG.visualWorker), '10,25,40,55 * * * * * *');
   assert.equal(schedules.get(TIMER_CONFIG.intelligenceWorker), '30 */10 * * * * *');
+  assert.equal(schedules.get(TIMER_CONFIG.profileReviewWorker), '20 * * * * * *');
   assert.equal(schedules.get(TIMER_CONFIG.dailyDigest), '0 0 8 * * * *');
   assert.equal(schedules.get(TIMER_CONFIG.weeklyDigest), '0 5 8 ? * 1 *');
   assert.equal(schedules.has(TIMER_CONFIG.weeklyColumn), false);

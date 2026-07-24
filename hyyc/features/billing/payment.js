@@ -1,8 +1,57 @@
 const MINIMUM_VIRTUAL_PAYMENT_SDK = '2.19.2';
 const PENDING_MEMBERSHIP_ORDER_KEY = 'billing.pendingMembershipOrder';
+const VIRTUAL_PAYMENT_PLATFORMS = new Set([
+  'android',
+  'devtools',
+  'harmony',
+  'ios',
+  'mac',
+  'ohos',
+  'unknown',
+  'windows'
+]);
+const OFFICIAL_VIRTUAL_PAYMENT_ERROR_MESSAGES = Object.freeze({
+  1001: '支付参数校验失败，请稍后重试',
+  '-1': '支付失败，请稍后重试',
+  '-2': '已取消支付',
+  '-4': '支付被安全保护拦截，请稍后重试',
+  '-5': '支付开通状态暂未确认，请稍后重试',
+  '-15001': '支付参数校验失败，请稍后重试',
+  '-15002': '这笔订单已失效，请重新发起支付',
+  '-15003': '支付系统暂时繁忙，请稍后重试',
+  '-15004': '支付币种配置异常，请稍后重试',
+  '-15005': '登录签名已失效，请重新发起支付',
+  '-15006': '支付签名配置异常，请稍后重试',
+  '-15007': '登录状态已过期，请重新发起支付',
+  '-15008': '商户支付配置尚未完成',
+  '-15009': '支付商品尚未发布',
+  '-15010': '会员商品尚未发布',
+  '-15011': '当前正式版本不能使用沙箱支付',
+  '-15012': '支付订单创建失败，请重新发起',
+  '-15013': '会员商品价格配置不一致',
+  '-15014': '会员商品发布尚未生效，请约 10 分钟后重试',
+  '-15016': '支付订单格式异常，请重新发起',
+  '-15017': '商户收款功能当前受限，请稍后重试',
+  '-15018': '会员商品未通过平台审核',
+  '-15019': '商户收款功能当前受限，请稍后重试',
+  '-15020': '操作过快，请稍后重试',
+  '-15021': '支付请求过于频繁，请稍后重试'
+});
+const OFFICIAL_VIRTUAL_PAYMENT_ERROR_CODES = new Set(
+  Object.keys(OFFICIAL_VIRTUAL_PAYMENT_ERROR_MESSAGES).map(Number)
+);
 
-function assertVirtualPaymentAvailable() {
-  if (virtualPaymentAvailable()) return;
+function currentWxApi() {
+  return typeof wx === 'undefined' ? null : wx;
+}
+
+function assertVirtualPaymentAvailable(wxApi = currentWxApi()) {
+  if (paymentPlatform(wxApi) === 'devtools') {
+    const error = new Error('开发者工具模拟器不能发起虚拟支付，请使用微信真机预览或真机调试');
+    error.code = 'VIRTUAL_PAYMENT_DEVTOOLS_UNSUPPORTED';
+    throw error;
+  }
+  if (virtualPaymentAvailable(wxApi)) return;
   const error = new Error('当前微信版本暂不支持支付，请升级微信后重试');
   error.code = 'VIRTUAL_PAYMENT_UNSUPPORTED';
   throw error;
@@ -28,10 +77,11 @@ function loginForPayment() {
 }
 
 function requestMiniProgramVirtualPayment(payment) {
-  assertVirtualPaymentAvailable();
+  const wxApi = currentWxApi();
+  assertVirtualPaymentAvailable(wxApi);
   const parameters = virtualPaymentParameters(payment);
   return new Promise((resolve, reject) => {
-    wx.requestVirtualPayment({
+    wxApi.requestVirtualPayment({
       signData: parameters.signData,
       paySig: parameters.paySig,
       signature: parameters.signature,
@@ -43,20 +93,45 @@ function requestMiniProgramVirtualPayment(payment) {
 }
 
 function paymentCancelled(error) {
-  const code = Number(error && (error.errCode !== undefined ? error.errCode : error.code));
+  const code = officialVirtualPaymentErrorCode(error);
   if (code === -2) return true;
   const message = String(error && (error.errMsg || error.message) || '');
   return /(?:cancel|canceled|cancelled|用户取消|取消支付)/i.test(message);
 }
 
 function paymentFailureMessage(error) {
+  if (error && error.code === 'VIRTUAL_PAYMENT_DEVTOOLS_UNSUPPORTED') return error.message;
   if (error && error.code === 'VIRTUAL_PAYMENT_UNSUPPORTED') return error.message;
   if (error && error.code === 'PAYMENT_STATE_UNAVAILABLE') return error.message;
-  const code = Number(error && (error.errCode !== undefined ? error.errCode : error.code));
-  if (code === -15007) return '登录状态已过期，请重新支付';
-  if (code === -4 || code === -15017) return '当前支付暂不可用，请稍后重试';
+  const code = officialVirtualPaymentErrorCode(error);
+  if (OFFICIAL_VIRTUAL_PAYMENT_ERROR_MESSAGES[code]) {
+    return OFFICIAL_VIRTUAL_PAYMENT_ERROR_MESSAGES[code];
+  }
   if (error && /^登录状态/.test(error.message || '')) return error.message;
   return '支付暂时无法完成，请稍后重试';
+}
+
+function officialVirtualPaymentErrorCode(error) {
+  const candidate = error && (
+    error.errCode !== undefined
+      ? error.errCode
+      : error.code
+  );
+  const code = Number(candidate);
+  return Number.isInteger(code) && OFFICIAL_VIRTUAL_PAYMENT_ERROR_CODES.has(code)
+    ? code
+    : null;
+}
+
+function virtualPaymentFailureDiagnostic(error, wxApi = currentWxApi()) {
+  const errCode = officialVirtualPaymentErrorCode(error);
+  if (errCode === null) return null;
+  return {
+    errCode,
+    platform: paymentPlatform(wxApi),
+    envVersion: paymentEnvironmentVersion(wxApi),
+    sdkVersion: currentSdkVersion(wxApi)
+  };
 }
 
 function rememberPendingMembershipOrder(orderId) {
@@ -94,12 +169,12 @@ function forgetPendingMembershipOrder(orderId) {
   }
 }
 
-function virtualPaymentAvailable() {
-  if (typeof wx === 'undefined' || typeof wx.requestVirtualPayment !== 'function') return false;
-  const sdkVersion = currentSdkVersion();
+function virtualPaymentAvailable(wxApi = currentWxApi()) {
+  if (!wxApi || typeof wxApi.requestVirtualPayment !== 'function') return false;
+  const sdkVersion = currentSdkVersion(wxApi);
   if (sdkVersion && compareVersions(sdkVersion, MINIMUM_VIRTUAL_PAYMENT_SDK) >= 0) return true;
   try {
-    return typeof wx.canIUse === 'function' && wx.canIUse('requestVirtualPayment');
+    return typeof wxApi.canIUse === 'function' && wxApi.canIUse('requestVirtualPayment');
   } catch (error) {
     return false;
   }
@@ -124,13 +199,46 @@ function virtualPaymentParameters(payment) {
   return parameters;
 }
 
-function currentSdkVersion() {
-  if (typeof wx.getSystemInfoSync !== 'function') return '';
+function currentSdkVersion(wxApi = currentWxApi()) {
+  if (!wxApi || typeof wxApi.getSystemInfoSync !== 'function') return '';
   try {
-    const system = wx.getSystemInfoSync();
+    const system = wxApi.getSystemInfoSync();
     return system && typeof system.SDKVersion === 'string' ? system.SDKVersion : '';
   } catch (error) {
     return '';
+  }
+}
+
+function paymentPlatform(wxApi = currentWxApi()) {
+  if (!wxApi) return 'unknown';
+  let value = '';
+  try {
+    const device = typeof wxApi.getDeviceInfo === 'function' && wxApi.getDeviceInfo();
+    value = device && device.platform;
+  } catch (error) {
+    value = '';
+  }
+  if (!value) {
+    try {
+      const system = typeof wxApi.getSystemInfoSync === 'function' && wxApi.getSystemInfoSync();
+      value = system && system.platform;
+    } catch (error) {
+      value = '';
+    }
+  }
+  const normalized = String(value || '').trim().toLowerCase();
+  return VIRTUAL_PAYMENT_PLATFORMS.has(normalized) ? normalized : 'unknown';
+}
+
+function paymentEnvironmentVersion(wxApi = currentWxApi()) {
+  try {
+    const account = wxApi
+      && typeof wxApi.getAccountInfoSync === 'function'
+      && wxApi.getAccountInfoSync();
+    const value = account && account.miniProgram && account.miniProgram.envVersion;
+    return ['develop', 'trial', 'release'].includes(value) ? value : 'unknown';
+  } catch (error) {
+    return 'unknown';
   }
 }
 
@@ -151,8 +259,12 @@ module.exports = {
   requestMiniProgramVirtualPayment,
   paymentCancelled,
   paymentFailureMessage,
+  officialVirtualPaymentErrorCode,
+  virtualPaymentFailureDiagnostic,
   rememberPendingMembershipOrder,
   pendingMembershipOrderId,
   forgetPendingMembershipOrder,
-  virtualPaymentAvailable
+  virtualPaymentAvailable,
+  paymentPlatform,
+  paymentEnvironmentVersion
 };
