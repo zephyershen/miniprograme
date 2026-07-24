@@ -2,7 +2,7 @@
 title: "评论与资料采用后台 AI 审核，结果统一进入站内消息"
 type: decision
 tags: [comments, profile, moderation, messages, loading, payment, ai]
-sources: [../sources/2026-07-24-async-comments-message-center-and-stable-loading.md]
+sources: [../sources/2026-07-24-async-comments-message-center-and-stable-loading.md, ../sources/2026-07-24-visible-wechat-account-confirmation-and-payment-diagnostics.md]
 last_updated: 2026-07-24
 status: accepted
 confidence: high
@@ -39,9 +39,11 @@ confidence: high
 8. 资讯、精选、专栏、简报、详情、收藏、资料和消息等懒加载区域统一使用轻量转圈；
    后台刷新保留现有内容和媒体高度。喜爱、收藏、媒体换签与轮询只更新叶子字段，
    不整页重绑列表或重置滚动/轮播状态。
-9. 会员支付前必须重新执行 `wx.login`，服务端通过 `code2Session` 校验该 OpenID 与
-   当前云函数身份一致，再创建订单。微信登录只完成身份绑定，不自动提供头像或昵称；
-   展示资料仍由用户主动选择，后续修改继续进入审核队列。
+9. 会员支付先用原生确认框明确“当前微信账号”、实付金额和期限；iPhone 同时说明
+   Apple 收银台和中国大陆 App Store 账号条件。确认后才静默执行 `wx.login`，
+   服务端通过 `code2Session` 校验该 OpenID 与当前云函数身份一致，再创建订单。
+   `wx.login` 不会另弹登录或资料授权页；微信登录只完成身份绑定，不自动提供头像
+   或昵称。展示资料仍由用户主动选择，后续修改继续进入审核队列。
 10. 微信虚拟商品后台原价和服务端 `goodsPrice` 独立于界面划线价。`pro_30d` 当前
     商品原价与实付价均为 590 分，1090 分只用于界面比较价；原价与现价相同时不传
     活动价。
@@ -63,6 +65,9 @@ confidence: high
   数据库、存储和函数执行，不能按固定比例承诺节省。
 - 真实新账号的资料/评论状态转换以及 iOS 真实支付仍需真机 canary；测试环境
   `env=0` 会真实扣款。
+- 支付失败诊断只保存官方码、未知数字码或无数字码类型及平台版本白名单字段；
+  不保存微信原始错误文本。没有数字码时只能把边界定位到系统收银台，不能猜测
+  具体 Apple 或微信账户原因。
 - 终态 outbox 和投递 checkpoint 后续需要按真实规模制定保留/归档策略。
 
 ## 被替代的结论

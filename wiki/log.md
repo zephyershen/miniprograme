@@ -1103,3 +1103,29 @@
   更新导航、总览、微信小程序实体和时间线。
 - Sensitive handling: 未记录用户标识、订单号、评论正文、昵称、头像/附件 File ID、
   支付签名、请求 ID、原始日志、环境变量值或回调密钥。
+
+## [2026-07-24] visible-wechat-account-payment-diagnostics | 可见账号确认与支付诊断
+
+- Session: local Codex task
+- Scope: 微信会员购买确认、虚拟支付客户端错误归一化、云端安全诊断合同、
+  `membershipBilling` 部署、开发预览与项目 Wiki；未修改商品价格、现有订单、
+  会员权益、微信已上传版本或生产用户数据。
+- Finding: `wx.login` 是静默登录凭证交换，不会弹出账号或资料授权页。最新两个
+  不同微信身份均已完成身份校验、建单与签名，590 分当前价和商品原价一致；订单
+  保持待支付、未扣款、未发放会员，失败边界在微信/Apple 收银台。因旧客户端没有
+  数字错误码，不能进一步猜测具体账户或系统原因。
+- Change: 支付前增加当前微信账号、金额、期限的原生确认；iOS 补充 Apple 收银台
+  和中国大陆 App Store 账号说明。诊断合同覆盖官方码、未知数字码和无数字码，
+  严格限制平台/运行版本/基础库版本，不保存原始错误文本。
+- Verification: 代码锚点 `d2434be`；专项 66/66、全量 620/620，完整
+  `npm.cmd run verify`、项目检查、覆盖率、依赖审计和 `git diff --check` 通过。
+- Production: `membershipBilling` 部署成功，四函数 manifest 0 漂移；线上计划
+  冒烟仍为可售、30 天、590 分当前价/商品原价和 1090 分界面比较价。新开发预览
+  459,512 bytes。
+- Remaining: iPhone 真机覆盖账号确认、成功、取消、无数字码、重复查单、发货、
+  退款与权益回收；`env=0` 会真实扣款。
+- Memory: 新增
+  `wiki/sources/2026-07-24-visible-wechat-account-confirmation-and-payment-diagnostics.md`，
+  更新决策、导航、总览、微信小程序实体和时间线。
+- Sensitive handling: 未记录用户标识、订单号、请求 ID、支付签名、原始错误文本、
+  原始日志、环境变量值或回调密钥。

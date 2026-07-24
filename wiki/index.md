@@ -14,6 +14,7 @@ confidence: high
 - [项目总览](overview.md) — 当前产品、代码、云端状态、验证结果和剩余工作
 - [上线前接手清单、CI 边界与剩余风险](syntheses/2026-07-23-release-readiness-handoff.md) — 新会话优先读取；记录精确版本锚点、旧审计关闭状态、P2 日志残余、依赖复审、真机与发布顺序
 - [生产发布候选部署与微信体验版上传](sources/2026-07-23-production-release-candidate.md) — 当前可复现 SHA、生产收敛、冒烟、微信上传与剩余人工边界
+- [会员支付可见账号确认与完整安全诊断](sources/2026-07-24-visible-wechat-account-confirmation-and-payment-diagnostics.md) — 静默登录语义、本次未扣款证据、iOS 收银台边界、新诊断和真机复测
 - [异步评论、站内消息、稳定加载与会员绑定上线](sources/2026-07-24-async-comments-message-center-and-stable-loading.md) — 评论/资料后台审核、我的消息、全页懒加载、无闪屏互动、微信身份与商品价格边界
 - [资料异步审核、预览支付诊断与微信消息回调上线](sources/2026-07-24-async-profile-review-and-preview-payment-diagnostics.md) — “审核中”队列、真机支付故障边界、入站消息 webhook 与生产收敛
 - [资料保存审核超时修复与生产部署](sources/2026-07-24-profile-moderation-timeout-repair.md) — 预览版资料保存失败根因、模型无思考修复、代码-only 发布与真实 canary 边界
