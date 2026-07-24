@@ -444,18 +444,29 @@ test('uses CloudBase managed models by task and records measured resource usage'
     content: '图片说明',
     imageUrls: ['https://example.test/image.jpg']
   });
+  const profileModeration = await provider.moderateProfile({
+    nickname: '小明',
+    avatarUrl: 'https://example.test/avatar.jpg'
+  });
 
   assert.equal(requests[0].group, 'cloudbase');
   assert.equal(requests[0].input.model, 'qwen3.5-flash');
+  assert.equal(requests[0].input.enable_thinking, undefined);
   assert.equal(requests[0].options.timeout, 90000);
   assert.equal(requests[1].input.model, 'qwen3.5-plus');
+  assert.equal(requests[1].input.enable_thinking, false);
   assert.equal(requests[1].options.timeout, 10000);
-  assert.deepEqual(timeoutDelays, [90000, 10000]);
+  assert.equal(requests[2].input.model, 'qwen3.5-plus');
+  assert.equal(requests[2].input.enable_thinking, false);
+  assert.equal(requests[2].options.timeout, 10000);
+  assert.deepEqual(timeoutDelays, [90000, 10000, 10000]);
   assert.equal(requests[1].input.messages[1].content[1].type, 'image_url');
   assert.equal(requests[1].input.messages[1].content[1].image_url.url, 'https://example.test/image.jpg');
+  assert.equal(requests[2].input.messages[1].content[1].image_url.url, 'https://example.test/avatar.jpg');
   assert.equal(analysis.provider, 'cloudbase');
   assert.ok(analysis.usage.resourcePointsEstimate >= 1);
   assert.equal(moderation.verdict, 'allow');
+  assert.equal(profileModeration.verdict, 'allow');
 });
 
 test('keeps the legacy CloudBase timeout for moderation when no task override is supplied', async () => {
