@@ -52,9 +52,27 @@ function rememberMembershipAccountVerification(access, wxApi = currentWxApi()) {
   }
 }
 
+function forgetMembershipAccountVerification(access, wxApi = currentWxApi()) {
+  const partition = accountPartition(access);
+  if (!partition
+    || !wxApi
+    || typeof wxApi.getStorageSync !== 'function'
+    || typeof wxApi.removeStorageSync !== 'function') return false;
+  try {
+    const record = wxApi.getStorageSync(STORAGE_KEY);
+    if (!record) return true;
+    if (record.cachePartition !== partition) return false;
+    wxApi.removeStorageSync(STORAGE_KEY);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
 module.exports = {
   STORAGE_KEY,
   accountPartition,
   membershipAccountVerified,
-  rememberMembershipAccountVerification
+  rememberMembershipAccountVerification,
+  forgetMembershipAccountVerification
 };

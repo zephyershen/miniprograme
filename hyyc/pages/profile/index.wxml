@@ -33,6 +33,21 @@
       <view wx:if="{{membership.renewalLabel}}" class="identity-meta">{{membership.renewalLabel}}</view>
     </view>
 
+    <view wx:if="{{billing.accountVerified}}" class="account-session-block">
+      <view class="account-session-copy">
+        <view class="account-session-title">已完成订阅账号验证</view>
+        <view class="account-session-note">
+          退出只会清除本机的订阅验证状态，不会退出手机微信、取消会员或删除资料。
+        </view>
+      </view>
+      <button
+        class="account-session-button account-session-logout"
+        bindtap="logoutWechatAccount"
+        loading="{{accountLoggingOut}}"
+        disabled="{{accountLoggingOut || accountAuthenticating || billing.purchasing}}"
+      >退出登录</button>
+    </view>
+
     <view wx:if="{{!membership.isAdmin}}" class="pro-pass {{membership.isPrivileged ? 'pro-pass-active' : ''}}">
       <view class="pro-pass-body">
         <view class="pro-pass-topline">
@@ -75,8 +90,8 @@
           wx:if="{{billing.available}}"
           class="pro-purchase-button"
           bindtap="purchaseMembership"
-          loading="{{billing.purchasing}}"
-          disabled="{{billing.purchasing}}"
+          loading="{{billing.purchasing || accountAuthenticating}}"
+          disabled="{{billing.purchasing || accountAuthenticating || accountLoggingOut}}"
         >{{billing.accountVerified ? '订阅并支付' : '使用当前微信账号登录'}}</button>
         <view wx:else class="pro-purchase-footnote">当前暂不可购买，请稍后再试。</view>
         <view class="pro-account-note">

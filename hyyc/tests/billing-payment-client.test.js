@@ -22,7 +22,8 @@ const {
   STORAGE_KEY: ACCOUNT_VERIFICATION_STORAGE_KEY,
   accountPartition,
   membershipAccountVerified,
-  rememberMembershipAccountVerification
+  rememberMembershipAccountVerification,
+  forgetMembershipAccountVerification
 } = require('../features/billing/account-session.js');
 const {
   loadBillingPlans
@@ -167,7 +168,8 @@ test('remembers the explicit account step only for the current viewer partition'
   const storage = new Map();
   global.wx = supportedWx({
     getStorageSync(key) { return storage.get(key); },
-    setStorageSync(key, value) { storage.set(key, value); }
+    setStorageSync(key, value) { storage.set(key, value); },
+    removeStorageSync(key) { storage.delete(key); }
   });
   const first = { viewer: { cachePartition: 'viewer-partition-a' } };
   const second = { viewer: { cachePartition: 'viewer-partition-b' } };
@@ -177,6 +179,24 @@ test('remembers the explicit account step only for the current viewer partition'
   assert.equal(membershipAccountVerified(first), true);
   assert.equal(membershipAccountVerified(second), false);
   assert.equal(storage.get(ACCOUNT_VERIFICATION_STORAGE_KEY).verified, true);
+  assert.equal(forgetMembershipAccountVerification(second), false);
+  assert.equal(membershipAccountVerified(first), true);
+  assert.equal(forgetMembershipAccountVerification(first), true);
+  assert.equal(membershipAccountVerified(first), false);
+  assert.equal(forgetMembershipAccountVerification(first), true);
+});
+
+test('keeps the account step intact when local logout cannot remove it', () => {
+  const storage = new Map();
+  global.wx = supportedWx({
+    getStorageSync(key) { return storage.get(key); },
+    setStorageSync(key, value) { storage.set(key, value); },
+    removeStorageSync() { throw new Error('storage unavailable'); }
+  });
+  const access = { viewer: { cachePartition: 'viewer-partition-a' } };
+  assert.equal(rememberMembershipAccountVerification(access), true);
+  assert.equal(forgetMembershipAccountVerification(access), false);
+  assert.equal(membershipAccountVerified(access), true);
 });
 
 test('gives an actionable Apple cashier hint for a code-less iOS failure', () => {

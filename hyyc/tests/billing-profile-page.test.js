@@ -16,7 +16,9 @@ function installModuleMock(request, exports) {
   };
 }
 
-function loadProfilePage(billingApi) {
+function loadProfilePage(billingApi, billingSession = {
+  loadBillingPlans: async () => ({})
+}) {
   const mocks = [
     ['../features/membership/session', {
       refreshMembershipAccess: async () => ({}),
@@ -32,9 +34,7 @@ function loadProfilePage(billingApi) {
       decorateUserProfile: () => ({})
     }],
     ['../features/billing/api', billingApi],
-    ['../features/billing/session', {
-      loadBillingPlans: async () => ({})
-    }],
+    ['../features/billing/session', billingSession],
     ['../features/billing/recovery', {
       recoverPendingMembershipOrder: async () => null
     }]
@@ -100,6 +100,8 @@ function paymentWx(events, paymentError, { completeProfile = false } = {}) {
 function purchaseContext(page, events, { accountVerified = true } = {}) {
   return {
     data: {
+      accountAuthenticating: false,
+      accountLoggingOut: false,
       billing: {
         purchasing: false,
         available: true,
@@ -126,10 +128,17 @@ function purchaseContext(page, events, { accountVerified = true } = {}) {
       if (Object.prototype.hasOwnProperty.call(patch, 'billing.accountVerified')) {
         this.data.billing.accountVerified = patch['billing.accountVerified'];
       }
+      if (Object.prototype.hasOwnProperty.call(patch, 'accountAuthenticating')) {
+        this.data.accountAuthenticating = patch.accountAuthenticating;
+      }
+      if (Object.prototype.hasOwnProperty.call(patch, 'accountLoggingOut')) {
+        this.data.accountLoggingOut = patch.accountLoggingOut;
+      }
     },
     queryMembershipOrderOnce: page.queryMembershipOrderOnce,
     recordMembershipPaymentFailure: page.recordMembershipPaymentFailure,
     promptProfileSetupAfterLogin: page.promptProfileSetupAfterLogin,
+    loginWechatAccount: page.loginWechatAccount,
     confirmMembershipOrder() {
       events.push('confirm-loop');
       throw new Error('confirmation loop must not run after recovered payment');
@@ -289,4 +298,213 @@ test('uses the first click only to verify the current account and offer optional
   ]);
   assert.equal(context.data.billing.accountVerified, true);
   assert.equal(context.data.billing.purchasing, false);
+});
+
+test('logs out only the current local account step after explicit confirmation', async () => {
+  const events = [];
+  const storage = new Map([[
+    'membership_account_verification_v1',
+    {
+      version: 1,
+      cachePartition: 'viewer-partition-a',
+      verified: true
+    }
+  ]]);
+  const page = loadProfilePage({});
+  const context = purchaseContext(page, events);
+  context.membershipLoadRequestId = 3;
+  context.billingLoadRequestId = 5;
+  const previousWx = global.wx;
+  global.wx = {
+    getStorageSync(key) { return storage.get(key); },
+    removeStorageSync(key) {
+      events.push('forget-account');
+      storage.delete(key);
+    },
+    showModal(options) {
+      events.push(`modal:${options.title}`);
+      assert.match(options.content, /不会退出手机微信、取消会员/);
+      options.success({ confirm: true });
+    },
+    showToast(options) {
+      events.push(`toast:${options.title}`);
+    }
+  };
+  try {
+    assert.equal(await page.logoutWechatAccount.call(context), true);
+  } finally {
+    if (previousWx) global.wx = previousWx;
+    else delete global.wx;
+  }
+
+  assert.deepEqual(events, [
+    'modal:退出订阅登录？',
+    'forget-account',
+    'toast:已退出订阅登录'
+  ]);
+  assert.equal(context.data.billing.accountVerified, false);
+  assert.equal(context.data.accountLoggingOut, false);
+  assert.equal(context.membershipLoadRequestId, 3);
+  assert.equal(context.billingLoadRequestId, 5);
+  assert.equal(storage.has('membership_account_verification_v1'), false);
+});
+
+test('cancelled or failed local logout never fakes a signed-out state', async () => {
+  const page = loadProfilePage({});
+  const previousWx = global.wx;
+  const cancelled = purchaseContext(page, []);
+  global.wx = {
+    showModal(options) {
+      assert.equal(cancelled.data.accountLoggingOut, true);
+      options.success({ confirm: false });
+    }
+  };
+  try {
+    assert.equal(await page.logoutWechatAccount.call(cancelled), false);
+    assert.equal(cancelled.data.billing.accountVerified, true);
+
+    const failed = purchaseContext(page, []);
+    global.wx = {
+      getStorageSync() {
+        return {
+          version: 1,
+          cachePartition: 'viewer-partition-a',
+          verified: true
+        };
+      },
+      removeStorageSync() { throw new Error('storage unavailable'); },
+      showModal(options) { options.success({ confirm: true }); },
+      showToast() {}
+    };
+    assert.equal(await page.logoutWechatAccount.call(failed), false);
+    assert.equal(failed.data.billing.accountVerified, true);
+    assert.equal(failed.data.accountLoggingOut, false);
+  } finally {
+    if (previousWx) global.wx = previousWx;
+    else delete global.wx;
+  }
+});
+
+test('a login finishing after the page hides does not reopen account UI', async () => {
+  const events = [];
+  let resolveVerification;
+  const page = loadProfilePage({
+    verifyMembershipAccount() {
+      events.push('verify-account');
+      return new Promise((resolve) => { resolveVerification = resolve; });
+    }
+  });
+  const context = purchaseContext(page, events, { accountVerified: false });
+  context.pageDisposed = false;
+  context.pageHidden = false;
+  context.accountOperationGeneration = 0;
+  context.refreshProfilePage = () => {
+    events.push('refresh-page');
+    return Promise.resolve(true);
+  };
+  const previousWx = global.wx;
+  global.wx = paymentWx(events, null);
+  try {
+    const pending = page.loginWechatAccount.call(context);
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.equal(typeof resolveVerification, 'function');
+
+    page.onHide.call(context);
+    resolveVerification({ verified: true });
+    assert.equal(await pending, true);
+    assert.deepEqual(events, [
+      'login',
+      'verify-account',
+      'remember-account'
+    ]);
+    assert.equal(context.data.billing.accountVerified, false);
+
+    page.onShow.call(context);
+    assert.equal(context.pageHidden, false);
+    assert.equal(context.data.accountAuthenticating, false);
+    assert.equal(context.data.accountLoggingOut, false);
+    assert.equal(events.at(-1), 'refresh-page');
+  } finally {
+    if (previousWx) global.wx = previousWx;
+    else delete global.wx;
+  }
+});
+
+test('a delayed billing response settles loading without restoring login after logout', async () => {
+  let resolvePlans;
+  const page = loadProfilePage({}, {
+    loadBillingPlans: () => new Promise((resolve) => { resolvePlans = resolve; })
+  });
+  const storage = new Map([[
+    'membership_account_verification_v1',
+    {
+      version: 1,
+      cachePartition: 'viewer-partition-a',
+      verified: true
+    }
+  ]]);
+  const writes = [];
+  const context = {
+    pageDisposed: false,
+    pageHidden: false,
+    accountOperationGeneration: 0,
+    billingLoaded: false,
+    billingLoadRequestId: 0,
+    data: {
+      accountAuthenticating: false,
+      accountLoggingOut: false,
+      billing: {
+        purchasing: false,
+        accountVerified: true,
+        loading: false
+      }
+    },
+    membershipAccess: {
+      viewer: { cachePartition: 'viewer-partition-a' }
+    },
+    setData(patch) {
+      writes.push(patch);
+      if (patch.billing) this.data.billing = patch.billing;
+      if (Object.prototype.hasOwnProperty.call(patch, 'billing.loading')) {
+        this.data.billing.loading = patch['billing.loading'];
+      }
+      if (Object.prototype.hasOwnProperty.call(patch, 'billing.accountVerified')) {
+        this.data.billing.accountVerified = patch['billing.accountVerified'];
+      }
+      if (Object.prototype.hasOwnProperty.call(patch, 'accountLoggingOut')) {
+        this.data.accountLoggingOut = patch.accountLoggingOut;
+      }
+    },
+    recoverPendingMembershipOrder: async () => null
+  };
+  const previousWx = global.wx;
+  global.wx = {
+    getStorageSync(key) { return storage.get(key); },
+    removeStorageSync(key) { storage.delete(key); },
+    showModal(options) { options.success({ confirm: true }); },
+    showToast() {}
+  };
+  try {
+    const pending = page.loadBilling.call(context, {
+      access: context.membershipAccess
+    });
+    assert.equal(context.data.billing.loading, true);
+    assert.equal(await page.logoutWechatAccount.call(context), true);
+
+    resolvePlans({
+      available: true,
+      plan: { key: 'pro_30d' }
+    });
+    assert.equal(await pending, true);
+  } finally {
+    if (previousWx) global.wx = previousWx;
+    else delete global.wx;
+  }
+
+  assert.equal(context.billingLoadRequestId, 1);
+  assert.equal(context.data.billing.loading, false);
+  assert.equal(context.data.billing.available, true);
+  assert.equal(context.data.billing.accountVerified, false);
+  assert.equal(writes.some((patch) => patch.billing && patch.billing.accountVerified === true), false);
 });

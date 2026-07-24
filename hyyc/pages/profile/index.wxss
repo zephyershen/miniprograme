@@ -60,6 +60,26 @@
 .identity-copy { margin-top: 12rpx; color: var(--ui-muted); font-size: 24rpx; line-height: 1.65; }
 .identity-meta { margin-top: 12rpx; font-size: 21rpx; font-weight: 680; }
 
+.account-session-block {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+  margin-top: 22rpx;
+  padding: 24rpx 26rpx;
+  border: 1rpx solid var(--ui-hairline);
+  border-radius: 26rpx;
+  background: var(--ui-surface-solid);
+}
+
+.account-session-copy { flex: 1; min-width: 0; }
+.account-session-title { color: var(--ui-ink); font-size: 24rpx; font-weight: 720; }
+.account-session-note { margin-top: 7rpx; color: var(--ui-muted); font-size: 18rpx; line-height: 1.55; }
+.account-session-button { flex: none; min-height: 64rpx; margin: 0; padding: 0 20rpx; border: 0; border-radius: 18rpx; background: var(--ui-accent-soft); color: var(--ui-accent-strong); font-size: 20rpx; font-weight: 700; line-height: 64rpx; }
+.account-session-button::after { border: 0; }
+.account-session-button[disabled] { opacity: .58; }
+.account-session-logout { background: #fff3f1; color: #a34c45; }
+
 .coverage-line {
   display: flex;
   flex-wrap: wrap;
