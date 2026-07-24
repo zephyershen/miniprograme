@@ -4,11 +4,19 @@ type: source
 tags: [payment, wechat-login, ios, diagnostics, deployment, preview]
 source_date: 2026-07-24
 last_updated: 2026-07-24
-status: confirmed
+status: superseded
 confidence: high
+superseded_by: 2026-07-24-two-step-membership-login-and-optional-profile.md
 ---
 
 # 会员支付增加可见微信账号确认与完整安全诊断
+
+## 取代说明
+
+本页记录的收银台失败边界和安全诊断合同继续有效；其中“原生确认框后在同一次点击
+内登录、建单并支付”的界面已由代码锚点 `d927bfb` 取代。当前产品以
+[先登录、再单独发起支付](2026-07-24-two-step-membership-login-and-optional-profile.md)
+为准：第一次点击不建单、不拉起收银台，第二次点击才支付。
 
 ## 结论
 

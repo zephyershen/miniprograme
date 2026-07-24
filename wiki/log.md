@@ -1129,3 +1129,29 @@
   更新决策、导航、总览、微信小程序实体和时间线。
 - Sensitive handling: 未记录用户标识、订单号、请求 ID、支付签名、原始错误文本、
   原始日志、环境变量值或回调密钥。
+
+## [2026-07-24] two-step-membership-login | 先登录当前微信账号再单独支付
+
+- Session: local Codex task
+- Scope: 会员订阅两步交互、服务端账号校验 action、查看者分区状态、可选头像昵称
+  引导、支付云函数部署、开发预览与项目 Wiki。
+- Clarification: 用户要求首次订阅先完成微信身份登录，再由用户单独点击付款。
+  微信 `wx.login` 只能静默取得登录码，不能弹出账号选择或自动返回真实头像昵称；
+  官方头像选择器和昵称输入可用于用户主动完善资料，但不能作为支付硬门槛。
+- Change: 第一次点击仅登录并调用 `verifyAccount`；服务端以 `code2Session` 确认
+  当前身份且不创建订单。第二次点击才重新登录、建单并调用收银台。资料未完成时
+  可进入官方资料控件，也可跳过；资料候选仍由后台审核。
+- Verification: 代码锚点 `d927bfb`；全量 621/621，32 JSON/301 JavaScript/
+  12 pages，完整 `npm.cmd run verify`、覆盖率、生产依赖审计和
+  `git diff --check` 通过。
+- Production: `membershipBilling` 部署成功，四函数 manifest 0 漂移；线上计划
+  仍为可售、30 天、590 分当前价/商品原价与 1090 分比较价。新开发预览
+  462,604 bytes。
+- Remaining: 用真实新账号确认第一次点击不出现收银台、资料可跳过、第二次点击才
+  支付；继续覆盖成功、取消、无数字码、重复查单、发货、退款和权益回收。
+  当前 `env=0` 会真实扣款。
+- Memory: 新增
+  `wiki/sources/2026-07-24-two-step-membership-login-and-optional-profile.md`，
+  将旧单次点击方案标记为已取代，并更新决策、导航、总览、实体和时间线。
+- Sensitive handling: 未记录用户标识、OpenID、订单号、请求 ID、支付签名、
+  原始错误文本、原始日志、环境变量值或回调密钥。

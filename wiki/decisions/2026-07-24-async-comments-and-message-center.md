@@ -2,7 +2,7 @@
 title: "评论与资料采用后台 AI 审核，结果统一进入站内消息"
 type: decision
 tags: [comments, profile, moderation, messages, loading, payment, ai]
-sources: [../sources/2026-07-24-async-comments-message-center-and-stable-loading.md, ../sources/2026-07-24-visible-wechat-account-confirmation-and-payment-diagnostics.md]
+sources: [../sources/2026-07-24-async-comments-message-center-and-stable-loading.md, ../sources/2026-07-24-visible-wechat-account-confirmation-and-payment-diagnostics.md, ../sources/2026-07-24-two-step-membership-login-and-optional-profile.md]
 last_updated: 2026-07-24
 status: accepted
 confidence: high
@@ -39,11 +39,12 @@ confidence: high
 8. 资讯、精选、专栏、简报、详情、收藏、资料和消息等懒加载区域统一使用轻量转圈；
    后台刷新保留现有内容和媒体高度。喜爱、收藏、媒体换签与轮询只更新叶子字段，
    不整页重绑列表或重置滚动/轮播状态。
-9. 会员支付先用原生确认框明确“当前微信账号”、实付金额和期限；iPhone 同时说明
-   Apple 收银台和中国大陆 App Store 账号条件。确认后才静默执行 `wx.login`，
-   服务端通过 `code2Session` 校验该 OpenID 与当前云函数身份一致，再创建订单。
-   `wx.login` 不会另弹登录或资料授权页；微信登录只完成身份绑定，不自动提供头像
-   或昵称。展示资料仍由用户主动选择，后续修改继续进入审核队列。
+9. 会员订阅采用两次点击：第一次只执行 `wx.login` 与服务端 `code2Session`
+   身份一致性校验，不建单、不拉起收银台；登录成功后，第二次点击才重新取得登录码、
+   创建订单并支付。登录步骤状态按匿名查看者分区保存，不能替代付款时的权威校验。
+   `wx.login` 不会弹出账号选择或资料授权页，也不自动提供真实头像昵称。资料未完成
+   时只提供官方 `chooseAvatar` 与昵称输入的可选引导，候选仍进入后台审核；不得把
+   头像昵称设为会员绑定或支付的硬门槛。
 10. 微信虚拟商品后台原价和服务端 `goodsPrice` 独立于界面划线价。`pro_30d` 当前
     商品原价与实付价均为 590 分，1090 分只用于界面比较价；原价与现价相同时不传
     活动价。
@@ -75,3 +76,5 @@ confidence: high
 - 取代“评论在请求内同步审核并通过后一次性写入”的实现结论；公开前审核原则不变。
 - 细化“资料异步审核”决策，使资料、评论、会员和参与通知共享站内消息结果面。
 - 取代“后台刷新可以重绑当前列表”的页面实现；阅读中的内容必须保持稳定。
+- 取代“在同一次点击中用确认框后立即登录、建单并支付”的交互；账号登录和付款
+  现在是两个独立的用户动作。
