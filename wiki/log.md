@@ -1025,3 +1025,20 @@
   权益重锁。依赖例外仍须在 2026-08-06 前复审。
 - Sensitive handling: 过程中产生的回调配置、浏览器会话和页面快照均在本地临时
   区域使用，凭据完成轮换；临时配置与浏览器审计文件已删除，普通 Wiki 不含实际值。
+
+## [2026-07-24] profile-moderation-timeout-repair | 修复预览版资料保存审核超时
+
+- Session: local Codex task
+- Root cause: 真实线上日志确认头像上传和 `saveProfile` 路由成功；两次
+  `qwen3.5-plus` 多模态资料审核都越过 30 秒应用超时后才返回，串行 Packy
+  兜底又发生网络失败，服务端按 fail-closed 返回
+  `CONTENT_REVIEW_UNAVAILABLE`，未发布头像或写入资料。
+- Change: 只对评论和资料审核显式传顶层 `enable_thinking:false`；分析、简报、
+  模型选择、严格 Schema、置信度门槛、兜底和失败不写入顺序保持不变。
+- Verification: 专项测试、完整 `npm.cmd run verify`、`git diff --check` 和
+  GitHub Actions `production-verify` 全部通过。修复提交为 `fd932bf`。
+- Production: 仅 code-only 更新 `knowledgeFeed`；发布后函数恢复 `Active`，
+  四函数 manifest 0 漂移，下载回读的入口和审核 adapter 与提交逐字节一致。
+  当前预览二维码无需重建；真实账号再次保存仍是最终产品 canary。
+- Sensitive handling: 未在 Wiki 中记录用户标识、来源 IP、头像 File ID、签名
+  URL、昵称、请求 ID、环境变量值或原始日志。
