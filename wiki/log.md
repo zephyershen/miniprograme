@@ -1042,3 +1042,28 @@
   当前预览二维码无需重建；真实账号再次保存仍是最终产品 canary。
 - Sensitive handling: 未在 Wiki 中记录用户标识、来源 IP、头像 File ID、签名
   URL、昵称、请求 ID、环境变量值或原始日志。
+
+## [2026-07-24] async-profile-review-and-preview-payment | 后台审核与支付诊断上线
+
+- Session: local Codex task
+- Scope: 资料审核队列、审核媒体生命周期、资料页状态、预览支付诊断、微信虚拟支付
+  发货消息回调、数据库合同、生产函数/触发器部署、开发预览和项目 Wiki。
+- Profile: 保存请求只校验、冻结候选并入队后立即返回；用户本人看到“审核中”。
+  worker 通过租约、版本与 claim 校验有界重试，只有允许结果能事务发布；旧已通过
+  资料在新候选通过前继续公开，首次资料通过前保持未完成。
+- Payment: 两次预览尝试均已成功服务端建单但未形成微信平台订单，故障边界在
+  客户端 `wx.requestVirtualPayment` 收银台。新增模拟器提示、官方错误码说明、
+  失败后一次查单恢复和严格白名单诊断；当前预览为 `env=0` 真实扣款。
+- Message callback: 明确后台“消息推送配置”为微信到服务器的入站 webhook；
+  新增 `xpay_goods_deliver_notify`，必须官方查单确认后才幂等发放和确认发货。
+- Verification: 代码锚点 `38d05c8`；568/568 测试、30 JSON/285 JavaScript/
+  11 pages、覆盖率和生产依赖审计通过；GitHub Actions
+  `production-verify` 成功。
+- Production: 23 个合同集合、37 个合同索引、四函数 manifest 0 漂移；
+  `knowledgeFeed` 9 个定时器与 `membershipBilling` 1 个对账定时器收敛。
+  新开发预览包 414,774 bytes；真实资料状态转换及资金矩阵仍待人工 canary。
+- Memory: 新增
+  `wiki/sources/2026-07-24-async-profile-review-and-preview-payment-diagnostics.md`，
+  更新导航、总览、微信小程序实体和时间线；旧同步超时记录保留为历史证据。
+- Sensitive handling: 未记录用户标识、订单号、头像 File ID、昵称、支付签名、
+  请求 ID、原始日志、环境变量值或回调密钥。
