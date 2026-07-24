@@ -23,7 +23,8 @@ function reportMembershipPaymentFailure(orderId, diagnostic) {
   return callCloudFunction('membershipBilling', {
     action: 'paymentFailure',
     orderId,
-    errCode: source.errCode,
+    ...(Number.isInteger(source.errCode) ? { errCode: source.errCode } : {}),
+    failureKind: source.failureKind,
     platform: source.platform,
     envVersion: source.envVersion,
     sdkVersion: source.sdkVersion

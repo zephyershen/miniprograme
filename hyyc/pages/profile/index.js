@@ -18,6 +18,7 @@ const {
 const {
   assertVirtualPaymentAvailable,
   loginForPayment,
+  confirmWechatAccountPayment,
   requestMiniProgramVirtualPayment,
   paymentCancelled,
   paymentFailureMessage,
@@ -278,6 +279,11 @@ Page({
     let orderId = '';
     try {
       assertVirtualPaymentAvailable();
+      const confirmed = await confirmWechatAccountPayment({
+        priceLabel: this.data.billing.plan.priceLabel,
+        durationDays: this.data.billing.plan.durationDays
+      });
+      if (!confirmed) return;
       const loginCode = await loginForPayment();
       const created = await createMembershipPayment(
         this.data.billing.plan.key,

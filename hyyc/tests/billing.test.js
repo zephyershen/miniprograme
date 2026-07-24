@@ -654,7 +654,7 @@ test('backs off failed reconciliation orders so they cannot starve the due queue
   assert.equal(JSON.stringify(updates).includes('upstream details'), false);
 });
 
-test('records only allowlisted owner-bound client payment diagnostics', async () => {
+test('records only safe owner-bound client payment diagnostics', async () => {
   const order = {
     id: 'MP20260724081033aaaaaaaaaaaaaaaa',
     ownerKey: 'owner-a',
@@ -684,6 +684,7 @@ test('records only allowlisted owner-bound client payment diagnostics', async ()
   assert.deepEqual(
     await service.recordPaymentFailure(order.id, {
       errCode: -15013,
+      failureKind: 'official_code',
       platform: 'ios',
       envVersion: 'develop',
       sdkVersion: '3.8.12',
@@ -696,6 +697,7 @@ test('records only allowlisted owner-bound client payment diagnostics', async ()
     orderId: order.id,
     fields: {
       clientFailureCode: -15013,
+      clientFailureKind: 'official_code',
       clientFailurePlatform: 'ios',
       clientFailureEnvVersion: 'develop',
       clientFailureSdkVersion: '3.8.12',
@@ -704,6 +706,33 @@ test('records only allowlisted owner-bound client payment diagnostics', async ()
     }
   });
   assert.equal(JSON.stringify(update).includes('must-not-be-persisted'), false);
+
+  assert.deepEqual(
+    await service.recordPaymentFailure(order.id, {
+      failureKind: 'no_numeric_code',
+      platform: 'ios',
+      envVersion: 'develop',
+      sdkVersion: '3.8.12',
+      errMsg: 'must-not-be-persisted'
+    }, actor),
+    { recorded: true }
+  );
+  assert.equal(update.fields.clientFailureCode, null);
+  assert.equal(update.fields.clientFailureKind, 'no_numeric_code');
+  assert.equal(JSON.stringify(update).includes('must-not-be-persisted'), false);
+
+  assert.deepEqual(
+    await service.recordPaymentFailure(order.id, {
+      errCode: -99999,
+      failureKind: 'unrecognized_numeric_code',
+      platform: 'ios',
+      envVersion: 'develop',
+      sdkVersion: '3.8.12'
+    }, actor),
+    { recorded: true }
+  );
+  assert.equal(update.fields.clientFailureCode, -99999);
+  assert.equal(update.fields.clientFailureKind, 'unrecognized_numeric_code');
 
   await assert.rejects(
     () => service.recordPaymentFailure(order.id, {
@@ -717,6 +746,7 @@ test('records only allowlisted owner-bound client payment diagnostics', async ()
   await assert.rejects(
     () => service.recordPaymentFailure(order.id, {
       errCode: -15013,
+      failureKind: 'official_code',
       platform: 'ios',
       envVersion: 'develop',
       sdkVersion: '3.8.12'

@@ -57,6 +57,7 @@ const ACTIONS = Object.freeze({
     event.orderId,
     {
       errCode: event.errCode,
+      failureKind: event.failureKind,
       platform: event.platform,
       envVersion: event.envVersion,
       sdkVersion: event.sdkVersion

@@ -42,6 +42,11 @@ const PAYMENT_FAILURE_PLATFORMS = new Set([
   'windows'
 ]);
 const PAYMENT_FAILURE_ENVIRONMENTS = new Set(['develop', 'trial', 'release', 'unknown']);
+const PAYMENT_FAILURE_KINDS = new Set([
+  'official_code',
+  'unrecognized_numeric_code',
+  'no_numeric_code'
+]);
 
 function centsToAmount(cents) {
   return (Math.max(0, Number(cents) || 0) / 100).toFixed(2);
@@ -73,19 +78,37 @@ function positiveIntegerString(value) {
 }
 
 function normalizePaymentFailureDiagnostic(value = {}) {
-  const errCode = Number(value.errCode);
+  const hasErrCode = value.errCode !== undefined
+    && value.errCode !== null
+    && value.errCode !== '';
+  const errCode = hasErrCode ? Number(value.errCode) : null;
+  const failureKind = boundedText(value.failureKind, 40);
   const platform = boundedText(value.platform, 24);
   const envVersion = boundedText(value.envVersion, 12);
   const sdkVersion = boundedText(value.sdkVersion, 20, { required: false });
-  const valid = Number.isInteger(errCode)
-    && OFFICIAL_VIRTUAL_PAYMENT_ERROR_CODES.has(errCode)
+  const codeMatchesKind = (
+    failureKind === 'official_code'
+      && Number.isInteger(errCode)
+      && OFFICIAL_VIRTUAL_PAYMENT_ERROR_CODES.has(errCode)
+  ) || (
+    failureKind === 'unrecognized_numeric_code'
+      && Number.isInteger(errCode)
+      && errCode >= -999999
+      && errCode <= 999999
+      && !OFFICIAL_VIRTUAL_PAYMENT_ERROR_CODES.has(errCode)
+  ) || (
+    failureKind === 'no_numeric_code'
+      && !hasErrCode
+  );
+  const valid = PAYMENT_FAILURE_KINDS.has(failureKind)
+    && codeMatchesKind
     && PAYMENT_FAILURE_PLATFORMS.has(platform)
     && PAYMENT_FAILURE_ENVIRONMENTS.has(envVersion)
     && (!sdkVersion || /^\d{1,3}(?:\.\d{1,3}){1,3}$/.test(sdkVersion));
   if (!valid) {
     throw new BillingError('PAYMENT_FAILURE_REPORT_INVALID', '支付诊断信息无效', 400);
   }
-  return { errCode, platform, envVersion, sdkVersion };
+  return { errCode, failureKind, platform, envVersion, sdkVersion };
 }
 
 function publicOrder(order) {
@@ -449,6 +472,7 @@ function createBillingService({ repository, paymentClient, config, plan, missing
     const reportedAt = now();
     await repository.updateOrder(order.id, {
       clientFailureCode: normalized.errCode,
+      clientFailureKind: normalized.failureKind,
       clientFailurePlatform: normalized.platform,
       clientFailureEnvVersion: normalized.envVersion,
       clientFailureSdkVersion: normalized.sdkVersion,

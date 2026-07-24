@@ -58,7 +58,7 @@ function loadProfilePage(billingApi) {
   return definition;
 }
 
-function paymentWx(events, paymentError) {
+function paymentWx(events, paymentError, { confirmAccount = true } = {}) {
   const storage = new Map();
   return {
     canIUse: (capability) => capability === 'requestVirtualPayment',
@@ -68,6 +68,10 @@ function paymentWx(events, paymentError) {
     login(options) {
       events.push('login');
       options.success({ code: 'login-code' });
+    },
+    showModal(options) {
+      events.push('confirm-account');
+      options.success({ confirm: confirmAccount, cancel: !confirmAccount });
     },
     requestVirtualPayment(options) {
       events.push('request-payment');
@@ -96,7 +100,11 @@ function purchaseContext(page, events) {
       billing: {
         purchasing: false,
         available: true,
-        plan: { key: 'pro_30d' }
+        plan: {
+          key: 'pro_30d',
+          priceLabel: '¥5.9',
+          durationDays: 30
+        }
       }
     },
     membershipAccess: {
@@ -156,6 +164,7 @@ test('queries once after a cashier failure and honors a server-confirmed paid or
   }
 
   assert.deepEqual(events, [
+    'confirm-account',
     'login',
     'create-order',
     'remember-order',
@@ -209,6 +218,7 @@ test('records a strict diagnostic only after the one-shot recovery remains unpai
   }
 
   assert.deepEqual(events, [
+    'confirm-account',
     'login',
     'create-order',
     'remember-order',
@@ -221,6 +231,7 @@ test('records a strict diagnostic only after the one-shot recovery remains unpai
     orderId,
     diagnostic: {
       errCode: -15013,
+      failureKind: 'official_code',
       platform: 'ios',
       envVersion: 'develop',
       sdkVersion: '3.8.12'
@@ -228,4 +239,32 @@ test('records a strict diagnostic only after the one-shot recovery remains unpai
   }]);
   assert.equal(JSON.stringify(reports).includes('price details'), false);
   assert.equal(JSON.stringify(reports).includes('signature'), false);
+});
+
+test('does not login or create an order when current-account confirmation is cancelled', async () => {
+  const events = [];
+  const page = loadProfilePage({
+    async createMembershipPayment() {
+      events.push('create-order');
+      throw new Error('must not create an order');
+    },
+    async getMembershipOrderStatus() {
+      throw new Error('must not query an order');
+    },
+    async reportMembershipPaymentFailure() {
+      throw new Error('must not report a failure');
+    }
+  });
+  const previousWx = global.wx;
+  global.wx = paymentWx(events, null, { confirmAccount: false });
+  const context = purchaseContext(page, events);
+  try {
+    await page.purchaseMembership.call(context);
+  } finally {
+    if (previousWx) global.wx = previousWx;
+    else delete global.wx;
+  }
+
+  assert.deepEqual(events, ['confirm-account']);
+  assert.equal(context.data.billing.purchasing, false);
 });

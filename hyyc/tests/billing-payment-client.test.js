@@ -3,9 +3,11 @@ const assert = require('node:assert/strict');
 const {
   assertVirtualPaymentAvailable,
   loginForPayment,
+  confirmWechatAccountPayment,
   requestMiniProgramVirtualPayment,
   paymentCancelled,
   paymentFailureMessage,
+  officialVirtualPaymentErrorCode,
   virtualPaymentFailureDiagnostic,
   rememberPendingMembershipOrder,
   pendingMembershipOrderId,
@@ -96,11 +98,11 @@ test('maps every documented virtual-payment error code to an actionable message'
   });
   assert.equal(
     paymentFailureMessage({ errCode: -99999 }),
-    '支付暂时无法完成，请稍后重试'
+    '支付暂时无法完成（微信错误码 -99999），请稍后重试'
   );
 });
 
-test('builds a strict non-sensitive diagnostic only for official payment errors', () => {
+test('builds a strict non-sensitive diagnostic for coded and code-less payment errors', () => {
   global.wx = supportedWx({
     getDeviceInfo: () => ({ platform: 'ios', model: 'must-not-leak' }),
     getAccountInfoSync: () => ({
@@ -115,12 +117,35 @@ test('builds a strict non-sensitive diagnostic only for official payment errors'
     }),
     {
       errCode: -15013,
+      failureKind: 'official_code',
       platform: 'ios',
       envVersion: 'develop',
       sdkVersion: '3.8.12'
     }
   );
-  assert.equal(virtualPaymentFailureDiagnostic({ errCode: -99999 }), null);
+  assert.deepEqual(
+    virtualPaymentFailureDiagnostic({ err_code: -99999 }),
+    {
+      errCode: -99999,
+      failureKind: 'unrecognized_numeric_code',
+      platform: 'ios',
+      envVersion: 'develop',
+      sdkVersion: '3.8.12'
+    }
+  );
+  assert.deepEqual(
+    virtualPaymentFailureDiagnostic({ errMsg: 'requestVirtualPayment:fail 支付无法完成' }),
+    {
+      failureKind: 'no_numeric_code',
+      platform: 'ios',
+      envVersion: 'develop',
+      sdkVersion: '3.8.12'
+    }
+  );
+  assert.equal(
+    officialVirtualPaymentErrorCode({ errMsg: 'requestVirtualPayment:fail err_code=-15013' }),
+    -15013
+  );
 });
 
 test('gets a fresh login code before a payment order is created', async () => {
@@ -130,6 +155,42 @@ test('gets a fresh login code before a payment order is created', async () => {
     }
   });
   assert.equal(await loginForPayment(), 'temporary-code');
+});
+
+test('requires an explicit current-WeChat-account confirmation before payment', async () => {
+  let modal;
+  global.wx = supportedWx({
+    getDeviceInfo: () => ({ platform: 'ios' }),
+    showModal(options) {
+      modal = options;
+      options.success({ confirm: true, cancel: false });
+    }
+  });
+  assert.equal(await confirmWechatAccountPayment({
+    priceLabel: '¥5.9',
+    durationDays: 30
+  }), true);
+  assert.equal(modal.title, '确认微信账号');
+  assert.equal(modal.confirmText, '确认支付');
+  assert.match(modal.content, /绑定当前打开小程序的微信账号/);
+  assert.match(modal.content, /微信登录不会另弹页面/);
+  assert.match(modal.content, /Apple 收银台/);
+  assert.match(modal.content, /中国大陆账号/);
+  assert.match(modal.content, /支付 ¥5\.9/);
+  assert.match(modal.content, /30 天会员/);
+
+  global.wx.showModal = (options) => options.success({ confirm: false, cancel: true });
+  assert.equal(await confirmWechatAccountPayment(), false);
+});
+
+test('gives an actionable Apple cashier hint for a code-less iOS failure', () => {
+  global.wx = supportedWx({
+    getDeviceInfo: () => ({ platform: 'ios' })
+  });
+  assert.match(
+    paymentFailureMessage({ errMsg: 'requestVirtualPayment:fail 支付无法完成' }),
+    /Apple 收银台.*中国大陆 App Store/
+  );
 });
 
 test('passes only the signed virtual-payment fields to the WeChat cashier', async () => {
@@ -278,6 +339,7 @@ test('reports only the owner-bound payment diagnostic allowlist fields', async (
   assert.deepEqual(
     await reportMembershipPaymentFailure('MP20260724081033aaaaaaaaaaaaaaaa', {
       errCode: -15013,
+      failureKind: 'official_code',
       platform: 'ios',
       envVersion: 'develop',
       sdkVersion: '3.8.12',
@@ -293,6 +355,26 @@ test('reports only the owner-bound payment diagnostic allowlist fields', async (
       action: 'paymentFailure',
       orderId: 'MP20260724081033aaaaaaaaaaaaaaaa',
       errCode: -15013,
+      failureKind: 'official_code',
+      platform: 'ios',
+      envVersion: 'develop',
+      sdkVersion: '3.8.12'
+    }
+  });
+
+  await reportMembershipPaymentFailure('MP20260724081033bbbbbbbbbbbbbbbb', {
+    failureKind: 'no_numeric_code',
+    platform: 'ios',
+    envVersion: 'develop',
+    sdkVersion: '3.8.12',
+    errMsg: 'must-not-leak'
+  });
+  assert.deepEqual(received, {
+    name: 'membershipBilling',
+    data: {
+      action: 'paymentFailure',
+      orderId: 'MP20260724081033bbbbbbbbbbbbbbbb',
+      failureKind: 'no_numeric_code',
       platform: 'ios',
       envVersion: 'develop',
       sdkVersion: '3.8.12'

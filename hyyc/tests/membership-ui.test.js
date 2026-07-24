@@ -242,10 +242,11 @@ test('renders four native tabs and a real one-time Pro purchase entry', () => {
   assert.match(profile, /wx:if="\{\{billing\.available\}\}"/);
   assert.match(profile, /loading="\{\{billing\.purchasing\}\}"/);
   assert.match(profile, /disabled="\{\{billing\.purchasing\}\}"/);
-  assert.match(profile, /<button\s+[^>]*class="pro-purchase-button"[^>]*>\s*登录微信并订阅\s*<\/button>/);
-  assert.match(profile, /会员绑定当前微信账号/);
+  assert.match(profile, /<button\s+[^>]*class="pro-purchase-button"[^>]*>\s*确认当前微信账号并支付\s*<\/button>/);
+  assert.match(profile, /会员只绑定该微信账号/);
+  assert.match(profile, /先确认当前微信账号/);
   assert.match(profile, /微信不会自动提供头像昵称/);
-  assert.match(profile, /个人资料仍需你主动选择/);
+  assert.match(profileScript, /confirmWechatAccountPayment/);
   assert.match(profileScript, /const loginCode = await loginForPayment\(\)/);
   assert.doesNotMatch(profileScript, /wx\.getUserProfile|wx\.getUserInfo/);
   assert.doesNotMatch(profile, /续费 30 天|立即解锁全部权益|解锁全部 Pro 权益|查看价格并开通 Pro/);

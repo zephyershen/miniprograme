@@ -12,7 +12,7 @@ const VIRTUAL_PAYMENT_PLATFORMS = new Set([
 ]);
 const OFFICIAL_VIRTUAL_PAYMENT_ERROR_MESSAGES = Object.freeze({
   1001: '支付参数校验失败，请稍后重试',
-  '-1': '支付失败，请稍后重试',
+  '-1': '微信收银台支付失败，请确认当前账号或系统支付方式可用后重试',
   '-2': '已取消支付',
   '-4': '支付被安全保护拦截，请稍后重试',
   '-5': '支付开通状态暂未确认，请稍后重试',
@@ -76,6 +76,40 @@ function loginForPayment() {
   });
 }
 
+function confirmWechatAccountPayment({
+  priceLabel = '',
+  durationDays = 30
+} = {}) {
+  return new Promise((resolve, reject) => {
+    if (typeof wx === 'undefined' || typeof wx.showModal !== 'function') {
+      const error = new Error('当前微信账号确认失败，请重试');
+      error.code = 'PAYMENT_ACCOUNT_CONFIRM_UNAVAILABLE';
+      reject(error);
+      return;
+    }
+    const normalizedPrice = String(priceLabel || '').trim();
+    const normalizedDays = Math.max(1, Math.floor(Number(durationDays) || 30));
+    const amountCopy = normalizedPrice ? `支付 ${normalizedPrice}，` : '';
+    const iosCopy = paymentPlatform(currentWxApi()) === 'ios'
+      ? 'iPhone 将使用 Apple 收银台，请确认 App Store 为中国大陆账号；'
+      : '';
+    wx.showModal({
+      title: '确认微信账号',
+      content: `会员将绑定当前打开小程序的微信账号。微信登录不会另弹页面；${iosCopy}确认后${amountCopy}将开通 ${normalizedDays} 天会员。`,
+      confirmText: '确认支付',
+      cancelText: '取消',
+      success(result) {
+        resolve(Boolean(result && result.confirm));
+      },
+      fail() {
+        const error = new Error('当前微信账号确认失败，请重试');
+        error.code = 'PAYMENT_ACCOUNT_CONFIRM_UNAVAILABLE';
+        reject(error);
+      }
+    });
+  });
+}
+
 function requestMiniProgramVirtualPayment(payment) {
   const wxApi = currentWxApi();
   assertVirtualPaymentAvailable(wxApi);
@@ -107,27 +141,54 @@ function paymentFailureMessage(error) {
   if (OFFICIAL_VIRTUAL_PAYMENT_ERROR_MESSAGES[code]) {
     return OFFICIAL_VIRTUAL_PAYMENT_ERROR_MESSAGES[code];
   }
+  const rawCode = numericVirtualPaymentErrorCode(error);
+  if (rawCode !== null) {
+    return `支付暂时无法完成（微信错误码 ${rawCode}），请稍后重试`;
+  }
   if (error && /^登录状态/.test(error.message || '')) return error.message;
+  if (error && error.code === 'PAYMENT_ACCOUNT_CONFIRM_UNAVAILABLE') return error.message;
+  if (paymentPlatform(currentWxApi()) === 'ios') {
+    return 'Apple 收银台未完成支付，请确认 iOS、微信版本和中国大陆 App Store 账号后重试';
+  }
   return '支付暂时无法完成，请稍后重试';
 }
 
 function officialVirtualPaymentErrorCode(error) {
-  const candidate = error && (
-    error.errCode !== undefined
-      ? error.errCode
-      : error.code
-  );
-  const code = Number(candidate);
+  const code = numericVirtualPaymentErrorCode(error);
   return Number.isInteger(code) && OFFICIAL_VIRTUAL_PAYMENT_ERROR_CODES.has(code)
     ? code
     : null;
 }
 
+function numericVirtualPaymentErrorCode(error) {
+  const candidates = error && [
+    error.errCode,
+    error.err_code,
+    error.errno,
+    error.code
+  ] || [];
+  for (const candidate of candidates) {
+    if (candidate === undefined || candidate === null || candidate === '') continue;
+    const code = Number(candidate);
+    if (Number.isInteger(code) && code >= -999999 && code <= 999999) return code;
+  }
+  const message = String(error && (error.errMsg || error.message) || '');
+  const labelled = message.match(/(?:err[_\s-]?code|errno)\s*[:=]?\s*(-?\d{1,6})/i);
+  if (!labelled) return null;
+  const code = Number(labelled[1]);
+  return Number.isInteger(code) && code >= -999999 && code <= 999999 ? code : null;
+}
+
 function virtualPaymentFailureDiagnostic(error, wxApi = currentWxApi()) {
-  const errCode = officialVirtualPaymentErrorCode(error);
-  if (errCode === null) return null;
+  const errCode = numericVirtualPaymentErrorCode(error);
+  const failureKind = errCode === null
+    ? 'no_numeric_code'
+    : (OFFICIAL_VIRTUAL_PAYMENT_ERROR_CODES.has(errCode)
+      ? 'official_code'
+      : 'unrecognized_numeric_code');
   return {
-    errCode,
+    ...(errCode === null ? {} : { errCode }),
+    failureKind,
     platform: paymentPlatform(wxApi),
     envVersion: paymentEnvironmentVersion(wxApi),
     sdkVersion: currentSdkVersion(wxApi)
@@ -256,6 +317,7 @@ function compareVersions(left, right) {
 module.exports = {
   assertVirtualPaymentAvailable,
   loginForPayment,
+  confirmWechatAccountPayment,
   requestMiniProgramVirtualPayment,
   paymentCancelled,
   paymentFailureMessage,
