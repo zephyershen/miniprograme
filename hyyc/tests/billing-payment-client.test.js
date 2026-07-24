@@ -3,7 +3,6 @@ const assert = require('node:assert/strict');
 const {
   assertVirtualPaymentAvailable,
   loginForPayment,
-  confirmWechatAccountPayment,
   requestMiniProgramVirtualPayment,
   paymentCancelled,
   paymentFailureMessage,
@@ -15,9 +14,16 @@ const {
   virtualPaymentAvailable
 } = require('../features/billing/payment.js');
 const {
+  verifyMembershipAccount,
   createMembershipPayment,
   reportMembershipPaymentFailure
 } = require('../features/billing/api.js');
+const {
+  STORAGE_KEY: ACCOUNT_VERIFICATION_STORAGE_KEY,
+  accountPartition,
+  membershipAccountVerified,
+  rememberMembershipAccountVerification
+} = require('../features/billing/account-session.js');
 const {
   loadBillingPlans
 } = require('../features/billing/session.js');
@@ -157,30 +163,20 @@ test('gets a fresh login code before a payment order is created', async () => {
   assert.equal(await loginForPayment(), 'temporary-code');
 });
 
-test('requires an explicit current-WeChat-account confirmation before payment', async () => {
-  let modal;
+test('remembers the explicit account step only for the current viewer partition', () => {
+  const storage = new Map();
   global.wx = supportedWx({
-    getDeviceInfo: () => ({ platform: 'ios' }),
-    showModal(options) {
-      modal = options;
-      options.success({ confirm: true, cancel: false });
-    }
+    getStorageSync(key) { return storage.get(key); },
+    setStorageSync(key, value) { storage.set(key, value); }
   });
-  assert.equal(await confirmWechatAccountPayment({
-    priceLabel: '¥5.9',
-    durationDays: 30
-  }), true);
-  assert.equal(modal.title, '确认微信账号');
-  assert.equal(modal.confirmText, '确认支付');
-  assert.match(modal.content, /绑定当前打开小程序的微信账号/);
-  assert.match(modal.content, /微信登录不会另弹页面/);
-  assert.match(modal.content, /Apple 收银台/);
-  assert.match(modal.content, /中国大陆账号/);
-  assert.match(modal.content, /支付 ¥5\.9/);
-  assert.match(modal.content, /30 天会员/);
-
-  global.wx.showModal = (options) => options.success({ confirm: false, cancel: true });
-  assert.equal(await confirmWechatAccountPayment(), false);
+  const first = { viewer: { cachePartition: 'viewer-partition-a' } };
+  const second = { viewer: { cachePartition: 'viewer-partition-b' } };
+  assert.equal(accountPartition(first), 'viewer-partition-a');
+  assert.equal(membershipAccountVerified(first), false);
+  assert.equal(rememberMembershipAccountVerification(first), true);
+  assert.equal(membershipAccountVerified(first), true);
+  assert.equal(membershipAccountVerified(second), false);
+  assert.equal(storage.get(ACCOUNT_VERIFICATION_STORAGE_KEY).verified, true);
 });
 
 test('gives an actionable Apple cashier hint for a code-less iOS failure', () => {
@@ -259,6 +255,10 @@ test('fails closed when the product gate or runtime environment is not verified'
     () => createMembershipPayment('pro_30d', 'login-code', disabledAccess),
     (error) => error && error.code === 'PAYMENT_NOT_READY'
   );
+  assert.throws(
+    () => verifyMembershipAccount('login-code', disabledAccess),
+    (error) => error && error.code === 'PAYMENT_NOT_READY'
+  );
 
   global.wx = supportedWx({
     getAccountInfoSync: () => ({ miniProgram: { envVersion: 'unknown-build' } }),
@@ -270,6 +270,10 @@ test('fails closed when the product gate or runtime environment is not verified'
   });
   await assert.rejects(
     () => createMembershipPayment('pro_30d', 'login-code', enabledAccess),
+    (error) => error && error.code === 'NON_RELEASE_MUTATION_BLOCKED'
+  );
+  await assert.rejects(
+    () => verifyMembershipAccount('login-code', enabledAccess),
     (error) => error && error.code === 'NON_RELEASE_MUTATION_BLOCKED'
   );
 });
@@ -296,6 +300,9 @@ test('shows and invokes purchasing only when product, provider and runtime gates
             }
           };
         }
+        if (request.data.action === 'verifyAccount') {
+          return { result: { ok: true, data: { verified: true } } };
+        }
         return { result: { ok: true, data: { order: { id: 'order' } } } };
       }
     }
@@ -305,6 +312,17 @@ test('shows and invokes purchasing only when product, provider and runtime gates
     (await loadBillingPlans({ force: true, access: enabledAccess, wxApi: global.wx })).available,
     true
   );
+  assert.deepEqual(
+    await verifyMembershipAccount('login-code', enabledAccess),
+    { verified: true }
+  );
+  assert.deepEqual(calls.at(-1), {
+    name: 'membershipBilling',
+    data: {
+      action: 'verifyAccount',
+      loginCode: 'login-code'
+    }
+  });
   assert.deepEqual(
     await createMembershipPayment('pro_30d', 'login-code', enabledAccess),
     { order: { id: 'order' } }

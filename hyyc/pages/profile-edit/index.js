@@ -11,6 +11,7 @@ Page({
     avatarChanged: false,
     reviewPending: false,
     reviewMessage: '',
+    membershipSetup: false,
     canSave: false
   },
 
@@ -19,6 +20,7 @@ Page({
     this.saveCompleted = false;
     this.returnTimer = null;
     this.returnToComments = options.from === 'comments';
+    this.setData({ membershipSetup: options.from === 'membership' });
     this.loadProfile();
   },
 
@@ -65,6 +67,11 @@ Page({
     this.setData({ canSave: Boolean(this.data.nickname.trim() && this.data.avatarUrl) });
   },
 
+  skipProfileSetup() {
+    if (!this.data.membershipSetup || this.data.saving) return;
+    wx.navigateBack();
+  },
+
   async saveProfile() {
     if (!this.data.canSave || this.data.saving || this.saveCompleted) return;
     this.setData({ saving: true });
@@ -75,7 +82,10 @@ Page({
       await updateUserProfile({ nickname: this.data.nickname.trim(), avatarFileId });
       this.saveCompleted = true;
       if (this.pageDisposed) return;
-      wx.showToast({ title: '已提交审核', icon: 'success' });
+      wx.showToast({
+        title: this.data.membershipSetup ? '资料已提交，可继续订阅' : '已提交审核',
+        icon: 'success'
+      });
       this.returnTimer = setTimeout(() => {
         this.returnTimer = null;
         if (!this.pageDisposed) wx.navigateBack();

@@ -77,9 +77,16 @@
           bindtap="purchaseMembership"
           loading="{{billing.purchasing}}"
           disabled="{{billing.purchasing}}"
-        >确认当前微信账号并支付</button>
+        >{{billing.accountVerified ? '订阅并支付' : '使用当前微信账号登录'}}</button>
         <view wx:else class="pro-purchase-footnote">当前暂不可购买，请稍后再试。</view>
-        <view class="pro-account-note">点击后会先确认当前微信账号，再进入系统收银台。会员只绑定该微信账号；微信不会自动提供头像昵称。</view>
+        <view class="pro-account-note">
+          {{billing.accountVerified
+            ? '已登录当前微信账号。再次点击订阅并支付，才会进入系统收银台。'
+            : '首次订阅先登录当前微信账号；登录成功后，你可以完善头像昵称，再单独点击订阅并支付。'}}
+        </view>
+        <view wx:if="{{billing.accountVerified && !userProfile.isComplete && !userProfile.reviewPending}}" class="pro-account-note">
+          微信不允许自动读取真实头像昵称；头像昵称为可选资料，不影响会员绑定。
+        </view>
         <view class="pro-renewal-note">{{membership.membershipTerms.renewalCopy}}</view>
       </view>
     </view>

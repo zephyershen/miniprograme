@@ -44,6 +44,10 @@ function isReconciliationTrigger(event, triggerSource = process.env.TRIGGER_SRC)
 
 const ACTIONS = Object.freeze({
   plans: async () => billingService.getPlans(),
+  verifyAccount: async (event) => billingService.verifyAccount(
+    event.loginCode,
+    resolveActor(() => cloud.getWXContext())
+  ),
   createPayment: async (event) => billingService.createPayment(
     event.planKey,
     event.loginCode,

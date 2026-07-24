@@ -14,6 +14,15 @@ function createMembershipPayment(planKey, loginCode, access) {
   return callCloudFunction('membershipBilling', { action: 'createPayment', planKey, loginCode });
 }
 
+function verifyMembershipAccount(loginCode, access) {
+  if (!memberPurchasesEnabled(access)) {
+    const error = new Error('会员购买正在开通，请稍后再试');
+    error.code = 'PAYMENT_NOT_READY';
+    throw error;
+  }
+  return callCloudFunction('membershipBilling', { action: 'verifyAccount', loginCode });
+}
+
 function getMembershipOrderStatus(orderId) {
   return callCloudFunction('membershipBilling', { action: 'orderStatus', orderId });
 }
@@ -33,6 +42,7 @@ function reportMembershipPaymentFailure(orderId, diagnostic) {
 
 module.exports = {
   getBillingPlans,
+  verifyMembershipAccount,
   createMembershipPayment,
   getMembershipOrderStatus,
   reportMembershipPaymentFailure

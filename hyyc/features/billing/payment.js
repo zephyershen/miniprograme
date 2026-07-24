@@ -76,40 +76,6 @@ function loginForPayment() {
   });
 }
 
-function confirmWechatAccountPayment({
-  priceLabel = '',
-  durationDays = 30
-} = {}) {
-  return new Promise((resolve, reject) => {
-    if (typeof wx === 'undefined' || typeof wx.showModal !== 'function') {
-      const error = new Error('当前微信账号确认失败，请重试');
-      error.code = 'PAYMENT_ACCOUNT_CONFIRM_UNAVAILABLE';
-      reject(error);
-      return;
-    }
-    const normalizedPrice = String(priceLabel || '').trim();
-    const normalizedDays = Math.max(1, Math.floor(Number(durationDays) || 30));
-    const amountCopy = normalizedPrice ? `支付 ${normalizedPrice}，` : '';
-    const iosCopy = paymentPlatform(currentWxApi()) === 'ios'
-      ? 'iPhone 将使用 Apple 收银台，请确认 App Store 为中国大陆账号；'
-      : '';
-    wx.showModal({
-      title: '确认微信账号',
-      content: `会员将绑定当前打开小程序的微信账号。微信登录不会另弹页面；${iosCopy}确认后${amountCopy}将开通 ${normalizedDays} 天会员。`,
-      confirmText: '确认支付',
-      cancelText: '取消',
-      success(result) {
-        resolve(Boolean(result && result.confirm));
-      },
-      fail() {
-        const error = new Error('当前微信账号确认失败，请重试');
-        error.code = 'PAYMENT_ACCOUNT_CONFIRM_UNAVAILABLE';
-        reject(error);
-      }
-    });
-  });
-}
-
 function requestMiniProgramVirtualPayment(payment) {
   const wxApi = currentWxApi();
   assertVirtualPaymentAvailable(wxApi);
@@ -146,7 +112,8 @@ function paymentFailureMessage(error) {
     return `支付暂时无法完成（微信错误码 ${rawCode}），请稍后重试`;
   }
   if (error && /^登录状态/.test(error.message || '')) return error.message;
-  if (error && error.code === 'PAYMENT_ACCOUNT_CONFIRM_UNAVAILABLE') return error.message;
+  if (error && ['PAYMENT_ACCOUNT_MISMATCH', 'PAYMENT_LOGIN_FAILED', 'PAYMENT_LOGIN_REQUIRED']
+    .includes(error.code)) return error.message;
   if (paymentPlatform(currentWxApi()) === 'ios') {
     return 'Apple 收银台未完成支付，请确认 iOS、微信版本和中国大陆 App Store 账号后重试';
   }
@@ -317,7 +284,6 @@ function compareVersions(left, right) {
 module.exports = {
   assertVirtualPaymentAvailable,
   loginForPayment,
-  confirmWechatAccountPayment,
   requestMiniProgramVirtualPayment,
   paymentCancelled,
   paymentFailureMessage,

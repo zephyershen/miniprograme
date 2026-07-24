@@ -58,7 +58,7 @@ function loadProfilePage(billingApi) {
   return definition;
 }
 
-function paymentWx(events, paymentError, { confirmAccount = true } = {}) {
+function paymentWx(events, paymentError, { completeProfile = false } = {}) {
   const storage = new Map();
   return {
     canIUse: (capability) => capability === 'requestVirtualPayment',
@@ -70,8 +70,11 @@ function paymentWx(events, paymentError, { confirmAccount = true } = {}) {
       options.success({ code: 'login-code' });
     },
     showModal(options) {
-      events.push('confirm-account');
-      options.success({ confirm: confirmAccount, cancel: !confirmAccount });
+      events.push('prompt-profile');
+      options.success({ confirm: completeProfile, cancel: !completeProfile });
+    },
+    navigateTo(options) {
+      events.push(`navigate:${options.url}`);
     },
     requestVirtualPayment(options) {
       events.push('request-payment');
@@ -79,7 +82,7 @@ function paymentWx(events, paymentError, { confirmAccount = true } = {}) {
     },
     setStorageSync(key, value) {
       storage.set(key, value);
-      events.push('remember-order');
+      events.push(key.includes('account_verification') ? 'remember-account' : 'remember-order');
     },
     getStorageSync(key) {
       return storage.get(key);
@@ -94,30 +97,39 @@ function paymentWx(events, paymentError, { confirmAccount = true } = {}) {
   };
 }
 
-function purchaseContext(page, events) {
+function purchaseContext(page, events, { accountVerified = true } = {}) {
   return {
     data: {
       billing: {
         purchasing: false,
         available: true,
+        accountVerified,
         plan: {
           key: 'pro_30d',
           priceLabel: '¥5.9',
           durationDays: 30
         }
+      },
+      userProfile: {
+        isComplete: false,
+        reviewPending: false
       }
     },
     membershipAccess: {
-      viewer: { role: 'free' },
+      viewer: { role: 'free', cachePartition: 'viewer-partition-a' },
       features: { memberPurchases: true }
     },
     setData(patch) {
       if (Object.prototype.hasOwnProperty.call(patch, 'billing.purchasing')) {
         this.data.billing.purchasing = patch['billing.purchasing'];
       }
+      if (Object.prototype.hasOwnProperty.call(patch, 'billing.accountVerified')) {
+        this.data.billing.accountVerified = patch['billing.accountVerified'];
+      }
     },
     queryMembershipOrderOnce: page.queryMembershipOrderOnce,
     recordMembershipPaymentFailure: page.recordMembershipPaymentFailure,
+    promptProfileSetupAfterLogin: page.promptProfileSetupAfterLogin,
     confirmMembershipOrder() {
       events.push('confirm-loop');
       throw new Error('confirmation loop must not run after recovered payment');
@@ -164,7 +176,6 @@ test('queries once after a cashier failure and honors a server-confirmed paid or
   }
 
   assert.deepEqual(events, [
-    'confirm-account',
     'login',
     'create-order',
     'remember-order',
@@ -218,7 +229,6 @@ test('records a strict diagnostic only after the one-shot recovery remains unpai
   }
 
   assert.deepEqual(events, [
-    'confirm-account',
     'login',
     'create-order',
     'remember-order',
@@ -241,9 +251,14 @@ test('records a strict diagnostic only after the one-shot recovery remains unpai
   assert.equal(JSON.stringify(reports).includes('signature'), false);
 });
 
-test('does not login or create an order when current-account confirmation is cancelled', async () => {
+test('uses the first click only to verify the current account and offer optional profile setup', async () => {
   const events = [];
   const page = loadProfilePage({
+    async verifyMembershipAccount(loginCode) {
+      events.push('verify-account');
+      assert.equal(loginCode, 'login-code');
+      return { verified: true };
+    },
     async createMembershipPayment() {
       events.push('create-order');
       throw new Error('must not create an order');
@@ -256,8 +271,8 @@ test('does not login or create an order when current-account confirmation is can
     }
   });
   const previousWx = global.wx;
-  global.wx = paymentWx(events, null, { confirmAccount: false });
-  const context = purchaseContext(page, events);
+  global.wx = paymentWx(events, null);
+  const context = purchaseContext(page, events, { accountVerified: false });
   try {
     await page.purchaseMembership.call(context);
   } finally {
@@ -265,6 +280,13 @@ test('does not login or create an order when current-account confirmation is can
     else delete global.wx;
   }
 
-  assert.deepEqual(events, ['confirm-account']);
+  assert.deepEqual(events, [
+    'login',
+    'verify-account',
+    'remember-account',
+    'prompt-profile',
+    'toast:请再次点击订阅并支付'
+  ]);
+  assert.equal(context.data.billing.accountVerified, true);
   assert.equal(context.data.billing.purchasing, false);
 });

@@ -20,6 +20,9 @@
 .editor-submit { min-height: 82rpx; margin: 32rpx 0 0; border: 0; border-radius: 22rpx; background: var(--ui-accent); color: #fff; font-size: 25rpx; font-weight: 720; line-height: 82rpx; }
 .editor-submit::after { border: 0; }
 .editor-submit[disabled] { background: #dfe7ec; color: #8b98a2; }
+.editor-skip { min-height: 76rpx; margin: 14rpx 0 0; border: 0; background: transparent; color: var(--ui-muted); font-size: 23rpx; font-weight: 650; line-height: 76rpx; }
+.editor-skip::after { border: 0; }
+.editor-skip[disabled] { color: var(--ui-faint); }
 .review-note { margin-top: 18rpx; padding: 14rpx 16rpx; border-radius: 16rpx; background: #fff7e8; color: #91611e; font-size: 19rpx; line-height: 1.55; }
 .review-note-rejected { background: #fff0ef; color: #a34c45; }
 .privacy-note { padding: 24rpx 12rpx; color: var(--ui-faint); font-size: 19rpx; line-height: 1.65; }

@@ -6,10 +6,15 @@ const { membershipPresentation } = require('../../features/membership/presentati
 const { loadUserProfile } = require('../../features/user-profile/session.js');
 const { decorateUserProfile } = require('../../features/user-profile/model.js');
 const {
+  verifyMembershipAccount,
   createMembershipPayment,
   getMembershipOrderStatus,
   reportMembershipPaymentFailure
 } = require('../../features/billing/api.js');
+const {
+  membershipAccountVerified,
+  rememberMembershipAccountVerification
+} = require('../../features/billing/account-session.js');
 const { loadBillingPlans } = require('../../features/billing/session.js');
 const { loadMessages } = require('../../features/messages/session.js');
 const {
@@ -18,7 +23,6 @@ const {
 const {
   assertVirtualPaymentAvailable,
   loginForPayment,
-  confirmWechatAccountPayment,
   requestMiniProgramVirtualPayment,
   paymentCancelled,
   paymentFailureMessage,
@@ -31,6 +35,7 @@ const EMPTY_BILLING = Object.freeze({
   loading: true,
   available: false,
   purchasing: false,
+  accountVerified: false,
   plan: {
     key: '',
     name: '',
@@ -137,7 +142,8 @@ Page({
       this.membershipLoaded = true;
       this.setData({
         loading: false,
-        membership: membershipPresentation(access)
+        membership: membershipPresentation(access),
+        'billing.accountVerified': membershipAccountVerified(access)
       });
       return access;
     } catch (error) {
@@ -193,6 +199,7 @@ Page({
     const requestId = (this.billingLoadRequestId || 0) + 1;
     this.billingLoadRequestId = requestId;
     const purchasing = this.data.billing.purchasing === true;
+    const accountVerified = membershipAccountVerified(access);
     if (!this.billingLoaded) this.setData({ 'billing.loading': true });
     try {
       const billing = await loadBillingPlans({ force, access });
@@ -203,6 +210,7 @@ Page({
           loading: false,
           available: billing && billing.available === true,
           purchasing,
+          accountVerified,
           plan: billing && billing.plan || EMPTY_BILLING.plan
         }
       });
@@ -273,17 +281,54 @@ Page({
     }
   },
 
+  async promptProfileSetupAfterLogin() {
+    const profile = this.data.userProfile || {};
+    if (profile.isComplete || profile.reviewPending) {
+      wx.showToast({ title: '登录成功，请再次点击订阅', icon: 'none' });
+      return false;
+    }
+    return new Promise((resolve) => {
+      wx.showModal({
+        title: '已登录当前微信账号',
+        content: '微信不允许小程序自动读取真实头像昵称。你可以主动选择微信头像和昵称，也可以稍后设置；这不会影响会员与当前微信账号绑定。',
+        confirmText: '完善资料',
+        cancelText: '稍后设置',
+        success: (result) => {
+          if (result && result.confirm) {
+            wx.navigateTo({ url: '/pages/profile-edit/index?from=membership' });
+            resolve(true);
+            return;
+          }
+          wx.showToast({ title: '请再次点击订阅并支付', icon: 'none' });
+          resolve(false);
+        },
+        fail: () => {
+          wx.showToast({ title: '登录成功，请再次点击订阅', icon: 'none' });
+          resolve(false);
+        }
+      });
+    });
+  },
+
   async purchaseMembership() {
     if (this.data.billing.purchasing || !this.data.billing.available) return;
     this.setData({ 'billing.purchasing': true });
     let orderId = '';
     try {
       assertVirtualPaymentAvailable();
-      const confirmed = await confirmWechatAccountPayment({
-        priceLabel: this.data.billing.plan.priceLabel,
-        durationDays: this.data.billing.plan.durationDays
-      });
-      if (!confirmed) return;
+      if (!this.data.billing.accountVerified) {
+        const loginCode = await loginForPayment();
+        const verified = await verifyMembershipAccount(loginCode, this.membershipAccess);
+        if (!verified || verified.verified !== true) {
+          const error = new Error('登录状态校验失败，请重试');
+          error.code = 'PAYMENT_LOGIN_FAILED';
+          throw error;
+        }
+        rememberMembershipAccountVerification(this.membershipAccess);
+        this.setData({ 'billing.accountVerified': true });
+        await this.promptProfileSetupAfterLogin();
+        return;
+      }
       const loginCode = await loginForPayment();
       const created = await createMembershipPayment(
         this.data.billing.plan.key,

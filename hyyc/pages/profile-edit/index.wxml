@@ -1,8 +1,12 @@
 <view class="profile-editor">
   <view class="editor-intro">
-    <view class="editor-kicker">讨论身份</view>
-    <view class="editor-title">让别人认出你的观点</view>
-    <view class="editor-copy">头像和昵称会显示在你发布的评论旁边，之后可以随时修改。</view>
+    <view class="editor-kicker">{{membershipSetup ? '微信资料 · 可选' : '讨论身份'}}</view>
+    <view class="editor-title">{{membershipSetup ? '选择你愿意展示的头像和昵称' : '让别人认出你的观点'}}</view>
+    <view class="editor-copy">
+      {{membershipSetup
+        ? '微信不允许小程序自动读取真实头像昵称。你可以主动选择或稍后设置；会员始终绑定当前微信账号。'
+        : '头像和昵称会显示在你发布的评论旁边，之后可以随时修改。'}}
+    </view>
   </view>
 
   <view wx:if="{{loading}}" class="editor-loading"><loading-state label="正在读取资料" /></view>
@@ -34,12 +38,20 @@
       disabled="{{!canSave || saving}}"
       loading="{{saving}}"
       bindtap="saveProfile"
-    >保存资料</button>
+    >{{membershipSetup ? '保存资料并返回订阅' : '保存资料'}}</button>
+    <button
+      wx:if="{{membershipSetup}}"
+      class="editor-skip"
+      disabled="{{saving}}"
+      bindtap="skipProfileSetup"
+    >暂不设置，返回订阅</button>
     <view wx:if="{{reviewPending}}" class="review-note">
-      {{avatarFileId ? '审核通过前，评论区继续使用原资料；首次设置则需审核通过后才能评论。' : '审核通过后即可参与评论。'}}
+      {{membershipSetup
+        ? '资料已进入后台审核，不影响会员订阅；审核通过后才用于评论展示。'
+        : (avatarFileId ? '审核通过前，评论区继续使用原资料；首次设置则需审核通过后才能评论。' : '审核通过后即可参与评论。')}}
     </view>
     <view wx:elif="{{reviewMessage}}" class="review-note review-note-rejected">{{reviewMessage}}</view>
   </view>
 
-  <view class="privacy-note">这里只保存你主动确认的头像与昵称，用于站内评论展示。</view>
+  <view class="privacy-note">这里只保存你主动确认的头像与昵称，用于站内评论展示；会员身份只绑定微信账号。</view>
 </view>

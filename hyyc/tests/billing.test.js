@@ -292,6 +292,43 @@ test('matches the official HMAC-SHA256 virtual-payment signature vectors', () =>
   );
 });
 
+test('verifies the current WeChat account without creating a payment order', async () => {
+  let exchanges = 0;
+  const service = createBillingService({
+    repository: {
+      async createOrder() {
+        throw new Error('account verification must not create an order');
+      }
+    },
+    paymentClient: {
+      async exchangeLoginCode(loginCode) {
+        exchanges += 1;
+        assert.equal(loginCode, 'login_code_123');
+        return { openId: 'open-id', sessionKey: 'must-not-leak' };
+      }
+    },
+    config: CONFIG,
+    plan: PLAN,
+    missingConfig: missingPaymentConfig
+  });
+
+  assert.deepEqual(
+    await service.verifyAccount('login_code_123', {
+      ownerKey: 'owner-key',
+      openId: 'open-id'
+    }),
+    { verified: true }
+  );
+  assert.equal(exchanges, 1);
+  await assert.rejects(
+    () => service.verifyAccount('login_code_123', {
+      ownerKey: 'owner-key',
+      openId: 'another-open-id'
+    }),
+    (error) => error && error.code === 'PAYMENT_ACCOUNT_MISMATCH'
+  );
+});
+
 test('creates a direct-purchase payment without exposing the session key', () => {
   const payment = createDirectPurchasePayment({
     offerId: CONFIG.offerId,

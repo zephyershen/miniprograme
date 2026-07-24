@@ -18,6 +18,7 @@ const MUTATING_ACTIONS = Object.freeze({
     'toggleLike'
   ]),
   membershipBilling: new Set([
+    'verifyAccount',
     'createPayment',
     'orderStatus',
     'paymentFailure'
