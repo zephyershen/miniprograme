@@ -14,7 +14,7 @@ confidence: high
 - [项目总览](overview.md) — 当前产品、代码、云端状态、验证结果和剩余工作
 - [上线前接手清单、CI 边界与剩余风险](syntheses/2026-07-23-release-readiness-handoff.md) — 新会话优先读取；记录精确版本锚点、旧审计关闭状态、P2 日志残余、依赖复审、真机与发布顺序
 - [生产发布候选部署与微信体验版上传](sources/2026-07-23-production-release-candidate.md) — 当前可复现 SHA、生产收敛、冒烟、微信上传与剩余人工边界
-- [会员订阅先登录、再单独支付](sources/2026-07-24-two-step-membership-login-and-optional-profile.md) — 第一次点击只校验当前微信账号、可选资料引导、第二次点击才建单支付
+- [会员订阅先登录、再单独支付](sources/2026-07-24-two-step-membership-login-and-optional-profile.md) — 第一次点击只校验当前微信账号、可选资料引导、第二次点击才建单支付，并支持仅撤销本机订阅验证的作用域退出
 - [历史：会员支付可见账号确认与完整安全诊断](sources/2026-07-24-visible-wechat-account-confirmation-and-payment-diagnostics.md) — 收银台诊断仍有效，旧单次点击交互已被两步流程取代
 - [异步评论、站内消息、稳定加载与会员绑定上线](sources/2026-07-24-async-comments-message-center-and-stable-loading.md) — 评论/资料后台审核、我的消息、全页懒加载、无闪屏互动、微信身份与商品价格边界
 - [资料异步审核、预览支付诊断与微信消息回调上线](sources/2026-07-24-async-profile-review-and-preview-payment-diagnostics.md) — “审核中”队列、真机支付故障边界、入站消息 webhook 与生产收敛
