@@ -27,6 +27,7 @@ function membershipPresentation(access, now = Date.now()) {
     && Number.isFinite(periodEnd)
     && periodEnd <= Number(now);
   const role = expiredMember ? 'free' : rawRole;
+  const isActiveMember = role === 'member' && viewer.isRolePreview !== true;
   const roleLabel = role === 'admin' ? '管理员' : role === 'member' ? 'Pro 会员' : '普通用户';
   const roleCopy = role === 'admin'
     ? '已拥有全部已归档资讯与所有会员能力。'
@@ -37,6 +38,8 @@ function membershipPresentation(access, now = Date.now()) {
     role,
     roleLabel,
     roleCopy,
+    isActiveMember,
+    purchaseMode: isActiveMember ? 'renew' : 'subscribe',
     isPrivileged: role === 'member' || role === 'admin',
     isAdmin: role === 'admin',
     isActualAdmin: viewer.isActualAdmin === true,

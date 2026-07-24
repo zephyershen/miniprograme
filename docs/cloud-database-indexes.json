@@ -382,6 +382,18 @@
     },
     {
       "collection": "knowledge_membership_orders",
+      "name": "owner_status_created_at",
+      "unique": false,
+      "keys": [
+        { "field": "ownerKey", "direction": "1" },
+        { "field": "status", "direction": "1" },
+        { "field": "createdAt", "direction": "-1" }
+      ],
+      "owner": "billing-purchase",
+      "reason": "Reuse one user's newest pending payment order instead of creating a duplicate charge."
+    },
+    {
+      "collection": "knowledge_membership_orders",
       "name": "providerTransactionId_1",
       "unique": false,
       "keys": [

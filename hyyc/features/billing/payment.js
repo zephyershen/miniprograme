@@ -40,6 +40,17 @@ const OFFICIAL_VIRTUAL_PAYMENT_ERROR_MESSAGES = Object.freeze({
 const OFFICIAL_VIRTUAL_PAYMENT_ERROR_CODES = new Set(
   Object.keys(OFFICIAL_VIRTUAL_PAYMENT_ERROR_MESSAGES).map(Number)
 );
+const SAFE_MEMBERSHIP_CHECKOUT_ERROR_MESSAGES = Object.freeze({
+  PAYMENT_ACCOUNT_MISMATCH: '当前微信账号校验不一致，请重新登录后再试',
+  PAYMENT_LOGIN_FAILED: '微信登录校验失败，请重新登录后再试',
+  PAYMENT_LOGIN_REQUIRED: '请先登录当前微信账号',
+  PAYMENT_NOT_READY: '会员购买正在开通，请稍后再试',
+  PAYMENT_CREATION_IN_PROGRESS: '支付订单正在准备，请稍后重试',
+  PAYMENT_CHECKOUT_TIMEOUT: '支付订单准备超时，请稍后重试',
+  PAYMENT_PENDING_ORDER_MISMATCH: '已有订单正在确认，请勿重复付款，稍后再试',
+  PAYMENT_PENDING_ORDER_BACKLOG: '已有订单正在确认，请勿重复付款，稍后再试',
+  TEMPORARY_FAILURE: '会员开通服务暂时不可用，请稍后重试'
+});
 
 function currentWxApi() {
   return typeof wx === 'undefined' ? null : wx;
@@ -103,6 +114,7 @@ function paymentFailureMessage(error) {
   if (error && error.code === 'VIRTUAL_PAYMENT_DEVTOOLS_UNSUPPORTED') return error.message;
   if (error && error.code === 'VIRTUAL_PAYMENT_UNSUPPORTED') return error.message;
   if (error && error.code === 'PAYMENT_STATE_UNAVAILABLE') return error.message;
+  if (error && error.code === 'INVALID_VIRTUAL_PAYMENT') return error.message;
   const code = officialVirtualPaymentErrorCode(error);
   if (OFFICIAL_VIRTUAL_PAYMENT_ERROR_MESSAGES[code]) {
     return OFFICIAL_VIRTUAL_PAYMENT_ERROR_MESSAGES[code];
@@ -118,6 +130,22 @@ function paymentFailureMessage(error) {
     return 'Apple 收银台未完成支付，请确认 iOS、微信版本和中国大陆 App Store 账号后重试';
   }
   return '支付暂时无法完成，请稍后重试';
+}
+
+function membershipCheckoutFailureMessage(error) {
+  if (error && [
+    'VIRTUAL_PAYMENT_DEVTOOLS_UNSUPPORTED',
+    'VIRTUAL_PAYMENT_UNSUPPORTED',
+    'PAYMENT_STATE_UNAVAILABLE'
+  ].includes(error.code)) return error.message;
+  if (error && /^登录状态/.test(error.message || '')) return error.message;
+  if (error && error.message === '支付订单创建失败') return error.message;
+  return SAFE_MEMBERSHIP_CHECKOUT_ERROR_MESSAGES[error && error.code]
+    || '会员开通服务暂时不可用，请稍后重试';
+}
+
+function paymentConfirmationFailureMessage() {
+  return '会员开通确认异常，请勿重复付款，稍后下拉刷新';
 }
 
 function officialVirtualPaymentErrorCode(error) {
@@ -166,7 +194,11 @@ function rememberPendingMembershipOrder(orderId) {
   const normalizedOrderId = String(orderId || '').trim();
   if (!normalizedOrderId) throw new Error('支付订单信息无效，请重新发起');
   try {
-    wx.setStorageSync(PENDING_MEMBERSHIP_ORDER_KEY, normalizedOrderId);
+    wx.setStorageSync(PENDING_MEMBERSHIP_ORDER_KEY, {
+      version: 1,
+      orderId: normalizedOrderId,
+      cashierCompleted: false
+    });
   } catch (cause) {
     const error = new Error('当前设备状态异常，请重试');
     error.code = 'PAYMENT_STATE_UNAVAILABLE';
@@ -174,14 +206,51 @@ function rememberPendingMembershipOrder(orderId) {
   }
 }
 
-function pendingMembershipOrderId() {
-  if (typeof wx === 'undefined' || typeof wx.getStorageSync !== 'function') return '';
+function pendingMembershipOrderState() {
+  if (typeof wx === 'undefined' || typeof wx.getStorageSync !== 'function') return null;
   try {
     const stored = wx.getStorageSync(PENDING_MEMBERSHIP_ORDER_KEY);
     const orderId = stored && typeof stored === 'object' ? stored.orderId : stored;
-    return typeof orderId === 'string' ? orderId.trim() : '';
+    const normalizedOrderId = typeof orderId === 'string' ? orderId.trim() : '';
+    if (!normalizedOrderId) return null;
+    return {
+      orderId: normalizedOrderId,
+      cashierCompleted: Boolean(
+        stored && typeof stored === 'object' && stored.cashierCompleted === true
+      )
+    };
   } catch (error) {
-    return '';
+    return null;
+  }
+}
+
+function pendingMembershipOrderId() {
+  const state = pendingMembershipOrderState();
+  return state && state.orderId || '';
+}
+
+function pendingMembershipCashierCompleted(orderId) {
+  const expectedOrderId = String(orderId || '').trim();
+  const state = pendingMembershipOrderState();
+  return Boolean(state
+    && (!expectedOrderId || state.orderId === expectedOrderId)
+    && state.cashierCompleted);
+}
+
+function markPendingMembershipCashierCompleted(orderId) {
+  if (typeof wx === 'undefined' || typeof wx.setStorageSync !== 'function') return false;
+  const expectedOrderId = String(orderId || '').trim();
+  const state = pendingMembershipOrderState();
+  if (!state || !expectedOrderId || state.orderId !== expectedOrderId) return false;
+  try {
+    wx.setStorageSync(PENDING_MEMBERSHIP_ORDER_KEY, {
+      version: 1,
+      orderId: expectedOrderId,
+      cashierCompleted: true
+    });
+    return true;
+  } catch (error) {
+    return false;
   }
 }
 
@@ -287,10 +356,14 @@ module.exports = {
   requestMiniProgramVirtualPayment,
   paymentCancelled,
   paymentFailureMessage,
+  membershipCheckoutFailureMessage,
+  paymentConfirmationFailureMessage,
   officialVirtualPaymentErrorCode,
   virtualPaymentFailureDiagnostic,
   rememberPendingMembershipOrder,
   pendingMembershipOrderId,
+  pendingMembershipCashierCompleted,
+  markPendingMembershipCashierCompleted,
   forgetPendingMembershipOrder,
   virtualPaymentAvailable,
   paymentPlatform,

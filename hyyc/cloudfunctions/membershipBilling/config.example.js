@@ -9,7 +9,7 @@ module.exports = {
   wechatMiniProgramAppId: 'wxcb0f641838abf6e6',
   wechatMiniProgramAppSecret: '仅放入云函数环境变量或未提交的 config.local.js',
   wechatVirtualPayApiBaseUrl: 'https://api.weixin.qq.com',
-  wechatVirtualPayTimeoutMs: 8000,
+  wechatVirtualPayTimeoutMs: 5000,
   wechatVirtualPayPro30dPriceCents: 590,
   wechatVirtualPayPro30dGoodsPriceCents: 590,
   wechatVirtualPayPro30dCompareAtPriceCents: 1090,

@@ -43,7 +43,7 @@ function createUserProfileReviewRepository(db, config) {
     return runBusyTransaction(db, async (transaction) => {
       const reference = transaction.collection(collectionName).doc(ownerKey);
       const current = await transactionDocumentOrNull(reference);
-      await reference.set({ data: document });
+      await reference.set({ data: writableDocument(document) });
       return { current, document };
     });
   }
@@ -95,7 +95,7 @@ function createUserProfileReviewRepository(db, config) {
         claimExpiresAt,
         updatedAt: claimedAt
       };
-      await reference.update({ data: patch });
+      await reference.update({ data: writableDocument(patch) });
       return { ...current, ...patch };
     });
   }
@@ -119,7 +119,7 @@ function createUserProfileReviewRepository(db, config) {
             avatarChanged: false
           }
         : patch;
-      await reference.update({ data: storedPatch });
+      await reference.update({ data: writableDocument(storedPatch) });
       if (terminal) {
         const event = messageEventDocument(
           storedPatch.status === 'failed' ? 'profile_review_failed' : 'profile_rejected',
@@ -169,12 +169,13 @@ function createUserProfileReviewRepository(db, config) {
         claimId: '',
         claimedAt: null,
         claimExpiresAt: null,
+        failureCode: '',
         nextAttemptAt: null,
         completedAt: updatedAt,
         updatedAt
       };
-      await profileReference.set({ data: profile });
-      await reviewReference.set({ data: finishedReview });
+      await profileReference.set({ data: writableDocument(profile) });
+      await reviewReference.set({ data: writableDocument(finishedReview) });
       const event = messageEventDocument(
         'profile_approved',
         `${ownerKey}:${revision}`,

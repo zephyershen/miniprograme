@@ -6,10 +6,14 @@ const {
   requestMiniProgramVirtualPayment,
   paymentCancelled,
   paymentFailureMessage,
+  membershipCheckoutFailureMessage,
+  paymentConfirmationFailureMessage,
   officialVirtualPaymentErrorCode,
   virtualPaymentFailureDiagnostic,
   rememberPendingMembershipOrder,
   pendingMembershipOrderId,
+  pendingMembershipCashierCompleted,
+  markPendingMembershipCashierCompleted,
   forgetPendingMembershipOrder,
   virtualPaymentAvailable
 } = require('../features/billing/payment.js');
@@ -209,6 +213,54 @@ test('gives an actionable Apple cashier hint for a code-less iOS failure', () =>
   );
 });
 
+test('never mistakes a server failure for an Apple cashier failure', () => {
+  global.wx = supportedWx({
+    getDeviceInfo: () => ({ platform: 'ios' })
+  });
+  assert.equal(
+    membershipCheckoutFailureMessage({
+      code: 'TEMPORARY_FAILURE',
+      message: '支付服务暂时不可用，请稍后重试'
+    }),
+    '会员开通服务暂时不可用，请稍后重试'
+  );
+  assert.equal(
+    membershipCheckoutFailureMessage({
+      code: 'FUNCTIONS_EXECUTE_FAIL',
+      message: 'internal requestId must-not-leak'
+    }),
+    '会员开通服务暂时不可用，请稍后重试'
+  );
+  assert.equal(
+    membershipCheckoutFailureMessage({
+      code: 'PAYMENT_CREATION_IN_PROGRESS',
+      message: 'must-not-leak'
+    }),
+    '支付订单正在准备，请稍后重试'
+  );
+  assert.equal(
+    membershipCheckoutFailureMessage({
+      code: 'PAYMENT_CHECKOUT_TIMEOUT',
+      message: 'must-not-leak'
+    }),
+    '支付订单准备超时，请稍后重试'
+  );
+  assert.equal(
+    membershipCheckoutFailureMessage({
+      code: 'PAYMENT_PENDING_ORDER_MISMATCH',
+      message: 'must-not-leak'
+    }),
+    '已有订单正在确认，请勿重复付款，稍后再试'
+  );
+  assert.equal(
+    paymentConfirmationFailureMessage({
+      code: 'PAYMENT_QUERY_FAILED',
+      message: '微信支付结果暂时无法确认'
+    }),
+    '会员开通确认异常，请勿重复付款，稍后下拉刷新'
+  );
+});
+
 test('passes only the signed virtual-payment fields to the WeChat cashier', async () => {
   let received;
   global.wx = supportedWx({
@@ -256,6 +308,10 @@ test('keeps an order pending until the matching server-confirmed order is cleare
 
   rememberPendingMembershipOrder('MP202607190001');
   assert.equal(pendingMembershipOrderId(), 'MP202607190001');
+  assert.equal(pendingMembershipCashierCompleted('MP202607190001'), false);
+  assert.equal(markPendingMembershipCashierCompleted('MP-other'), false);
+  assert.equal(markPendingMembershipCashierCompleted('MP202607190001'), true);
+  assert.equal(pendingMembershipCashierCompleted('MP202607190001'), true);
   assert.equal(forgetPendingMembershipOrder('MP-other'), false);
   assert.equal(pendingMembershipOrderId(), 'MP202607190001');
   assert.equal(forgetPendingMembershipOrder('MP202607190001'), true);

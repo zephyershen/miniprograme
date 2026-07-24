@@ -14,8 +14,8 @@ async function performRecovery() {
   const order = result && result.order;
   if (!order || (order.id && order.id !== orderId)) return null;
   if (order.status === 'paid') {
-    forgetPendingMembershipOrder(orderId);
     await refreshMembershipAccess({ force: true });
+    forgetPendingMembershipOrder(orderId);
   } else if (['failed', 'closed', 'refunded'].includes(order.status)) {
     forgetPendingMembershipOrder(orderId);
   }

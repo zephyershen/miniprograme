@@ -20,6 +20,12 @@ function positiveInteger(value, fallback = 0) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+const MAX_PAYMENT_REQUEST_TIMEOUT_MS = 5000;
+
+function paymentRequestTimeout(value, fallback = MAX_PAYMENT_REQUEST_TIMEOUT_MS) {
+  return Math.min(MAX_PAYMENT_REQUEST_TIMEOUT_MS, integer(value, fallback));
+}
+
 function paymentEnvironment(value) {
   const parsed = Number(value);
   return [0, 1].includes(parsed) ? parsed : -1;
@@ -72,7 +78,10 @@ const WECHAT_VIRTUAL_PAY_CONFIG = Object.freeze({
     'wechatVirtualPayApiBaseUrl',
     'https://api.weixin.qq.com'
   ),
-  timeoutMs: integer(value('WECHAT_VIRTUAL_PAY_TIMEOUT_MS', 'wechatVirtualPayTimeoutMs'), 8000)
+  timeoutMs: paymentRequestTimeout(
+    value('WECHAT_VIRTUAL_PAY_TIMEOUT_MS', 'wechatVirtualPayTimeoutMs'),
+    MAX_PAYMENT_REQUEST_TIMEOUT_MS
+  )
 });
 
 const WECHAT_MESSAGE_PUSH_CONFIG = Object.freeze({
@@ -126,12 +135,15 @@ function missingMessagePushConfig(config = WECHAT_MESSAGE_PUSH_CONFIG) {
 }
 
 const COLLECTIONS = Object.freeze({
+  checkoutLocks: 'knowledge_membership_checkout_locks',
   orders: 'knowledge_membership_orders',
   memberships: 'knowledge_memberships',
   messageEvents: 'knowledge_message_events'
 });
 
 module.exports = {
+  MAX_PAYMENT_REQUEST_TIMEOUT_MS,
+  paymentRequestTimeout,
   PLAN,
   WECHAT_VIRTUAL_PAY_CONFIG,
   WECHAT_MESSAGE_PUSH_CONFIG,

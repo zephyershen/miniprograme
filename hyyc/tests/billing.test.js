@@ -13,6 +13,10 @@ const {
   centsToAmount,
   centsToPriceLabel,
   createOrderId,
+  createCheckoutLeaseToken,
+  CHECKOUT_LEASE_MS,
+  CHECKOUT_OPERATION_BUDGET_MS,
+  runWithinCheckoutDeadline,
   reconciliationRetryDelay,
   createBillingService
 } = require('../cloudfunctions/membershipBilling/services/billing-service');
@@ -21,6 +25,8 @@ const {
   createBillingRepository
 } = require('../cloudfunctions/membershipBilling/repositories/billing-repository');
 const {
+  MAX_PAYMENT_REQUEST_TIMEOUT_MS,
+  paymentRequestTimeout,
   missingPaymentConfig
 } = require('../cloudfunctions/membershipBilling/config');
 
@@ -45,6 +51,50 @@ const PLAN = Object.freeze({
   priceCents: 590,
   goodsPriceCents: 590,
   compareAtPriceCents: 1090
+});
+
+function currentPendingOrder(actor, overrides = {}) {
+  return {
+    id: 'MP20260724160000abcdefabcdefabcd',
+    ownerKey: actor.ownerKey,
+    openId: actor.openId,
+    planKey: PLAN.key,
+    amountCents: PLAN.priceCents,
+    goodsPriceCents: PLAN.goodsPriceCents,
+    productId: CONFIG.productId,
+    environment: CONFIG.environment,
+    provider: 'wechat_virtual_pay',
+    providerStatus: 1,
+    providerTransactionId: '',
+    deliveryStatus: 'not_paid',
+    status: 'payment_pending',
+    createdAt: new Date('2026-07-24T08:00:00.000Z'),
+    updatedAt: new Date('2026-07-24T08:00:00.000Z'),
+    ...overrides
+  };
+}
+
+test('uses an unpredictable 90-second checkout lease token', () => {
+  const first = createCheckoutLeaseToken();
+  const second = createCheckoutLeaseToken();
+  assert.match(first, /^[a-f0-9]{32}$/);
+  assert.match(second, /^[a-f0-9]{32}$/);
+  assert.notEqual(first, second);
+  assert.equal(CHECKOUT_LEASE_MS, 90 * 1000);
+  assert.equal(CHECKOUT_OPERATION_BUDGET_MS, 22 * 1000);
+});
+
+test('caps provider requests and the complete checkout operation below the function timeout', async () => {
+  assert.equal(MAX_PAYMENT_REQUEST_TIMEOUT_MS, 5000);
+  assert.equal(paymentRequestTimeout(8000), 5000);
+  assert.equal(paymentRequestTimeout(3000), 3000);
+  await assert.rejects(
+    () => runWithinCheckoutDeadline(
+      () => new Promise(() => {}),
+      Date.now() + 5
+    ),
+    (error) => error && error.code === 'PAYMENT_CHECKOUT_TIMEOUT'
+  );
 });
 
 test('keeps new sales closed until the explicit release gate is approved', async () => {
@@ -419,6 +469,16 @@ test('queries official XPay state with an exact body signature and confirms deli
         });
       }
       if (request.url.includes('/xpay/notify_provide_goods')) {
+        const body = options.body;
+        const parsedUrl = new URL(request.url);
+        assert.equal(
+          parsedUrl.searchParams.get('pay_sig'),
+          createPaySignature('/xpay/notify_provide_goods', body, CONFIG.appKey)
+        );
+        assert.deepEqual(JSON.parse(body), {
+          order_id: 'MP20260719120000abcdefabcdefabcd',
+          env: 0
+        });
         return { ok: true, text: async () => '' };
       }
       throw new Error(`unexpected request: ${request.url}`);
@@ -438,7 +498,86 @@ test('queries official XPay state with an exact body signature and confirms deli
   assert.equal(requests.some((request) => request.url.includes('/xpay/notify_provide_goods')), true);
 });
 
+test('re-signs delivery confirmation after refreshing an expired access token', async () => {
+  let tokenRequests = 0;
+  const deliveryRequests = [];
+  const client = createWechatVirtualPayClient({
+    config: CONFIG,
+    fetchImpl: async (url, options) => {
+      const requestUrl = String(url);
+      if (requestUrl.endsWith('/cgi-bin/stable_token')) {
+        tokenRequests += 1;
+        return jsonResponse({
+          access_token: tokenRequests === 1 ? 'expired-token' : 'fresh-token',
+          expires_in: 7200
+        });
+      }
+      if (requestUrl.includes('/xpay/notify_provide_goods')) {
+        deliveryRequests.push({ url: requestUrl, options });
+        return deliveryRequests.length === 1
+          ? jsonResponse({ errcode: 40001, errmsg: 'access token expired' })
+          : { ok: true, text: async () => '' };
+      }
+      throw new Error(`unexpected request: ${requestUrl}`);
+    }
+  });
+  const order = {
+    id: 'MP20260719120000abcdefabcdefabcd',
+    openId: 'open-id',
+    amountCents: 590
+  };
+
+  await client.confirmDelivery(order);
+
+  assert.equal(tokenRequests, 2);
+  assert.equal(deliveryRequests.length, 2);
+  deliveryRequests.forEach((request, index) => {
+    const body = request.options.body;
+    const parsedUrl = new URL(request.url);
+    assert.equal(
+      parsedUrl.searchParams.get('access_token'),
+      index === 0 ? 'expired-token' : 'fresh-token'
+    );
+    assert.equal(
+      parsedUrl.searchParams.get('pay_sig'),
+      createPaySignature('/xpay/notify_provide_goods', body, CONFIG.appKey)
+    );
+    assert.deepEqual(JSON.parse(body), {
+      order_id: order.id,
+      env: CONFIG.environment
+    });
+  });
+});
+
+test('maps a nonzero delivery business error to DELIVERY_CONFIRM_FAILED', async () => {
+  const client = createWechatVirtualPayClient({
+    config: CONFIG,
+    fetchImpl: async (url) => {
+      const requestUrl = String(url);
+      if (requestUrl.endsWith('/cgi-bin/stable_token')) {
+        return jsonResponse({ access_token: 'access-token', expires_in: 7200 });
+      }
+      if (requestUrl.includes('/xpay/notify_provide_goods')) {
+        return jsonResponse({ errcode: 268490001, errmsg: 'delivery rejected' });
+      }
+      throw new Error(`unexpected request: ${requestUrl}`);
+    }
+  });
+
+  await assert.rejects(
+    () => client.confirmDelivery({
+      id: 'MP20260719120000abcdefabcdefabcd',
+      openId: 'open-id',
+      amountCents: 590
+    }),
+    (error) => error
+      && error.code === 'DELIVERY_CONFIRM_FAILED'
+      && error.statusCode === 502
+  );
+});
+
 test('maps every terminal virtual-payment state conservatively', () => {
+  assert.equal(mapOrderState(0), 'F');
   assert.equal(mapOrderState(1), 'P');
   assert.equal(mapOrderState(2), 'S');
   assert.equal(mapOrderState(4), 'S');
@@ -451,8 +590,30 @@ test('maps every terminal virtual-payment state conservatively', () => {
 test('only grants membership after an official paid query with an exact amount', async () => {
   const stored = new Map();
   let fulfilled = 0;
+  let activeLeaseToken = '';
   const repository = {
-    async createOrder(order) { stored.set(order.id, order); return order; },
+    async findLatestPendingOrderByOwner() { return null; },
+    async acquireCheckoutLease(ownerKey, leaseToken) {
+      assert.equal(ownerKey, 'owner-key');
+      activeLeaseToken = leaseToken;
+      return { acquired: true };
+    },
+    async commitCheckoutOrder(ownerKey, openId, leaseToken, order) {
+      assert.equal(ownerKey, 'owner-key');
+      assert.equal(openId, 'open-id');
+      assert.equal(leaseToken, activeLeaseToken);
+      stored.set(order.id, order);
+      return order;
+    },
+    async bindCheckoutOrder() {
+      throw new Error('new checkout must not bind an old order');
+    },
+    async releaseCheckoutLease(ownerKey, leaseToken) {
+      assert.equal(ownerKey, 'owner-key');
+      assert.equal(leaseToken, activeLeaseToken);
+      activeLeaseToken = '';
+      return true;
+    },
     async getOrder(orderId) { return stored.get(orderId) || null; },
     async updateOrder(orderId, fields) {
       const updated = { ...stored.get(orderId), ...fields };
@@ -523,6 +684,7 @@ test('only grants membership after an official paid query with an exact amount',
     { id: 'order', amountCents: 590 },
     {
       state: 'S', orderId: 'order', amountCents: 590, paidAmountCents: 59,
+      providerStatus: 2,
       orderType: 0, environmentType: 1
     }
   ), /支付金额校验失败/);
@@ -530,6 +692,7 @@ test('only grants membership after an official paid query with an exact amount',
     { id: 'order', amountCents: 590 },
     {
       state: 'S', orderId: 'order', amountCents: 1090, paidAmountCents: 1090,
+      providerStatus: 2,
       orderType: 0, environmentType: 1
     }
   ), /支付金额校验失败/);
@@ -537,9 +700,599 @@ test('only grants membership after an official paid query with an exact amount',
     { id: 'order', amountCents: 590 },
     {
       state: 'R', orderId: 'order', amountCents: 590, paidAmountCents: 1090,
+      providerStatus: 8,
       orderType: 7, environmentType: 1
     }
   ), /支付金额校验失败/);
+  assert.throws(
+    () => service.validateProviderResult(
+      { id: 'order', amountCents: 590 },
+      {
+        state: 'P',
+        providerStatus: 6,
+        orderId: 'order',
+        amountCents: 590,
+        paidAmountCents: 0,
+        orderType: 0,
+        environmentType: 1
+      }
+    ),
+    (error) => error && error.code === 'PAYMENT_RESULT_MISMATCH'
+  );
+});
+
+test('queries and re-signs the same pending order without creating a second order id', async () => {
+  const actor = { openId: 'open-id', ownerKey: 'owner-key' };
+  let pending = {
+    id: 'MP20260724160000abcdefabcdefabcd',
+    ownerKey: actor.ownerKey,
+    openId: actor.openId,
+    planKey: PLAN.key,
+    amountCents: PLAN.priceCents,
+    goodsPriceCents: PLAN.goodsPriceCents,
+    productId: CONFIG.productId,
+    environment: CONFIG.environment,
+    provider: 'wechat_virtual_pay',
+    providerStatus: 1,
+    providerTransactionId: '',
+    deliveryStatus: 'not_paid',
+    status: 'payment_pending',
+    createdAt: new Date('2026-07-24T08:00:00.000Z')
+  };
+  let signed = 0;
+  let committed = 0;
+  let activeLeaseToken = '';
+  const service = createBillingService({
+    repository: {
+      async acquireCheckoutLease(ownerKey, leaseToken) {
+        assert.equal(ownerKey, actor.ownerKey);
+        activeLeaseToken = leaseToken;
+        return { acquired: true };
+      },
+      async findLatestPendingOrderByOwner(ownerKey) {
+        assert.equal(ownerKey, actor.ownerKey);
+        return pending;
+      },
+      async updateOrder(orderId, fields) {
+        assert.equal(orderId, pending.id);
+        pending = { ...pending, ...fields };
+        return pending;
+      },
+      async getOrder(orderId) {
+        return orderId === pending.id ? pending : null;
+      },
+      async bindCheckoutOrder(ownerKey, openId, leaseToken, orderId) {
+        assert.equal(ownerKey, actor.ownerKey);
+        assert.equal(openId, actor.openId);
+        assert.equal(leaseToken, activeLeaseToken);
+        assert.equal(orderId, pending.id);
+        return pending;
+      },
+      async commitCheckoutOrder() {
+        committed += 1;
+        throw new Error('must not create a duplicate order');
+      },
+      async releaseCheckoutLease(ownerKey, leaseToken) {
+        assert.equal(ownerKey, actor.ownerKey);
+        assert.equal(leaseToken, activeLeaseToken);
+        activeLeaseToken = '';
+        return true;
+      }
+    },
+    paymentClient: {
+      async queryPayment(order) {
+        assert.equal(order.id, pending.id);
+        return {
+          state: 'P',
+          orderId: order.id,
+          amountCents: PLAN.priceCents,
+          paidAmountCents: 0,
+          providerStatus: 1,
+          orderType: 0,
+          environmentType: 1,
+          providerTransactionId: ''
+        };
+      },
+      async createPayment(order) {
+        signed += 1;
+        assert.equal(order.id, pending.id);
+        return {
+          signData: JSON.stringify({ outTradeNo: order.id }),
+          paySig: 'pay',
+          signature: 'user',
+          mode: 'short_series_goods'
+        };
+      }
+    },
+    config: CONFIG,
+    plan: PLAN,
+    missingConfig: () => []
+  });
+
+  const result = await service.createPayment(PLAN.key, 'login-code', actor);
+
+  assert.equal(result.reused, true);
+  assert.equal(JSON.parse(result.payment.signData).outTradeNo, pending.id);
+  assert.equal(result.order.id, pending.id);
+  assert.equal(result.order.status, 'payment_pending');
+  assert.equal(signed, 1);
+  assert.equal(committed, 0);
+});
+
+test('allows only one concurrent checkout per owner to generate payment parameters', async () => {
+  const actor = { openId: 'open-id', ownerKey: 'owner-key' };
+  let activeLeaseToken = '';
+  let providerCalls = 0;
+  let committedOrder = null;
+  let enterProvider;
+  let finishProvider;
+  const providerEntered = new Promise((resolve) => { enterProvider = resolve; });
+  const providerMayFinish = new Promise((resolve) => { finishProvider = resolve; });
+  const repository = {
+    async acquireCheckoutLease(ownerKey, leaseToken) {
+      assert.equal(ownerKey, actor.ownerKey);
+      if (activeLeaseToken) return { acquired: false };
+      activeLeaseToken = leaseToken;
+      return { acquired: true };
+    },
+    async findLatestPendingOrderByOwner() {
+      return committedOrder && committedOrder.status === 'payment_pending'
+        ? committedOrder
+        : null;
+    },
+    async commitCheckoutOrder(ownerKey, openId, leaseToken, order) {
+      assert.equal(ownerKey, actor.ownerKey);
+      assert.equal(openId, actor.openId);
+      assert.equal(leaseToken, activeLeaseToken);
+      committedOrder = order;
+      return order;
+    },
+    async bindCheckoutOrder() {
+      throw new Error('no historical order should be bound');
+    },
+    async releaseCheckoutLease(ownerKey, leaseToken) {
+      assert.equal(ownerKey, actor.ownerKey);
+      if (leaseToken !== activeLeaseToken) return false;
+      activeLeaseToken = '';
+      return true;
+    }
+  };
+  const paymentClient = {
+    async createPayment(order) {
+      providerCalls += 1;
+      enterProvider();
+      await providerMayFinish;
+      return {
+        signData: JSON.stringify({ outTradeNo: order.id }),
+        paySig: 'pay',
+        signature: 'user',
+        mode: 'short_series_goods'
+      };
+    }
+  };
+  const service = createBillingService({
+    repository,
+    paymentClient,
+    config: CONFIG,
+    plan: PLAN,
+    missingConfig: () => [],
+    now: () => new Date('2026-07-24T08:00:00.000Z')
+  });
+
+  const first = service.createPayment(PLAN.key, 'first-login-code', actor);
+  await providerEntered;
+  await assert.rejects(
+    () => service.createPayment(PLAN.key, 'second-login-code', actor),
+    (error) => error && error.code === 'PAYMENT_CREATION_IN_PROGRESS'
+  );
+  finishProvider();
+  const result = await first;
+
+  assert.equal(providerCalls, 1);
+  assert.equal(result.order.id, committedOrder.id);
+  assert.equal(result.order.status, 'payment_pending');
+});
+
+test('recovers an officially paid pending order without generating another payment', async () => {
+  const actor = { openId: 'open-id', ownerKey: 'owner-key' };
+  let pending = currentPendingOrder(actor);
+  let activeLeaseToken = '';
+  let generated = 0;
+  const repository = {
+    async acquireCheckoutLease(ownerKey, leaseToken) {
+      activeLeaseToken = leaseToken;
+      return { acquired: true };
+    },
+    async findLatestPendingOrderByOwner() {
+      return pending && pending.status === 'payment_pending' ? pending : null;
+    },
+    async fulfill(orderId, payment) {
+      assert.equal(orderId, pending.id);
+      pending = {
+        ...pending,
+        status: 'paid',
+        paidAt: payment.paidAt,
+        deliveryStatus: 'delivered'
+      };
+      return { order: pending, membership: { status: 'active' } };
+    },
+    async updateOrder(orderId, fields) {
+      assert.equal(orderId, pending.id);
+      pending = { ...pending, ...fields };
+      return pending;
+    },
+    async commitCheckoutOrder() {
+      throw new Error('paid recovery must not create another order');
+    },
+    async bindCheckoutOrder() {
+      throw new Error('paid recovery must not re-open the cashier');
+    },
+    async releaseCheckoutLease(ownerKey, leaseToken) {
+      assert.equal(ownerKey, actor.ownerKey);
+      assert.equal(leaseToken, activeLeaseToken);
+      activeLeaseToken = '';
+      return true;
+    }
+  };
+  const service = createBillingService({
+    repository,
+    paymentClient: {
+      async queryPayment(order) {
+        return {
+          state: 'S',
+          orderId: order.id,
+          amountCents: PLAN.priceCents,
+          paidAmountCents: PLAN.priceCents,
+          providerStatus: 4,
+          orderType: 0,
+          environmentType: 1,
+          providerTransactionId: 'wx-paid',
+          paidAt: new Date('2026-07-24T08:01:00.000Z'),
+          delivered: true
+        };
+      },
+      async createPayment() {
+        generated += 1;
+        throw new Error('must not generate a second payment');
+      }
+    },
+    config: CONFIG,
+    plan: PLAN,
+    missingConfig: () => []
+  });
+
+  const result = await service.createPayment(PLAN.key, 'login-code', actor);
+
+  assert.equal(result.reused, true);
+  assert.equal(result.payment, null);
+  assert.equal(result.order.status, 'paid');
+  assert.equal(generated, 0);
+});
+
+for (const terminal of [
+  { name: 'closes', providerStatus: 6, localStatus: 'closed' },
+  { name: 'cannot initialize', providerStatus: 0, localStatus: 'failed' }
+]) {
+  test(`creates a new order only after the official provider ${terminal.name} the historical pending order`, async () => {
+  const actor = { openId: 'open-id', ownerKey: 'owner-key' };
+  let pending = currentPendingOrder(actor);
+  let activeLeaseToken = '';
+  let generatedOrder = null;
+  let providerQueries = 0;
+  const repository = {
+    async acquireCheckoutLease(ownerKey, leaseToken) {
+      activeLeaseToken = leaseToken;
+      return { acquired: true };
+    },
+    async findLatestPendingOrderByOwner() {
+      return pending && pending.status === 'payment_pending' ? pending : null;
+    },
+    async updateOrder(orderId, fields) {
+      assert.equal(orderId, pending.id);
+      pending = { ...pending, ...fields };
+      return pending;
+    },
+    async commitCheckoutOrder(ownerKey, openId, leaseToken, order) {
+      assert.equal(ownerKey, actor.ownerKey);
+      assert.equal(openId, actor.openId);
+      assert.equal(leaseToken, activeLeaseToken);
+      assert.notEqual(order.id, pending.id);
+      generatedOrder = order;
+      return order;
+    },
+    async bindCheckoutOrder() {
+      throw new Error('closed order must not be rebound');
+    },
+    async releaseCheckoutLease(ownerKey, leaseToken) {
+      assert.equal(ownerKey, actor.ownerKey);
+      assert.equal(leaseToken, activeLeaseToken);
+      activeLeaseToken = '';
+      return true;
+    }
+  };
+  const service = createBillingService({
+    repository,
+    paymentClient: {
+      async queryPayment(order) {
+        providerQueries += 1;
+        return {
+          state: 'F',
+          orderId: order.id,
+          amountCents: PLAN.priceCents,
+          paidAmountCents: 0,
+          providerStatus: terminal.providerStatus,
+          orderType: 0,
+          environmentType: 1,
+          providerTransactionId: ''
+        };
+      },
+      async createPayment(order) {
+        assert.notEqual(order.id, pending.id);
+        return {
+          signData: JSON.stringify({ outTradeNo: order.id }),
+          paySig: 'pay',
+          signature: 'user',
+          mode: 'short_series_goods'
+        };
+      }
+    },
+    config: CONFIG,
+    plan: PLAN,
+    missingConfig: () => [],
+    now: () => new Date('2026-07-24T08:02:00.000Z')
+  });
+
+  const result = await service.createPayment(PLAN.key, 'login-code', actor);
+
+  assert.equal(providerQueries, 1);
+  assert.equal(pending.status, terminal.localStatus);
+  assert.equal(result.order.id, generatedOrder.id);
+  assert.notEqual(result.order.id, pending.id);
+  });
+}
+
+test('does not create a new order when a stale closed result races an already-paid transition', async () => {
+  const actor = { openId: 'open-id', ownerKey: 'owner-key' };
+  const pending = currentPendingOrder(actor);
+  let activeLeaseToken = '';
+  let generated = 0;
+  let committed = 0;
+  const service = createBillingService({
+    repository: {
+      async acquireCheckoutLease(ownerKey, leaseToken) {
+        activeLeaseToken = leaseToken;
+        return { acquired: true };
+      },
+      async findLatestPendingOrderByOwner() {
+        return pending;
+      },
+      async transitionPendingOrder(orderId, fields) {
+        assert.equal(orderId, pending.id);
+        assert.equal(fields.status, 'closed');
+        return {
+          ...pending,
+          status: 'paid',
+          providerStatus: 4,
+          paidAt: new Date('2026-07-24T08:01:00.000Z')
+        };
+      },
+      async commitCheckoutOrder() {
+        committed += 1;
+        throw new Error('paid race must not commit a new order');
+      },
+      async bindCheckoutOrder() {
+        throw new Error('paid race must not re-open the cashier');
+      },
+      async releaseCheckoutLease(ownerKey, leaseToken) {
+        assert.equal(ownerKey, actor.ownerKey);
+        assert.equal(leaseToken, activeLeaseToken);
+        activeLeaseToken = '';
+        return true;
+      }
+    },
+    paymentClient: {
+      async queryPayment(order) {
+        return {
+          state: 'F',
+          orderId: order.id,
+          amountCents: PLAN.priceCents,
+          paidAmountCents: 0,
+          providerStatus: 6,
+          orderType: 0,
+          environmentType: 1,
+          providerTransactionId: ''
+        };
+      },
+      async createPayment() {
+        generated += 1;
+        throw new Error('paid race must not generate another payment');
+      }
+    },
+    config: CONFIG,
+    plan: PLAN,
+    missingConfig: () => []
+  });
+
+  const result = await service.createPayment(PLAN.key, 'login-code', actor);
+
+  assert.equal(result.reused, true);
+  assert.equal(result.payment, null);
+  assert.equal(result.order.status, 'paid');
+  assert.equal(generated, 0);
+  assert.equal(committed, 0);
+});
+
+for (const scenario of [
+  {
+    name: 'belongs to another account',
+    pending: (actor) => currentPendingOrder(actor, { openId: 'another-open-id' }),
+    expectedCode: 'PAYMENT_ACCOUNT_MISMATCH',
+    queryPayment: async () => {
+      throw new Error('another account order must not reach the provider');
+    }
+  },
+  {
+    name: 'contract does not match',
+    pending: (actor) => currentPendingOrder(actor, { goodsPriceCents: 1090 }),
+    expectedCode: 'PAYMENT_PENDING_ORDER_MISMATCH',
+    queryPayment: async () => {
+      throw new Error('mismatched pending order must not reach the provider');
+    }
+  },
+  {
+    name: 'official query fails',
+    pending: (actor) => currentPendingOrder(actor),
+    expectedCode: 'PAYMENT_QUERY_FAILED',
+    queryPayment: async () => {
+      const error = new Error('temporary provider failure');
+      error.code = 'PAYMENT_QUERY_FAILED';
+      throw error;
+    }
+  },
+  {
+    name: 'official query returns an unknown status',
+    pending: (actor) => currentPendingOrder(actor),
+    expectedCode: 'PAYMENT_RESULT_MISMATCH',
+    queryPayment: async (order) => ({
+      state: 'P',
+      orderId: order.id,
+      amountCents: PLAN.priceCents,
+      paidAmountCents: 0,
+      providerStatus: 999,
+      orderType: 0,
+      environmentType: 1,
+      providerTransactionId: ''
+    })
+  },
+  {
+    name: 'official query reports a failed refund',
+    pending: (actor) => currentPendingOrder(actor),
+    expectedCode: 'PAYMENT_RESULT_MISMATCH',
+    queryPayment: async (order) => ({
+      state: 'P',
+      orderId: order.id,
+      amountCents: PLAN.priceCents,
+      paidAmountCents: PLAN.priceCents,
+      providerStatus: 7,
+      orderType: 0,
+      environmentType: 1,
+      providerTransactionId: 'refund-failed-order'
+    })
+  },
+  {
+    name: 'official pending state reports a nonzero paid amount',
+    pending: (actor) => currentPendingOrder(actor),
+    expectedCode: 'PAYMENT_AMOUNT_MISMATCH',
+    queryPayment: async (order) => ({
+      state: 'P',
+      orderId: order.id,
+      amountCents: PLAN.priceCents,
+      paidAmountCents: PLAN.priceCents,
+      providerStatus: 1,
+      orderType: 0,
+      environmentType: 1,
+      providerTransactionId: 'inconsistent-pending-order'
+    })
+  }
+]) {
+  test(`fails closed without creating a new order when the historical pending ${scenario.name}`, async () => {
+    const actor = { openId: 'open-id', ownerKey: 'owner-key' };
+    const pending = scenario.pending(actor);
+    let activeLeaseToken = '';
+    let generated = 0;
+    let committed = 0;
+    const service = createBillingService({
+      repository: {
+        async acquireCheckoutLease(ownerKey, leaseToken) {
+          activeLeaseToken = leaseToken;
+          return { acquired: true };
+        },
+        async findLatestPendingOrderByOwner() {
+          return pending;
+        },
+        async commitCheckoutOrder() {
+          committed += 1;
+          throw new Error('must not commit a new order');
+        },
+        async bindCheckoutOrder() {
+          throw new Error('must not bind an unsafe order');
+        },
+        async releaseCheckoutLease(ownerKey, leaseToken) {
+          assert.equal(ownerKey, actor.ownerKey);
+          assert.equal(leaseToken, activeLeaseToken);
+          activeLeaseToken = '';
+          return true;
+        }
+      },
+      paymentClient: {
+        queryPayment: scenario.queryPayment,
+        async createPayment() {
+          generated += 1;
+          throw new Error('must not generate payment parameters');
+        }
+      },
+      config: CONFIG,
+      plan: PLAN,
+      missingConfig: () => []
+    });
+
+    await assert.rejects(
+      () => service.createPayment(PLAN.key, 'login-code', actor),
+      (error) => error && error.code === scenario.expectedCode
+    );
+    assert.equal(generated, 0);
+    assert.equal(committed, 0);
+  });
+}
+
+test('returns the refunded state when delivery confirmation races a refund', async () => {
+  const actor = { openId: 'open-id', ownerKey: 'owner-key' };
+  const paidOrder = currentPendingOrder(actor, {
+    status: 'paid',
+    providerStatus: 4,
+    deliveryStatus: 'pending',
+    paidAt: new Date('2026-07-24T08:01:00.000Z')
+  });
+  const refundedOrder = {
+    ...paidOrder,
+    status: 'refunded',
+    providerStatus: 8,
+    deliveryStatus: 'pending',
+    refundedAt: new Date('2026-07-24T08:02:00.000Z'),
+    nextCheckAt: null
+  };
+  let blindUpdates = 0;
+  const service = createBillingService({
+    repository: {
+      async getOrder(orderId) {
+        assert.equal(orderId, paidOrder.id);
+        return paidOrder;
+      },
+      async transitionPaidOrder(orderId, fields) {
+        assert.equal(orderId, paidOrder.id);
+        assert.equal(fields.deliveryStatus, 'delivered');
+        return refundedOrder;
+      },
+      async updateOrder() {
+        blindUpdates += 1;
+        throw new Error('a stale paid snapshot must use the paid-only transition');
+      }
+    },
+    paymentClient: {
+      async confirmDelivery(order) {
+        assert.equal(order.id, paidOrder.id);
+        return true;
+      }
+    },
+    config: CONFIG,
+    plan: PLAN,
+    missingConfig: () => []
+  });
+
+  const result = await service.queryOrder(paidOrder.id, actor);
+
+  assert.equal(result.order.status, 'refunded');
+  assert.equal(blindUpdates, 0);
 });
 
 test('hides a crossed-out comparison price unless it is above the charged price', () => {
@@ -599,6 +1352,35 @@ test('selects only due reconciliation orders with a bounded oldest-first query',
     { id: 'b', nextCheckAt: dueAt },
     { id: 'a', nextCheckAt: dueAt }
   ) > 0, true);
+});
+
+test('finds only the newest pending order for one owner before creating a payment', async () => {
+  const calls = [];
+  const pending = {
+    id: 'MP20260724160000abcdefabcdefabcd',
+    ownerKey: 'owner',
+    status: 'payment_pending'
+  };
+  const query = {
+    where(filter) { calls.push(['where', filter]); return this; },
+    orderBy(field, direction) { calls.push(['orderBy', field, direction]); return this; },
+    limit(value) { calls.push(['limit', value]); return this; },
+    async get() { return { data: [pending] }; }
+  };
+  const repository = createBillingRepository({
+    createCollection: async () => null,
+    collection: () => query
+  }, {
+    orders: 'knowledge_membership_orders',
+    memberships: 'knowledge_memberships'
+  });
+
+  assert.equal(await repository.findLatestPendingOrderByOwner('owner'), pending);
+  assert.deepEqual(calls, [
+    ['where', { ownerKey: 'owner', status: 'payment_pending' }],
+    ['orderBy', 'createdAt', 'desc'],
+    ['limit', 1]
+  ]);
 });
 
 test('resolves a payment identifier only when it belongs to one order', async () => {

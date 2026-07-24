@@ -340,7 +340,7 @@ test('binds an iOS refund inquiry to one paid product and payment record', async
   assert.equal((await service.evaluateIosRefundQuery(refundQuery({ p_count: '2' }))).result_code, 1);
 });
 
-test('queries the official order before idempotent goods fulfillment and delivery confirmation', async () => {
+test('queries the official order before idempotent fulfillment and acknowledges the callback', async () => {
   const pendingOrder = {
     ...ORDER,
     goodsPriceCents: PLAN.goodsPriceCents,
@@ -364,15 +364,7 @@ test('queries the official order before idempotent goods fulfillment and deliver
         }
       };
     },
-    async updateOrder(orderId, fields) {
-      calls.push('update-delivery');
-      return {
-        ...pendingOrder,
-        ...fields,
-        id: orderId,
-        status: 'paid'
-      };
-    }
+    async updateOrder() { throw new Error('must not write after fulfillment'); }
   };
   const paymentClient = {
     async queryPayment(order) {
@@ -390,11 +382,7 @@ test('queries the official order before idempotent goods fulfillment and deliver
         delivered: false
       };
     },
-    async confirmDelivery(order) {
-      calls.push('confirm-delivery');
-      assert.equal(order.status, 'paid');
-      return true;
-    }
+    async confirmDelivery() { throw new Error('must remain a background fallback'); }
   };
   const service = createBillingService({
     repository,
@@ -411,9 +399,7 @@ test('queries the official order before idempotent goods fulfillment and deliver
   assert.deepEqual(calls, [
     'get-order',
     'query-order',
-    'fulfill',
-    'confirm-delivery',
-    'update-delivery'
+    'fulfill'
   ]);
 });
 
@@ -515,14 +501,13 @@ test('requests goods-delivery retry when the official order is not yet paid', as
   assert.equal(fulfillCalls, 0);
 });
 
-test('surfaces a delivery-confirmation failure so the encrypted handler can request retry', async () => {
+test('does not block a successful goods callback on any post-fulfillment fallback', async () => {
   const pendingOrder = {
     ...ORDER,
     goodsPriceCents: PLAN.goodsPriceCents,
     status: 'payment_pending',
     deliveryStatus: 'not_paid'
   };
-  let retryPersisted = false;
   const service = createBillingService({
     repository: {
       async getOrder() { return pendingOrder; },
@@ -535,10 +520,7 @@ test('surfaces a delivery-confirmation failure so the encrypted handler can requ
           }
         };
       },
-      async updateOrder(orderId, fields) {
-        retryPersisted = orderId === pendingOrder.id && fields.deliveryStatus === 'retry';
-        return { ...pendingOrder, ...fields, id: orderId, status: 'paid' };
-      }
+      async updateOrder() { throw new Error('must not write after fulfillment'); }
     },
     paymentClient: {
       async queryPayment() {
@@ -563,11 +545,117 @@ test('surfaces a delivery-confirmation failure so the encrypted handler can requ
     missingConfig: () => []
   });
 
-  await assert.rejects(
-    () => service.processGoodsDeliveryNotification(goodsDeliveryNotification()),
-    /发货状态尚未确认/
+  assert.deepEqual(
+    await service.processGoodsDeliveryNotification(goodsDeliveryNotification()),
+    { acknowledged: true, delivered: true }
   );
-  assert.equal(retryPersisted, true);
+});
+
+test('returns an encrypted retry when the entitlement transaction fails', async () => {
+  const pendingOrder = {
+    ...ORDER,
+    goodsPriceCents: PLAN.goodsPriceCents,
+    status: 'payment_pending',
+    deliveryStatus: 'not_paid'
+  };
+  let manualDeliveryCalls = 0;
+  const service = createBillingService({
+    repository: {
+      async getOrder() { return pendingOrder; },
+      async fulfill() { throw new Error('transaction failed'); }
+    },
+    paymentClient: {
+      async queryPayment() {
+        return {
+          state: 'S',
+          orderId: pendingOrder.id,
+          amountCents: PLAN.priceCents,
+          paidAmountCents: PLAN.priceCents,
+          providerStatus: 3,
+          orderType: 7,
+          environmentType: 1,
+          providerTransactionId: ORDER.providerTransactionId,
+          delivered: false
+        };
+      },
+      async confirmDelivery() { manualDeliveryCalls += 1; }
+    },
+    config: PAYMENT_CONFIG,
+    plan: PLAN,
+    missingConfig: () => []
+  });
+  const handler = createWechatMessagePushHandler({
+    config: MESSAGE_CONFIG,
+    missingConfig: () => [],
+    billingService: service
+  });
+
+  assert.deepEqual(
+    decryptHandlerResponse(await handler(encryptedEvent(goodsDeliveryNotification()))),
+    { ErrCode: 1, ErrMsg: 'retry' }
+  );
+  assert.equal(manualDeliveryCalls, 0);
+});
+
+test('acknowledges a repeated paid callback without granting membership twice', async () => {
+  let currentOrder = {
+    ...ORDER,
+    goodsPriceCents: PLAN.goodsPriceCents,
+    status: 'payment_pending',
+    deliveryStatus: 'not_paid'
+  };
+  let membershipGrants = 0;
+  let manualDeliveryCalls = 0;
+  const service = createBillingService({
+    repository: {
+      async getOrder() { return currentOrder; },
+      async fulfill() {
+        if (currentOrder.status === 'paid') {
+          return { order: currentOrder, alreadyPaid: true };
+        }
+        membershipGrants += 1;
+        currentOrder = {
+          ...currentOrder,
+          status: 'paid',
+          deliveryStatus: 'pending'
+        };
+        return { order: currentOrder, alreadyPaid: false };
+      }
+    },
+    paymentClient: {
+      async queryPayment() {
+        return {
+          state: 'S',
+          orderId: currentOrder.id,
+          amountCents: PLAN.priceCents,
+          paidAmountCents: PLAN.priceCents,
+          providerStatus: 3,
+          orderType: 7,
+          environmentType: 1,
+          providerTransactionId: ORDER.providerTransactionId,
+          delivered: false
+        };
+      },
+      async confirmDelivery() { manualDeliveryCalls += 1; }
+    },
+    config: PAYMENT_CONFIG,
+    plan: PLAN,
+    missingConfig: () => []
+  });
+  const handler = createWechatMessagePushHandler({
+    config: MESSAGE_CONFIG,
+    missingConfig: () => [],
+    billingService: service
+  });
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    assert.deepEqual(
+      decryptHandlerResponse(await handler(encryptedEvent(goodsDeliveryNotification()))),
+      { ErrCode: 0, ErrMsg: 'success' }
+    );
+  }
+  assert.equal(membershipGrants, 1);
+  assert.equal(manualDeliveryCalls, 0);
 });
 
 test('confirms a refund with the official order API before idempotent entitlement recovery', async () => {

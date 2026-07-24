@@ -27,8 +27,13 @@ const {
   requestMiniProgramVirtualPayment,
   paymentCancelled,
   paymentFailureMessage,
+  membershipCheckoutFailureMessage,
+  paymentConfirmationFailureMessage,
   virtualPaymentFailureDiagnostic,
   rememberPendingMembershipOrder,
+  pendingMembershipOrderId,
+  pendingMembershipCashierCompleted,
+  markPendingMembershipCashierCompleted,
   forgetPendingMembershipOrder
 } = require('../../features/billing/payment.js');
 
@@ -289,6 +294,63 @@ Page({
     }
   },
 
+  async applyMembershipOrderResult(orderId, order) {
+    if (order && order.status === 'paid') {
+      const purchaseMode = this.data.membership
+        && this.data.membership.purchaseMode === 'renew'
+        ? 'renew'
+        : 'subscribe';
+      const access = await this.loadMembership({ force: true });
+      if (!access) {
+        const error = new Error('会员状态暂时无法刷新');
+        error.code = 'MEMBERSHIP_CONFIRMATION_FAILED';
+        throw error;
+      }
+      forgetPendingMembershipOrder(orderId);
+      wx.showToast({
+        title: purchaseMode === 'renew' ? '续费成功' : 'Pro 已开通',
+        icon: 'success'
+      });
+      return 'paid';
+    }
+    if (order && ['failed', 'closed'].includes(order.status)) {
+      forgetPendingMembershipOrder(orderId);
+      wx.showToast({ title: '支付未完成，请重新发起', icon: 'none' });
+      return order.status;
+    }
+    if (order && order.status === 'refunded') {
+      forgetPendingMembershipOrder(orderId);
+      wx.showToast({ title: '订单已退款', icon: 'none' });
+      return 'refunded';
+    }
+    wx.showToast({
+      title: '支付结果确认中，请勿重复付款，稍后下拉刷新',
+      icon: 'none',
+      duration: 3000
+    });
+    return 'payment_pending';
+  },
+
+  async resumePendingMembershipPurchase() {
+    const orderId = pendingMembershipOrderId();
+    if (!orderId) return false;
+    let outcome = 'confirmation_failed';
+    this.setData({ 'billing.purchasing': true });
+    try {
+      const order = await this.confirmMembershipOrder(orderId);
+      outcome = await this.applyMembershipOrderResult(orderId, order);
+    } catch (error) {
+      wx.showToast({
+        title: paymentConfirmationFailureMessage(error),
+        icon: 'none',
+        duration: 3000
+      });
+    } finally {
+      this.setData({ 'billing.purchasing': false });
+    }
+    return outcome;
+  },
+
   async recordMembershipPaymentFailure(orderId, error) {
     if (!orderId || paymentCancelled(error)) return false;
     const diagnostic = virtualPaymentFailureDiagnostic(error);
@@ -431,58 +493,75 @@ Page({
     if (this.data.accountAuthenticating
       || this.data.accountLoggingOut
       || this.data.billing.purchasing
+      || this.membershipPurchaseInFlight
       || !this.data.billing.available) return;
-    if (!this.data.billing.accountVerified) {
-      await this.loginWechatAccount();
-      return;
-    }
-    this.setData({ 'billing.purchasing': true });
-    let orderId = '';
+    this.membershipPurchaseInFlight = true;
     try {
-      assertVirtualPaymentAvailable();
-      const loginCode = await loginForPayment();
-      const created = await createMembershipPayment(
-        this.data.billing.plan.key,
-        loginCode,
-        this.membershipAccess
-      );
-      orderId = created && created.order && created.order.id || '';
-      if (!orderId) throw new Error('支付订单创建失败');
-      rememberPendingMembershipOrder(orderId);
-      let order = created.order.status === 'paid' ? created.order : null;
-      if (created.order.status !== 'paid') {
-        try {
-          await requestMiniProgramVirtualPayment(created.payment);
-        } catch (paymentError) {
-          order = await this.queryMembershipOrderOnce(orderId);
-          if (!order || order.status !== 'paid') {
-            await this.recordMembershipPaymentFailure(orderId, paymentError);
-            throw paymentError;
+      const pendingOrderId = pendingMembershipOrderId();
+      if (pendingOrderId) {
+        const recoveryOutcome = await this.resumePendingMembershipPurchase();
+        if (recoveryOutcome !== 'payment_pending'
+          || pendingMembershipCashierCompleted(pendingOrderId)) return;
+      }
+      if (!this.data.billing.accountVerified) {
+        await this.loginWechatAccount();
+        return;
+      }
+      this.setData({ 'billing.purchasing': true });
+      let orderId = '';
+      let cashierInvoked = false;
+      let cashierCompleted = false;
+      let paymentConfirmed = false;
+      try {
+        assertVirtualPaymentAvailable();
+        const loginCode = await loginForPayment();
+        const created = await createMembershipPayment(
+          this.data.billing.plan.key,
+          loginCode,
+          this.membershipAccess
+        );
+        orderId = created && created.order && created.order.id || '';
+        if (!orderId) throw new Error('支付订单创建失败');
+        rememberPendingMembershipOrder(orderId);
+        let order = created.order.status === 'paid' ? created.order : null;
+        if (created.order.status !== 'paid' && created.payment) {
+          cashierInvoked = true;
+          try {
+            await requestMiniProgramVirtualPayment(created.payment);
+            cashierCompleted = true;
+            markPendingMembershipCashierCompleted(orderId);
+          } catch (paymentError) {
+            order = await this.queryMembershipOrderOnce(orderId);
+            if (!order || order.status !== 'paid') {
+              await this.recordMembershipPaymentFailure(orderId, paymentError);
+              throw paymentError;
+            }
           }
         }
-      }
-      if (!order) order = await this.confirmMembershipOrder(orderId);
-      if (order && order.status === 'paid') {
-        forgetPendingMembershipOrder(orderId);
-        await this.loadMembership({ force: true });
-        wx.showToast({ title: 'Pro 已开通', icon: 'success' });
-      } else if (order && ['failed', 'closed'].includes(order.status)) {
-        forgetPendingMembershipOrder(orderId);
-        wx.showToast({ title: '支付未完成，请重新发起', icon: 'none' });
-      } else if (order && order.status === 'refunded') {
-        forgetPendingMembershipOrder(orderId);
-        wx.showToast({ title: '订单已退款', icon: 'none' });
-      } else {
-        wx.showToast({ title: '支付结果确认中，请稍后下拉刷新', icon: 'none', duration: 2600 });
-      }
-    } catch (error) {
-      if (paymentCancelled(error)) {
-        wx.showToast({ title: '已取消支付', icon: 'none' });
-      } else {
-        wx.showToast({ title: paymentFailureMessage(error), icon: 'none' });
+        if (!order) order = await this.confirmMembershipOrder(orderId);
+        paymentConfirmed = order && order.status === 'paid';
+        await this.applyMembershipOrderResult(orderId, order);
+      } catch (error) {
+        if (paymentCancelled(error)) {
+          wx.showToast({ title: '已取消支付', icon: 'none' });
+        } else {
+          wx.showToast({
+            title: cashierCompleted
+              ? paymentConfirmationFailureMessage(error)
+              : (paymentConfirmed
+                ? paymentConfirmationFailureMessage(error)
+                : (cashierInvoked
+                  ? paymentFailureMessage(error)
+                  : membershipCheckoutFailureMessage(error))),
+            icon: 'none',
+            duration: cashierCompleted || paymentConfirmed ? 3000 : 1500
+          });
+        }
+      } finally {
+        this.setData({ 'billing.purchasing': false });
       }
     } finally {
-      this.setData({ 'billing.purchasing': false });
+      this.membershipPurchaseInFlight = false;
     }
   },
 

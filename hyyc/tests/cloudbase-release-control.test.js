@@ -23,7 +23,11 @@ test('loads versioned release contracts without credentials', () => {
   const contracts = loadReleaseContracts();
   assert.equal(contracts.envId, ENV_ID);
   assert.equal(contracts.database.mode, 'adminOnly');
-  assert.equal(contracts.database.collections.length, 25);
+  assert.equal(contracts.database.collections.length, 26);
+  assert.equal(
+    contracts.database.collections.includes('knowledge_membership_checkout_locks'),
+    true
+  );
   assert.equal(contracts.storage.write, 'false');
 });
 

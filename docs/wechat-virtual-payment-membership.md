@@ -9,7 +9,7 @@
 3. 云函数生成道具直购 `signData`、支付签名和用户态签名；AppKey、AppSecret、session_key 均不会返回客户端。
 4. 前端调用 `wx.requestVirtualPayment`，并保存待确认订单号。
 5. 前端成功回调只触发查单，不直接开会员。云函数调用 `/xpay/query_order`，校验订单号、订单金额和实付金额后，才幂等增加 30 天权益。
-6. 权益到账后调用 `/xpay/notify_provide_goods` 确认发货；失败会保留重试状态。
+6. 收到 `xpay_goods_deliver_notify` 后，官方查单和权益事务成功即返回加密 `ErrCode=0`，这是正常发货确认主路径；`/xpay/notify_provide_goods` 只由后台对异常未完成订单使用支付签名兜底，不会阻塞消息回调。
 7. 收银台异常退出时，订单号仍保存在本机；再次打开小程序会向服务端恢复查单。
 8. `/hyyc/membership/notify` 接收微信安全模式消息：GET 完成地址验证，POST 处理支付成功发货、iOS 退款询问和退款通知。发货和退款都必须再次通过官方查单确认，通知字段本身不能直接授予或回收权益。
 
@@ -46,7 +46,7 @@
 | `WECHAT_VIRTUAL_PAY_PRO_30D_COMPARE_AT_PRICE_CENTS` | 仅用于页面划线价展示，不参与支付签名；当前 `1090` |
 | `WECHAT_MINIPROGRAM_APP_ID` | 当前小程序 AppID |
 | `WECHAT_MINIPROGRAM_APP_SECRET` | 当前小程序 AppSecret，仅服务端使用 |
-| `WECHAT_VIRTUAL_PAY_TIMEOUT_MS` | 可选，微信接口超时，默认 8000ms |
+| `WECHAT_VIRTUAL_PAY_TIMEOUT_MS` | 可选，微信单次接口超时，默认且最高 5000ms；单次购买的支付外呼链路另有 22 秒安全预算 |
 | `WECHAT_MESSAGE_PUSH_TOKEN` | 微信后台消息推送配置中的 Token，只存服务端 |
 | `WECHAT_MESSAGE_PUSH_ENCODING_AES_KEY` | 微信后台消息推送配置中的 EncodingAESKey，只存服务端 |
 

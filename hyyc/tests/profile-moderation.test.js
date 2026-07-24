@@ -158,6 +158,53 @@ test('publishes and atomically swaps an approved claimed profile review', async 
   assert.deepEqual(calls.at(-1), ['delete', [OLD_AVATAR]]);
 });
 
+test('finishes a retried review whose avatar was already published before the transaction failed', async () => {
+  const review = pendingReview({
+    status: 'retry',
+    attemptCount: 6,
+    failureCode: 'REVIEW_UNAVAILABLE'
+  });
+  let retryCalls = 0;
+  let publicationCalls = 0;
+  let approvedAvatarFileId = '';
+  const service = serviceFor({
+    reviewRepository: {
+      listDue: async () => [review],
+      listStaleClaims: async () => [],
+      claim: async () => ({ ...review, status: 'processing', attemptCount: 7 }),
+      markRetry: async () => {
+        retryCalls += 1;
+        return null;
+      },
+      approveAndSave: async (ownerKey, revision, claimId, approved) => {
+        approvedAvatarFileId = approved.avatarFileId;
+        return {
+          applied: true,
+          currentProfile: approvedProfile(),
+          profile: approved
+        };
+      }
+    },
+    userMediaService: {
+      publishOwned: async (actor, kind, fileIds, reference, options) => {
+        publicationCalls += 1;
+        assert.deepEqual(fileIds, [STAGING_AVATAR]);
+        assert.deepEqual(reference, { kind: 'profile', id: OWNER });
+        assert.deepEqual(options, { keepPrivateCopies: true });
+        // The media service returns the existing published copy idempotently.
+        return [PUBLISHED_AVATAR];
+      }
+    }
+  });
+
+  const result = await service.processDue();
+
+  assert.equal(result.approved, 1);
+  assert.equal(publicationCalls, 1);
+  assert.equal(retryCalls, 0);
+  assert.equal(approvedAvatarFileId, PUBLISHED_AVATAR);
+});
+
 test('keeps private copies while retiring the superseded avatar when binding is deferred', async () => {
   const review = pendingReview();
   let cleanupCalls = 0;

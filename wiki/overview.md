@@ -2,7 +2,7 @@
 title: "知识获取平台小程序项目总览"
 type: overview
 tags: [overview, miniprogram, wechat, knowledge-platform, editorial-index]
-sources: [sources/2026-07-13-digest-inbox-implementation.md, sources/2026-07-14-cloud-cleanup-and-deployment.md, sources/2026-07-15-wechat-e2e-and-runtime-fixes.md, sources/2026-07-15-editorial-ui-implementation.md, sources/2026-07-15-aihot-feed-integration.md, sources/2026-07-16-modular-refactor.md, sources/2026-07-16-source-preview-deployment.md, sources/2026-07-17-fingerprint-sync-and-carousel.md, sources/2026-07-17-feed-history-and-long-preview.md, sources/2026-07-17-full-feed-admin-and-capacity.md, sources/2026-07-17-visual-backfill-quality-and-performance.md, sources/2026-07-17-pro-membership-implementation.md, sources/2026-07-17-luma-ui-redesign.md, sources/2026-07-18-premium-ia-and-copy.md, sources/2026-07-18-focus-previews-and-handdrawn-column.md, sources/2026-07-19-interaction-reliability-and-comment-media.md, sources/2026-07-19-packy-grok-intelligence.md, sources/2026-07-19-profile-moderation-and-huifu-payment.md, sources/2026-07-19-infrastructure-pricing-and-huifu-mode.md, sources/2026-07-19-wechat-virtual-payment.md, sources/2026-07-20-cloudbase-ai-cost-and-hybrid-routing.md, sources/2026-07-20-launch-readiness-remediation.md, sources/2026-07-20-practical-column-implementation.md, sources/2026-07-21-column-reader-restoration.md, sources/2026-07-21-timeout-feed-and-manual-production-validation.md, sources/2026-07-21-bounded-visual-and-membership-conversion.md, sources/2026-07-21-source-preview-v3-quality-and-repair.md, sources/2026-07-22-cloudbase-scf-source-preview-and-mobile-timeline.md, sources/2026-07-22-parallel-visual-worker-and-column-media-v2.md, sources/2026-07-22-public-proxy-capacity-and-traffic-audit.md, sources/2026-07-22-new-relay-route-canary.md, sources/2026-07-22-cloud-media-proactive-renewal.md, sources/2026-07-22-replacement-relay-ip-cutover.md, sources/2026-07-22-six-concurrency-and-personal-proxy-headroom.md, sources/2026-07-22-runtime-reliability-performance-and-feed-spacing.md, sources/2026-07-24-async-comments-message-center-and-stable-loading.md, sources/2026-07-24-visible-wechat-account-confirmation-and-payment-diagnostics.md, sources/2026-07-24-two-step-membership-login-and-optional-profile.md, decisions/2026-07-15-engaging-news-detail.md, decisions/2026-07-16-modular-architecture.md, decisions/2026-07-16-source-preview-renderer.md, decisions/2026-07-17-fingerprint-driven-feed-sync.md, decisions/2026-07-17-full-feed-and-role-entitlements.md, decisions/2026-07-17-full-feed-visual-queue-and-quality.md, decisions/2026-07-17-pro-membership-and-intelligence.md, decisions/2026-07-17-luma-ui-redesign.md, decisions/2026-07-18-premium-learning-and-curation-ia.md, decisions/2026-07-18-forward-only-focus-previews-and-handdrawn-column.md, decisions/2026-07-19-profiled-media-comments-and-optimistic-engagement.md, decisions/2026-07-19-automatic-ai-curation-and-comment-moderation.md, decisions/2026-07-19-wechat-virtual-payment-membership.md, decisions/2026-07-20-cloudbase-ai-primary-packy-fallback.md, decisions/2026-07-20-practical-column-editorial-system.md, decisions/2026-07-21-restore-protected-handdrawn-galleries.md, decisions/2026-07-21-image-independent-feed-and-direct-practical-manual.md, decisions/2026-07-21-bounded-visual-publication-and-pro-access-pass.md, decisions/2026-07-21-aihot-source-metadata-contract.md, decisions/2026-07-22-cloudbase-scf-source-preview.md, decisions/2026-07-24-async-comments-and-message-center.md]
+sources: [sources/2026-07-13-digest-inbox-implementation.md, sources/2026-07-14-cloud-cleanup-and-deployment.md, sources/2026-07-15-wechat-e2e-and-runtime-fixes.md, sources/2026-07-15-editorial-ui-implementation.md, sources/2026-07-15-aihot-feed-integration.md, sources/2026-07-16-modular-refactor.md, sources/2026-07-16-source-preview-deployment.md, sources/2026-07-17-fingerprint-sync-and-carousel.md, sources/2026-07-17-feed-history-and-long-preview.md, sources/2026-07-17-full-feed-admin-and-capacity.md, sources/2026-07-17-visual-backfill-quality-and-performance.md, sources/2026-07-17-pro-membership-implementation.md, sources/2026-07-17-luma-ui-redesign.md, sources/2026-07-18-premium-ia-and-copy.md, sources/2026-07-18-focus-previews-and-handdrawn-column.md, sources/2026-07-19-interaction-reliability-and-comment-media.md, sources/2026-07-19-packy-grok-intelligence.md, sources/2026-07-19-profile-moderation-and-huifu-payment.md, sources/2026-07-19-infrastructure-pricing-and-huifu-mode.md, sources/2026-07-19-wechat-virtual-payment.md, sources/2026-07-20-cloudbase-ai-cost-and-hybrid-routing.md, sources/2026-07-20-launch-readiness-remediation.md, sources/2026-07-20-practical-column-implementation.md, sources/2026-07-21-column-reader-restoration.md, sources/2026-07-21-timeout-feed-and-manual-production-validation.md, sources/2026-07-21-bounded-visual-and-membership-conversion.md, sources/2026-07-21-source-preview-v3-quality-and-repair.md, sources/2026-07-22-cloudbase-scf-source-preview-and-mobile-timeline.md, sources/2026-07-22-parallel-visual-worker-and-column-media-v2.md, sources/2026-07-22-public-proxy-capacity-and-traffic-audit.md, sources/2026-07-22-new-relay-route-canary.md, sources/2026-07-22-cloud-media-proactive-renewal.md, sources/2026-07-22-replacement-relay-ip-cutover.md, sources/2026-07-22-six-concurrency-and-personal-proxy-headroom.md, sources/2026-07-22-runtime-reliability-performance-and-feed-spacing.md, sources/2026-07-24-async-comments-message-center-and-stable-loading.md, sources/2026-07-24-visible-wechat-account-confirmation-and-payment-diagnostics.md, sources/2026-07-24-two-step-membership-login-and-optional-profile.md, sources/2026-07-24-ios-membership-payment-recovery.md, sources/2026-07-24-ios-refund-profile-review-and-renewal-ui.md, decisions/2026-07-15-engaging-news-detail.md, decisions/2026-07-16-modular-architecture.md, decisions/2026-07-16-source-preview-renderer.md, decisions/2026-07-17-fingerprint-driven-feed-sync.md, decisions/2026-07-17-full-feed-and-role-entitlements.md, decisions/2026-07-17-full-feed-visual-queue-and-quality.md, decisions/2026-07-17-pro-membership-and-intelligence.md, decisions/2026-07-17-luma-ui-redesign.md, decisions/2026-07-18-premium-learning-and-curation-ia.md, decisions/2026-07-18-forward-only-focus-previews-and-handdrawn-column.md, decisions/2026-07-19-profiled-media-comments-and-optimistic-engagement.md, decisions/2026-07-19-automatic-ai-curation-and-comment-moderation.md, decisions/2026-07-19-wechat-virtual-payment-membership.md, decisions/2026-07-20-cloudbase-ai-primary-packy-fallback.md, decisions/2026-07-20-practical-column-editorial-system.md, decisions/2026-07-21-restore-protected-handdrawn-galleries.md, decisions/2026-07-21-image-independent-feed-and-direct-practical-manual.md, decisions/2026-07-21-bounded-visual-publication-and-pro-access-pass.md, decisions/2026-07-21-aihot-source-metadata-contract.md, decisions/2026-07-22-cloudbase-scf-source-preview.md, decisions/2026-07-24-async-comments-and-message-center.md]
 last_updated: 2026-07-24
 status: confirmed
 confidence: high
@@ -12,24 +12,24 @@ confidence: high
 
 ## 一句话说明
 
-这是一个从个人文章消化箱迁移为编辑型知识获取平台的微信小程序，现有资讯、专栏、简报、我的四个原生 Tab；会员精选作为资讯顶部能力入口进入独立页面。普通用户查看滚动 24 小时内的 AI 资讯，Pro 查看 30 天，并可访问精选、简报，以及由 24 节基础课和 6 节动手课组成的会员专栏；免费目录只显示标题。资讯顶部包含“全部 / 官方动态 / 资讯 / 推文 / GitHub”五个来源范围：前四个来自 AIHOT 成员关系，`GitHub` 从 AIGCLINK 公开方案索引同步全部项目，卡片来源显示为“GitHub 开源库”。独立频道使用无日期和时间线的连续列表，只按 AIGCLINK 原生标签筛选且不限时间；同一记录在“全部”频道仍按普通资讯时间线、主题和权限展示。24 节基础课在鉴权后各显示三页高清手绘讲解。新资讯优先完整复用并持久化来源媒体，没有合格来源图时才进入截图队列；截图失败不阻止文字公开，后续图片可继续补入。CloudBase 内置模型以无思考模式负责后台分析、简报、图文、评论和资料审核，Packy/Grok 以最低推理强度自动兜底；资料与评论均采用异步审核，结果进入“我的消息”。全部主要懒加载区域显示转圈，阅读中的列表和媒体在后台刷新时保持稳定。一次购买 30 天使用微信小程序虚拟支付：第一次点击只登录并校验当前微信账号，第二次点击才创建订单和发起支付；头像昵称使用官方选择控件且为可选资料。会员商品和生产支付链路已开售，微信版本 `2.3.1` 正在审核，真实手机资金闭环仍需人工验收。
+这是一个从个人文章消化箱迁移为编辑型知识获取平台的微信小程序，现有资讯、专栏、简报、我的四个原生 Tab；会员精选作为资讯顶部能力入口进入独立页面。普通用户查看滚动 24 小时内的 AI 资讯，Pro 查看 30 天，并可访问精选、简报，以及由 24 节基础课和 6 节动手课组成的会员专栏；免费目录只显示标题。资讯顶部包含“全部 / 官方动态 / 资讯 / 推文 / GitHub”五个来源范围：前四个来自 AIHOT 成员关系，`GitHub` 从 AIGCLINK 公开方案索引同步全部项目，卡片来源显示为“GitHub 开源库”。独立频道使用无日期和时间线的连续列表，只按 AIGCLINK 原生标签筛选且不限时间；同一记录在“全部”频道仍按普通资讯时间线、主题和权限展示。24 节基础课在鉴权后各显示三页高清手绘讲解。新资讯优先完整复用并持久化来源媒体，没有合格来源图时才进入截图队列；截图失败不阻止文字公开，后续图片可继续补入。CloudBase 内置模型以无思考模式负责后台分析、简报、图文、评论和资料审核，Packy/Grok 以最低推理强度自动兜底；资料与评论均采用异步审核，结果进入“我的消息”。全部主要懒加载区域显示转圈，阅读中的列表和媒体在后台刷新时保持稳定。一次购买 30 天使用微信小程序虚拟支付：第一次点击只登录并校验当前微信账号，第二次点击才创建订单和发起支付；头像昵称使用官方选择控件且为可选资料。会员商品和生产支付链路已开售，iOS 实付与会员恢复已完成线上核对；真实退款和退款后权益回收仍需人工验收。
 
 ## 最新生产审计状态
 
 2026-07-23 的初始 [全项目生产就绪审计](reports/production-readiness-audit-2026-07-23.md)
-结论为 Fail；该结论已被后续修复和生产部署取代。当前客户端代码锚点
-`f522b64` 通过 626/626 本地测试；`knowledgeFeed`
-生产业务锚点仍为 `2db8dce`。生产已收敛为 25 个合同集合、43 个合同索引、
-四个正式函数和完整触发器 manifest。资料与评论均改为后台队列并显示“审核中”，
-我的消息统一承载结果；虚拟商品价格分离、稳定懒加载和局部互动刷新已上线。
-会员订阅已拆成两次点击：第一次只登录并校验当前微信账号，不建单、不拉起收银台；
-第二次才重新校验、建单和支付。头像昵称使用微信官方选择控件且不是支付硬门槛。
-“退出登录”只清除本机当前查看者的订阅验证步骤，不退出手机微信，也不取消会员、
-删除资料或清除待支付订单。`membershipBilling` 仍使用 `d927bfb` 已部署的服务端
-合同；本次客户端功能无需重部署。最新开发预览包为 467,606 bytes。
-[两步会员登录记录](sources/2026-07-24-two-step-membership-login-and-optional-profile.md)
-记录实现与部署证据。剩余边界是微信审核与发布、真实手机资料/评论 canary、
-支付/退款验收，以及 2026-08-06 前的依赖复审。
+结论为 Fail；该结论已被后续修复和生产部署取代。当前工作树通过 670/670 本地
+测试；`knowledgeFeed` 生产业务锚点仍为 `2db8dce`。生产已收敛为 26 个合同集合、
+44 个合同索引、四个正式函数和完整触发器 manifest。资料与评论均改为后台队列并
+显示“审核中”，我的消息统一承载结果；虚拟商品价格分离、稳定懒加载和局部互动
+刷新已上线。会员订阅为两次点击，支持作用域退出；支付订单新增账户级租约、阶段
+恢复和事务状态转换。iOS “付款成功但会员未生效”已修复并恢复：生产只读核对
+3/3 已付款记录均匹配有效会员和已完成成功消息。发货回调不再被手工发货 API
+阻塞。最新开发预览包为 471,387 bytes。
+[iOS 支付恢复记录](sources/2026-07-24-ios-membership-payment-recovery.md)
+记录根因、发布和资金边界。生产资料审核真实记录已按正常 worker 完成；产品不
+提供管理员主动退款，用户决定本次不申请 Apple 退款，平台被动退款通知与权益
+一致性保护继续保留。剩余边界是微信审核与发布、真实手机评论 canary，以及
+2026-08-06 前的依赖复审。
 
 ## 事实健康表
 
@@ -37,7 +37,7 @@ confidence: high
 | --- | --- | --- |
 | AppID、云环境 ID、Git 历史和远程地址已保留 | confirmed | 项目配置、应用入口、Git 命令 |
 | 旧社区、商品、任务、聊天、实名、定位、钱包、支付和图片审核代码已从活跃树移除 | confirmed | 当前文件树与重建历史 |
-| 12 个注册页面、4 个正式云函数及本地测试已实现 | confirmed | 当前代码、626/626 个 Node 测试与四函数白名单回读通过 |
+| 12 个注册页面、4 个正式云函数及本地测试已实现 | confirmed | 当前代码、670/670 个 Node 测试与四函数白名单回读通过 |
 | 旧云资源清空及 5 个新集合创建 | confirmed | 2026-07-14 CloudBase 清单与复核 |
 | `digestIngest`、`digestStore` 已退休 | confirmed | 正式函数冒烟后按固定允许列表删除，最终函数清单精确为四个 |
 | 真实 OpenID、数据库闭环和开发者工具编译 | confirmed | 2026-07-15 微信开发者工具端到端验证 |
@@ -64,7 +64,7 @@ confidence: high
 | 历史公开内容审核闭环 | confirmed | 生产 2 条评论与 1 份资料完成幂等补审；公开评论和完整资料的缺审计数均为 0，未删除媒体 |
 | 评论举报、删除、申诉与恢复闭环 | confirmed | 复用评论和用户互动集合；作者/管理员删除、三人举报自动隐藏、作者申诉、真实管理员恢复均为幂等事务，公开计数只改变一次；普通用户只能读取 active 评论及其媒体，作者私有状态按 item/status/author 精确查询，管理员治理扫描保持 500 条上限 |
 | 付费内容服务端保护 | confirmed | 客户端不含课程正文或手绘图，免费 DTO 不含副标题/摘要/结论，服务端正文重鉴权后才签发短期图片 URL，缓存按角色与期限隔离并失效关闭 |
-| 微信虚拟支付会员闭环代码 | needs-review | 支付前 `wx.login` 与 OpenID 一致性校验、官方查单/发货、消息回调、对账、iOS 退款询问和幂等回收已部署；商品当前按原价/现价 590 分请求，真实扣款/退款仍待真机验收 |
+| 微信虚拟支付会员闭环代码 | confirmed | 登录与 OpenID 校验、账户级建单租约、官方查单、事务履约、回调应答、对账、恢复和平台退款幂等回收均已部署；iOS 实付 3/3 已恢复有效会员与成功消息；产品不提供管理员主动退款，本次不申请退款 |
 | 生产基础设施容量 | confirmed | 截图已迁入 2048 MB CloudBase SCF；公网中继实测业务内存低于 600 MiB，单次 X 视频帖约 2.9 MB 出站，代理专用新机 1C1G/512GB 月流量足够；旧 renderer 已下线 |
 | 微信开发者工具 CLI 优先工作流 | confirmed | Stable 2.01.2510290 的 `auto`、`open`、`islogin` 已通过；端口只监听 `127.0.0.1:9420` |
 | 跨来源去重、独立官方源与其他扩展频道 | needs-review | AIGCLINK 上游与“GitHub 开源库”展示已投入生产，但跨来源语义去重和厂商官方源尚未实现，不得宣称为全频道实时新闻服务 |
@@ -151,8 +151,8 @@ confidence: high
 
 ## 本地验证
 
-- `npm test`：626/626 通过。
-- `npm run check`：32 个 JSON、301 个 JavaScript、12 个注册页面通过结构、
+- `npm test`：670/670 通过。
+- `npm run check`：32 个 JSON、303 个 JavaScript、12 个注册页面通过结构、
   语法与微信模块引用兼容性检查；客户端源码保持在微信包体限制内。
 - `git diff --check`：通过。
 - 微信开发者工具模拟器已覆盖资讯、详情、精选、专栏、简报和我的页面；2026-07-21 最新回归确认专栏首页返回 `contractVersion=4`、会员无锁、六节动手课目录不含操作系统名，“安装 Codex CLI”按 Windows/macOS/Linux 展开且视觉模式为 `none`，简报不含 `trends` 且核心标题按 5 条显示“先看这5件事”。普通用户真实点击精选会打开可滚动的七项权益订阅卡，弹层和“我的”页均为白底、无侧轨并使用单行“订阅”按钮；测试后恢复 Pro 预览状态。
@@ -164,20 +164,20 @@ confidence: high
 
 - 旧业务的 41 个函数、24 个集合、2,456 条文档、217 个存储对象和 `adminportal/` 已清理。
 - 环境级空存储桶、平台认证文件、AppID 关联和标准版套餐被保留。
-- 当前 25 个合同集合均由云函数管理并为 `ADMINONLY`。互动、评论、公开资料、资料审核队列、消息 outbox 与收件箱分别按 owner、item、状态和到期时间使用合同索引。
+- 当前 26 个合同集合均由云函数管理并为 `ADMINONLY`。互动、评论、公开资料、资料审核队列、消息 outbox、收件箱与会员 checkout 租约分别按 owner、item、状态和到期时间使用合同索引。
 - 四个正式函数保留：三个 Node.js 18.15 函数和 Node.js 20.19 的
   `sourcePreviewWorker`。生产 `knowledgeFeed` 已从代码锚点 `2db8dce` 部署
   24 节基础课、6 节动手课、
   合同版本 4、GitHub 全量库、受保护手绘图、视觉队列、AIHOT 来源增强、
   CloudBase 无思考主模型、Packy 低推理兜底、评论/资料异步审核、站内消息和安全
   媒体链路。
-  `knowledgeOps` 无触发器且受维护令牌保护；`membershipBilling` 已从
-  `d927bfb` 部署并每 15 分钟
-  对账。现网 `plans.available=true`，30 天会员商品原价和现价均为 5.9 元，
-  10.9 元仅为界面比较价；微信入站消息已支持
-  发货和退款事件，仍以官方查单为权益发放依据。新订单继续受产品开关、正式发布
-  批准、微信配置和服务端计划校验。
-- 生产历史补审已处理 2 条评论和 1 份资料；复核查询中公开评论和完整资料的缺审计数均为 0。生产资讯同步修复后失败计数为 0，观测指纹与应用指纹一致。
+  `knowledgeOps` 无触发器且受维护令牌保护；`membershipBilling` 已部署当前
+  支付恢复版本并每 15 分钟对账。现网 `plans.available=true`，30 天会员商品
+  原价和现价均为 5.9 元，10.9 元仅为界面比较价；微信入站发货回调在官方查单和
+  权益事务成功后直接返回加密成功，手工发货接口只作带 `pay_sig` 的后台异常
+  兜底；最新生产对账已让 3/3 历史已付款订单完成发货确认。新订单继续受
+  产品开关、正式发布批准、微信配置、服务端计划校验和账户级租约保护。
+- 生产历史补审已处理 2 条评论和 1 份资料；本次真实资料审核的 AI 与媒体判定已成功，修复 `_id` 事务写入后由正常 worker 完成公开和结果消息投递。复核查询中公开评论和完整资料的缺审计数均为 0。生产资讯同步修复后失败计数为 0，观测指纹与应用指纹一致。
 - 真实微信上下文已验证喜爱/收藏目标状态开启与还原、会员评论列表读取、空资料接口、会员转化卡状态以及列表/详情分享 payload；部署后日志未再出现 `TransactionBusy`，所有测试互动状态已还原。开发者工具已验证键盘高度 336px 时输入坞整体上移、96rpx 发送按钮右对齐、64 表情网格、标准图片图标、页面滚动锁和评论独立滚动；喜欢与收藏两次快速反向点击在 29ms/16ms 内即时变化并最终同步为测试前状态。头像、相册原图、真机键盘与好友接收仍需手机人工验收。
 - 评论、资料和会员事件现通过可靠 outbox 投递站内消息；批量投递 checkpoint、
   聚合版本、严格 cutoff 已读、超过 1000 条全部已读和查看者切换/响应乱序均有
@@ -194,11 +194,10 @@ confidence: high
    拒绝/失败候选不公开，并在我的消息看到结果；再用第二个账号确认收到评论通知。
 3. 在全部、专栏、简报、精选、详情和收藏页真机覆盖弱网、前后台切换及连续
    喜爱/收藏，确认加载转圈不清空现有内容，列表、媒体和滚动位置不闪动。
-4. 用真实新账号和 iPhone 真机确认第一次点击只登录、不建单、不拉起收银台，
-   可跳过头像昵称，第二次点击才进入支付；再覆盖成功、取消、异常恢复、重复查单、
-   发货、退款和退款/到期后权益重锁。当前预览为 `env=0` 真实扣款。若失败，
-   记录界面展示的微信数字错误码；没有数字码时检查 iOS、微信版本、中国大陆
-   App Store 账号和系统支付方式。该人工资金验收不能由自动化代替。
+4. 用同一已付款微信账号扫描最新预览，确认“我的”直接显示现有 Pro，且不会再次
+   拉起收银台；再用真实新账号覆盖首次只登录、第二次才支付、取消和异常恢复。
+   产品不提供管理员主动退款，本次不申请 Apple 退款；平台被动退款通知与权益
+   回收保护继续保留。当前预览为 `env=0` 真实扣款，已付款账号不得为复测再次购买。
 5. 在真机补齐普通/Pro、GitHub 标签筛选、无图列表/详情、头像、相册原图、
    键盘、分享接收和弱网恢复验收；测试后清理或还原生产数据。
 6. 在 `2026-08-06` 前升级或重新复审当前 6 个 CloudBase 传递依赖风险包和

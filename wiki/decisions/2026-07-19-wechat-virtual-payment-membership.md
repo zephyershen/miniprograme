@@ -3,7 +3,7 @@ title: "采用微信小程序虚拟支付销售一次性 30 天会员"
 type: decision
 tags: [membership, payment, wechat, virtual-payment, cloudbase, security]
 sources: [../sources/2026-07-19-wechat-virtual-payment.md, ../sources/2026-07-20-launch-readiness-remediation.md]
-last_updated: 2026-07-20
+last_updated: 2026-07-24
 status: accepted
 confidence: high
 supersedes: 2026-07-19-huifu-membership-payment-and-paid-content.md
@@ -24,6 +24,11 @@ supersedes: 2026-07-19-huifu-membership-payment-and-paid-content.md
 5. 权益提交后调用 `/xpay/notify_provide_goods`；空的 2xx 成功响应也视为成功。订单保留发货重试和下一次核对时间，已支付订单仍可定期复核退款；退款幂等回收对应 30 天。
 6. 客户端在拉起收银台前保存待确认订单，异常退出后再次打开小程序会恢复服务端查单；每 15 分钟的有界对账负责兜底。安全模式消息入口消费 iOS 退款询问与退款通知，只有官方查单确认退款后才回收权益。
 7. 既有付费内容保护继续有效：完整专栏不进入小程序包，服务端每次重鉴权后返回短期地址，客户端不能直接读取 `ai-column/`。
+8. iOS Apple 虚拟商品退款必须由付款用户通过 Apple 官方入口申请，开发者不能用
+   普通 `/xpay/refund_order` 代替。退款询问、退款通知和官方查单只负责验证并
+   幂等回收该笔 30 天权益；管理员直接撤销会员不构成资金退款。产品不实现管理
+   员主动退款入口；用户选择不退款时不执行任何订单或权益变更，但平台被动退款
+   回调必须保留，防止未来 Apple 退款后会员仍然有效。
 
 ## 当前状态
 

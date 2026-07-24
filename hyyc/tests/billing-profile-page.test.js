@@ -78,11 +78,13 @@ function paymentWx(events, paymentError, { completeProfile = false } = {}) {
     },
     requestVirtualPayment(options) {
       events.push('request-payment');
-      options.fail(paymentError);
+      if (paymentError) options.fail(paymentError);
+      else options.success({ errMsg: 'requestVirtualPayment:ok' });
     },
     setStorageSync(key, value) {
       storage.set(key, value);
-      events.push(key.includes('account_verification') ? 'remember-account' : 'remember-order');
+      if (key.includes('account_verification')) events.push('remember-account');
+      else if (!value || value.cashierCompleted !== true) events.push('remember-order');
     },
     getStorageSync(key) {
       return storage.get(key);
@@ -97,11 +99,17 @@ function paymentWx(events, paymentError, { completeProfile = false } = {}) {
   };
 }
 
-function purchaseContext(page, events, { accountVerified = true } = {}) {
+function purchaseContext(page, events, {
+  accountVerified = true,
+  confirmMembershipOrder = null,
+  loadMembership = null,
+  purchaseMode = 'subscribe'
+} = {}) {
   return {
     data: {
       accountAuthenticating: false,
       accountLoggingOut: false,
+      membership: { purchaseMode },
       billing: {
         purchasing: false,
         available: true,
@@ -136,16 +144,19 @@ function purchaseContext(page, events, { accountVerified = true } = {}) {
       }
     },
     queryMembershipOrderOnce: page.queryMembershipOrderOnce,
+    applyMembershipOrderResult: page.applyMembershipOrderResult,
+    resumePendingMembershipPurchase: page.resumePendingMembershipPurchase,
     recordMembershipPaymentFailure: page.recordMembershipPaymentFailure,
     promptProfileSetupAfterLogin: page.promptProfileSetupAfterLogin,
     loginWechatAccount: page.loginWechatAccount,
-    confirmMembershipOrder() {
+    confirmMembershipOrder: confirmMembershipOrder || (() => {
       events.push('confirm-loop');
       throw new Error('confirmation loop must not run after recovered payment');
-    },
-    async loadMembership() {
+    }),
+    loadMembership: loadMembership || (async () => {
       events.push('refresh-membership');
-    }
+      return { viewer: { role: 'member' } };
+    })
   };
 }
 
@@ -190,9 +201,50 @@ test('queries once after a cashier failure and honors a server-confirmed paid or
     'remember-order',
     'request-payment',
     'query-once',
-    'forget-order',
     'refresh-membership',
+    'forget-order',
     'toast:Pro 已开通'
+  ]);
+});
+
+test('labels a paid result as renewal when an active member started checkout', async () => {
+  const events = [];
+  const orderId = 'MP20260724081033a1a1a1a1a1a1a1a1';
+  const page = loadProfilePage({
+    async getMembershipOrderStatus() {
+      throw new Error('not expected');
+    }
+  });
+  const previousWx = global.wx;
+  global.wx = paymentWx(events, null);
+  const context = purchaseContext(page, events, {
+    purchaseMode: 'renew',
+    loadMembership: async () => {
+      events.push('refresh-membership');
+      return {
+        viewer: {
+          role: 'member',
+          membershipStatus: 'active',
+          currentPeriodEnd: '2026-10-22T08:00:00.000Z'
+        }
+      };
+    }
+  });
+  try {
+    const result = await page.applyMembershipOrderResult.call(
+      context,
+      orderId,
+      { id: orderId, status: 'paid' }
+    );
+    assert.equal(result, 'paid');
+  } finally {
+    if (previousWx) global.wx = previousWx;
+    else delete global.wx;
+  }
+
+  assert.deepEqual(events, [
+    'refresh-membership',
+    'toast:续费成功'
   ]);
 });
 
@@ -258,6 +310,302 @@ test('records a strict diagnostic only after the one-shot recovery remains unpai
   }]);
   assert.equal(JSON.stringify(reports).includes('price details'), false);
   assert.equal(JSON.stringify(reports).includes('signature'), false);
+});
+
+test('keeps a successful cashier order pending without inviting another payment', async () => {
+  const events = [];
+  const orderId = 'MP20260724081033cccccccccccccccc';
+  const page = loadProfilePage({
+    async createMembershipPayment() {
+      events.push('create-order');
+      return {
+        order: { id: orderId, status: 'payment_pending' },
+        payment: {
+          signData: '{}',
+          paySig: 'pay',
+          signature: 'user',
+          mode: 'short_series_goods'
+        }
+      };
+    }
+  });
+  const previousWx = global.wx;
+  global.wx = paymentWx(events, null);
+  const context = purchaseContext(page, events, {
+    confirmMembershipOrder: async () => {
+      events.push('confirm-loop');
+      return { id: orderId, status: 'payment_pending' };
+    }
+  });
+  try {
+    await page.purchaseMembership.call(context);
+    await page.purchaseMembership.call(context);
+  } finally {
+    if (previousWx) global.wx = previousWx;
+    else delete global.wx;
+  }
+
+  assert.deepEqual(events, [
+    'login',
+    'create-order',
+    'remember-order',
+    'request-payment',
+    'confirm-loop',
+    'toast:支付结果确认中，请勿重复付款，稍后下拉刷新',
+    'confirm-loop',
+    'toast:支付结果确认中，请勿重复付款，稍后下拉刷新'
+  ]);
+  assert.equal(events.filter((event) => event === 'create-order').length, 1);
+  assert.equal(events.filter((event) => event === 'request-payment').length, 1);
+  assert.equal(events.some((event) => event.includes('Apple')), false);
+  assert.equal(events.includes('forget-order'), false);
+});
+
+test('synchronously blocks a concurrent double click before login or order creation', async () => {
+  const events = [];
+  const orderId = 'MP20260724081033abababababababab';
+  let releaseCreation;
+  const creationBarrier = new Promise((resolve) => {
+    releaseCreation = resolve;
+  });
+  const page = loadProfilePage({
+    async createMembershipPayment() {
+      events.push('create-order');
+      await creationBarrier;
+      return {
+        order: { id: orderId, status: 'payment_pending' },
+        payment: {
+          signData: '{}',
+          paySig: 'pay',
+          signature: 'user',
+          mode: 'short_series_goods'
+        }
+      };
+    }
+  });
+  const previousWx = global.wx;
+  global.wx = paymentWx(events, null);
+  const context = purchaseContext(page, events, {
+    confirmMembershipOrder: async () => {
+      events.push('confirm-loop');
+      return { id: orderId, status: 'payment_pending' };
+    }
+  });
+  try {
+    const first = page.purchaseMembership.call(context);
+    const second = page.purchaseMembership.call(context);
+    releaseCreation();
+    await Promise.all([first, second]);
+  } finally {
+    if (previousWx) global.wx = previousWx;
+    else delete global.wx;
+  }
+
+  assert.equal(events.filter((event) => event === 'login').length, 1);
+  assert.equal(events.filter((event) => event === 'create-order').length, 1);
+  assert.equal(events.filter((event) => event === 'request-payment').length, 1);
+});
+
+test('reports a post-cashier server error as a confirmation problem and preserves recovery', async () => {
+  const events = [];
+  const orderId = 'MP20260724081033dddddddddddddddd';
+  const page = loadProfilePage({
+    async createMembershipPayment() {
+      events.push('create-order');
+      return {
+        order: { id: orderId, status: 'payment_pending' },
+        payment: {
+          signData: '{}',
+          paySig: 'pay',
+          signature: 'user',
+          mode: 'short_series_goods'
+        }
+      };
+    }
+  });
+  const previousWx = global.wx;
+  global.wx = paymentWx(events, null);
+  const context = purchaseContext(page, events, {
+    confirmMembershipOrder: async () => {
+      events.push('confirm-loop');
+      const error = new Error('支付服务暂时不可用，请稍后重试');
+      error.code = 'TEMPORARY_FAILURE';
+      throw error;
+    }
+  });
+  try {
+    await page.purchaseMembership.call(context);
+  } finally {
+    if (previousWx) global.wx = previousWx;
+    else delete global.wx;
+  }
+
+  assert.deepEqual(events, [
+    'login',
+    'create-order',
+    'remember-order',
+    'request-payment',
+    'confirm-loop',
+    'toast:会员开通确认异常，请勿重复付款，稍后下拉刷新'
+  ]);
+  assert.equal(events.some((event) => event.includes('Apple')), false);
+  assert.equal(events.includes('forget-order'), false);
+});
+
+test('recovers a server-reused pending order without opening a second cashier', async () => {
+  const events = [];
+  const orderId = 'MP20260724081033ffffffffffffffff';
+  const page = loadProfilePage({
+    async createMembershipPayment() {
+      events.push('create-order');
+      return {
+        order: { id: orderId, status: 'payment_pending' },
+        payment: null,
+        reused: true
+      };
+    }
+  });
+  const previousWx = global.wx;
+  global.wx = paymentWx(events, null);
+  const context = purchaseContext(page, events, {
+    confirmMembershipOrder: async () => {
+      events.push('confirm-loop');
+      return { id: orderId, status: 'payment_pending' };
+    }
+  });
+  try {
+    await page.purchaseMembership.call(context);
+  } finally {
+    if (previousWx) global.wx = previousWx;
+    else delete global.wx;
+  }
+
+  assert.deepEqual(events, [
+    'login',
+    'create-order',
+    'remember-order',
+    'confirm-loop',
+    'toast:支付结果确认中，请勿重复付款，稍后下拉刷新'
+  ]);
+  assert.equal(events.includes('request-payment'), false);
+});
+
+test('opens the cashier when the server safely resumes the same pending order', async () => {
+  const events = [];
+  const orderId = 'MP20260724081033cdcdcdcdcdcdcdcd';
+  const page = loadProfilePage({
+    async createMembershipPayment() {
+      events.push('create-order');
+      return {
+        order: { id: orderId, status: 'payment_pending' },
+        payment: {
+          signData: '{}',
+          paySig: 'pay',
+          signature: 'user',
+          mode: 'short_series_goods'
+        },
+        reused: true
+      };
+    }
+  });
+  const previousWx = global.wx;
+  global.wx = paymentWx(events, null);
+  const context = purchaseContext(page, events, {
+    confirmMembershipOrder: async () => {
+      events.push('confirm-loop');
+      return { id: orderId, status: 'payment_pending' };
+    }
+  });
+  try {
+    await page.purchaseMembership.call(context);
+  } finally {
+    if (previousWx) global.wx = previousWx;
+    else delete global.wx;
+  }
+
+  assert.deepEqual(events, [
+    'login',
+    'create-order',
+    'remember-order',
+    'request-payment',
+    'confirm-loop',
+    'toast:支付结果确认中，请勿重复付款，稍后下拉刷新'
+  ]);
+});
+
+test('does not label an order-creation server failure as an Apple cashier failure', async () => {
+  const events = [];
+  const page = loadProfilePage({
+    async createMembershipPayment() {
+      events.push('create-order');
+      const error = new Error('支付服务暂时不可用，请稍后重试');
+      error.code = 'TEMPORARY_FAILURE';
+      throw error;
+    }
+  });
+  const previousWx = global.wx;
+  global.wx = paymentWx(events, null);
+  try {
+    await page.purchaseMembership.call(purchaseContext(page, events));
+  } finally {
+    if (previousWx) global.wx = previousWx;
+    else delete global.wx;
+  }
+
+  assert.deepEqual(events, [
+    'login',
+    'create-order',
+    'toast:会员开通服务暂时不可用，请稍后重试'
+  ]);
+  assert.equal(events.some((event) => event.includes('Apple')), false);
+});
+
+test('keeps the paid order recoverable until membership state refresh succeeds', async () => {
+  const events = [];
+  const orderId = 'MP20260724081033eeeeeeeeeeeeeeee';
+  const page = loadProfilePage({
+    async createMembershipPayment() {
+      events.push('create-order');
+      return {
+        order: { id: orderId, status: 'payment_pending' },
+        payment: {
+          signData: '{}',
+          paySig: 'pay',
+          signature: 'user',
+          mode: 'short_series_goods'
+        }
+      };
+    }
+  });
+  const previousWx = global.wx;
+  global.wx = paymentWx(events, null);
+  const context = purchaseContext(page, events, {
+    confirmMembershipOrder: async () => {
+      events.push('confirm-loop');
+      return { id: orderId, status: 'paid' };
+    },
+    loadMembership: async () => {
+      events.push('refresh-membership');
+      return null;
+    }
+  });
+  try {
+    await page.purchaseMembership.call(context);
+  } finally {
+    if (previousWx) global.wx = previousWx;
+    else delete global.wx;
+  }
+
+  assert.deepEqual(events, [
+    'login',
+    'create-order',
+    'remember-order',
+    'request-payment',
+    'confirm-loop',
+    'refresh-membership',
+    'toast:会员开通确认异常，请勿重复付款，稍后下拉刷新'
+  ]);
+  assert.equal(events.includes('forget-order'), false);
 });
 
 test('uses the first click only to verify the current account and offer optional profile setup', async () => {

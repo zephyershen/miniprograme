@@ -67,6 +67,7 @@ test('versioned index contract covers media, feed, engagement, and billing hot p
     'knowledge_feed_comments/review_state_claim_expires',
     'knowledge_feed_user_engagements/ownerKey_1',
     'knowledge_membership_orders/status_next_check_at_1',
+    'knowledge_membership_orders/owner_status_created_at',
     'knowledge_message_events/status_next_attempt_at',
     'knowledge_message_events/status_claim_expires_at',
     'knowledge_feed_archive/date_desc',
@@ -86,6 +87,16 @@ test('versioned index contract covers media, feed, engagement, and billing hot p
       { field: 'authorKey', direction: '1' },
       { field: 'createdAt', direction: '-1' },
       { field: '_id', direction: '-1' }
+    ]
+  );
+  assert.deepEqual(
+    loaded.contract.indexes.find(
+      (index) => index.name === 'owner_status_created_at'
+    ).keys,
+    [
+      { field: 'ownerKey', direction: '1' },
+      { field: 'status', direction: '1' },
+      { field: 'createdAt', direction: '-1' }
     ]
   );
 });

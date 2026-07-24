@@ -4,6 +4,23 @@ const { compactShanghaiDateTime } = require('../lib/time');
 const { safeEqualText } = require('../lib/wechat-message-crypto');
 
 const ORDER_ID_PATTERN = /^MP\d{14}[a-f0-9]{16}$/;
+const CHECKOUT_LEASE_MS = 90 * 1000;
+const CHECKOUT_OPERATION_BUDGET_MS = 22 * 1000;
+const MAX_HISTORICAL_PENDING_CHECKS = 1;
+const PROVIDER_STATE_BY_STATUS = Object.freeze({
+  // 0 means initialization failed and the order cannot be paid. It is a
+  // terminal failure; only a successfully created order (1) may reopen.
+  0: 'F',
+  1: 'P',
+  2: 'S',
+  3: 'S',
+  4: 'S',
+  5: 'R',
+  6: 'F',
+  // 7 means refund failed. It is deliberately fail-closed instead of being
+  // treated as an unpaid order that may safely reopen the cashier.
+  8: 'R'
+});
 const OFFICIAL_VIRTUAL_PAYMENT_ERROR_CODES = new Set([
   1001,
   -1,
@@ -58,6 +75,37 @@ function centsToPriceLabel(cents) {
 
 function createOrderId(date = new Date()) {
   return `MP${compactShanghaiDateTime(date)}${crypto.randomBytes(8).toString('hex')}`;
+}
+
+function createCheckoutLeaseToken() {
+  return crypto.randomBytes(16).toString('hex');
+}
+
+async function runWithinCheckoutDeadline(operation, deadlineAtMs) {
+  if (typeof operation !== 'function') {
+    throw new BillingError('PAYMENT_CHECKOUT_OPERATION_INVALID', '支付服务暂时不可用', 503);
+  }
+  const deadline = Number(deadlineAtMs);
+  if (!Number.isFinite(deadline) || deadline <= 0) return operation();
+  const remainingMs = Math.floor(deadline - Date.now());
+  if (remainingMs <= 0) {
+    throw new BillingError('PAYMENT_CHECKOUT_TIMEOUT', '支付订单准备超时，请稍后重试', 503);
+  }
+  let timer = null;
+  try {
+    return await Promise.race([
+      Promise.resolve().then(operation),
+      new Promise((resolve, reject) => {
+        timer = setTimeout(() => reject(new BillingError(
+          'PAYMENT_CHECKOUT_TIMEOUT',
+          '支付订单准备超时，请稍后重试',
+          503
+        )), remainingMs);
+      })
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 function reconciliationRetryDelay(attempt) {
@@ -179,6 +227,14 @@ function createBillingService({ repository, paymentClient, config, plan, missing
       && safeEqualText(order.productId || config.productId, config.productId));
   }
 
+  function pendingOrderMatchesCurrentCheckout(order) {
+    return Boolean(orderMatchesPlan(order)
+      && order.status === 'payment_pending'
+      && Number(order.goodsPriceCents) === Number(plan.goodsPriceCents)
+      && Number(order.environment) === Number(config.environment)
+      && safeEqualText(order.productId, config.productId));
+  }
+
   function matchesKnownPaymentId(order, paymentId, { allowMerchantOrderId = true } = {}) {
     const normalized = boundedText(paymentId, 128);
     if (!normalized || !order) return false;
@@ -291,11 +347,19 @@ function createBillingService({ repository, paymentClient, config, plan, missing
       throw new BillingError('GOODS_DELIVERY_NOT_CONFIRMED', '支付结果尚未确认', 409);
     }
 
-    const deliveredOrder = await fulfillProviderOrder(order, providerResult);
-    if (!deliveredOrder || deliveredOrder.deliveryStatus !== 'delivered') {
+    const fulfilled = await repository.fulfill(order.id, providerResult, plan, now());
+    const fulfilledOrder = fulfilled && (fulfilled.order || fulfilled);
+    if (!fulfilledOrder) {
       throw new BillingError('GOODS_DELIVERY_CONFIRM_FAILED', '发货状态尚未确认', 503);
     }
-    return { acknowledged: true, delivered: true };
+    // The encrypted ErrCode=0 response is the primary acknowledgement for
+    // xpay_goods_deliver_notify. Once the entitlement transaction commits,
+    // avoid another database or provider dependency before returning success.
+    // The manual delivery API remains a background reconciliation fallback.
+    return {
+      acknowledged: true,
+      delivered: !fulfilled.alreadyRefunded && fulfilledOrder.status === 'paid'
+    };
   }
 
   async function processRefundNotification(notification = {}) {
@@ -335,6 +399,12 @@ function createBillingService({ repository, paymentClient, config, plan, missing
     if (!result || result.orderId !== order.id) {
       throw new BillingError('PAYMENT_RESULT_MISMATCH', '支付订单校验失败', 409);
     }
+    const expectedState = Number.isInteger(result.providerStatus)
+      ? PROVIDER_STATE_BY_STATUS[result.providerStatus]
+      : '';
+    if (!expectedState || result.state !== expectedState) {
+      throw new BillingError('PAYMENT_RESULT_MISMATCH', '支付订单校验失败', 409);
+    }
     if (!Number.isInteger(result.amountCents) || result.amountCents !== order.amountCents) {
       throw new BillingError('PAYMENT_AMOUNT_MISMATCH', '支付金额校验失败', 409);
     }
@@ -346,11 +416,23 @@ function createBillingService({ repository, paymentClient, config, plan, missing
       && (!Number.isInteger(result.paidAmountCents) || result.paidAmountCents !== order.amountCents)) {
       throw new BillingError('PAYMENT_AMOUNT_MISMATCH', '支付金额校验失败', 409);
     }
+    if (['P', 'F'].includes(result.state)
+      && (!Number.isInteger(result.paidAmountCents) || result.paidAmountCents !== 0)) {
+      throw new BillingError('PAYMENT_AMOUNT_MISMATCH', '支付金额校验失败', 409);
+    }
   }
 
-  async function markDelivery(order, delivered) {
+  async function transitionPaidOrder(orderId, fields) {
+    if (typeof repository.transitionPaidOrder === 'function') {
+      return repository.transitionPaidOrder(orderId, fields);
+    }
+    return repository.updateOrder(orderId, fields);
+  }
+
+  async function markDelivery(order, delivered, { checkoutDeadlineAtMs = 0 } = {}) {
+    if (!order || order.status === 'refunded') return order;
     if (delivered || order.deliveryStatus === 'delivered') {
-      return repository.updateOrder(order.id, {
+      return transitionPaidOrder(order.id, {
         deliveryStatus: 'delivered',
         deliveryErrorCode: '',
         deliveredAt: order.deliveredAt || now(),
@@ -359,8 +441,11 @@ function createBillingService({ repository, paymentClient, config, plan, missing
       });
     }
     try {
-      await paymentClient.confirmDelivery(order);
-      return repository.updateOrder(order.id, {
+      await runWithinCheckoutDeadline(
+        () => paymentClient.confirmDelivery(order),
+        checkoutDeadlineAtMs
+      );
+      return transitionPaidOrder(order.id, {
         deliveryStatus: 'delivered',
         deliveryErrorCode: '',
         deliveredAt: now(),
@@ -368,32 +453,53 @@ function createBillingService({ repository, paymentClient, config, plan, missing
         updatedAt: now()
       });
     } catch (error) {
-      await repository.updateOrder(order.id, {
+      const retryOrder = await transitionPaidOrder(order.id, {
         deliveryStatus: 'retry',
         deliveryErrorCode: error && error.code || 'DELIVERY_CONFIRM_FAILED',
         nextCheckAt: nextCheckAt(5 * 60 * 1000),
         updatedAt: now()
       }).catch(() => null);
-      return order;
+      return retryOrder || order;
     }
   }
 
-  async function fulfillProviderOrder(order, providerResult) {
+  async function fulfillProviderOrder(
+    order,
+    providerResult,
+    { checkoutDeadlineAtMs = 0 } = {}
+  ) {
     const fulfilled = await repository.fulfill(order.id, providerResult, plan, now());
-    return markDelivery(fulfilled.order, providerResult.delivered);
+    if (fulfilled.alreadyRefunded || fulfilled.order.status === 'refunded') {
+      return fulfilled.order;
+    }
+    return markDelivery(
+      fulfilled.order,
+      providerResult.delivered,
+      { checkoutDeadlineAtMs }
+    );
   }
 
-  async function applyProviderResult(order, providerResult) {
+  async function applyProviderResult(
+    order,
+    providerResult,
+    { checkoutDeadlineAtMs = 0 } = {}
+  ) {
     validateProviderResult(order, providerResult);
     if (providerResult.state === 'S') {
-      return { order: publicOrder(await fulfillProviderOrder(order, providerResult)) };
+      return {
+        order: publicOrder(await fulfillProviderOrder(
+          order,
+          providerResult,
+          { checkoutDeadlineAtMs }
+        ))
+      };
     }
     if (providerResult.state === 'R') {
       const refunded = await repository.markRefunded(order.id, providerResult, plan, now());
       return { order: publicOrder(refunded.order || refunded) };
     }
     if (order.status === 'paid') {
-      const preserved = await repository.updateOrder(order.id, {
+      const preserved = await transitionPaidOrder(order.id, {
         providerStatus: providerResult.providerStatus,
         providerTransactionId: providerResult.providerTransactionId || order.providerTransactionId || '',
         nextCheckAt: nextCheckAt(60 * 60 * 1000),
@@ -402,7 +508,10 @@ function createBillingService({ repository, paymentClient, config, plan, missing
       return { order: publicOrder(preserved) };
     }
     if (providerResult.state === 'F') {
-      const closed = await repository.updateOrder(order.id, {
+      const transition = typeof repository.transitionPendingOrder === 'function'
+        ? repository.transitionPendingOrder.bind(repository)
+        : repository.updateOrder.bind(repository);
+      const closed = await transition(order.id, {
         status: providerResult.providerStatus === 6 ? 'closed' : 'failed',
         providerStatus: providerResult.providerStatus,
         providerTransactionId: providerResult.providerTransactionId || order.providerTransactionId || '',
@@ -411,7 +520,10 @@ function createBillingService({ repository, paymentClient, config, plan, missing
       });
       return { order: publicOrder(closed) };
     }
-    const pending = await repository.updateOrder(order.id, {
+    const transition = typeof repository.transitionPendingOrder === 'function'
+      ? repository.transitionPendingOrder.bind(repository)
+      : repository.updateOrder.bind(repository);
+    const pending = await transition(order.id, {
       status: 'payment_pending',
       providerStatus: providerResult.providerStatus,
       providerTransactionId: providerResult.providerTransactionId || order.providerTransactionId || '',
@@ -424,35 +536,162 @@ function createBillingService({ repository, paymentClient, config, plan, missing
   async function createPayment(planKey, loginCode, actor) {
     assertSalesAvailable();
     assertPlan(planKey);
-    const createdAt = now();
-    const order = {
-      id: createOrderId(createdAt),
-      ownerKey: actor.ownerKey,
-      openId: actor.openId,
-      planKey: plan.key,
-      amountCents: plan.priceCents,
-      goodsPriceCents: plan.goodsPriceCents,
-      goodsDescription: plan.name,
-      productId: config.productId,
-      environment: config.environment,
-      provider: 'wechat_virtual_pay',
-      providerStatus: 0,
-      providerTransactionId: '',
-      deliveryStatus: 'not_paid',
-      status: 'created',
-      createdAt,
-      updatedAt: createdAt,
-      nextCheckAt: createdAt,
-      paidAt: null
-    };
-    let payment;
-    try {
-      payment = await paymentClient.createPayment(order, loginCode);
-    } catch (error) {
-      throw error;
+    if (!actor || !actor.ownerKey || !actor.openId) {
+      throw new BillingError('PAYMENT_LOGIN_REQUIRED', '请先登录当前微信账号', 401);
     }
-    await repository.createOrder({ ...order, status: 'payment_pending' });
-    return { order: publicOrder({ ...order, status: 'payment_pending' }), payment };
+    const checkoutMethods = [
+      'acquireCheckoutLease',
+      'commitCheckoutOrder',
+      'bindCheckoutOrder',
+      'releaseCheckoutLease',
+      'findLatestPendingOrderByOwner'
+    ];
+    if (checkoutMethods.some((method) => typeof repository[method] !== 'function')) {
+      throw new BillingError('TEMPORARY_FAILURE', '支付服务暂时不可用，请稍后重试', 503);
+    }
+    const checkoutDeadlineAtMs = Date.now() + CHECKOUT_OPERATION_BUDGET_MS;
+    const leaseToken = createCheckoutLeaseToken();
+    const acquiredAt = now();
+    const lease = await repository.acquireCheckoutLease(
+      actor.ownerKey,
+      leaseToken,
+      acquiredAt,
+      new Date(acquiredAt.getTime() + CHECKOUT_LEASE_MS)
+    );
+    if (!lease || !lease.acquired) {
+      throw new BillingError(
+        'PAYMENT_CREATION_IN_PROGRESS',
+        '支付订单正在准备，请稍后重试',
+        409
+      );
+    }
+    try {
+      for (let checked = 0; checked < MAX_HISTORICAL_PENDING_CHECKS; checked += 1) {
+        const pendingOrder = await repository.findLatestPendingOrderByOwner(actor.ownerKey);
+        if (!pendingOrder) break;
+        if (pendingOrder.ownerKey !== actor.ownerKey || pendingOrder.openId !== actor.openId) {
+          throw new BillingError(
+            'PAYMENT_ACCOUNT_MISMATCH',
+            '当前微信账号与待确认订单不一致',
+            401
+          );
+        }
+        if (!pendingOrderMatchesCurrentCheckout(pendingOrder)) {
+          throw new BillingError(
+            'PAYMENT_PENDING_ORDER_MISMATCH',
+            '已有待确认订单需要先完成核验',
+            409
+          );
+        }
+        const providerResult = await runWithinCheckoutDeadline(
+          () => paymentClient.queryPayment(pendingOrder),
+          checkoutDeadlineAtMs
+        );
+        validateProviderResult(pendingOrder, providerResult);
+        if (providerResult.state === 'S') {
+          const applied = await applyProviderResult(
+            pendingOrder,
+            providerResult,
+            { checkoutDeadlineAtMs }
+          );
+          return { order: applied.order, payment: null, reused: true };
+        }
+        if (['F', 'R'].includes(providerResult.state)) {
+          const applied = await applyProviderResult(
+            pendingOrder,
+            providerResult,
+            { checkoutDeadlineAtMs }
+          );
+          if (applied.order && applied.order.status === 'paid') {
+            return { order: applied.order, payment: null, reused: true };
+          }
+          if (applied.order
+            && ['failed', 'closed', 'refunded'].includes(applied.order.status)) {
+            continue;
+          }
+          throw new BillingError(
+            'PAYMENT_PENDING_ORDER_MISMATCH',
+            '已有待确认订单需要先完成核验',
+            409
+          );
+        }
+        const refreshedOrder = await repository.getOrder(pendingOrder.id);
+        if (refreshedOrder && refreshedOrder.status === 'paid') {
+          return { order: publicOrder(refreshedOrder), payment: null, reused: true };
+        }
+        if (refreshedOrder
+          && ['failed', 'closed', 'refunded'].includes(refreshedOrder.status)) {
+          continue;
+        }
+        if (!pendingOrderMatchesCurrentCheckout(refreshedOrder)
+          || refreshedOrder.ownerKey !== actor.ownerKey
+          || refreshedOrder.openId !== actor.openId) {
+          throw new BillingError(
+            'PAYMENT_PENDING_ORDER_MISMATCH',
+            '已有待确认订单需要先完成核验',
+            409
+          );
+        }
+        const resumedPayment = await runWithinCheckoutDeadline(
+          () => paymentClient.createPayment(refreshedOrder, loginCode),
+          checkoutDeadlineAtMs
+        );
+        const boundOrder = await repository.bindCheckoutOrder(
+          actor.ownerKey,
+          actor.openId,
+          leaseToken,
+          refreshedOrder.id,
+          now()
+        );
+        return {
+          order: publicOrder(boundOrder),
+          payment: resumedPayment,
+          reused: true
+        };
+      }
+      if (await repository.findLatestPendingOrderByOwner(actor.ownerKey)) {
+        throw new BillingError(
+          'PAYMENT_PENDING_ORDER_BACKLOG',
+          '已有多笔待确认订单需要先完成核验',
+          409
+        );
+      }
+      const createdAt = now();
+      const order = {
+        id: createOrderId(createdAt),
+        ownerKey: actor.ownerKey,
+        openId: actor.openId,
+        planKey: plan.key,
+        amountCents: plan.priceCents,
+        goodsPriceCents: plan.goodsPriceCents,
+        goodsDescription: plan.name,
+        productId: config.productId,
+        environment: config.environment,
+        provider: 'wechat_virtual_pay',
+        providerStatus: 0,
+        providerTransactionId: '',
+        deliveryStatus: 'not_paid',
+        status: 'payment_pending',
+        createdAt,
+        updatedAt: createdAt,
+        nextCheckAt: createdAt,
+        paidAt: null
+      };
+      const payment = await runWithinCheckoutDeadline(
+        () => paymentClient.createPayment(order, loginCode),
+        checkoutDeadlineAtMs
+      );
+      const committedOrder = await repository.commitCheckoutOrder(
+        actor.ownerKey,
+        actor.openId,
+        leaseToken,
+        order,
+        now()
+      );
+      return { order: publicOrder(committedOrder), payment };
+    } finally {
+      await repository.releaseCheckoutLease(actor.ownerKey, leaseToken, now()).catch(() => false);
+    }
   }
 
   async function verifyAccount(loginCode, actor) {
@@ -498,8 +737,10 @@ function createBillingService({ repository, paymentClient, config, plan, missing
     assertProviderReady();
     const order = await getOwnedOrder(orderId, actor);
     if (order.status === 'paid') {
-      if (order.deliveryStatus !== 'delivered') await markDelivery(order, false);
-      return { order: publicOrder(order) };
+      const currentOrder = order.deliveryStatus !== 'delivered'
+        ? await markDelivery(order, false)
+        : order;
+      return { order: publicOrder(currentOrder) };
     }
     if (['failed', 'closed', 'refunded'].includes(order.status)) {
       return { order: publicOrder(order) };
@@ -570,6 +811,12 @@ module.exports = {
   centsToAmount,
   centsToPriceLabel,
   createOrderId,
+  createCheckoutLeaseToken,
+  CHECKOUT_LEASE_MS,
+  CHECKOUT_OPERATION_BUDGET_MS,
+  MAX_HISTORICAL_PENDING_CHECKS,
+  PROVIDER_STATE_BY_STATUS,
+  runWithinCheckoutDeadline,
   reconciliationRetryDelay,
   publicOrder,
   boundedText,

@@ -63,6 +63,8 @@ test('keeps administrator role-preview controls visible while rendering effectiv
     }
   }));
   assert.equal(freePreview.roleLabel, '普通用户');
+  assert.equal(freePreview.isActiveMember, false);
+  assert.equal(freePreview.purchaseMode, 'subscribe');
   assert.equal(freePreview.canPreviewRoles, true);
   assert.equal(freePreview.isRolePreview, true);
   assert.equal(freePreview.roleOptions.find((item) => item.key === 'free').active, true);
@@ -73,6 +75,8 @@ test('keeps administrator role-preview controls visible while rendering effectiv
       previewRole: 'member', isRolePreview: true
     }
   }));
+  assert.equal(memberPreview.isActiveMember, false);
+  assert.equal(memberPreview.purchaseMode, 'subscribe');
   assert.equal(memberPreview.isPrivileged, true);
   assert.equal(memberPreview.roleOptions.find((item) => item.key === 'member').active, true);
 });
@@ -86,6 +90,8 @@ test('fails closed when a cached paid membership has already reached its period 
     }
   }), Date.parse('2026-07-20T00:00:00.000Z'));
   assert.equal(expired.role, 'free');
+  assert.equal(expired.isActiveMember, false);
+  assert.equal(expired.purchaseMode, 'subscribe');
   assert.equal(expired.isPrivileged, false);
   assert.equal(expired.accessExpired, true);
   assert.equal(expired.periodEndLabel, '');
@@ -98,6 +104,20 @@ test('does not turn a missing membership period end into the Unix epoch', () => 
   assert.equal(membershipPresentation({
     viewer: { role: 'member', currentPeriodEnd: null }
   }).periodEndLabel, '');
+});
+
+test('presents an active membership as renewable with its explicit period end', () => {
+  const active = membershipPresentation(normalizeMembershipAccess({
+    viewer: {
+      role: 'member',
+      membershipStatus: 'active',
+      currentPeriodEnd: '2026-09-22T08:00:00.000Z'
+    }
+  }), Date.parse('2026-07-24T08:00:00.000Z'));
+
+  assert.equal(active.isActiveMember, true);
+  assert.equal(active.purchaseMode, 'renew');
+  assert.equal(active.periodEndLabel, '2026.09.22');
 });
 
 test('keeps the complete Pro benefit list in one model without claiming free engagement actions', () => {
@@ -219,7 +239,7 @@ test('keeps the free briefing example fixed and filterable', () => {
   assert.equal(briefing.trends, undefined);
 });
 
-test('renders four native tabs and a real one-time Pro purchase entry', () => {
+test('renders four native tabs and a state-aware Pro purchase or renewal entry', () => {
   const app = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../app.json'), 'utf8'));
   assert.deepEqual(app.tabBar.list.map((item) => item.text), ['资讯', '专栏', '简报', '我的']);
   const profile = fs.readFileSync(path.resolve(__dirname, '../pages/profile/index.wxml'), 'utf8');
@@ -244,6 +264,11 @@ test('renders four native tabs and a real one-time Pro purchase entry', () => {
   assert.match(profile, /disabled="\{\{billing\.purchasing \|\| accountAuthenticating \|\| accountLoggingOut\}\}"/);
   assert.match(profile, /使用当前微信账号登录/);
   assert.match(profile, /订阅并支付/);
+  assert.match(profile, /membership\.purchaseMode === 'renew'/);
+  assert.match(profile, /续费/);
+  assert.match(profile, /当前有效期至 \{\{membership\.periodEndLabel\}\}/);
+  assert.match(profile, /从该日顺延 \{\{billing\.plan\.durationLabel \|\| '30 天'\}\}/);
+  assert.match(profile, /会员有效期会继续累加/);
   assert.match(profile, /再次点击订阅并支付/);
   assert.match(profile, /微信不允许自动读取真实头像昵称/);
   assert.match(profile, /bindtap="logoutWechatAccount"/);
@@ -259,10 +284,11 @@ test('renders four native tabs and a real one-time Pro purchase entry', () => {
   assert.match(profileScript, /const loginCode = await loginForPayment\(\)/);
   assert.doesNotMatch(profileScript, /confirmWechatAccountPayment/);
   assert.doesNotMatch(profileScript, /wx\.getUserProfile|wx\.getUserInfo/);
-  assert.doesNotMatch(profile, /续费 30 天|立即解锁全部权益|解锁全部 Pro 权益|查看价格并开通 Pro/);
+  assert.doesNotMatch(profile, /立即解锁全部权益|解锁全部 Pro 权益|查看价格并开通 Pro/);
   const profileStyles = fs.readFileSync(path.resolve(__dirname, '../pages/profile/index.wxss'), 'utf8');
   assert.match(profileStyles, /\.pro-pass\s*\{/);
   assert.match(profileStyles, /\.pro-benefit-list\s*\{/);
+  assert.match(profileStyles, /\.pro-current-period\s*\{/);
   assert.match(profileStyles, /\.pro-offer-compare[^}]*text-decoration:\s*line-through/);
   assert.match(profileStyles, /\.pro-purchase-button\s*\{[^}]*white-space:\s*nowrap/s);
   assert.doesNotMatch(`${profile}\n${profileStyles}`, /pro-pass-rail/);

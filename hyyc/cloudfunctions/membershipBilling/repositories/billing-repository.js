@@ -12,6 +12,40 @@ function notFound(error) {
   ));
 }
 
+function withoutDocumentId(document) {
+  if (!document || typeof document !== 'object' || Array.isArray(document)) return document;
+  const { _id, ...data } = document;
+  return data;
+}
+
+function checkoutLockId(ownerKey) {
+  return crypto.createHash('sha256')
+    .update(`membership_checkout:${String(ownerKey || '').trim()}`)
+    .digest('hex');
+}
+
+function repositoryError(code) {
+  const error = new Error(code);
+  error.code = code;
+  return error;
+}
+
+function dateValue(value) {
+  const date = value && typeof value.toDate === 'function' ? value.toDate() : new Date(value || 0);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+function assertActiveCheckoutLease(lock, ownerKey, leaseToken, referenceNow) {
+  const expiresAt = dateValue(lock && lock.leaseExpiresAt);
+  if (!lock
+    || lock.ownerKey !== ownerKey
+    || lock.leaseToken !== leaseToken
+    || !expiresAt
+    || expiresAt.getTime() <= referenceNow.getTime()) {
+    throw repositoryError('PAYMENT_CHECKOUT_LEASE_LOST');
+  }
+}
+
 async function documentOrNull(reference) {
   try {
     return (await reference.get()).data;
@@ -89,7 +123,9 @@ function createBillingRepository(db, collections) {
 
   async function createOrder(order) {
     await ensureCollections([collections.orders]);
-    await db.collection(collections.orders).doc(order.id).set({ data: order });
+    await db.collection(collections.orders).doc(order.id).set({
+      data: withoutDocumentId(order)
+    });
     return order;
   }
 
@@ -105,8 +141,233 @@ function createBillingRepository(db, collections) {
 
   async function updateOrder(orderId, fields) {
     await ensureCollections([collections.orders]);
-    await db.collection(collections.orders).doc(orderId).update({ data: fields });
+    await db.collection(collections.orders).doc(orderId).update({
+      data: withoutDocumentId(fields)
+    });
     return getOrder(orderId);
+  }
+
+  async function transitionOrderFromStatus(orderId, expectedStatus, fields) {
+    await ensureCollections([collections.orders]);
+    const normalizedOrderId = String(orderId || '').trim();
+    const normalizedExpectedStatus = String(expectedStatus || '').trim();
+    if (!normalizedOrderId || !normalizedExpectedStatus
+      || !fields || typeof fields !== 'object' || Array.isArray(fields)) {
+      throw repositoryError('PAYMENT_ORDER_TRANSITION_INVALID');
+    }
+    const transactionResult = await db.runTransaction(async (transaction) => {
+      const orderRef = transaction.collection(collections.orders).doc(normalizedOrderId);
+      const currentOrder = await documentOrNull(orderRef);
+      if (!currentOrder) throw repositoryError('ORDER_NOT_FOUND');
+      if (currentOrder.status !== normalizedExpectedStatus) return currentOrder;
+      const transitionedOrder = {
+        ...currentOrder,
+        ...withoutDocumentId(fields)
+      };
+      await orderRef.set({ data: withoutDocumentId(transitionedOrder) });
+      return transitionedOrder;
+    });
+    return transactionResult && Object.prototype.hasOwnProperty.call(transactionResult, 'result')
+      ? transactionResult.result
+      : transactionResult;
+  }
+
+  async function transitionPendingOrder(orderId, fields) {
+    return transitionOrderFromStatus(orderId, 'payment_pending', fields);
+  }
+
+  async function transitionPaidOrder(orderId, fields) {
+    return transitionOrderFromStatus(orderId, 'paid', fields);
+  }
+
+  async function acquireCheckoutLease(
+    ownerKey,
+    leaseToken,
+    acquiredAt,
+    leaseExpiresAt
+  ) {
+    await ensureCollections([collections.checkoutLocks]);
+    const normalizedOwner = String(ownerKey || '').trim();
+    const normalizedToken = String(leaseToken || '').trim();
+    const nowDate = dateValue(acquiredAt);
+    const expiryDate = dateValue(leaseExpiresAt);
+    if (!normalizedOwner || !normalizedToken || !nowDate || !expiryDate
+      || expiryDate.getTime() <= nowDate.getTime()) {
+      throw repositoryError('PAYMENT_CHECKOUT_LEASE_INVALID');
+    }
+    const transactionResult = await db.runTransaction(async (transaction) => {
+      const lockRef = transaction.collection(collections.checkoutLocks)
+        .doc(checkoutLockId(normalizedOwner));
+      const currentLock = await documentOrNull(lockRef);
+      if (currentLock && currentLock.ownerKey && currentLock.ownerKey !== normalizedOwner) {
+        throw repositoryError('PAYMENT_CHECKOUT_OWNER_MISMATCH');
+      }
+      const currentExpiry = dateValue(currentLock && currentLock.leaseExpiresAt);
+      if (currentLock
+        && currentLock.leaseToken
+        && currentExpiry
+        && currentExpiry.getTime() > nowDate.getTime()) {
+        return {
+          acquired: false,
+          orderId: String(currentLock.orderId || ''),
+          leaseExpiresAt: currentExpiry
+        };
+      }
+      const lock = {
+        ...withoutDocumentId(currentLock || {}),
+        ownerKey: normalizedOwner,
+        state: 'leased',
+        leaseToken: normalizedToken,
+        leaseExpiresAt: expiryDate,
+        orderId: String(currentLock && currentLock.orderId || ''),
+        createdAt: currentLock && currentLock.createdAt || nowDate,
+        updatedAt: nowDate
+      };
+      await lockRef.set({ data: withoutDocumentId(lock) });
+      return {
+        acquired: true,
+        orderId: lock.orderId,
+        leaseExpiresAt: expiryDate
+      };
+    });
+    return transactionResult && Object.prototype.hasOwnProperty.call(transactionResult, 'result')
+      ? transactionResult.result
+      : transactionResult;
+  }
+
+  async function commitCheckoutOrder(
+    ownerKey,
+    openId,
+    leaseToken,
+    order,
+    referenceNow = new Date()
+  ) {
+    await ensureCollections([collections.checkoutLocks, collections.orders]);
+    const normalizedOwner = String(ownerKey || '').trim();
+    const normalizedOpenId = String(openId || '').trim();
+    const normalizedToken = String(leaseToken || '').trim();
+    const nowDate = dateValue(referenceNow);
+    if (!normalizedOwner || !normalizedOpenId || !normalizedToken || !nowDate
+      || !order || order.ownerKey !== normalizedOwner || order.openId !== normalizedOpenId
+      || order.status !== 'payment_pending') {
+      throw repositoryError('PAYMENT_CHECKOUT_COMMIT_INVALID');
+    }
+    const transactionResult = await db.runTransaction(async (transaction) => {
+      const lockRef = transaction.collection(collections.checkoutLocks)
+        .doc(checkoutLockId(normalizedOwner));
+      const lock = await documentOrNull(lockRef);
+      assertActiveCheckoutLease(lock, normalizedOwner, normalizedToken, nowDate);
+      const orderRef = transaction.collection(collections.orders).doc(order.id);
+      const existingOrder = await documentOrNull(orderRef);
+      if (existingOrder) throw repositoryError('PAYMENT_CHECKOUT_ORDER_EXISTS');
+      await orderRef.set({ data: withoutDocumentId(order) });
+      await lockRef.set({
+        data: withoutDocumentId({
+          ...lock,
+          state: 'committed',
+          orderId: order.id,
+          updatedAt: nowDate
+        })
+      });
+      return order;
+    });
+    return transactionResult && Object.prototype.hasOwnProperty.call(transactionResult, 'result')
+      ? transactionResult.result
+      : transactionResult;
+  }
+
+  async function bindCheckoutOrder(
+    ownerKey,
+    openId,
+    leaseToken,
+    orderId,
+    referenceNow = new Date()
+  ) {
+    await ensureCollections([collections.checkoutLocks, collections.orders]);
+    const normalizedOwner = String(ownerKey || '').trim();
+    const normalizedOpenId = String(openId || '').trim();
+    const normalizedToken = String(leaseToken || '').trim();
+    const normalizedOrderId = String(orderId || '').trim();
+    const nowDate = dateValue(referenceNow);
+    if (!normalizedOwner || !normalizedOpenId || !normalizedToken || !normalizedOrderId || !nowDate) {
+      throw repositoryError('PAYMENT_CHECKOUT_BIND_INVALID');
+    }
+    const transactionResult = await db.runTransaction(async (transaction) => {
+      const lockRef = transaction.collection(collections.checkoutLocks)
+        .doc(checkoutLockId(normalizedOwner));
+      const lock = await documentOrNull(lockRef);
+      assertActiveCheckoutLease(lock, normalizedOwner, normalizedToken, nowDate);
+      const orderRef = transaction.collection(collections.orders).doc(normalizedOrderId);
+      const order = await documentOrNull(orderRef);
+      if (!order
+        || order.ownerKey !== normalizedOwner
+        || order.openId !== normalizedOpenId
+        || order.status !== 'payment_pending') {
+        throw repositoryError('PAYMENT_CHECKOUT_ORDER_MISMATCH');
+      }
+      await lockRef.set({
+        data: withoutDocumentId({
+          ...lock,
+          state: 'committed',
+          orderId: normalizedOrderId,
+          updatedAt: nowDate
+        })
+      });
+      return order;
+    });
+    return transactionResult && Object.prototype.hasOwnProperty.call(transactionResult, 'result')
+      ? transactionResult.result
+      : transactionResult;
+  }
+
+  async function releaseCheckoutLease(
+    ownerKey,
+    leaseToken,
+    releasedAt = new Date()
+  ) {
+    await ensureCollections([collections.checkoutLocks]);
+    const normalizedOwner = String(ownerKey || '').trim();
+    const normalizedToken = String(leaseToken || '').trim();
+    const nowDate = dateValue(releasedAt);
+    if (!normalizedOwner || !normalizedToken || !nowDate) return false;
+    const transactionResult = await db.runTransaction(async (transaction) => {
+      const lockRef = transaction.collection(collections.checkoutLocks)
+        .doc(checkoutLockId(normalizedOwner));
+      const lock = await documentOrNull(lockRef);
+      if (!lock) return false;
+      if (lock.ownerKey !== normalizedOwner) {
+        throw repositoryError('PAYMENT_CHECKOUT_OWNER_MISMATCH');
+      }
+      if (lock.leaseToken !== normalizedToken) return false;
+      await lockRef.set({
+        data: withoutDocumentId({
+          ...lock,
+          state: 'idle',
+          leaseToken: '',
+          leaseExpiresAt: null,
+          updatedAt: nowDate
+        })
+      });
+      return true;
+    });
+    return transactionResult && Object.prototype.hasOwnProperty.call(transactionResult, 'result')
+      ? transactionResult.result
+      : transactionResult;
+  }
+
+  async function findLatestPendingOrderByOwner(ownerKey) {
+    await ensureCollections([collections.orders]);
+    const normalized = String(ownerKey || '').trim();
+    if (!normalized) return null;
+    const response = await db.collection(collections.orders)
+      .where({
+        ownerKey: normalized,
+        status: 'payment_pending'
+      })
+      .orderBy('createdAt', 'desc')
+      .limit(1)
+      .get();
+    return response && response.data && response.data[0] || null;
   }
 
   async function findOrderByPaymentId(paymentId) {
@@ -144,6 +405,13 @@ function createBillingRepository(db, collections) {
       const orderRef = transaction.collection(collections.orders).doc(orderId);
       const currentOrder = (await orderRef.get()).data;
       if (!currentOrder) throw new Error('ORDER_NOT_FOUND');
+      if (currentOrder.status === 'refunded') {
+        return {
+          order: currentOrder,
+          alreadyPaid: false,
+          alreadyRefunded: true
+        };
+      }
       const messageEvent = collections.messageEvents
         ? membershipMessageEvent(
           currentOrder,
@@ -160,7 +428,7 @@ function createBillingRepository(db, collections) {
         : null;
       if (currentOrder.status === 'paid') {
         if (messageEventRef && !currentMessageEvent) {
-          await messageEventRef.set({ data: messageEvent.data });
+          await messageEventRef.set({ data: withoutDocumentId(messageEvent.data) });
         }
         return { order: currentOrder, alreadyPaid: true };
       }
@@ -179,8 +447,7 @@ function createBillingRepository(db, collections) {
         ? currentEndDate.getTime()
         : now.getTime();
       const currentPeriodEnd = new Date(baseMs + (plan.durationDays * 24 * 60 * 60 * 1000));
-      const paidOrder = {
-        ...currentOrder,
+      const paidOrderUpdate = {
         status: 'paid',
         providerStatus: payment.providerStatus,
         providerTransactionId: payment.providerTransactionId || currentOrder.providerTransactionId || '',
@@ -189,7 +456,13 @@ function createBillingRepository(db, collections) {
         deliveryStatus: payment.delivered ? 'delivered' : 'pending',
         deliveredAt: payment.delivered ? now : currentOrder.deliveredAt || null,
         paidAt: payment.paidAt || now,
+        reconciliationFailures: 0,
+        reconciliationErrorCode: '',
         updatedAt: now
+      };
+      const paidOrder = {
+        ...currentOrder,
+        ...paidOrderUpdate
       };
       const membership = {
         ownerKey: currentOrder.ownerKey,
@@ -204,10 +477,10 @@ function createBillingRepository(db, collections) {
         version: Math.max(0, Number(currentMembership && currentMembership.version) || 0) + 1,
         updatedAt: now
       };
-      await membershipRef.set({ data: membership });
-      await orderRef.set({ data: paidOrder });
+      await membershipRef.set({ data: withoutDocumentId(membership) });
+      await orderRef.set({ data: withoutDocumentId(paidOrder) });
       if (messageEventRef && !currentMessageEvent) {
-        await messageEventRef.set({ data: messageEvent.data });
+        await messageEventRef.set({ data: withoutDocumentId(messageEvent.data) });
       }
       return { order: paidOrder, membership, alreadyPaid: false };
     });
@@ -224,16 +497,21 @@ function createBillingRepository(db, collections) {
       if (!currentOrder) throw new Error('ORDER_NOT_FOUND');
       if (currentOrder.status === 'refunded') return { order: currentOrder, alreadyRefunded: true };
 
-      const refundedOrder = {
-        ...currentOrder,
+      const refundedOrderUpdate = {
         status: 'refunded',
         providerStatus: payment.providerStatus,
         providerTransactionId: payment.providerTransactionId || currentOrder.providerTransactionId || '',
         refundedAt: now,
+        reconciliationFailures: 0,
+        reconciliationErrorCode: '',
         nextCheckAt: null,
         updatedAt: now
       };
-      await orderRef.set({ data: refundedOrder });
+      const refundedOrder = {
+        ...currentOrder,
+        ...refundedOrderUpdate
+      };
+      await orderRef.set({ data: withoutDocumentId(refundedOrder) });
 
       if (currentOrder.status !== 'paid') {
         return { order: refundedOrder, alreadyRefunded: false };
@@ -258,15 +536,18 @@ function createBillingRepository(db, collections) {
         (Number.isFinite(currentEnd.getTime()) ? currentEnd.getTime() : now.getTime())
           - (plan.durationDays * 24 * 60 * 60 * 1000)
       );
-      const adjustedMembership = {
-        ...membership,
+      const adjustedMembershipUpdate = {
         status: reducedEndMs > now.getTime() ? 'active' : 'expired',
         currentPeriodEnd: new Date(reducedEndMs),
         lastRefundedOrderId: currentOrder.id,
         version: Math.max(0, Number(membership.version) || 0) + 1,
         updatedAt: now
       };
-      await membershipRef.set({ data: adjustedMembership });
+      const adjustedMembership = {
+        ...membership,
+        ...adjustedMembershipUpdate
+      };
+      await membershipRef.set({ data: withoutDocumentId(adjustedMembership) });
       return { order: refundedOrder, membership: adjustedMembership, alreadyRefunded: false };
     });
     return transactionResult && Object.prototype.hasOwnProperty.call(transactionResult, 'result')
@@ -297,6 +578,13 @@ function createBillingRepository(db, collections) {
     getOrder,
     findOrderByPaymentId,
     updateOrder,
+    transitionPendingOrder,
+    transitionPaidOrder,
+    acquireCheckoutLease,
+    commitCheckoutOrder,
+    bindCheckoutOrder,
+    releaseCheckoutLease,
+    findLatestPendingOrderByOwner,
     fulfill,
     markRefunded,
     listReconciliationOrders
@@ -309,6 +597,8 @@ module.exports = {
   reconciliationTimestamp,
   compareReconciliationOrders,
   membershipMessageEvent,
+  withoutDocumentId,
+  checkoutLockId,
   alreadyExists,
   notFound,
   createBillingRepository

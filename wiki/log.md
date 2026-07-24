@@ -1176,3 +1176,73 @@
   时间线；未创建内容重叠的新 source。
 - Sensitive handling: 未记录用户标识、OpenID、订单号、头像 File ID、昵称、
   支付签名、请求 ID、原始日志、环境变量值或回调密钥。
+
+## [2026-07-24] ios-membership-payment-recovery | 修复 iOS 实付后会员未生效
+
+- Session: local Codex task
+- Incident: iOS 收银台显示付款成功后，客户端稍后提示订阅未成功。生产安全核对
+  发现履约事务尝试回写数据库管理字段 `_id`，触发 `-501007` 并整体回滚；发货
+  回调又在权益提交后同步调用手工发货 API，失败时持续返回 retry。
+- Change: 所有支付写入剥离 `_id`；paid/pending/refunded 使用条件事务转换；
+  新增账号级 90 秒 checkout 租约、历史待确认订单官方查单、22 秒建单预算和
+  状态/金额 fail-closed；客户端保存收银台完成阶段、拦截并发双击并区分建单、
+  收银台与确认错误。发货回调在官方查单和权益事务成功后直接回加密成功，手工
+  发货只保留为带 `pay_sig` 的后台兜底。
+- Recovery: 未人工改付费状态或授予会员。生产只读聚合确认 3 笔已付款记录来自
+  2 个账号，3/3 匹配有效会员，3/3 有已完成 `membership_succeeded` 消息。
+- Production: 新增 checkout 锁集合及订单 owner/status/createdAt 索引；26 个
+  合同集合、44 个合同索引、26 份规则和四函数 manifest 均收敛。
+  `membershipBilling` 最终版本部署成功，计划冒烟仍为可售、30 天、590 分；
+  最新生产定时对账已让 3/3 历史已付款订单完成发货确认。
+- Verification: 完整 `npm.cmd run verify` 与 `git diff --check` 通过；
+  Node 663/663，32 JSON/302 JavaScript/12 pages，覆盖率行 80.85%/分支
+  69.05%/函数 77.82%。最新开发预览包 471,387 bytes。
+- Remaining: 同一已付款账号扫描最新预览确认会员展示；真实退款、退款通知和权益
+  回收仍需人工 canary。`env=0` 会真实扣款，已付款订单不得为测试重复购买。
+- Memory: 新增
+  `wiki/sources/2026-07-24-ios-membership-payment-recovery.md`，更新导航和总览。
+- Sensitive handling: 未记录用户标识、OpenID、订单号、请求 ID、支付签名、
+  原始错误文本、原始日志、环境变量值、访问令牌或回调密钥。
+
+## [2026-07-24] ios-refund-profile-review-renewal | 恢复资料审核并校正续费展示
+
+- Session: local Codex task
+- Incident: 已付款账号出现两次购买、资料审核数小时未结束，同时有效会员仍显示
+  “订阅并支付”。
+- Diagnosis: iOS 两笔已付款购买已按每笔 30 天累加；Apple 订单不能由管理员主动
+  退款。资料的 AI 与媒体审核已成功，最终事务因回写 CloudBase 管理字段 `_id`
+  而进入重试。会员购买卡文案未按真实有效期派生。
+- Change: 资料审核仓储全部写入剥离 `_id`，新增 CloudBase 写入边界和已公开重试
+  测试；会员展示模型区分未验证、免费、有效会员，分别显示登录、订阅和“续费
+  30 天”，并在购买卡重复展示到期时间。续费继续使用
+  `max(currentPeriodEnd, now) + 30 days` 的服务端合同。
+- Production: `knowledgeFeed` 重新部署并处于可用状态。受影响记录仅提前正常重试
+  时间，随后由 worker 审核通过、公开并完成站内消息，没有人工强制批准。
+- Refund boundary: 本次没有执行退款或直接修改资金/会员数据。iOS 重复购买需用户
+  在 Apple 官方入口只申请一笔退款；官方确认后后端幂等回收对应 30 天。
+- Verification: 完整 `npm.cmd run verify` 通过；Node 670/670，32 JSON、
+  303 JavaScript、12 pages，覆盖率行 80.68%/分支 69.18%/函数 77.57%；
+  四函数部署状态和 `git diff --check` 通过。最新预览包 472,432 bytes。
+- Memory: 新增
+  `wiki/sources/2026-07-24-ios-refund-profile-review-and-renewal-ui.md`，更新导航、
+  总览和虚拟支付决策。
+- Sensitive handling: 未记录用户标识、OpenID、订单号、昵称、头像 File ID、
+  请求 ID、支付签名、原始日志、环境变量值、访问令牌或回调密钥。
+
+## [2026-07-24] no-admin-refund-and-ios-settlement | 保留购买并明确 iOS 结算路径
+
+- Session: local Codex task
+- Decision: 用户决定保留两笔购买、不申请退款。产品不实现管理员主动退款入口，
+  本次没有发起退款，也没有修改订单、会员或生产数据。
+- Code audit: 当前客户端和云函数没有管理员退款 action、退款按钮或
+  `/xpay/refund_order` 调用，因此不存在刚新增的主动退款运行时代码可删除。
+  Apple/微信官方退款询问、退款通知、官方查单和幂等权益回收在本轮前已经存在，
+  必须保留以防平台退款后会员仍然有效。
+- Settlement: iOS 款项按 `Apple → 腾讯 → 开发者虚拟支付账户 → 提现账户`
+  结算。Apple 通常在自然月结束后 45～60 天内扣佣后结算给腾讯；虚拟支付账户
+  到账后才可提现。项目没有提现或银行账户配置，不能从代码断言钱已进入对公户。
+- Verification: 只读代码差异和 tracked 文件检索确认无主动退款、自动提现或
+  银行账户逻辑；官方微信文档回读确认 iOS 结算周期、虚拟支付账户和资金管理
+  边界。运行时代码未改动。
+- Sensitive handling: 未读取或记录银行卡、商户号、用户标识、OpenID、订单号、
+  支付签名、原始日志、环境变量值、访问令牌或回调密钥。

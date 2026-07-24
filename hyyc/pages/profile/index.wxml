@@ -86,17 +86,30 @@
         </view>
 
         <view class="pro-support-boundary">{{membership.membershipTerms.supportBoundary}}</view>
+        <view
+          wx:if="{{membership.purchaseMode === 'renew' && membership.periodEndLabel}}"
+          class="pro-current-period"
+        >
+          <view>当前有效期至 {{membership.periodEndLabel}}</view>
+          <text>本次续费成功后，将从该日顺延 {{billing.plan.durationLabel || '30 天'}}。</text>
+        </view>
         <button
           wx:if="{{billing.available}}"
           class="pro-purchase-button"
           bindtap="purchaseMembership"
           loading="{{billing.purchasing || accountAuthenticating}}"
           disabled="{{billing.purchasing || accountAuthenticating || accountLoggingOut}}"
-        >{{billing.accountVerified ? '订阅并支付' : '使用当前微信账号登录'}}</button>
+        >{{billing.accountVerified
+          ? (membership.purchaseMode === 'renew'
+            ? '续费 ' + (billing.plan.durationLabel || '30 天')
+            : '订阅并支付')
+          : '使用当前微信账号登录'}}</button>
         <view wx:else class="pro-purchase-footnote">当前暂不可购买，请稍后再试。</view>
         <view class="pro-account-note">
           {{billing.accountVerified
-            ? '已登录当前微信账号。再次点击订阅并支付，才会进入系统收银台。'
+            ? (membership.purchaseMode === 'renew'
+              ? '已登录当前微信账号。点击续费并完成支付后，会员有效期会继续累加。'
+              : '已登录当前微信账号。再次点击订阅并支付，才会进入系统收银台。')
             : '首次订阅先登录当前微信账号；登录成功后，你可以完善头像昵称，再单独点击订阅并支付。'}}
         </view>
         <view wx:if="{{billing.accountVerified && !userProfile.isComplete && !userProfile.reviewPending}}" class="pro-account-note">

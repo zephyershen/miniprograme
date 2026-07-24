@@ -192,6 +192,9 @@
 .pro-benefit-title { font-size: 23rpx; font-weight: 720; line-height: 1.4; }
 .pro-benefit-copy { margin-top: 5rpx; color: var(--ui-muted); font-size: 18rpx; line-height: 1.55; }
 .pro-support-boundary { margin-top: 18rpx; color: var(--ui-faint); font-size: 17rpx; line-height: 1.55; }
+.pro-current-period { margin-top: 22rpx; padding: 20rpx 22rpx; border: 1rpx solid rgba(28, 156, 229, .18); border-radius: 16rpx; background: rgba(28, 156, 229, .07); color: var(--ui-ink); }
+.pro-current-period view { font-size: 22rpx; font-weight: 730; line-height: 1.45; }
+.pro-current-period text { display: block; margin-top: 7rpx; color: var(--ui-muted); font-size: 18rpx; line-height: 1.55; }
 .pro-purchase-button { display: flex; width: 100%; min-width: 0; min-height: 80rpx; align-items: center; justify-content: center; margin: 22rpx 0 0; padding: 0 24rpx; border: 0; border-radius: 18rpx; background: var(--ui-accent); color: #fff; font-size: 24rpx; font-weight: 760; line-height: 1; white-space: nowrap; }
 .pro-purchase-button::after { border: 0; }
 .pro-purchase-button[disabled] { opacity: .72; }

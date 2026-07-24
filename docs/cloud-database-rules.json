@@ -22,6 +22,7 @@
     "knowledge_feed_sync_state",
     "knowledge_feed_user_engagements",
     "knowledge_feed_visual_jobs",
+    "knowledge_membership_checkout_locks",
     "knowledge_membership_orders",
     "knowledge_memberships",
     "knowledge_message_events",

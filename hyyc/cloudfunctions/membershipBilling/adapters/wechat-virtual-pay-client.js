@@ -22,7 +22,7 @@ function mapOrderState(status) {
   const value = Number(status);
   if ([2, 3, 4].includes(value)) return 'S';
   if ([5, 8].includes(value)) return 'R';
-  if (value === 6) return 'F';
+  if ([0, 6].includes(value)) return 'F';
   return 'P';
 }
 
@@ -105,7 +105,17 @@ function createWechatVirtualPayClient({ config, fetchImpl = globalThis.fetch, no
     return tokenCache.value;
   }
 
-  async function callXpay(path, body, { signed = false, retry = true, allowEmpty = false } = {}) {
+  async function callXpay(
+    path,
+    body,
+    {
+      signed = false,
+      retry = true,
+      allowEmpty = false,
+      errorCode = 'PAYMENT_QUERY_FAILED',
+      errorMessage = '支付结果暂时无法确认，请稍后刷新'
+    } = {}
+  ) {
     const bodyText = JSON.stringify(body);
     const token = await getAccessToken(false);
     const url = new URL(`${apiBaseUrl}${path}`);
@@ -118,17 +128,23 @@ function createWechatVirtualPayClient({ config, fetchImpl = globalThis.fetch, no
         headers: { 'Content-Type': 'application/json' },
         body: bodyText
       },
-      'PAYMENT_QUERY_FAILED',
-      '支付结果暂时无法确认，请稍后刷新',
+      errorCode,
+      errorMessage,
       { allowEmpty }
     );
     if (retry && [40001, 40014, 42001].includes(Number(result.errcode))) {
       tokenCache = null;
       await getAccessToken(true);
-      return callXpay(path, body, { signed, retry: false, allowEmpty });
+      return callXpay(path, body, {
+        signed,
+        retry: false,
+        allowEmpty,
+        errorCode,
+        errorMessage
+      });
     }
     if (Number(result.errcode || 0) !== 0) {
-      throw new BillingError('PAYMENT_QUERY_FAILED', '支付结果暂时无法确认，请稍后刷新', 502);
+      throw new BillingError(errorCode, errorMessage, 502);
     }
     return result;
   }
@@ -186,7 +202,12 @@ function createWechatVirtualPayClient({ config, fetchImpl = globalThis.fetch, no
     await callXpay('/xpay/notify_provide_goods', {
       order_id: order.id,
       env: config.environment
-    }, { allowEmpty: true });
+    }, {
+      signed: true,
+      allowEmpty: true,
+      errorCode: 'DELIVERY_CONFIRM_FAILED',
+      errorMessage: '发货状态暂时无法确认'
+    });
     return true;
   }
 
