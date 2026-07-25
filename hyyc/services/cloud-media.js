@@ -1,13 +1,20 @@
 const { callCloudFunction } = require('./cloud-functions.js');
 
-const CLOUD_FUNCTION_UPLOAD_MAX_BYTES = 480 * 1024;
+// Source images are never rejected by file size. They are transformed locally
+// until the Base64 + JSON event fits even stricter real-device invoke budgets.
+const CLOUD_FUNCTION_UPLOAD_TARGET_BYTES = 144 * 1024;
+const CLOUD_FUNCTION_UPLOAD_MAX_BYTES = CLOUD_FUNCTION_UPLOAD_TARGET_BYTES;
 const IMAGE_COMPRESSION_PRESETS = Object.freeze([
   Object.freeze({ maxDimension: 1600, quality: 82 }),
   Object.freeze({ maxDimension: 1280, quality: 70 }),
   Object.freeze({ maxDimension: 1024, quality: 58 }),
   Object.freeze({ maxDimension: 800, quality: 48 }),
   Object.freeze({ maxDimension: 640, quality: 42 }),
-  Object.freeze({ maxDimension: 480, quality: 36 })
+  Object.freeze({ maxDimension: 480, quality: 36 }),
+  Object.freeze({ maxDimension: 360, quality: 30 }),
+  Object.freeze({ maxDimension: 280, quality: 24 }),
+  Object.freeze({ maxDimension: 200, quality: 18 }),
+  Object.freeze({ maxDimension: 128, quality: 12 })
 ]);
 const IMAGE_COMPRESSION_QUALITIES = Object.freeze(
   IMAGE_COMPRESSION_PRESETS.map((preset) => preset.quality)
@@ -359,6 +366,30 @@ async function canvasImagePayload(filePath, kind, imageInfo, canvasOptions) {
   return null;
 }
 
+async function transformedImagePayload(
+  filePath,
+  kind,
+  extension,
+  imageInfo,
+  canvasOptions
+) {
+  if (canvasOptions) {
+    try {
+      const canvasPayload = await canvasImagePayload(
+        filePath,
+        kind,
+        imageInfo,
+        canvasOptions
+      );
+      if (canvasPayload) return canvasPayload;
+    } catch (error) {
+      // Some devices cannot export a canvas created from a large source bitmap.
+      // Native JPEG compression provides an independent fallback.
+    }
+  }
+  return compressedImagePayload(filePath, kind, extension, imageInfo);
+}
+
 async function imagePayloadForFunction(filePath, kind, options = {}) {
   let extension = fileExtension(filePath);
   const [imageInfo, sourceSize] = await Promise.all([
@@ -370,17 +401,20 @@ async function imagePayloadForFunction(filePath, kind, options = {}) {
   const supportedExtension = ['jpg', 'png'].includes(extension);
 
   if (options.canvas) {
-    const convertedPayload = await canvasImagePayload(
+    const convertedPayload = await transformedImagePayload(
       sourcePath,
       kind,
+      extension,
       imageInfo,
       options.canvas
     );
     if (convertedPayload) return convertedPayload;
-    throw new Error('图片处理失败，请重新选择图片');
+    throw new Error(kind === 'avatar'
+      ? '头像自动处理失败，请重新选择图片'
+      : '图片自动处理失败，请重新选择图片');
   }
 
-  if (sourceSize <= CLOUD_FUNCTION_UPLOAD_MAX_BYTES) {
+  if (sourceSize > 0 && sourceSize <= CLOUD_FUNCTION_UPLOAD_TARGET_BYTES) {
     const contentBase64 = await readLocalFileBase64(sourcePath);
     const detectedExtension = imageExtensionFromBase64(contentBase64, extension);
     if (typeof contentBase64 === 'string'
@@ -396,23 +430,19 @@ async function imagePayloadForFunction(filePath, kind, options = {}) {
   }
 
   if (supportedExtension) {
-    const compressedPayload = await compressedImagePayload(
+    const compressedPayload = await transformedImagePayload(
       sourcePath,
       kind,
       extension,
-      imageInfo
+      imageInfo,
+      null
     );
     if (compressedPayload) return compressedPayload;
   }
 
-  const contentBase64 = await readLocalFileBase64(sourcePath);
-  extension = imageExtensionFromBase64(contentBase64, extension);
-  if (typeof contentBase64 !== 'string' || !contentBase64) {
-    throw new Error('图片读取失败，请重新选择');
-  }
   throw new Error(kind === 'avatar'
-    ? '头像处理失败，请重新选择图片'
-    : '图片处理失败，请重新选择图片');
+    ? '头像自动处理失败，请重新选择图片'
+    : '图片自动处理失败，请重新选择图片');
 }
 
 function temporaryUrlMaxAgeMs(value) {
@@ -512,6 +542,7 @@ async function previewCloudImages(fileIds, currentFileId) {
 }
 
 module.exports = {
+  CLOUD_FUNCTION_UPLOAD_TARGET_BYTES,
   CLOUD_FUNCTION_UPLOAD_MAX_BYTES,
   IMAGE_COMPRESSION_PRESETS,
   IMAGE_COMPRESSION_QUALITIES,
@@ -528,6 +559,7 @@ module.exports = {
   isUsableCloudMediaUrl,
   successfulTempFileEntry,
   isUserMediaFileId,
+  transformedImagePayload,
   imagePayloadForFunction,
   uploadCloudFile,
   resolveCloudFileUrls,

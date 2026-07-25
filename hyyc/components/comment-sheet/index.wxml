@@ -1,7 +1,105 @@
+<template name="commentInner">
+  <view class="comment-meta">
+    <view class="comment-author">
+      <text class="comment-author-name">{{c.author.nickname}}</text>
+      <block wx:if="{{c.replyToNickname && c.replyToCommentId !== c.parentCommentId}}">
+        <text class="comment-reply-connector">›</text>
+        <text class="comment-reply-target">{{c.replyToNickname}}</text>
+      </block>
+      <text wx:if="{{c.isMine}}" class="comment-mine">我</text>
+      <text wx:if="{{c.statusLabel}}" class="comment-status">{{c.statusLabel}}</text>
+    </view>
+    <view class="comment-meta-actions">
+      <text
+        wx:if="{{c.canDelete}}"
+        class="comment-action {{busy === c.id ? 'is-disabled' : ''}}"
+        data-comment-id="{{c.id}}"
+        data-action="delete"
+        aria-role="button"
+        aria-label="删除这条评论"
+        aria-disabled="{{busy === c.id}}"
+        catchtap="handleCommentAction"
+      >删除</text>
+      <text
+        wx:if="{{c.canReport}}"
+        class="comment-action {{c.reported || busy === c.id ? 'is-disabled' : ''}}"
+        data-comment-id="{{c.id}}"
+        data-action="report"
+        aria-role="button"
+        aria-label="{{c.reported ? '这条评论已举报' : '举报这条评论'}}"
+        aria-disabled="{{c.reported || busy === c.id}}"
+        catchtap="handleCommentAction"
+      >{{c.reported ? '已举报' : '举报'}}</text>
+      <text
+        wx:if="{{c.canAppeal}}"
+        class="comment-action {{busy === c.id ? 'is-disabled' : ''}}"
+        data-comment-id="{{c.id}}"
+        data-action="appeal"
+        aria-role="button"
+        aria-label="申诉这条被隐藏的评论"
+        aria-disabled="{{busy === c.id}}"
+        catchtap="handleCommentAction"
+      >申诉</text>
+      <text
+        wx:if="{{c.canRestore}}"
+        class="comment-action {{busy === c.id ? 'is-disabled' : ''}}"
+        data-comment-id="{{c.id}}"
+        data-action="restore"
+        aria-role="button"
+        aria-label="恢复这条评论"
+        aria-disabled="{{busy === c.id}}"
+        catchtap="handleCommentAction"
+      >恢复</text>
+    </view>
+  </view>
+  <view wx:if="{{detached}}" class="comment-detached-context">原评论暂不可见</view>
+  <view wx:if="{{c.content}}" class="comment-copy">{{c.content}}</view>
+  <view wx:if="{{c.attachmentCount}}" class="comment-media-grid count-{{c.attachmentCount}}">
+    <block
+      wx:for="{{c.attachments}}"
+      wx:for-item="attachment"
+      wx:for-index="attachmentIndex"
+      wx:key="fileId"
+    >
+      <image
+        wx:if="{{attachment.url}}"
+        class="comment-media"
+        src="{{attachment.url}}"
+        mode="aspectFill"
+        lazy-load="{{true}}"
+        data-comment-id="{{c.id}}"
+        data-file-id="{{attachment.fileId}}"
+        data-attachment-index="{{attachmentIndex}}"
+        bindtap="previewCommentImage"
+        binderror="handleCommentImageError"
+      />
+      <view
+        wx:else
+        class="comment-media comment-media-placeholder {{c.reviewPending ? 'is-reviewing' : ''}}"
+        aria-label="{{c.reviewPending ? '图片审核中' : '图片暂时无法显示'}}"
+      >
+        <view wx:if="{{c.reviewPending}}" class="comment-media-spinner"></view>
+        <text>{{c.reviewPending ? '图片审核中' : '图片暂时无法显示'}}</text>
+      </view>
+    </block>
+  </view>
+  <view class="comment-foot">
+    <text class="comment-time">{{c.createdLabel}}</text>
+    <text
+      wx:if="{{c.canReply}}"
+      class="comment-reply-btn"
+      data-comment-id="{{c.id}}"
+      aria-role="button"
+      aria-label="回复 {{c.author.nickname}}"
+      bindtap="beginReply"
+    >回复</text>
+  </view>
+</template>
+
 <view wx:if="{{visible}}" class="comments-mask" bindtap="close">
   <view class="comments-sheet {{keyboardOpen ? 'comments-sheet-keyboard' : ''}}" style="{{sheetStyle}}" catchtap="noop">
     <view class="comments-head">
-      <view class="comments-title">评论 {{commentCount || ''}}</view>
+      <view class="comments-title">评论 {{displayCommentCount || ''}}</view>
       <view class="comments-close" bindtap="close">关闭</view>
     </view>
     <scroll-view
@@ -19,107 +117,48 @@
       </view>
       <block wx:else>
         <view
-          wx:for="{{comments}}"
+          wx:for="{{commentThreads}}"
           wx:key="id"
-          id="comment-{{item.id}}"
-          class="comment-row {{item.isHidden ? 'is-hidden' : ''}} {{item.reviewPending ? 'is-reviewing' : ''}} {{item.isReply ? 'is-reply' : ''}}"
+          id="comment-{{item.root.id}}"
+          class="comment-row {{item.root.isHidden ? 'is-hidden' : ''}} {{item.root.reviewPending ? 'is-reviewing' : ''}}"
         >
           <view class="comment-avatar-wrap">
-            <image wx:if="{{item.author.avatarUrl}}" class="comment-avatar" src="{{item.author.avatarUrl}}" mode="aspectFill" lazy-load="{{true}}" />
-            <view wx:else class="comment-avatar comment-avatar-empty">{{item.author.initial}}</view>
+            <image wx:if="{{item.root.author.avatarUrl}}" class="comment-avatar" src="{{item.root.author.avatarUrl}}" mode="aspectFill" lazy-load="{{true}}" data-comment-id="{{item.root.id}}" binderror="handleCommentAvatarError" />
+            <view wx:else class="comment-avatar comment-avatar-empty">{{item.root.author.initial}}</view>
           </view>
           <view class="comment-body">
-            <view class="comment-meta">
-              <view class="comment-author">
-                <text>{{item.author.nickname}}</text>
-                <text wx:if="{{item.isMine}}" class="comment-mine">我</text>
-                <text wx:if="{{item.statusLabel}}" class="comment-status">{{item.statusLabel}}</text>
-              </view>
-              <view class="comment-meta-actions">
-                <text>{{item.createdLabel}}</text>
-                <text
-                  wx:if="{{item.canDelete}}"
-                  class="comment-action {{commentActionBusyId === item.id ? 'is-disabled' : ''}}"
-                  data-comment-id="{{item.id}}"
-                  data-action="delete"
-                  aria-role="button"
-                  aria-label="删除这条评论"
-                  aria-disabled="{{commentActionBusyId === item.id}}"
-                  catchtap="handleCommentAction"
-                >删除</text>
-                <text
-                  wx:if="{{item.canReport}}"
-                  class="comment-action {{item.reported || commentActionBusyId === item.id ? 'is-disabled' : ''}}"
-                  data-comment-id="{{item.id}}"
-                  data-action="report"
-                  aria-role="button"
-                  aria-label="{{item.reported ? '这条评论已举报' : '举报这条评论'}}"
-                  aria-disabled="{{item.reported || commentActionBusyId === item.id}}"
-                  catchtap="handleCommentAction"
-                >{{item.reported ? '已举报' : '举报'}}</text>
-                <text
-                  wx:if="{{item.canAppeal}}"
-                  class="comment-action {{commentActionBusyId === item.id ? 'is-disabled' : ''}}"
-                  data-comment-id="{{item.id}}"
-                  data-action="appeal"
-                  aria-role="button"
-                  aria-label="申诉这条被隐藏的评论"
-                  aria-disabled="{{commentActionBusyId === item.id}}"
-                  catchtap="handleCommentAction"
-                >申诉</text>
-                <text
-                  wx:if="{{item.canRestore}}"
-                  class="comment-action {{commentActionBusyId === item.id ? 'is-disabled' : ''}}"
-                  data-comment-id="{{item.id}}"
-                  data-action="restore"
-                  aria-role="button"
-                  aria-label="恢复这条评论"
-                  aria-disabled="{{commentActionBusyId === item.id}}"
-                  catchtap="handleCommentAction"
-                >恢复</text>
-              </view>
-            </view>
-            <view wx:if="{{item.isReply}}" class="comment-reply-context">
-              回复 <text>@{{item.replyToNickname || '读者'}}</text>
-              <text wx:if="{{item.replyToPreview}}" class="comment-reply-quote">“{{item.replyToPreview}}”</text>
-            </view>
-            <view wx:if="{{item.content}}" class="comment-copy">{{item.content}}</view>
-            <view wx:if="{{item.attachmentCount}}" class="comment-media-grid count-{{item.attachmentCount}}">
-              <block
-                wx:for="{{item.attachments}}"
-                wx:for-item="attachment"
-                wx:for-index="attachmentIndex"
-                wx:key="fileId"
-              >
-                <image
-                  wx:if="{{attachment.url}}"
-                  class="comment-media"
-                  src="{{attachment.url}}"
-                  mode="aspectFill"
-                  lazy-load="{{true}}"
-                  data-comment-id="{{item.id}}"
-                  data-file-id="{{attachment.fileId}}"
-                  data-attachment-index="{{attachmentIndex}}"
-                  bindtap="previewCommentImage"
-                  binderror="handleCommentImageError"
-                />
+            <template is="commentInner" data="{{c: item.root, busy: commentActionBusyId, detached: item.isDetachedReply}}" />
+            <view wx:if="{{item.replyCount}}" class="comment-replies">
+              <block wx:for="{{item.visibleReplies}}" wx:for-item="reply" wx:key="id">
                 <view
-                  wx:else
-                  class="comment-media comment-media-placeholder {{item.reviewPending ? 'is-reviewing' : ''}}"
-                  aria-label="{{item.reviewPending ? '图片审核中' : '图片暂时无法显示'}}"
+                  id="comment-{{reply.id}}"
+                  class="comment-reply {{reply.isHidden ? 'is-hidden' : ''}} {{reply.reviewPending ? 'is-reviewing' : ''}}"
                 >
-                  <view wx:if="{{item.reviewPending}}" class="comment-media-spinner"></view>
-                  <text>{{item.reviewPending ? '图片审核中' : '图片暂时无法显示'}}</text>
+                  <view class="comment-avatar-wrap">
+                    <image wx:if="{{reply.author.avatarUrl}}" class="comment-avatar comment-avatar-sm" src="{{reply.author.avatarUrl}}" mode="aspectFill" lazy-load="{{true}}" data-comment-id="{{reply.id}}" binderror="handleCommentAvatarError" />
+                    <view wx:else class="comment-avatar comment-avatar-sm comment-avatar-empty">{{reply.author.initial}}</view>
+                  </view>
+                  <view class="comment-body">
+                    <template is="commentInner" data="{{c: reply, busy: commentActionBusyId}}" />
+                  </view>
                 </view>
               </block>
-            </view>
-            <view wx:if="{{item.canReply}}" class="comment-thread-actions">
-              <text
-                data-comment-id="{{item.id}}"
+              <view
+                wx:if="{{item.hiddenReplyCount}}"
+                class="comment-reply-more"
+                data-root-id="{{item.root.id}}"
                 aria-role="button"
-                aria-label="回复 {{item.author.nickname}}"
-                bindtap="beginReply"
-              >回复</text>
+                aria-label="展开剩余 {{item.hiddenReplyCount}} 条回复"
+                bindtap="expandReplies"
+              ><text class="comment-reply-more-line"></text><text>展开 {{item.hiddenReplyCount}} 条回复</text><text class="comment-reply-more-caret">⌄</text></view>
+              <view
+                wx:elif="{{item.visibleReplies.length && !item.isCollapsed}}"
+                class="comment-reply-more"
+                data-root-id="{{item.root.id}}"
+                aria-role="button"
+                aria-label="收起回复"
+                bindtap="collapseReplies"
+              ><text class="comment-reply-more-line"></text><text>收起</text><text class="comment-reply-more-caret">⌃</text></view>
             </view>
           </view>
         </view>

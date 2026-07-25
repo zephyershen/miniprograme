@@ -1351,3 +1351,53 @@
   需删除对应旧评论，并从手机原图重新上传。新上传图片才会经过本次修复链路。
 - Sensitive handling: 未记录用户标识、OpenID、订单号、评论正文、图片、
   File ID、支付签名、环境变量值或访问令牌；云函数下载审计副本在验证后删除。
+
+## [2026-07-25] threaded-comment-reload-and-message-swipe-delete | 修复回复重进扁平化并增加消息左滑删除
+
+- Session: local Codex task
+- Incident: 回复在乐观提交和当前会话内位于根评论下方，但退出详情后重新进入时，
+  评论分页可能只返回较新的回复而没有返回较早的根评论，客户端因此只能把回复作为
+  独立行展示；消息中心的评论互动与系统通知缺少用户可控的单条删除入口。
+- Change: 评论服务在分页结果包含回复但缺少根评论时，按同一资讯补齐仍然公开可见的
+  根评论；客户端按稳定的根评论 ID 构建两级线程，并在稀疏提交响应替换乐观回复时
+  保留回复关系。消息中心为两个分类统一增加横向手势锁定、单行展开和删除按钮；
+  删除通过 `knowledgeFeed/deleteMessage` 执行所有者校验，客户端乐观移除、失败回滚，
+  并同步更新未读数、分类计数和查看者隔离缓存。
+- Structure: 评论树构建留在 `features/engagement/model.js`，缺失根评论补齐留在
+  `feed-engagement-service/repository`；消息手势由页面编排，计数变换、API、串行会话
+  缓存和所有者隔离删除分别留在 messages feature 与云端 service/repository。
+- Verification: `npm.cmd run check` 通过；全量 Node 测试 701/701 通过，
+  `git diff --check` 通过；CloudBase 四函数 manifest 配置只读检查为 0 漂移。
+- Release boundary: 本次未部署 `knowledgeFeed` 云函数、未上传微信体验版、未提交
+  Git，也未修改生产数据库。评论重进修复和消息删除必须在客户端代码与
+  `knowledgeFeed` 云函数一起更新后才会在真机完整生效。
+- Sensitive handling: 未读取或记录用户标识、OpenID、消息正文、评论正文、
+  File ID、环境变量值、访问令牌或原始生产日志。
+
+## [2026-07-25] threaded-comment-router-contract-and-production-validation | 修正入口漏传并完成线上闭环
+
+- Session: local Codex task
+- Supersedes: 本条补充并修正上一条仅归因于“分页缺根评论”的不完整判断；缺根评论
+  补齐是必要的防御，但用户新回复在重进后仍扁平的直接原因是 `addComment` action
+  没有把 `replyToCommentId` 转发到服务层。
+- Production diagnosis: 部署前下载的线上 `knowledgeFeed` 源码既不包含
+  `deleteMessage`，也不包含根评论补齐逻辑，因此本地新客户端会收到“不支持的操作”。
+  入口漏传又使乐观回复只在当前会话嵌套，云端实际按根评论保存。
+- Change: `knowledgeFeed/index.js` 显式转发 `replyToCommentId` 并增加路由契约回归；
+  保留两级线程、缺根评论补齐、消息所有者隔离删除、乐观回滚和缓存计数同步实现。
+- Deployment: 仅 code-only 更新 `knowledgeFeed`；函数恢复 `Active / Available`，
+  四函数 manifest 0 漂移。部署后下载回读五个关键文件，SHA-256 与当前本地工作树
+  全部一致。
+- Runtime verification: 已登录微信开发者工具加载 14 条消息，左滑成功打开删除区；
+  不存在的消息 ID 删除返回成功且消息数不变。随后在当前用户自己的根评论下创建临时
+  回复，创建结果、第一次进入和退出后第二次进入都保留父级并分组到同一线程；验证后
+  测试回复删除成功。
+- Verification: 全量 `npm.cmd test` 701/701；`npm.cmd run check` 通过 33 JSON、
+  316 JavaScript、13 pages。完整证据见
+  [评论回复持久化与消息左滑删除修复证据](sources/2026-07-25-threaded-comments-and-message-deletion.md)。
+- Historical data boundary: 入口修复前已被存成根评论的旧回复缺少父评论标识，无法
+  安全自动推断；需删除后重新发送。新回复已通过生产退出重进闭环。
+- Release boundary: 本次没有上传微信体验版、提交审核、正式发布或创建 Git 提交。
+  生产函数当前领先最后 Git 锚点，后续提交需包含本次修复。
+- Sensitive handling: Wiki 未记录用户标识、OpenID、消息/评论正文、对象 ID、
+  File ID、环境变量值、访问令牌或原始生产日志。

@@ -1,5 +1,9 @@
 <page-meta page-style="{{membershipPromptVisible ? 'overflow: hidden;' : ''}}" />
 <view class="editorial-page">
+  <view wx:if="{{refreshingFeed}}" class="feed-refresh-float" aria-role="progressbar" aria-label="正在刷新资讯">
+    <loading-state compact="{{true}}" label="正在刷新资讯" />
+  </view>
+
   <view wx:if="{{newItemsVisible}}" class="new-items-float {{applyingNewItems ? 'new-items-float-loading' : ''}}" bindtap="applyNewItems" aria-role="button" aria-label="{{newItemsLabel}}，点击查看最新资讯">
     <view class="new-items-signal"></view>
     <text class="new-items-label">{{applyingNewItems ? '正在载入最新资讯' : newItemsLabel}}</text>

@@ -245,12 +245,17 @@ function createUserMessageService({
     return list(actor);
   }
 
+  async function deleteMessage(messageId, actor) {
+    await repository.deleteMessage(actor.ownerKey, messageId);
+    return list(actor);
+  }
+
   async function markAllRead(actor) {
     await repository.markAllRead(actor.ownerKey, new Date(now()));
     return list(actor);
   }
 
-  return { processDue, list, markRead, markAllRead };
+  return { processDue, list, markRead, deleteMessage, markAllRead };
 }
 
 module.exports = {

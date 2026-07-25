@@ -80,6 +80,16 @@ test('keeps the new-items notice as a fixed overlay without shifting the list', 
   assert.doesNotMatch(styles, /\.post-list-noticed\b/);
 });
 
+test('shows the shared loading component during pull-to-refresh', () => {
+  const markup = read('../pages/inbox/index.wxml');
+  const styles = read('../pages/inbox/index.wxss');
+  assert.match(
+    markup,
+    /wx:if="\{\{refreshingFeed\}\}" class="feed-refresh-float"[\s\S]*?<loading-state[^>]*label="正在刷新资讯"/
+  );
+  assert.match(styles, /\.feed-refresh-float\s*\{[^}]*position:\s*fixed;/s);
+});
+
 test('reserves feed media height while durable cloud files resolve', () => {
   const markup = read('../pages/inbox/index.wxml');
   const styles = read('../pages/inbox/index.wxss');

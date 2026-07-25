@@ -991,16 +991,22 @@ test('pull-to-refresh keeps the current feed while the authoritative refresh is 
   let stopped = 0;
   global.wx = { stopPullDownRefresh: () => { stopped += 1; } };
   const context = {
+    data: { refreshingFeed: false },
+    pageDisposed: false,
+    setData(patch) {
+      Object.assign(this.data, patch);
+    },
     loadFeed(force, options) {
       calls.push({ force, options });
       return Promise.resolve(false);
     }
   };
   try {
-    page.onPullDownRefresh.call(context);
-    await Promise.resolve();
-    await Promise.resolve();
+    const refresh = page.onPullDownRefresh.call(context);
+    assert.equal(context.data.refreshingFeed, true);
+    await refresh;
     assert.deepEqual(calls, [{ force: true, options: { preserveCurrent: true } }]);
+    assert.equal(context.data.refreshingFeed, false);
     assert.equal(stopped, 1);
   } finally {
     if (previousWx) global.wx = previousWx;

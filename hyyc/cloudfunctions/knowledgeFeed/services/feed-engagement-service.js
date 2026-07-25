@@ -119,6 +119,37 @@ function commentView(comment, ownerKey, profile = null, options = {}) {
   };
 }
 
+async function includeCommentThreadRoots(repository, itemId, comments = []) {
+  const knownCommentIds = new Set(
+    comments.map((comment) => comment && (comment._id || comment.id)).filter(Boolean)
+  );
+  const missingRootIds = [...new Set(
+    comments
+      .map((comment) => comment && comment.parentCommentId)
+      .filter((rootId) => rootId && !knownCommentIds.has(rootId))
+  )];
+  if (!missingRootIds.length) return comments;
+
+  let roots = [];
+  if (typeof repository.getCommentsByIds === 'function') {
+    roots = await repository.getCommentsByIds(missingRootIds, itemId);
+  } else if (typeof repository.getComment === 'function') {
+    const results = await Promise.all(
+      missingRootIds.map((rootId) => repository.getComment(rootId, itemId))
+    );
+    roots = results.map((result) => result && result.comment).filter(Boolean);
+  }
+  return [
+    ...comments,
+    ...roots.filter((root) => (
+      root
+      && root.status === 'active'
+      && moderationApproved(root.moderation)
+      && !knownCommentIds.has(root._id || root.id)
+    ))
+  ];
+}
+
 function engagementView(item, state, entitlement) {
   return {
     liked: Boolean(state && state.liked),
@@ -213,12 +244,15 @@ function createFeedEngagementService({
   async function listComments(itemId, actor, entitlement) {
     const canParticipate = canComment(entitlement);
     const admin = isActualAdmin(entitlement);
-    if (canParticipate) await itemLoader(itemId, entitlement);
-    const comments = await repository.listComments(itemId, config.commentPageSize, {
+    const item = canParticipate ? await itemLoader(itemId, entitlement) : null;
+    const listedComments = await repository.listComments(itemId, config.commentPageSize, {
       ownerKey: actor.ownerKey,
       isAdmin: admin,
       includeActive: canParticipate || admin
     });
+    const comments = canParticipate || admin
+      ? await includeCommentThreadRoots(repository, itemId, listedComments)
+      : listedComments;
     const [profiles, states] = await Promise.all([
       profileRepository.getMany(comments.map((comment) => comment.authorKey)),
       repository.getMany(actor.ownerKey, [itemId])
@@ -230,6 +264,7 @@ function createFeedEngagementService({
     );
     return {
       canParticipate,
+      ...(item ? { commentCount: count(item.commentCount) } : {}),
       comments: comments.map((comment) => commentView(
         comment,
         actor.ownerKey,

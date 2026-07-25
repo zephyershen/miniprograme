@@ -12,6 +12,13 @@ function markMessageRead(messageId, messageVersion = '') {
   });
 }
 
+function deleteMessage(messageId) {
+  return callCloudFunction('knowledgeFeed', {
+    action: 'deleteMessage',
+    messageId
+  });
+}
+
 function markAllMessagesRead() {
   return callCloudFunction('knowledgeFeed', { action: 'markAllMessagesRead' });
 }
@@ -19,5 +26,6 @@ function markAllMessagesRead() {
 module.exports = {
   getMessages,
   markMessageRead,
+  deleteMessage,
   markAllMessagesRead
 };

@@ -41,6 +41,21 @@
   white-space: nowrap;
 }
 
+.feed-refresh-float {
+  position: fixed;
+  z-index: 25;
+  top: 196rpx;
+  left: 50%;
+  box-sizing: border-box;
+  min-width: 230rpx;
+  padding: 12rpx 24rpx;
+  border: 1rpx solid var(--ui-hairline);
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 10rpx 26rpx rgba(16, 24, 40, 0.12);
+  transform: translateX(-50%);
+}
+
 .new-items-signal { width: 12rpx; height: 12rpx; flex: none; border-radius: 50%; background: #fff; }
 .new-items-label { overflow: hidden; font-size: 23rpx; font-weight: 700; text-overflow: ellipsis; }
 .new-items-arrow { flex: none; margin-left: 2rpx; font-size: 24rpx; font-weight: 800; line-height: 1; }

@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 function installModuleMock(request, exports) {
   const filename = require.resolve(request);
@@ -16,7 +18,7 @@ function installModuleMock(request, exports) {
   };
 }
 
-function loadCommentSheet(getComments, media = {}) {
+function loadCommentSheet(getComments, media = {}, api = {}) {
   const restores = [
     installModuleMock('../features/engagement/api', {
       getComments,
@@ -24,7 +26,8 @@ function loadCommentSheet(getComments, media = {}) {
       deleteComment: async () => ({}),
       reportComment: async () => ({}),
       appealComment: async () => ({}),
-      restoreComment: async () => ({})
+      restoreComment: async () => ({}),
+      ...api
     }),
     installModuleMock('../features/engagement/media', {
       chooseCommentImages: async () => [],
@@ -112,9 +115,10 @@ function comment(id, content, attachments = []) {
   };
 }
 
-function commentsResult(comments) {
+function commentsResult(comments, commentCount) {
   return {
     comments,
+    ...(commentCount === undefined ? {} : { commentCount }),
     canParticipate: true,
     viewerProfile: {
       nickname: 'Viewer',
@@ -122,6 +126,95 @@ function commentsResult(comments) {
     }
   };
 }
+
+test('uses replies in the visible count and reports the authoritative server total', async () => {
+  const definition = loadCommentSheet(async () => commentsResult([
+    comment('root', 'Root'),
+    {
+      ...comment('reply-a', 'Reply A'),
+      parentCommentId: 'root',
+      replyToCommentId: 'root'
+    },
+    {
+      ...comment('reply-b', 'Reply B'),
+      parentCommentId: 'root',
+      replyToCommentId: 'reply-a'
+    }
+  ], 3));
+  const context = createContext(definition);
+  const previousWx = global.wx;
+  global.wx = {
+    hideKeyboard() {},
+    showToast() {}
+  };
+  try {
+    setObservedProperty(definition, context, 'itemId', 'item-count');
+    setObservedProperty(definition, context, 'commentCount', 2);
+    setObservedProperty(definition, context, 'visible', true);
+    await flushTasks();
+    await flushTasks();
+    assert.equal(context.data.displayCommentCount, 3);
+    assert.ok(context.events.some((event) => (
+      event.name === 'changed' && event.detail.commentCount === 3
+    )));
+  } finally {
+    if (previousWx) global.wx = previousWx;
+    else delete global.wx;
+  }
+});
+
+test('polls an owned pending comment until its review result is visible', async () => {
+  const calls = [];
+  const definition = loadCommentSheet(async () => {
+    calls.push(calls.length + 1);
+    return commentsResult([{
+      ...comment('reviewed-comment', 'Review me'),
+      isMine: true,
+      reviewPending: calls.length === 1,
+      statusLabel: calls.length === 1 ? '审核中' : ''
+    }], calls.length === 1 ? 0 : 1);
+  });
+  const context = createContext(definition);
+  const previousWx = global.wx;
+  const previousSetTimeout = global.setTimeout;
+  const previousClearTimeout = global.clearTimeout;
+  const scheduled = [];
+  global.setTimeout = (callback, delay) => {
+    const timer = { id: scheduled.length + 1, callback, delay };
+    scheduled.push(timer);
+    return timer.id;
+  };
+  global.clearTimeout = () => {};
+  global.wx = {
+    hideKeyboard() {},
+    showToast() {},
+    previewImage() {}
+  };
+
+  try {
+    setObservedProperty(definition, context, 'itemId', 'item-review');
+    setObservedProperty(definition, context, 'visible', true);
+    await flushTasks();
+    await flushTasks();
+
+    assert.deepEqual(calls, [1]);
+    assert.equal(context.data.comments[0].reviewPending, true);
+    assert.equal(scheduled.length, 1);
+    assert.equal(scheduled[0].delay, 2500);
+
+    await scheduled[0].callback();
+    await flushTasks();
+    assert.deepEqual(calls, [1, 2]);
+    assert.equal(context.data.comments[0].reviewPending, false);
+    assert.equal(context.data.displayCommentCount, 1);
+    assert.equal(context.commentReviewRefreshTimer, null);
+  } finally {
+    global.setTimeout = previousSetTimeout;
+    global.clearTimeout = previousClearTimeout;
+    if (previousWx) global.wx = previousWx;
+    else delete global.wx;
+  }
+});
 
 function flushTasks() {
   return new Promise((resolve) => setImmediate(resolve));
@@ -271,6 +364,178 @@ test('returning from image preview preserves comments when detail hydration rebi
       imageUrl: image.url
     }]);
     assert.deepEqual(calls, ['item-a']);
+  } finally {
+    if (previousWx) global.wx = previousWx;
+    else delete global.wx;
+  }
+});
+
+test('renders replies inside one root group and rebuilds the visible slice when expanded', async () => {
+  const root = comment('root-comment', 'Root comment');
+  const replies = [1, 2, 3].map((number) => ({
+    ...comment(`reply-${number}`, `Reply ${number}`),
+    parentCommentId: root.id,
+    replyToCommentId: number === 1 ? root.id : `reply-${number - 1}`,
+    replyToNickname: number === 1 ? root.author.nickname : `Author reply-${number - 1}`,
+    createdAt: `2026-07-25T01:0${number}:00.000Z`
+  }));
+  const definition = loadCommentSheet(async () => commentsResult([
+    replies[2],
+    root,
+    replies[0],
+    replies[1]
+  ]));
+  const context = createContext(definition);
+  const previousWx = global.wx;
+  global.wx = {
+    hideKeyboard() {},
+    showToast() {},
+    previewImage() {}
+  };
+
+  try {
+    setObservedProperty(definition, context, 'itemId', 'item-a');
+    setObservedProperty(definition, context, 'visible', true);
+    await flushTasks();
+    await flushTasks();
+
+    assert.equal(context.data.commentThreads.length, 1);
+    assert.equal(context.data.commentThreads[0].root.id, root.id);
+    assert.deepEqual(
+      context.data.commentThreads[0].visibleReplies.map((entry) => entry.id),
+      ['reply-1', 'reply-2']
+    );
+    assert.equal(context.data.commentThreads[0].hiddenReplyCount, 1);
+
+    context.expandReplies({
+      currentTarget: { dataset: { rootId: root.id } }
+    });
+    assert.deepEqual(
+      context.data.commentThreads[0].visibleReplies.map((entry) => entry.id),
+      ['reply-1', 'reply-2', 'reply-3']
+    );
+    assert.equal(context.data.commentThreads[0].isExpanded, true);
+
+    context.collapseReplies({
+      currentTarget: { dataset: { rootId: root.id } }
+    });
+    assert.deepEqual(context.data.commentThreads[0].visibleReplies, []);
+    assert.equal(context.data.commentThreads[0].isExpanded, false);
+    assert.equal(context.data.commentThreads[0].isCollapsed, true);
+  } finally {
+    if (previousWx) global.wx = previousWx;
+    else delete global.wx;
+  }
+});
+
+test('lets a root collapse and reopen even when it has only one reply', async () => {
+  const root = comment('root-single', 'Root comment');
+  const reply = {
+    ...comment('reply-single', 'Only reply'),
+    parentCommentId: root.id,
+    replyToCommentId: root.id
+  };
+  const definition = loadCommentSheet(async () => commentsResult([root, reply]));
+  const context = createContext(definition);
+  const previousWx = global.wx;
+  global.wx = {
+    hideKeyboard() {},
+    showToast() {},
+    previewImage() {}
+  };
+
+  try {
+    setObservedProperty(definition, context, 'itemId', 'item-single');
+    setObservedProperty(definition, context, 'visible', true);
+    await flushTasks();
+    await flushTasks();
+    assert.deepEqual(
+      context.data.commentThreads[0].visibleReplies.map((entry) => entry.id),
+      [reply.id]
+    );
+
+    context.collapseReplies({
+      currentTarget: { dataset: { rootId: root.id } }
+    });
+    assert.deepEqual(context.data.commentThreads[0].visibleReplies, []);
+    assert.equal(context.data.commentThreads[0].hiddenReplyCount, 1);
+
+    context.expandReplies({
+      currentTarget: { dataset: { rootId: root.id } }
+    });
+    assert.deepEqual(
+      context.data.commentThreads[0].visibleReplies.map((entry) => entry.id),
+      [reply.id]
+    );
+
+    const markup = fs.readFileSync(
+      path.resolve(__dirname, '../components/comment-sheet/index.wxml'),
+      'utf8'
+    );
+    assert.match(markup, /item\.visibleReplies\.length && !item\.isCollapsed/);
+  } finally {
+    if (previousWx) global.wx = previousWx;
+    else delete global.wx;
+  }
+});
+
+test('keeps a submitted reply under its root after the optimistic row is accepted', async () => {
+  const root = {
+    ...comment('root-comment', 'Root comment'),
+    canReply: true
+  };
+  const definition = loadCommentSheet(
+    async () => commentsResult([root]),
+    {},
+    {
+      addComment: async (_itemId, payload) => ({
+        comment: {
+          id: 'server-reply',
+          content: payload.content,
+          attachments: [],
+          createdAt: '2026-07-25T01:01:00.000Z'
+        },
+        commentCount: 2
+      })
+    }
+  );
+  const context = createContext(definition);
+  const previousWx = global.wx;
+  global.wx = {
+    hideKeyboard() {},
+    showToast() {},
+    previewImage() {}
+  };
+
+  try {
+    context.data.itemId = 'item-a';
+    context.data.comments = [root];
+    context.data.commentThreads = [];
+    context.data.commentDraft = 'Submitted reply';
+    context.data.replyTarget = {
+      id: root.id,
+      parentCommentId: root.id,
+      nickname: root.author.nickname,
+      preview: root.content
+    };
+    context.data.viewerProfile = {
+      isComplete: true,
+      nickname: 'Reply author',
+      initial: 'R'
+    };
+
+    await context.submitComment();
+
+    assert.equal(context.data.commentThreads.length, 1);
+    assert.equal(context.data.commentThreads[0].root.id, root.id);
+    assert.deepEqual(
+      context.data.commentThreads[0].replies.map((entry) => entry.id),
+      ['server-reply']
+    );
+    assert.equal(
+      context.data.commentThreads[0].replies[0].parentCommentId,
+      root.id
+    );
   } finally {
     if (previousWx) global.wx = previousWx;
     else delete global.wx;

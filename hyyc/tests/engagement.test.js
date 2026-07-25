@@ -21,8 +21,9 @@ const {
   decorateFavorites,
   createOptimisticPendingComment,
   updateOptimisticPendingComment,
-  mergeLocalCommentMedia,
+  mergeAcceptedComment,
   mergeResolvedCommentMedia,
+  buildCommentThreads,
   arrangeCommentThreads
 } = require('../features/engagement/model');
 const { optimisticLike, optimisticFavorite } = require('../features/engagement/optimistic');
@@ -76,7 +77,11 @@ function queryableCollection(documents, trace) {
     async get() {
       const values = documents
         .filter((document) => Object.entries(filters).every(
-          ([field, value]) => document[field] === value
+          ([field, value]) => (
+            value && typeof value === 'object' && typeof value.includes === 'function'
+              ? value.includes(document[field])
+              : document[field] === value
+          )
         ))
         .sort((left, right) => {
           for (const order of orders) {
@@ -281,6 +286,58 @@ test('continues comment pages until the requested approved comments are found', 
   ]);
 });
 
+test('loads comment roots by id without leaking a root from another item', async () => {
+  const trace = { where: [], orderBy: [], skip: [], limit: [] };
+  const documents = [
+    {
+      _id: 'root-comment-1',
+      itemId: ITEM.id,
+      status: 'active',
+      moderation: { status: 'approved' }
+    },
+    {
+      _id: 'root-comment-2',
+      itemId: 'another-item',
+      status: 'active',
+      moderation: { status: 'approved' }
+    }
+  ];
+  const repository = createFeedEngagementRepository({
+    command: {
+      in(values) {
+        return { testInValues: values };
+      }
+    },
+    createCollection: async () => null,
+    collection: () => {
+      const collection = queryableCollection(documents, trace);
+      const originalWhere = collection.where;
+      collection.where = function where(values) {
+        const normalized = Object.fromEntries(Object.entries(values).map(([key, value]) => [
+          key,
+          value && value.testInValues
+            ? { includes: (candidate) => value.testInValues.includes(candidate) }
+            : value
+        ]));
+        return originalWhere.call(this, normalized);
+      };
+      return collection;
+    }
+  }, {
+    userEngagementsCollectionName: 'engagements',
+    commentsCollectionName: 'comments',
+    favoriteListLimit: 100,
+    commentPageSize: 30
+  });
+
+  const comments = await repository.getCommentsByIds(
+    ['root-comment-1', 'root-comment-2'],
+    ITEM.id
+  );
+
+  assert.deepEqual(comments.map((comment) => comment._id), ['root-comment-1']);
+});
+
 test('lets every signed-in viewer like, favorite, and manage private history while only members participate in comments', async () => {
   const repository = memoryRepository();
   const profiles = new Map([
@@ -380,7 +437,9 @@ test('lets every signed-in viewer like, favorite, and manage private history whi
   assert.equal(publishCount, 0);
   assert.equal(holdCount, 1);
   assert.equal((await service.listComments(ITEM.id, { ownerKey: OTHER }, member)).comments.length, 0);
-  assert.equal((await service.listComments(ITEM.id, actor, member)).comments[0].reviewPending, true);
+  const ownerComments = await service.listComments(ITEM.id, actor, member);
+  assert.equal(ownerComments.comments[0].reviewPending, true);
+  assert.equal(ownerComments.commentCount, ITEM.commentCount);
   profiles.delete(OWNER);
   await assert.rejects(() => service.addComment(ITEM.id, {
     content: '没有资料不能发布',
@@ -491,6 +550,220 @@ test('stores a reply against its visible root and keeps replies beside that root
   assert.deepEqual(arranged.map((comment) => comment.id), [root._id, result.comment.id]);
 });
 
+test('returns the root comment when a paged result starts with its reply', async () => {
+  const root = {
+    _id: 'root-comment',
+    itemId: ITEM.id,
+    authorKey: OTHER,
+    content: '原评论',
+    status: 'active',
+    moderation: { status: 'approved' },
+    createdAt: new Date(NOW - 1000)
+  };
+  const reply = {
+    _id: 'reply-comment',
+    itemId: ITEM.id,
+    authorKey: OWNER,
+    content: '这是回复',
+    parentCommentId: root._id,
+    replyToCommentId: root._id,
+    replyToNickname: '原作者',
+    status: 'active',
+    moderation: { status: 'approved' },
+    createdAt: new Date(NOW)
+  };
+  const requestedRootIds = [];
+  const profiles = new Map([
+    [OWNER, { ownerKey: OWNER, nickname: '回复者', moderation: { status: 'approved' } }],
+    [OTHER, { ownerKey: OTHER, nickname: '原作者', moderation: { status: 'approved' } }]
+  ]);
+  const service = createFeedEngagementService({
+    repository: {
+      listComments: async () => [reply],
+      getCommentsByIds: async (ids) => {
+        requestedRootIds.push(...ids);
+        return [root];
+      },
+      getMany: async () => []
+    },
+    profileRepository: {
+      get: async (ownerKey) => profiles.get(ownerKey) || null,
+      getMany: async (ownerKeys) => ownerKeys.map((key) => profiles.get(key)).filter(Boolean)
+    },
+    itemLoader: async () => ITEM,
+    config: {
+      commentPageSize: 30,
+      commentMaxLength: 280,
+      commentImageLimit: 3,
+      favoriteListLimit: 100
+    },
+    now: () => NOW
+  });
+
+  const result = await service.listComments(
+    ITEM.id,
+    { ownerKey: OWNER },
+    entitlement('member')
+  );
+  const arranged = arrangeCommentThreads(result.comments);
+
+  assert.deepEqual(requestedRootIds, [root._id]);
+  assert.deepEqual(
+    arranged.map((comment) => comment.id),
+    [root._id, reply._id]
+  );
+});
+
+test('does not expose an active thread root through private comment history', async () => {
+  const privateReply = {
+    _id: 'hidden-reply',
+    itemId: ITEM.id,
+    authorKey: OWNER,
+    content: '我的历史回复',
+    parentCommentId: 'active-root',
+    replyToCommentId: 'active-root',
+    status: 'hidden',
+    moderation: { status: 'approved' },
+    createdAt: new Date(NOW)
+  };
+  let rootReadCount = 0;
+  const profile = {
+    ownerKey: OWNER,
+    nickname: '回复者',
+    moderation: { status: 'approved' }
+  };
+  const service = createFeedEngagementService({
+    repository: {
+      listComments: async (_itemId, _limit, access) => {
+        assert.equal(access.includeActive, false);
+        return [privateReply];
+      },
+      getCommentsByIds: async () => {
+        rootReadCount += 1;
+        return [];
+      },
+      getMany: async () => []
+    },
+    profileRepository: {
+      get: async () => profile,
+      getMany: async () => [profile]
+    },
+    itemLoader: async () => {
+      throw new Error('free private history must not load protected item content');
+    },
+    config: {
+      commentPageSize: 30,
+      commentMaxLength: 280,
+      commentImageLimit: 3,
+      favoriteListLimit: 100
+    },
+    now: () => NOW
+  });
+
+  const result = await service.listComments(
+    ITEM.id,
+    { ownerKey: OWNER },
+    entitlement('free')
+  );
+
+  assert.equal(rootReadCount, 0);
+  assert.deepEqual(result.comments.map((comment) => comment.id), [privateReply._id]);
+});
+
+test('builds a two-level reply group with a stable collapsed preview', () => {
+  const comments = arrangeCommentThreads([
+    {
+      id: 'reply-3',
+      parentCommentId: 'root-comment',
+      replyToCommentId: 'reply-2',
+      createdAt: '2026-07-18T08:03:00.000Z'
+    },
+    {
+      id: 'reply-1',
+      parentCommentId: 'root-comment',
+      replyToCommentId: 'root-comment',
+      createdAt: '2026-07-18T08:01:00.000Z'
+    },
+    {
+      id: 'root-comment',
+      createdAt: '2026-07-18T08:00:00.000Z'
+    },
+    {
+      id: 'reply-2',
+      parentCommentId: 'root-comment',
+      replyToCommentId: 'reply-1',
+      createdAt: '2026-07-18T08:02:00.000Z'
+    }
+  ]);
+
+  const [collapsed] = buildCommentThreads(comments);
+  assert.equal(collapsed.root.id, 'root-comment');
+  assert.deepEqual(
+    collapsed.replies.map((comment) => comment.id),
+    ['reply-1', 'reply-2', 'reply-3']
+  );
+  assert.deepEqual(
+    collapsed.visibleReplies.map((comment) => comment.id),
+    ['reply-1', 'reply-2']
+  );
+  assert.equal(collapsed.hiddenReplyCount, 1);
+  assert.equal(collapsed.isExpanded, false);
+  assert.equal(collapsed.isCollapsed, false);
+
+  const [expanded] = buildCommentThreads(comments, {
+    expandedThreadIds: { 'root-comment': true }
+  });
+  assert.deepEqual(
+    expanded.visibleReplies.map((comment) => comment.id),
+    ['reply-1', 'reply-2', 'reply-3']
+  );
+  assert.equal(expanded.hiddenReplyCount, 0);
+  assert.equal(expanded.isExpanded, true);
+
+  const [fullyCollapsed] = buildCommentThreads(comments, {
+    expandedThreadIds: { 'root-comment': false }
+  });
+  assert.deepEqual(fullyCollapsed.visibleReplies, []);
+  assert.equal(fullyCollapsed.hiddenReplyCount, 3);
+  assert.equal(fullyCollapsed.isCollapsed, true);
+});
+
+test('keeps reply context when a sparse server response replaces the optimistic comment', () => {
+  const root = {
+    id: 'root-comment',
+    content: '原评论',
+    createdAt: '2026-07-18T08:00:00.000Z'
+  };
+  const optimisticReply = createOptimisticPendingComment({
+    id: 'local-reply',
+    content: '这是回复',
+    profile: { nickname: '回复者' },
+    replyTarget: {
+      id: root.id,
+      parentCommentId: root.id,
+      nickname: '原作者',
+      preview: root.content
+    },
+    createdAt: '2026-07-18T08:01:00.000Z'
+  });
+  const acceptedReply = mergeAcceptedComment({
+    id: 'server-reply',
+    content: '这是回复',
+    attachments: [],
+    createdAt: '2026-07-18T08:01:00.000Z'
+  }, optimisticReply);
+  const [thread] = buildCommentThreads(
+    arrangeCommentThreads([acceptedReply, root])
+  );
+
+  assert.equal(acceptedReply.parentCommentId, root.id);
+  assert.equal(acceptedReply.replyToCommentId, root.id);
+  assert.equal(acceptedReply.replyToNickname, '原作者');
+  assert.equal(acceptedReply.isReply, true);
+  assert.equal(thread.root.id, root.id);
+  assert.deepEqual(thread.replies.map((comment) => comment.id), ['server-reply']);
+});
+
 test('shows a local image comment immediately and preserves its preview while the server accepts it', () => {
   const pending = createOptimisticPendingComment({
     id: 'local_mutation_123',
@@ -525,7 +798,7 @@ test('shows a local image comment immediately and preserves its preview while th
       localPath: 'wxfile://local-photo.jpg'
     }]
   });
-  const accepted = mergeLocalCommentMedia({
+  const accepted = mergeAcceptedComment({
     id: 'server-comment-1',
     content: pending.content,
     attachments: [{

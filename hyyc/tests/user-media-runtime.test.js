@@ -16,6 +16,8 @@ const {
 const {
   IMAGE_COMPRESSION_PRESETS,
   IMAGE_COMPRESSION_QUALITIES,
+  CLOUD_FUNCTION_UPLOAD_TARGET_BYTES,
+  CLOUD_FUNCTION_UPLOAD_MAX_BYTES,
   MAX_BASE64_LENGTH,
   applyCanvasOrientation,
   imageOrientation,
@@ -71,6 +73,17 @@ test('does not reject a selected source photo by its original file size', async 
   }
 });
 
+test('keeps image bytes below a Base64-safe cloud-function event budget', () => {
+  assert.equal(CLOUD_FUNCTION_UPLOAD_TARGET_BYTES, 144 * 1024);
+  assert.equal(CLOUD_FUNCTION_UPLOAD_MAX_BYTES, CLOUD_FUNCTION_UPLOAD_TARGET_BYTES);
+  assert.deepEqual(IMAGE_COMPRESSION_PRESETS.slice(-4), [
+    { maxDimension: 360, quality: 30 },
+    { maxDimension: 280, quality: 24 },
+    { maxDimension: 200, quality: 18 },
+    { maxDimension: 128, quality: 12 }
+  ]);
+});
+
 test('uploads new media only to a server-reserved staging path', async () => {
   const previousWx = global.wx;
   const cloudPath = `user-media/staging/${OWNER}/avatars/${UPLOAD}.jpg`;
@@ -79,6 +92,10 @@ test('uploads new media only to a server-reserved staging path', async () => {
   global.wx = {
     getAccountInfoSync: () => ({ miniProgram: { envVersion: 'release' } }),
     getFileSystemManager: () => ({
+      stat: ({ path, success }) => {
+        assert.equal(path, 'wxfile://avatar.jpg');
+        success({ stats: { size: 128 } });
+      },
       readFile: ({ filePath, encoding, success }) => {
         assert.equal(filePath, 'wxfile://avatar.jpg');
         assert.equal(encoding, 'base64');
@@ -190,6 +207,78 @@ test('compresses a normal phone photo below the cloud-function payload limit bef
     assert.equal(uploaded.previewPath, 'wxfile://compressed-1280x960-70.jpg');
     assert.equal(uploaded.width, 2048);
     assert.equal(uploaded.height, 1536);
+  } finally {
+    global.wx = previousWx;
+  }
+});
+
+test('falls back to native compression without reading an arbitrarily large source file', async () => {
+  const previousWx = global.wx;
+  const cloudPath = `user-media/staging/${OWNER}/comments/${UPLOAD}.jpg`;
+  const fileId = `cloud://env/${cloudPath}`;
+  const safeBase64 = '/9j/AAECAwQFBgcICQ==';
+  const component = {
+    createSelectorQuery: () => {
+      const query = {
+        select: () => query,
+        fields: () => query,
+        exec: (callback) => callback([{}])
+      };
+      return query;
+    }
+  };
+  const sourceSize = Number.MAX_SAFE_INTEGER;
+  let compressed = 0;
+  global.wx = {
+    getAccountInfoSync: () => ({ miniProgram: { envVersion: 'release' } }),
+    getFileSystemManager: () => ({
+      stat: ({ path, success }) => {
+        assert.equal(path, 'wxfile://unbounded-source.jpg');
+        success({ stats: { size: sourceSize } });
+      },
+      readFile: ({ filePath, encoding, success }) => {
+        assert.equal(filePath, 'wxfile://native-compressed.jpg');
+        assert.equal(encoding, 'base64');
+        success({ data: safeBase64 });
+      }
+    }),
+    getImageInfo: ({ src, success }) => {
+      assert.equal(src, 'wxfile://unbounded-source.jpg');
+      success({ width: 12000, height: 8000, type: 'jpg', path: src });
+    },
+    compressImage: ({ success }) => {
+      compressed += 1;
+      success({ tempFilePath: 'wxfile://native-compressed.jpg' });
+    },
+    canvasToTempFilePath: () => assert.fail('missing canvas nodes must use native compression'),
+    cloud: {
+      callFunction: async ({ data }) => {
+        assert.equal(data.action, 'uploadMedia');
+        assert.equal(data.contentBase64, safeBase64);
+        return {
+          result: {
+            ok: true,
+            data: { cloudPath, fileId }
+          }
+        };
+      }
+    }
+  };
+
+  try {
+    const [uploaded] = await uploadCommentImages([{
+      tempFilePath: 'wxfile://unbounded-source.jpg',
+      width: 12000,
+      height: 8000,
+      size: sourceSize
+    }], {
+      canvas: {
+        component,
+        canvasId: 'commentMediaCompressor'
+      }
+    });
+    assert.equal(compressed, 1);
+    assert.equal(uploaded.fileId, fileId);
   } finally {
     global.wx = previousWx;
   }
@@ -458,24 +547,31 @@ test('keeps comment content and initials when a CloudBase media batch fails', as
   assert.equal(comment.attachments[0].url, '');
 });
 
-test('refreshes a cloud image URL instead of previewing a cached temporary address', async () => {
+test('refreshes cloud avatar and image URLs instead of reusing cached temporary addresses', async () => {
   const fileId = 'cloud://env/user-media/published/comments/photo.jpg';
+  const avatarFileId = 'cloud://env/user-media/published/avatars/me.jpg';
   let requested = [];
   const resolved = await resolveFreshCommentMedia({
     id: 'comment-refresh',
-    author: {},
+    author: {
+      avatarFileId,
+      avatarUrl: 'https://temporary.example/expired-avatar.jpg'
+    },
     attachments: [{
       fileId,
       url: 'https://temporary.example/expired.jpg'
     }]
   }, async (fileIds) => {
     requested = fileIds;
-    return [{
-      fileId,
-      url: 'https://temporary.example/fresh.jpg'
-    }];
+    return fileIds.map((requestedFileId) => ({
+      fileId: requestedFileId,
+      url: requestedFileId === avatarFileId
+        ? 'https://temporary.example/fresh-avatar.jpg'
+        : 'https://temporary.example/fresh.jpg'
+    }));
   });
-  assert.deepEqual(requested, [fileId]);
+  assert.deepEqual(requested, [avatarFileId, fileId]);
+  assert.equal(resolved.author.avatarUrl, 'https://temporary.example/fresh-avatar.jpg');
   assert.equal(resolved.attachments[0].url, 'https://temporary.example/fresh.jpg');
 });
 
@@ -495,6 +591,7 @@ test('profile, profile editor and comment list do not bind stored cloud IDs dire
     'utf8'
   );
   assert.match(commentSource, /binderror="handleCommentImageError"/);
+  assert.match(commentSource, /binderror="handleCommentAvatarError"/);
   assert.match(commentSource, /图片审核中/);
   assert.match(commentSource, /图片暂时无法显示/);
 });

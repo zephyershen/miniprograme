@@ -29,7 +29,7 @@
         {
           "name": "knowledge-feed-profile-review-worker",
           "type": "timer",
-          "config": "20 * * * * * *"
+          "config": "5,20,35,50 * * * * * *"
         },
         {
           "name": "knowledge-feed-archive-maintenance",

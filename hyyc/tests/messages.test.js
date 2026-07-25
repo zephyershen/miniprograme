@@ -5,7 +5,8 @@ const path = require('node:path');
 
 const {
   formatMessageDate,
-  normalizeMessagesResult
+  normalizeMessagesResult,
+  removeMessageFromState
 } = require('../features/messages/model');
 
 function replaceModule(filename, exports) {
@@ -141,7 +142,26 @@ test('decorates a direct reply with actor, quote and source context', () => {
   assert.equal(message.itemTitle, '一条值得继续讨论的资讯');
 });
 
-test('uses the agreed knowledgeFeed actions for listing and read mutations', async () => {
+test('removes a message while keeping category and unread counts consistent', () => {
+  const state = normalizeMessagesResult({
+    unreadCount: 2,
+    messages: [
+      { id: 'interaction', type: 'comment_received', unread: true },
+      { id: 'system', type: 'profile_approved', unread: true }
+    ]
+  });
+
+  const next = removeMessageFromState(state, 'interaction');
+
+  assert.deepEqual(next.messages.map((message) => message.id), ['system']);
+  assert.equal(next.interactionCount, 0);
+  assert.equal(next.systemCount, 1);
+  assert.equal(next.unreadCount, 1);
+  assert.equal(next.hasUnread, true);
+  assert.equal(removeMessageFromState(state, 'missing'), null);
+});
+
+test('uses the agreed knowledgeFeed actions for listing, read and delete mutations', async () => {
   const cloudPath = require.resolve('../services/cloud-functions');
   const apiPath = require.resolve('../features/messages/api');
   const calls = [];
@@ -157,10 +177,12 @@ test('uses the agreed knowledgeFeed actions for listing and read mutations', asy
     const {
       getMessages,
       markMessageRead,
+      deleteMessage,
       markAllMessagesRead
     } = require(apiPath);
     await getMessages();
     await markMessageRead('message/01', 'event-01');
+    await deleteMessage('message/01');
     await markAllMessagesRead();
   } finally {
     if (previousApi) require.cache[apiPath] = previousApi;
@@ -176,6 +198,13 @@ test('uses the agreed knowledgeFeed actions for listing and read mutations', asy
         action: 'markMessageRead',
         messageId: 'message/01',
         messageVersion: 'event-01'
+      }
+    },
+    {
+      name: 'knowledgeFeed',
+      data: {
+        action: 'deleteMessage',
+        messageId: 'message/01'
       }
     },
     { name: 'knowledgeFeed', data: { action: 'markAllMessagesRead' } }
@@ -239,6 +268,83 @@ test('loads the page, marks a row read and opens its related feed item', async (
   }
 });
 
+test('opens delete only on a horizontal swipe and removes either message category', async () => {
+  const rawMessages = [
+    {
+      id: 'interaction-1',
+      type: 'comment_received',
+      itemId: 'item-1',
+      unread: true
+    },
+    {
+      id: 'system-1',
+      type: 'profile_approved',
+      unread: true
+    }
+  ];
+  const deletions = [];
+  const loaded = loadMessagesPage({
+    loadMessages: async () => ({ messages: rawMessages, unreadCount: 2 }),
+    markMessageRead: async () => ({ messages: rawMessages, unreadCount: 2 }),
+    deleteMessage: async (messageId) => {
+      deletions.push(messageId);
+      return {
+        messages: rawMessages.filter((message) => message.id !== messageId),
+        unreadCount: 1
+      };
+    },
+    markAllMessagesRead: async () => ({ messages: rawMessages, unreadCount: 2 })
+  });
+  const previousWx = global.wx;
+  global.wx = {
+    getWindowInfo: () => ({ windowWidth: 375 }),
+    showToast() {},
+    stopPullDownRefresh() {}
+  };
+  try {
+    const page = pageContext(loaded.definition);
+    await page.onLoad.call(page);
+
+    page.onMessageTouchStart.call(page, {
+      currentTarget: { dataset: { messageId: 'system-1' } },
+      touches: [{ clientX: 300, clientY: 100 }]
+    });
+    page.onMessageTouchMove.call(page, {
+      touches: [{ clientX: 294, clientY: 160 }]
+    });
+    page.onMessageTouchEnd.call(page, {
+      changedTouches: [{ clientX: 294, clientY: 160 }]
+    });
+    assert.equal(page.data.swipedMessageId, '');
+
+    page.onMessageTouchStart.call(page, {
+      currentTarget: { dataset: { messageId: 'interaction-1' } },
+      touches: [{ clientX: 300, clientY: 100 }]
+    });
+    page.onMessageTouchMove.call(page, {
+      touches: [{ clientX: 245, clientY: 104 }]
+    });
+    page.onMessageTouchEnd.call(page, {
+      changedTouches: [{ clientX: 245, clientY: 104 }]
+    });
+    assert.equal(page.data.swipedMessageId, 'interaction-1');
+
+    assert.equal(await page.deleteMessage.call(page, {
+      currentTarget: { dataset: { messageId: 'interaction-1' } }
+    }), true);
+    assert.deepEqual(deletions, ['interaction-1']);
+    assert.deepEqual(page.data.messages.map((message) => message.id), ['system-1']);
+    assert.equal(page.data.interactionCount, 0);
+    assert.equal(page.data.systemCount, 1);
+    assert.equal(page.data.unreadCount, 1);
+    assert.equal(page.data.deletingMessageId, '');
+  } finally {
+    loaded.restore();
+    if (previousWx) global.wx = previousWx;
+    else delete global.wx;
+  }
+});
+
 test('supports all-read, loading, error, empty and unread visual states', async () => {
   const rawMessages = [
     { id: 'one', kind: 'membership_activated', isRead: false },
@@ -281,7 +387,68 @@ test('supports all-read, loading, error, empty and unread visual states', async 
   assert.match(markup, /wx:elif="\{\{!messages\.length\}\}"/);
   assert.match(markup, /class="message-unread-dot"/);
   assert.match(markup, /bindtap="markAllMessages"/);
+  assert.match(markup, /bindtouchmove="onMessageTouchMove"/);
+  assert.match(markup, /catchtap="deleteMessage"/);
   assert.match(styles, /\.message-row-unread::before/);
+  assert.match(styles, /\.message-swipe-content\.is-open/);
+  assert.match(styles, /\.message-delete-action/);
+});
+
+test('refreshes messages while the page stays visible and stops polling when hidden', async () => {
+  const loaded = loadMessagesPage({
+    loadMessages: async () => ({ messages: [], unreadCount: 0 }),
+    markMessageRead: async () => ({ messages: [], unreadCount: 0 }),
+    deleteMessage: async () => ({ messages: [], unreadCount: 0 }),
+    markAllMessagesRead: async () => ({ messages: [], unreadCount: 0 })
+  });
+  const previousSetTimeout = global.setTimeout;
+  const previousClearTimeout = global.clearTimeout;
+  const scheduled = [];
+  const cleared = [];
+  let nextTimerId = 1;
+  global.setTimeout = (callback, delay) => {
+    const timer = { id: nextTimerId, callback, delay };
+    nextTimerId += 1;
+    scheduled.push(timer);
+    return timer.id;
+  };
+  global.clearTimeout = (timerId) => {
+    cleared.push(timerId);
+  };
+
+  try {
+    const page = pageContext(loaded.definition);
+    const refreshOptions = [];
+    page.pageDisposed = false;
+    page.messagesLoaded = true;
+    page.loadMessages = async (options) => {
+      refreshOptions.push(options);
+      return true;
+    };
+
+    assert.equal(await page.onShow.call(page), true);
+    assert.equal(page.messagesPageVisible, true);
+    assert.deepEqual(refreshOptions, [{ force: true, preserveCurrent: true }]);
+    assert.equal(scheduled.length, 1);
+    assert.equal(scheduled[0].delay, 10_000);
+
+    await scheduled[0].callback();
+    assert.deepEqual(refreshOptions, [
+      { force: true, preserveCurrent: true },
+      { force: true, preserveCurrent: true }
+    ]);
+    assert.equal(scheduled.length, 2);
+
+    const activeTimerId = page.messagesRefreshTimer;
+    page.onHide.call(page);
+    assert.equal(page.messagesPageVisible, false);
+    assert.equal(page.messagesRefreshTimer, null);
+    assert.ok(cleared.includes(activeTimerId));
+  } finally {
+    global.setTimeout = previousSetTimeout;
+    global.clearTimeout = previousClearTimeout;
+    loaded.restore();
+  }
 });
 
 test('ignores an older single-read response after a newer message mutation finishes', async () => {
@@ -354,6 +521,44 @@ test('serializes message reads and mark-all before updating the shared cache', a
     await readRequest;
     await allRequest;
     assert.deepEqual(calls, ['read', 'all']);
+  } finally {
+    if (previousSession) require.cache[sessionPath] = previousSession;
+    else delete require.cache[sessionPath];
+    restoreApi();
+  }
+});
+
+test('keeps a deleted message out of the shared cache when the page is reopened', async () => {
+  const apiPath = require.resolve('../features/messages/api');
+  const sessionPath = require.resolve('../features/messages/session');
+  const calls = [];
+  const restoreApi = replaceModule(apiPath, {
+    getMessages: async () => {
+      calls.push('load');
+      return {
+        messages: [{ id: 'message-one', type: 'profile_approved', unread: true }],
+        unreadCount: 1
+      };
+    },
+    markMessageRead: async () => ({ messages: [], unreadCount: 0 }),
+    deleteMessage: async () => {
+      calls.push('delete');
+      return { messages: [], unreadCount: 0 };
+    },
+    markAllMessagesRead: async () => ({ messages: [], unreadCount: 0 })
+  });
+  const previousSession = require.cache[sessionPath];
+  delete require.cache[sessionPath];
+  try {
+    const session = require(sessionPath);
+    const loaded = await session.loadMessages({ force: true });
+    assert.deepEqual(loaded.messages.map((message) => message.id), ['message-one']);
+
+    await session.deleteMessage('message-one');
+    const reopened = await session.loadMessages();
+
+    assert.deepEqual(reopened.messages, []);
+    assert.deepEqual(calls, ['load', 'delete']);
   } finally {
     if (previousSession) require.cache[sessionPath] = previousSession;
     else delete require.cache[sessionPath];

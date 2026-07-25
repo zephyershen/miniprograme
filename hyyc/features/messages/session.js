@@ -1,6 +1,7 @@
 const {
   getMessages,
   markMessageRead: requestMarkMessageRead,
+  deleteMessage: requestDeleteMessage,
   markAllMessagesRead: requestMarkAllMessagesRead
 } = require('./api.js');
 const { normalizeMessagesResult } = require('./model.js');
@@ -60,6 +61,17 @@ function markMessageRead(messageId, messageVersion) {
   });
 }
 
+function deleteMessage(messageId) {
+  const scope = currentScope();
+  const generation = messageViewerGeneration;
+  return enqueueMessageOperation(async () => {
+    assertCurrentViewer(scope, generation);
+    const result = normalizeMessagesResult(await requestDeleteMessage(messageId));
+    assertCurrentViewer(scope, generation);
+    return messagesCache.remember(scope, result);
+  });
+}
+
 function markAllMessagesRead() {
   const scope = currentScope();
   const generation = messageViewerGeneration;
@@ -81,6 +93,7 @@ registerViewerCache(clearMessages);
 module.exports = {
   loadMessages,
   markMessageRead,
+  deleteMessage,
   markAllMessagesRead,
   clearMessages
 };

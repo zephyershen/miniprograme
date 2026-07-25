@@ -25,6 +25,11 @@ test('cloudbaserc is the exact four-function production manifest', () => {
     [...EXPECTED_FUNCTION_NAMES].sort()
   );
   assert.equal(contracts.functions.length, 4);
+  const knowledgeFeed = contracts.functions.find((entry) => entry.name === 'knowledgeFeed');
+  const reviewWorker = knowledgeFeed.triggers.find(
+    (trigger) => trigger.name === 'knowledge-feed-profile-review-worker'
+  );
+  assert.equal(reviewWorker.config, '5,20,35,50 * * * * * *');
 });
 
 test('function list, detail and delete commands preserve exact targets', () => {

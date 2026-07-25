@@ -117,6 +117,13 @@ async function resolveCommentMedia(comments = [], resolver = resolveCloudFileUrl
 async function resolveFreshCommentMedia(comment, resolver = resolveCloudFileUrls) {
   const refreshableComment = {
     ...comment,
+    author: {
+      ...(comment && comment.author || {}),
+      avatarUrl: String(comment && comment.author && comment.author.avatarFileId || '')
+        .startsWith('cloud://')
+        ? ''
+        : comment && comment.author && comment.author.avatarUrl || ''
+    },
     attachments: (comment && comment.attachments || []).map((attachment) => ({
       ...attachment,
       url: String(attachment && attachment.fileId || '').startsWith('cloud://')

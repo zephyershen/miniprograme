@@ -6,6 +6,7 @@ const MUTATING_ACTIONS = Object.freeze({
   knowledgeFeed: new Set([
     'addComment',
     'appealComment',
+    'deleteMessage',
     'deleteComment',
     'markAllMessagesRead',
     'markMessageRead',

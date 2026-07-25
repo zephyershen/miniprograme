@@ -557,6 +557,7 @@ const ACTION_HANDLERS = Object.freeze({
       {
         content: event.content,
         attachments: event.attachments,
+        replyToCommentId: event.replyToCommentId,
         clientMutationId: event.clientMutationId
       },
       actor,
@@ -607,13 +608,19 @@ const ACTION_HANDLERS = Object.freeze({
     const actor = actorService.resolve();
     return userProfileService.save(event.profile, actor);
   },
-    messages: async () => userMessageService.list(actorService.resolve()),
-    markMessageRead: async (event) => userMessageService.markRead(
-      event.messageId,
-      event.messageVersion,
-      actorService.resolve()
-    ),
-  markAllMessagesRead: async () => userMessageService.markAllRead(actorService.resolve()),
+  messages: async () => userMessageService.list(actorService.resolve()),
+  markMessageRead: async (event) => userMessageService.markRead(
+    event.messageId,
+    event.messageVersion,
+    actorService.resolve()
+  ),
+  deleteMessage: async (event) => userMessageService.deleteMessage(
+    event.messageId,
+    actorService.resolve()
+  ),
+  markAllMessagesRead: async () => userMessageService.markAllRead(
+    actorService.resolve()
+  ),
   columnContent: async () => {
     const actor = actorService.resolve();
     return columnContentService.get(await resolveEntitlement(actor));

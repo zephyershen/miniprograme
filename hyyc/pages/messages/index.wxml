@@ -1,13 +1,12 @@
 <view class="messages-page">
   <view class="messages-header">
     <view class="messages-heading">
-      <view class="messages-kicker"><text></text>MY UPDATES</view>
       <view class="messages-title">消息</view>
       <view class="messages-deck">会员开通、审核结果和你参与的讨论动态，都会留在这里。</view>
     </view>
     <button
       class="read-all-action"
-      disabled="{{!hasUnread || markingAll || loading}}"
+      disabled="{{!hasUnread || markingAll || deletingMessageId || loading}}"
       loading="{{markingAll}}"
       bindtap="markAllMessages"
     >全部已读</button>
@@ -33,83 +32,129 @@
   </view>
 
   <block wx:else>
-    <view class="messages-summary interaction-summary">
-      <view>
-        <view class="summary-title">评论互动</view>
-        <view class="summary-deck">回复与同一讨论的新观点</view>
+    <view class="message-tabs">
+      <view
+        class="message-tab {{activeMessageTab === 'interaction' ? 'is-active' : ''}}"
+        data-tab="interaction"
+        bindtap="switchMessageTab"
+      >
+        <text>评论互动</text>
+        <text wx:if="{{interactionCount}}" class="message-tab-count">{{interactionCount}}</text>
       </view>
-      <view class="summary-count">{{hasUnread ? unreadCount + ' 条未读' : '已全部读完'}}</view>
+      <view
+        class="message-tab {{activeMessageTab === 'system' ? 'is-active' : ''}}"
+        data-tab="system"
+        bindtap="switchMessageTab"
+      >
+        <text>系统通知</text>
+        <text wx:if="{{systemCount}}" class="message-tab-count">{{systemCount}}</text>
+      </view>
     </view>
-    <view class="interaction-list">
+    <view class="message-list" wx:if="{{activeMessageTab === 'interaction'}}">
       <view wx:if="{{!interactionCount}}" class="interaction-empty">
         <text>还没有评论互动</text>
         <text>有人回复你的评论，或参与同一资讯讨论时，会出现在这里。</text>
       </view>
       <block wx:for="{{messages}}" wx:key="id">
-      <view
-        wx:if="{{item.isInteraction}}"
-        class="interaction-row {{item.unread ? 'interaction-row-unread' : ''}}"
-        hover-class="interaction-row-pressed"
-        data-message-id="{{item.id}}"
-        bindtap="openMessage"
-      >
-        <view class="interaction-avatar-wrap">
-          <image wx:if="{{item.actorAvatarUrl}}" class="interaction-avatar" src="{{item.actorAvatarUrl}}" mode="aspectFill" lazy-load="{{true}}" />
-          <view wx:else class="interaction-avatar interaction-avatar-empty">{{item.actorInitial}}</view>
-          <view wx:if="{{item.unread}}" class="interaction-unread-dot"></view>
-        </view>
-        <view class="interaction-main">
-          <view class="interaction-meta">
-            <text class="interaction-name">{{item.isOwnComment ? '我的评论' : (item.actorNickname || '一位读者')}}</text>
-            <text>{{item.interactionVerb}}</text>
-            <text class="interaction-time">{{item.occurredLabel}}</text>
-          </view>
-          <view class="interaction-copy">{{item.commentPreview || item.body}}</view>
-          <view wx:if="{{item.replyToPreview}}" class="interaction-quote">
-            <text>原评论</text>
-            <text>“{{item.replyToPreview}}”</text>
-          </view>
-          <view class="interaction-context">
-            <view class="interaction-context-copy">
-              <text>所在资讯</text>
-              <text>{{item.itemTitle || item.title || '查看相关资讯'}}</text>
+        <view
+          wx:if="{{item.isInteraction}}"
+          class="message-swipe-shell"
+        >
+          <view
+            class="message-delete-action"
+            data-message-id="{{item.id}}"
+            catchtap="deleteMessage"
+            aria-role="button"
+            aria-label="删除这条评论互动"
+          >删除</view>
+          <view
+            class="message-swipe-content {{swipedMessageId === item.id ? 'is-open' : ''}}"
+            style="{{swipeDraggingId === item.id ? ('transform: translateX(' + swipeDragOffset + 'px); transition: none;') : ''}}"
+            data-message-id="{{item.id}}"
+            bindtouchstart="onMessageTouchStart"
+            bindtouchmove="onMessageTouchMove"
+            bindtouchend="onMessageTouchEnd"
+            bindtouchcancel="onMessageTouchCancel"
+          >
+            <view
+              class="interaction-row {{item.unread ? 'interaction-row-unread' : ''}}"
+              hover-class="interaction-row-pressed"
+              data-message-id="{{item.id}}"
+              bindtap="openMessage"
+            >
+              <view class="interaction-avatar-wrap">
+                <image wx:if="{{item.actorAvatarUrl}}" class="interaction-avatar" src="{{item.actorAvatarUrl}}" mode="aspectFill" lazy-load="{{true}}" />
+                <view wx:else class="interaction-avatar interaction-avatar-empty">{{item.actorInitial}}</view>
+                <view wx:if="{{item.unread}}" class="interaction-unread-dot"></view>
+              </view>
+              <view class="interaction-main">
+                <view class="interaction-meta">
+                  <text class="interaction-name">{{item.isOwnComment ? '我的评论' : (item.actorNickname || '一位读者')}}</text>
+                  <text>{{item.interactionVerb}}</text>
+                  <text class="interaction-time">{{item.occurredLabel}}</text>
+                </view>
+                <view class="interaction-copy">{{item.commentPreview || item.body}}</view>
+                <view wx:if="{{item.replyToPreview}}" class="interaction-quote">
+                  <text>原评论</text>
+                  <text>“{{item.replyToPreview}}”</text>
+                </view>
+                <view class="interaction-context">
+                  <view class="interaction-context-copy">
+                    <text>所在资讯</text>
+                    <text>{{item.itemTitle || item.title || '查看相关资讯'}}</text>
+                  </view>
+                  <image wx:if="{{item.itemThumbnailUrl}}" class="interaction-thumbnail" src="{{item.itemThumbnailUrl}}" mode="aspectFill" lazy-load="{{true}}" />
+                  <text class="interaction-arrow">→</text>
+                </view>
+              </view>
             </view>
-            <image wx:if="{{item.itemThumbnailUrl}}" class="interaction-thumbnail" src="{{item.itemThumbnailUrl}}" mode="aspectFill" lazy-load="{{true}}" />
-            <text class="interaction-arrow">→</text>
           </view>
         </view>
-      </view>
       </block>
     </view>
-
-    <view class="messages-summary system-summary">
-      <view>
-        <view class="summary-title">系统通知</view>
-        <view class="summary-deck">会员、资料与审核结果</view>
-      </view>
-    </view>
-    <view class="message-list">
+    <view class="message-list" wx:if="{{activeMessageTab === 'system'}}">
       <view wx:if="{{!systemCount}}" class="system-empty">暂时没有系统通知</view>
       <block wx:for="{{messages}}" wx:key="id">
         <view
           wx:if="{{!item.isInteraction}}"
-          class="message-row {{item.unread ? 'message-row-unread' : ''}}"
-          hover-class="message-row-pressed"
-          data-message-id="{{item.id}}"
-          bindtap="openMessage"
+          class="message-swipe-shell"
         >
-          <view class="message-signal message-signal-{{item.tone}}">
-            <text>{{item.glyph}}</text>
-            <view wx:if="{{item.unread}}" class="message-unread-dot"></view>
-          </view>
-          <view class="message-copy">
-            <view class="message-meta">
-              <text>{{item.kindLabel}}</text>
-              <text class="message-time">{{item.occurredLabel}}</text>
+          <view
+            class="message-delete-action"
+            data-message-id="{{item.id}}"
+            catchtap="deleteMessage"
+            aria-role="button"
+            aria-label="删除这条系统通知"
+          >删除</view>
+          <view
+            class="message-swipe-content {{swipedMessageId === item.id ? 'is-open' : ''}}"
+            style="{{swipeDraggingId === item.id ? ('transform: translateX(' + swipeDragOffset + 'px); transition: none;') : ''}}"
+            data-message-id="{{item.id}}"
+            bindtouchstart="onMessageTouchStart"
+            bindtouchmove="onMessageTouchMove"
+            bindtouchend="onMessageTouchEnd"
+            bindtouchcancel="onMessageTouchCancel"
+          >
+            <view
+              class="message-row {{item.unread ? 'message-row-unread' : ''}}"
+              hover-class="message-row-pressed"
+              data-message-id="{{item.id}}"
+              bindtap="openMessage"
+            >
+              <view class="message-signal message-signal-{{item.tone}}">
+                <text>{{item.glyph}}</text>
+                <view wx:if="{{item.unread}}" class="message-unread-dot"></view>
+              </view>
+              <view class="message-copy">
+                <view class="message-meta">
+                  <text>{{item.kindLabel}}</text>
+                  <text class="message-time">{{item.occurredLabel}}</text>
+                </view>
+                <view class="message-title">{{item.title}}</view>
+                <view class="message-body">{{item.body}}</view>
+                <view wx:if="{{item.canOpenItem}}" class="message-link">查看相关资讯 <text>→</text></view>
+              </view>
             </view>
-            <view class="message-title">{{item.title}}</view>
-            <view class="message-body">{{item.body}}</view>
-            <view wx:if="{{item.canOpenItem}}" class="message-link">查看相关资讯 <text>→</text></view>
           </view>
         </view>
       </block>

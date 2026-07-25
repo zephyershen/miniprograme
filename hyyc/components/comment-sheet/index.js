@@ -7,11 +7,13 @@ const {
   restoreComment: restoreCommentRequest
 } = require('../../features/engagement/api.js');
 const {
+  buildCommentThreads,
   arrangeCommentThreads,
   decorateCommentThreads,
+  commentDisplayCount,
   createOptimisticPendingComment,
   updateOptimisticPendingComment,
-  mergeLocalCommentMedia,
+  mergeAcceptedComment,
   mergeResolvedCommentMedia
 } = require('../../features/engagement/model.js');
 const {
@@ -39,6 +41,33 @@ function mutationId() {
 
 function normalizeItemId(value) {
   return typeof value === 'string' ? value.trim() : '';
+}
+
+const COMMENT_REVIEW_REFRESH_INTERVAL_MS = 2500;
+
+function hasPendingOwnCommentReview(comments = []) {
+  return comments.some((comment) => (
+    comment
+    && comment.isMine === true
+    && comment.reviewPending === true
+  ));
+}
+
+function createCommentThreadViews(comments, expandedThreadIds) {
+  return buildCommentThreads(comments, { expandedThreadIds }).flatMap((thread) => {
+    if (thread.root) return [thread];
+    return thread.replies.map((reply) => ({
+      id: reply.id,
+      root: reply,
+      replies: [],
+      visibleReplies: [],
+      replyCount: 0,
+      hiddenReplyCount: 0,
+      isExpanded: false,
+      isCollapsed: false,
+      isDetachedReply: true
+    }));
+  });
 }
 
 function confirmAction(options) {
@@ -102,6 +131,7 @@ Component({
     commentsLoading: false,
     commentsResolved: false,
     comments: [],
+    displayCommentCount: 0,
     canParticipate: false,
     commentDraft: '',
     commentDraftImages: [],
@@ -116,6 +146,8 @@ Component({
     emojiOptions: COMMENT_EMOJIS,
     commentActionBusyId: '',
     scrollIntoCommentId: '',
+    expandedReplyThreadIds: {},
+    commentThreads: [],
     viewerProfile: decorateUserProfile(null)
   },
 
@@ -129,6 +161,9 @@ Component({
       } catch (error) {
         this.windowHeight = 0;
       }
+    },
+    detached() {
+      this.stopCommentReviewRefresh();
     }
   },
 
@@ -136,7 +171,9 @@ Component({
     visible(value) {
       if (value) {
         if (!this.commentsLoaded) this.loadComments();
+        else this.syncCommentReviewRefresh();
       } else {
+        this.stopCommentReviewRefresh();
         this.resetComposer();
       }
     },
@@ -144,6 +181,7 @@ Component({
       const nextItemId = normalizeItemId(value);
       const previousItemId = normalizeItemId(this.commentItemId);
       if (nextItemId === previousItemId) return;
+      this.stopCommentReviewRefresh();
       this.commentItemId = nextItemId;
       this.commentsLoaded = false;
       this.commentLoadedItemId = '';
@@ -151,12 +189,15 @@ Component({
       this.commentLoadRequestId = (this.commentLoadRequestId || 0) + 1;
       this.commentMediaRequestId = (this.commentMediaRequestId || 0) + 1;
       this.commentImageRecoveryRequests = new Set();
+      this.commentAvatarRecoveryRequests = new Set();
       this.setData({
         comments: [],
+        commentThreads: [],
         commentsLoading: false,
         commentsResolved: false,
         canParticipate: this.data.canParticipateHint === true,
-        scrollIntoCommentId: ''
+        scrollIntoCommentId: '',
+        expandedReplyThreadIds: {}
       }, () => {
         if (nextItemId && this.data.visible) this.loadComments();
       });
@@ -169,11 +210,18 @@ Component({
       if (!this.commentsLoaded && value === true && this.data.canParticipate !== true) {
         this.setData({ canParticipate: true });
       }
+    },
+    commentCount(value) {
+      const displayCommentCount = commentDisplayCount(this.data.comments, value);
+      if (displayCommentCount !== this.data.displayCommentCount) {
+        this.setData({ displayCommentCount });
+      }
     }
   },
 
   pageLifetimes: {
     async show() {
+      if (this.data.visible) this.syncCommentReviewRefresh();
       if (!this.profileEditorRequested) return;
       this.profileEditorRequested = false;
       try {
@@ -182,6 +230,9 @@ Component({
       } catch (error) {
         console.warn('评论身份暂时未刷新', error && error.code ? error.code : error);
       }
+    },
+    hide() {
+      this.stopCommentReviewRefresh();
     }
   },
 
@@ -191,6 +242,43 @@ Component({
     close() {
       wx.hideKeyboard();
       this.triggerEvent('close');
+    },
+
+    stopCommentReviewRefresh() {
+      if (this.commentReviewRefreshTimer) {
+        clearTimeout(this.commentReviewRefreshTimer);
+      }
+      this.commentReviewRefreshTimer = null;
+    },
+
+    scheduleCommentReviewRefresh(delay = COMMENT_REVIEW_REFRESH_INTERVAL_MS) {
+      this.stopCommentReviewRefresh();
+      if (!this.data.visible
+        || !normalizeItemId(this.data.itemId)
+        || !hasPendingOwnCommentReview(this.data.comments)) return false;
+      this.commentReviewRefreshTimer = setTimeout(async () => {
+        this.commentReviewRefreshTimer = null;
+        if (!this.data.visible || !hasPendingOwnCommentReview(this.data.comments)) return;
+        try {
+          await this.loadComments(true, { silent: true });
+        } finally {
+          this.syncCommentReviewRefresh();
+        }
+      }, delay);
+      if (this.commentReviewRefreshTimer
+        && typeof this.commentReviewRefreshTimer.unref === 'function') {
+        this.commentReviewRefreshTimer.unref();
+      }
+      return true;
+    },
+
+    syncCommentReviewRefresh(comments = this.data.comments) {
+      if (!this.data.visible || !hasPendingOwnCommentReview(comments)) {
+        this.stopCommentReviewRefresh();
+        return false;
+      }
+      if (this.commentReviewRefreshTimer) return true;
+      return this.scheduleCommentReviewRefresh();
     },
 
     resetComposer() {
@@ -209,7 +297,23 @@ Component({
       });
     },
 
-    async loadComments(force = false) {
+    setComments(comments, extra = {}) {
+      const expandedThreadIds = extra.expandedReplyThreadIds
+        || this.data.expandedReplyThreadIds;
+      const authoritativeCommentCount = extra.authoritativeCommentCount === undefined
+        ? this.data.commentCount
+        : extra.authoritativeCommentCount;
+      const nextExtra = { ...extra };
+      delete nextExtra.authoritativeCommentCount;
+      this.setData({
+        comments,
+        displayCommentCount: commentDisplayCount(comments, authoritativeCommentCount),
+        commentThreads: createCommentThreadViews(comments, expandedThreadIds),
+        ...nextExtra
+      });
+    },
+
+    async loadComments(force = false, { silent = false } = {}) {
       const itemId = normalizeItemId(this.data.itemId);
       if (!itemId) return;
       if (!force && this.commentsLoaded && this.commentLoadedItemId === itemId) return;
@@ -227,15 +331,20 @@ Component({
         this.commentsLoaded = true;
         this.commentLoadedItemId = itemId;
         const comments = decorateCommentThreads(result.comments || []);
-        this.setData({
-          comments,
+        this.setComments(comments, {
+          authoritativeCommentCount: result.commentCount,
           commentsResolved: true,
           canParticipate: result.canParticipate === true,
           viewerProfile: decorateUserProfile(result.viewerProfile),
           ...(this.data.focusCommentId
             ? { scrollIntoCommentId: `comment-${this.data.focusCommentId}` }
-            : {})
+            : {}),
+          ...this.focusThreadExpansion(comments)
         });
+        this.syncCommentReviewRefresh(comments);
+        if (Number.isFinite(Number(result.commentCount))) {
+          this.triggerEvent('changed', { commentCount: Number(result.commentCount) });
+        }
         this.resolveVisibleCommentMedia(comments);
         rememberUserProfile(result.viewerProfile).then((viewerProfile) => {
           if (requestId === this.commentLoadRequestId
@@ -250,7 +359,7 @@ Component({
           this.commentsLoaded = false;
           this.commentLoadedItemId = '';
           this.triggerEvent('locked');
-        } else {
+        } else if (!silent) {
           wx.showToast({ title: error.message || '评论暂时无法加载', icon: 'none' });
         }
       } finally {
@@ -331,6 +440,34 @@ Component({
       }
     },
 
+    async handleCommentAvatarError(event) {
+      const commentId = event.currentTarget.dataset.commentId || '';
+      const comment = this.data.comments.find((entry) => entry && entry.id === commentId);
+      if (!comment || !comment.author || !comment.author.avatarFileId) return;
+      this.commentAvatarRecoveryRequests = this.commentAvatarRecoveryRequests || new Set();
+      if (this.commentAvatarRecoveryRequests.has(commentId)) return;
+      this.commentAvatarRecoveryRequests.add(commentId);
+      let avatarUrl = '';
+      try {
+        const refreshed = await resolveFreshCommentMedia(comment);
+        avatarUrl = refreshed && refreshed.author && refreshed.author.avatarUrl || '';
+      } catch (error) {
+        avatarUrl = '';
+      }
+      const comments = this.data.comments.map((entry) => (
+        entry && entry.id === commentId
+          ? {
+            ...entry,
+            author: {
+              ...(entry.author || {}),
+              avatarUrl
+            }
+          }
+          : entry
+      ));
+      this.setComments(comments);
+    },
+
     beginReply(event) {
       const commentId = event.currentTarget.dataset.commentId || '';
       const comment = this.data.comments.find((entry) => entry.id === commentId);
@@ -355,6 +492,53 @@ Component({
       this.setData({ replyTarget: null });
     },
 
+    expandReplies(event) {
+      const rootId = event.currentTarget.dataset.rootId || '';
+      this.setReplyThreadExpanded(rootId, true);
+    },
+
+    collapseReplies(event) {
+      const rootId = event.currentTarget.dataset.rootId || '';
+      this.setReplyThreadExpanded(rootId, false);
+    },
+
+    setReplyThreadExpanded(rootId, expanded) {
+      if (!rootId) return;
+      const expandedReplyThreadIds = {
+        ...this.data.expandedReplyThreadIds,
+        [rootId]: expanded
+      };
+      this.setData({
+        expandedReplyThreadIds,
+        commentThreads: createCommentThreadViews(
+          this.data.comments,
+          expandedReplyThreadIds
+        )
+      });
+    },
+
+    focusThreadExpansion(comments) {
+      const focusId = this.data.focusCommentId;
+      if (!focusId) return {};
+      const byId = (comments || []).reduce((map, entry) => {
+        if (entry && entry.id) map[entry.id] = entry;
+        return map;
+      }, {});
+      const target = byId[focusId];
+      if (!target || !target.parentCommentId) return {};
+      let cursor = target;
+      while (cursor && cursor.parentCommentId && byId[cursor.parentCommentId]) {
+        cursor = byId[cursor.parentCommentId];
+      }
+      const rootId = cursor && cursor.id;
+      return {
+        expandedReplyThreadIds: {
+          ...this.data.expandedReplyThreadIds,
+          [rootId || target.parentCommentId]: true
+        }
+      };
+    },
+
     async resolveVisibleCommentMedia(comments) {
       const requestId = (this.commentMediaRequestId || 0) + 1;
       this.commentMediaRequestId = requestId;
@@ -362,9 +546,7 @@ Component({
       try {
         const resolved = await resolveCommentMedia(comments);
         if (requestId === this.commentMediaRequestId && itemId === this.data.itemId) {
-          this.setData({
-            comments: mergeResolvedCommentMedia(this.data.comments, resolved)
-          });
+          this.setComments(mergeResolvedCommentMedia(this.data.comments, resolved));
         }
       } catch (error) {
         // Text and initials are already visible; media resolution is fail-open.
@@ -393,9 +575,7 @@ Component({
           event.currentTarget.dataset.fileId
         );
         if (resolvedComment) {
-          this.setData({
-            comments: mergeResolvedCommentMedia(this.data.comments, [resolvedComment])
-          });
+          this.setComments(mergeResolvedCommentMedia(this.data.comments, [resolvedComment]));
         }
       } catch (error) {
         if (attachment.localPath) {
@@ -430,7 +610,7 @@ Component({
           attachmentMediaCount: attachments.filter((attachment) => attachment.url).length
         };
       });
-      this.setData({ comments });
+      this.setComments(comments);
     },
 
     async handleCommentImageError(event) {
@@ -461,9 +641,7 @@ Component({
           this.markCommentImageUnavailable(commentId, fileId, attachmentIndex);
           return;
         }
-        this.setData({
-          comments: mergeResolvedCommentMedia(this.data.comments, [resolvedComment])
-        });
+        this.setComments(mergeResolvedCommentMedia(this.data.comments, [resolvedComment]));
       } catch (error) {
         if (itemId === normalizeItemId(this.data.itemId)) {
           this.markCommentImageUnavailable(commentId, fileId, attachmentIndex);
@@ -505,7 +683,7 @@ Component({
             : this.data.comments.map((entry) => (
                 entry.id === commentId ? { ...entry, reported: true } : entry
               ));
-          this.setData({ comments });
+          this.setComments(comments);
         }
         this.triggerEvent('changed', { commentCount: result.commentCount });
         wx.showToast({
@@ -556,8 +734,11 @@ Component({
       });
       let draftForRetry = draftImages;
       wx.hideKeyboard();
-      this.setData({
-        comments: arrangeCommentThreads([optimisticComment, ...this.data.comments]),
+      const commentsWithOptimistic = arrangeCommentThreads([
+        optimisticComment,
+        ...this.data.comments
+      ]);
+      this.setComments(commentsWithOptimistic, {
         scrollIntoCommentId: `comment-${optimisticId}`,
         commentDraft: '',
         commentDraftImages: [],
@@ -598,7 +779,7 @@ Component({
             statusLabel: '提交审核中'
           }
         );
-        this.setData({ comments: commentsWithUploadedMedia });
+        this.setComments(commentsWithUploadedMedia);
         const result = await addComment(this.data.itemId, {
           content,
           attachments: imagesWithFileIds.map((image) => ({
@@ -614,23 +795,21 @@ Component({
         this.commentMutationId = '';
         const localComment = this.data.comments.find((entry) => entry.id === optimisticId)
           || optimisticComment;
-        const acceptedComment = mergeLocalCommentMedia(result.comment, localComment);
+        const acceptedComment = mergeAcceptedComment(result.comment, localComment);
         const comments = decorateCommentThreads(this.data.comments.map((comment) => (
           comment.id === optimisticId ? acceptedComment : comment
         )));
-        this.setData({
-          comments,
+        this.setComments(comments, {
           scrollIntoCommentId: `comment-${result.comment.id}`
         });
+        this.syncCommentReviewRefresh(comments);
         this.resolveVisibleCommentMedia(comments);
         this.triggerEvent('published', { commentCount: result.commentCount });
-        wx.showToast({ title: '已提交，后台审核中', icon: 'none', duration: 2200 });
       } catch (error) {
         const comments = this.data.comments.filter((comment) => comment.id !== optimisticId);
         if (error.code === 'PROFILE_REQUIRED') {
           this.commentMutationId = '';
-          this.setData({
-            comments,
+          this.setComments(comments, {
             commentDraft: content,
             commentDraftImages: draftForRetry,
             replyTarget,
@@ -639,8 +818,7 @@ Component({
           this.openProfileEditor();
         } else if (error.code === 'CONTENT_REJECTED') {
           this.commentMutationId = '';
-          this.setData({
-            comments,
+          this.setComments(comments, {
             commentDraft: content,
             commentDraftImages: [],
             replyTarget,
@@ -648,8 +826,7 @@ Component({
           });
           wx.showToast({ title: error.message || '评论包含不适合公开的内容', icon: 'none' });
         } else {
-          this.setData({
-            comments,
+          this.setComments(comments, {
             commentDraft: content,
             commentDraftImages: draftForRetry,
             replyTarget,
@@ -659,6 +836,7 @@ Component({
         }
       } finally {
         this.setData({ commentSubmitting: false, commentSubmitStatus: '' });
+        this.syncCommentReviewRefresh();
       }
     }
   }

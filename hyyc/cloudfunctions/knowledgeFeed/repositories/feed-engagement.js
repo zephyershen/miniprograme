@@ -272,6 +272,22 @@ function createFeedEngagementRepository(db, config) {
     ]);
   }
 
+  async function getCommentsByIds(commentIds, itemId) {
+    await ensureComments();
+    const safeItemId = assertItemId(itemId);
+    const ids = [...new Set((commentIds || []).filter(Boolean).map(assertCommentId))];
+    const documents = [];
+    for (const batch of chunks(ids, 50)) {
+      if (!batch.length) continue;
+      const response = await comments()
+        .where({ _id: db.command.in(batch) })
+        .limit(batch.length)
+        .get();
+      documents.push(...((response && response.data) || []));
+    }
+    return documents.filter((comment) => comment && comment.itemId === safeItemId);
+  }
+
   async function getComment(commentId, itemId) {
     await Promise.all([ensureComments(), config.ensureItems ? config.ensureItems() : null]);
     const [comment, item] = await Promise.all([
@@ -624,6 +640,7 @@ function createFeedEngagementRepository(db, config) {
     toggleFavorite: setFavorite,
     listFavorites,
     listComments,
+    getCommentsByIds,
     getComment,
     findByAttachmentFileIds,
     addComment,

@@ -261,6 +261,24 @@ function normalizeMessagesResult(value = {}, now = Date.now()) {
   };
 }
 
+function removeMessageFromState(state = {}, messageId) {
+  const messages = Array.isArray(state.messages) ? state.messages : [];
+  const removed = messages.find((message) => message && message.id === messageId);
+  if (!removed) return null;
+  const nextMessages = messages.filter((message) => message && message.id !== messageId);
+  const unreadCount = Math.max(
+    0,
+    Math.floor(Number(state.unreadCount) || 0) - (removed.unread ? 1 : 0)
+  );
+  return {
+    messages: nextMessages,
+    interactionCount: nextMessages.filter((message) => message.isInteraction).length,
+    systemCount: nextMessages.filter((message) => !message.isInteraction).length,
+    unreadCount,
+    hasUnread: unreadCount > 0
+  };
+}
+
 function createMessagesState() {
   return {
     loading: true,
@@ -270,7 +288,12 @@ function createMessagesState() {
     systemCount: 0,
     unreadCount: 0,
     hasUnread: false,
-    markingAll: false
+    markingAll: false,
+    activeMessageTab: 'interaction',
+    swipedMessageId: '',
+    swipeDraggingId: '',
+    swipeDragOffset: 0,
+    deletingMessageId: ''
   };
 }
 
@@ -280,5 +303,6 @@ module.exports = {
   decorateMessage,
   mergeResolvedMessageMedia,
   normalizeMessagesResult,
+  removeMessageFromState,
   createMessagesState
 };

@@ -318,6 +318,25 @@ test('delivers one approved-comment result and notifies prior participants once'
   assert.equal(completed.patch.status, 'completed');
 });
 
+test('deletes a user message through the owner-scoped repository and returns a fresh list', async () => {
+  const calls = [];
+  const service = createUserMessageService({
+    repository: {
+      deleteMessage: async (ownerKey, messageId) => {
+        calls.push({ ownerKey, messageId });
+      },
+      listOwnerMessages: async () => [],
+      unreadCount: async () => 0
+    },
+    config: {}
+  });
+
+  const result = await service.deleteMessage('message-1', { ownerKey: OWNER });
+
+  assert.deepEqual(calls, [{ ownerKey: OWNER, messageId: 'message-1' }]);
+  assert.deepEqual(result, { messages: [], unreadCount: 0 });
+});
+
 test('delivers a reply only to its direct and root comment owners with actor context', async () => {
   const event = {
     ...messageEventDocument('comment_approved', 'reply_async_1', {

@@ -10,6 +10,13 @@ function formatActionCount(value) {
   return String(count);
 }
 
+function commentDisplayCount(comments = [], authoritativeCount = 0) {
+  const visibleLoadedCount = comments.filter((comment) => (
+    comment && comment.isHidden !== true
+  )).length;
+  return Math.max(engagementCount(authoritativeCount), visibleLoadedCount);
+}
+
 function decorateEngagement(value = {}) {
   return {
     liked: value.liked === true,
@@ -78,35 +85,94 @@ function decorateComments(comments = [], now = Date.now()) {
   });
 }
 
-function arrangeCommentThreads(comments = []) {
-  const roots = [];
-  const repliesByRoot = new Map();
-  const knownIds = new Set(
-    comments.filter((comment) => comment && comment.id).map((comment) => comment.id)
-  );
-  comments.forEach((comment) => {
-    if (!comment || !comment.parentCommentId || !knownIds.has(comment.parentCommentId)) {
-      roots.push(comment);
-      return;
+const COLLAPSED_REPLY_LIMIT = 2;
+
+function buildCommentThreads(comments = [], options = {}) {
+  const expandedThreadIds = options.expandedThreadIds || {};
+  const collapsedReplyLimit = Number.isInteger(options.collapsedReplyLimit)
+    ? Math.max(0, options.collapsedReplyLimit)
+    : COLLAPSED_REPLY_LIMIT;
+  const entries = comments.filter((comment) => comment && comment.id);
+  const commentsById = new Map(entries.map((comment) => [comment.id, comment]));
+  const threads = [];
+  const threadsById = new Map();
+
+  entries.forEach((comment) => {
+    const threadId = resolveCommentThreadId(comment, commentsById);
+    let thread = threadsById.get(threadId);
+    if (!thread) {
+      thread = {
+        id: threadId,
+        root: null,
+        replies: []
+      };
+      threadsById.set(threadId, thread);
+      threads.push(thread);
     }
-    const replies = repliesByRoot.get(comment.parentCommentId) || [];
-    replies.push(comment);
-    repliesByRoot.set(comment.parentCommentId, replies);
+    if (comment.id === threadId && !comment.parentCommentId) {
+      thread.root = comment;
+    } else {
+      thread.replies.push(comment);
+    }
   });
-  const byOldestFirst = (left, right) => {
-    const leftTime = new Date(left && left.createdAt).getTime();
-    const rightTime = new Date(right && right.createdAt).getTime();
-    return (Number.isFinite(leftTime) ? leftTime : 0)
-      - (Number.isFinite(rightTime) ? rightTime : 0);
-  };
-  return roots.flatMap((root) => [
-    root,
-    ...(repliesByRoot.get(root && root.id) || []).sort(byOldestFirst)
-  ]);
+
+  return threads.map((thread) => {
+    const replies = [...thread.replies].sort(byOldestCommentFirst);
+    const expansionState = expandedThreadIds[thread.id];
+    const isExpanded = expansionState === true;
+    const isCollapsed = expansionState === false;
+    const visibleReplies = isCollapsed
+      ? []
+      : isExpanded
+        ? replies
+        : replies.slice(0, collapsedReplyLimit);
+    return {
+      ...thread,
+      replies,
+      visibleReplies,
+      replyCount: replies.length,
+      hiddenReplyCount: Math.max(0, replies.length - visibleReplies.length),
+      isExpanded,
+      isCollapsed
+    };
+  });
+}
+
+function arrangeCommentThreads(comments = []) {
+  return buildCommentThreads(comments, {
+    collapsedReplyLimit: Number.MAX_SAFE_INTEGER
+  }).flatMap((thread) => (
+    thread.root
+      ? [thread.root, ...thread.replies]
+      : thread.replies
+  ));
 }
 
 function decorateCommentThreads(comments = [], now = Date.now()) {
   return arrangeCommentThreads(decorateComments(comments, now));
+}
+
+function resolveCommentThreadId(comment, commentsById) {
+  let cursor = comment;
+  const visited = new Set();
+  while (cursor && cursor.id && !visited.has(cursor.id)) {
+    visited.add(cursor.id);
+    const parentId = cursor.parentCommentId || cursor.replyToCommentId;
+    if (!parentId) return cursor.id;
+    const parent = commentsById.get(parentId);
+    if (!parent) return parentId;
+    cursor = parent;
+  }
+  return comment.id;
+}
+
+function byOldestCommentFirst(left, right) {
+  const leftTime = new Date(left && left.createdAt).getTime();
+  const rightTime = new Date(right && right.createdAt).getTime();
+  const normalizedLeft = Number.isFinite(leftTime) ? leftTime : 0;
+  const normalizedRight = Number.isFinite(rightTime) ? rightTime : 0;
+  if (normalizedLeft !== normalizedRight) return normalizedLeft - normalizedRight;
+  return String(left && left.id || '').localeCompare(String(right && right.id || ''));
 }
 
 function createOptimisticPendingComment({
@@ -166,10 +232,17 @@ function updateOptimisticPendingComment(comments = [], id, updates = {}) {
   });
 }
 
-function mergeLocalCommentMedia(comment = {}, localComment = {}) {
+function mergeAcceptedComment(comment = {}, localComment = {}) {
   const localAttachments = localComment.attachments || [];
+  const parentCommentId = comment.parentCommentId || localComment.parentCommentId || '';
+  const replyToCommentId = comment.replyToCommentId || localComment.replyToCommentId || '';
   return {
     ...comment,
+    parentCommentId,
+    replyToCommentId,
+    replyToNickname: comment.replyToNickname || localComment.replyToNickname || '',
+    replyToPreview: comment.replyToPreview || localComment.replyToPreview || '',
+    isReply: Boolean(comment.isReply || localComment.isReply || parentCommentId || replyToCommentId),
     attachments: (comment.attachments || []).map((attachment, index) => {
       const local = localAttachments[index] || {};
       return {
@@ -249,6 +322,7 @@ function mergeResolvedCommentMedia(currentComments = [], resolvedComments = []) 
 module.exports = {
   engagementCount,
   formatActionCount,
+  commentDisplayCount,
   decorateEngagement,
   decorateItemEngagement,
   applyItemEngagement,
@@ -256,11 +330,12 @@ module.exports = {
   decorateFavorites,
   formatCommentDate,
   decorateComments,
+  buildCommentThreads,
   arrangeCommentThreads,
   decorateCommentThreads,
   createOptimisticPendingComment,
   updateOptimisticPendingComment,
-  mergeLocalCommentMedia,
+  mergeAcceptedComment,
   applyCommentMedia,
   mergeResolvedCommentMedia
 };

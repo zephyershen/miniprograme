@@ -157,6 +157,7 @@ function trackVisibleFeedMedia(page, requestId) {
 Page({
   data: {
     ...createInitialListState(),
+    refreshingFeed: false,
     membershipPromptVisible: false,
     membershipPromptFeature: 'curated_feed'
   },
@@ -239,7 +240,15 @@ Page({
   },
 
   onPullDownRefresh() {
-    this.loadFeed(true, { preserveCurrent: true }).finally(() => wx.stopPullDownRefresh());
+    if (this.data.refreshingFeed) {
+      wx.stopPullDownRefresh();
+      return Promise.resolve(false);
+    }
+    this.setData({ refreshingFeed: true });
+    return this.loadFeed(true, { preserveCurrent: true }).finally(() => {
+      if (!this.pageDisposed) this.setData({ refreshingFeed: false });
+      wx.stopPullDownRefresh();
+    });
   },
 
   async loadFeed(force, options = {}) {

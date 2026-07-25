@@ -81,7 +81,10 @@ test('declares isolated timer names and schedules instead of one serial minute c
   assert.equal(schedules.get(TIMER_CONFIG.source), '0 * * * * * *');
   assert.equal(schedules.get(TIMER_CONFIG.visualWorker), '10,25,40,55 * * * * * *');
   assert.equal(schedules.get(TIMER_CONFIG.intelligenceWorker), '30 */10 * * * * *');
-  assert.equal(schedules.get(TIMER_CONFIG.profileReviewWorker), '20 * * * * * *');
+  assert.equal(
+    schedules.get(TIMER_CONFIG.profileReviewWorker),
+    '5,20,35,50 * * * * * *'
+  );
   assert.equal(schedules.get(TIMER_CONFIG.dailyDigest), '0 0 8 * * * *');
   assert.equal(schedules.get(TIMER_CONFIG.weeklyDigest), '0 5 8 ? * 1 *');
   assert.equal(schedules.has(TIMER_CONFIG.weeklyColumn), false);

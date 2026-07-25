@@ -811,6 +811,7 @@ test('routes the full governance lifecycle through the API and mutation gate', a
   assert.equal(MUTATING_ACTIONS.knowledgeFeed.has('appealComment'), true);
   assert.equal(MUTATING_ACTIONS.knowledgeFeed.has('restoreComment'), true);
   assert.equal(MUTATING_ACTIONS.knowledgeFeed.has('markMessageRead'), true);
+  assert.equal(MUTATING_ACTIONS.knowledgeFeed.has('deleteMessage'), true);
   assert.equal(MUTATING_ACTIONS.knowledgeFeed.has('markAllMessagesRead'), true);
 });
 
@@ -850,7 +851,7 @@ test('renders the governance lifecycle with confirmations, ARIA, and count synch
   assert.match(js, /title: '恢复评论'/);
   assert.match(
     js,
-    /const optimisticComment = createOptimisticPendingComment[\s\S]*comments: arrangeCommentThreads\(\[optimisticComment, \.\.\.this\.data\.comments\]\)[\s\S]*await uploadCommentImages/
+    /const optimisticComment = createOptimisticPendingComment[\s\S]*const commentsWithOptimistic = arrangeCommentThreads[\s\S]*this\.setComments\(commentsWithOptimistic[\s\S]*await uploadCommentImages/
   );
   assert.match(wxml, /scroll-into-view="\{\{scrollIntoCommentId\}\}"/);
   assert.match(detail, /bindchanged="onCommentPublished"/);
@@ -863,6 +864,10 @@ test('renders the governance lifecycle with confirmations, ARIA, and count synch
   );
   assert.match(js, /canParticipateHint:\s*\{\s*type:\s*Boolean/);
   assert.match(js, /showMembershipBenefits\(\)/);
+  assert.match(
+    router,
+    /addComment:\s*async[\s\S]*?replyToCommentId:\s*event\.replyToCommentId/
+  );
   assert.match(router, /deleteComment:\s*async/);
   assert.match(router, /reportComment:\s*async/);
   assert.match(router, /appealComment:\s*async/);

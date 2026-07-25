@@ -337,6 +337,21 @@ function createUserMessageRepository(db, config) {
     });
   }
 
+  async function deleteMessage(ownerKey, messageId) {
+    await ensureMessages();
+    const safeOwnerKey = assertOwnerKey(ownerKey);
+    return runBusyTransaction(db, async (transaction) => {
+      const reference = transaction.collection(messagesCollectionName).doc(messageId);
+      const current = await documentOrNull(reference);
+      if (!current) return { _id: messageId, alreadyDeleted: true };
+      if (current.ownerKey !== safeOwnerKey) {
+        throw new AppError('MESSAGE_NOT_FOUND', '这条消息不存在');
+      }
+      await reference.remove();
+      return { _id: messageId, ...current };
+    });
+  }
+
   async function markAllRead(ownerKey, readThroughAt) {
     await ensureMessages();
     const safeOwnerKey = assertOwnerKey(ownerKey);
@@ -401,6 +416,7 @@ function createUserMessageRepository(db, config) {
     listOwnerMessages,
     unreadCount,
     markRead,
+    deleteMessage,
     markAllRead
   };
 }

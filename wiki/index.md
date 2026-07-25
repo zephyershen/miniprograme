@@ -2,7 +2,7 @@
 title: "知识获取平台小程序 Wiki 导航"
 type: index
 tags: [index, miniprogram, knowledge-platform, editorial-index]
-last_updated: 2026-07-24
+last_updated: 2026-07-25
 status: confirmed
 confidence: high
 ---
@@ -19,6 +19,7 @@ confidence: high
 - [iOS 结算边界、资料审核恢复与续费状态展示](sources/2026-07-24-ios-refund-profile-review-and-renewal-ui.md) — 不提供管理员主动退款、Apple 到虚拟支付账户再提现的结算路径、资料审核恢复与续费展示
 - [历史：会员支付可见账号确认与完整安全诊断](sources/2026-07-24-visible-wechat-account-confirmation-and-payment-diagnostics.md) — 收银台诊断仍有效，旧单次点击交互已被两步流程取代
 - [异步评论、站内消息、稳定加载与会员绑定上线](sources/2026-07-24-async-comments-message-center-and-stable-loading.md) — 评论/资料后台审核、我的消息、全页懒加载、无闪屏互动、微信身份与商品价格边界
+- [评论回复持久化与消息左滑删除修复证据](sources/2026-07-25-threaded-comments-and-message-deletion.md) — `replyToCommentId` 入口漏传根因、线上 `deleteMessage` 更新、两次重进分组与测试数据清理
 - [资料异步审核、预览支付诊断与微信消息回调上线](sources/2026-07-24-async-profile-review-and-preview-payment-diagnostics.md) — “审核中”队列、真机支付故障边界、入站消息 webhook 与生产收敛
 - [资料保存审核超时修复与生产部署](sources/2026-07-24-profile-moderation-timeout-repair.md) — 预览版资料保存失败根因、模型无思考修复、代码-only 发布与真实 canary 边界
 - [2026-07-23 全项目生产就绪审计](reports/production-readiness-audit-2026-07-23.md) — 已被发布候选修复结果取代的审计前快照

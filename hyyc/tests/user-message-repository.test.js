@@ -61,6 +61,10 @@ function createMemoryDb(initial = {}) {
             const value = store(name).get(id);
             if (!value) throw notFound();
             store(name).set(id, { ...value, ...structuredClone(data) });
+          },
+          async remove() {
+            if (!store(name).has(id)) throw notFound();
+            store(name).delete(id);
           }
         };
       },
@@ -219,6 +223,38 @@ test('keeps replayed direct events read and uses the business event time', async
   await assert.rejects(
     () => messages.markRead(OTHER, created._id, event._id, deliveredAt),
     (error) => error && error.code === 'MESSAGE_NOT_FOUND'
+  );
+});
+
+test('deletes only the current owner message and updates unread totals', async () => {
+  const db = createMemoryDb();
+  const messages = repository(db);
+  const event = {
+    ...messageEventDocument('profile_approved', 'delete-revision', {
+      ownerKey: OWNER
+    }, EVENT_AT)
+  };
+  const created = await messages.upsertDirectMessage(
+    OWNER,
+    event,
+    { type: 'profile_approved', category: 'profile', title: '资料已通过' },
+    EVENT_AT
+  );
+
+  await assert.rejects(
+    () => messages.deleteMessage(OTHER, created._id),
+    (error) => error && error.code === 'MESSAGE_NOT_FOUND'
+  );
+  assert.equal((await messages.listOwnerMessages(OWNER, 50)).length, 1);
+  assert.equal(await messages.unreadCount(OWNER), 1);
+
+  const removed = await messages.deleteMessage(OWNER, created._id);
+  assert.equal(removed._id, created._id);
+  assert.equal((await messages.listOwnerMessages(OWNER, 50)).length, 0);
+  assert.equal(await messages.unreadCount(OWNER), 0);
+  assert.equal(
+    (await messages.deleteMessage(OWNER, created._id)).alreadyDeleted,
+    true
   );
 });
 
