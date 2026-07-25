@@ -1,5 +1,8 @@
 const { AppError } = require('../lib/errors');
-const { decideModeration } = require('../policies/moderation-policy');
+const {
+  commentRejectionReason,
+  decideModeration
+} = require('../policies/moderation-policy');
 
 function safeTempFileUrl(value) {
   return typeof value === 'string' && /^https:\/\//i.test(value) ? value : '';
@@ -49,10 +52,21 @@ function createCommentModerationService({
     const decision = decideModeration(result);
     if (decision.verdict !== 'allow') {
       const uncertain = decision.verdict === 'unsure';
-      throw new AppError(
+      const error = new AppError(
         uncertain ? 'CONTENT_REVIEW_UNAVAILABLE' : 'CONTENT_REJECTED',
         uncertain ? '评论暂时无法发布，请调整后重试' : '评论包含不适合公开的内容，请调整后重试'
       );
+      if (!uncertain) {
+        error.rejectionReason = commentRejectionReason(decision.categories);
+        error.moderation = {
+          status: 'rejected',
+          verdict: 'reject',
+          confidence: decision.confidence,
+          categories: decision.categories,
+          reason: typeof result.reason === 'string' ? result.reason.slice(0, 80) : ''
+        };
+      }
+      throw error;
     }
     return {
       status: 'approved',

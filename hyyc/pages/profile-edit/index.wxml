@@ -54,4 +54,9 @@
   </view>
 
   <view class="privacy-note">这里只保存你主动确认的头像与昵称，用于站内评论展示；会员身份只绑定微信账号。</view>
+  <canvas
+    type="2d"
+    id="avatarMediaCompressor"
+    class="media-compressor-canvas"
+  />
 </view>

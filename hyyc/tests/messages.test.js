@@ -96,26 +96,49 @@ test('normalizes message kinds, unread state and safe feed-detail routes', () =>
   assert.equal(result.messages.length, 2);
   assert.equal(result.unreadCount, 1);
   assert.equal(result.hasUnread, true);
-  assert.deepEqual(result.messages[0], {
-    id: 'thread-1',
-    version: '',
-    kind: 'thread_comment_published',
-    kindLabel: '讨论动态',
-    glyph: '讯',
-    tone: 'info',
-    title: '你参与的资讯有新评论',
-    body: '打开资讯，看看讨论中的新观点。',
-    itemId: 'item/01',
-    openComments: true,
-    isRead: false,
-    unread: true,
-    occurredAt: '2026-07-24T07:30:00.000Z',
-    occurredLabel: '30 分钟前',
-    canOpenItem: true
-  });
+  assert.equal(result.messages[0].id, 'thread-1');
+  assert.equal(result.messages[0].kind, 'thread_comment_published');
+  assert.equal(result.messages[0].kindLabel, '讨论动态');
+  assert.equal(result.messages[0].title, '你参与的资讯有新评论');
+  assert.equal(result.messages[0].body, '打开资讯，看看讨论中的新观点。');
+  assert.equal(result.messages[0].itemId, 'item/01');
+  assert.equal(result.messages[0].openComments, true);
+  assert.equal(result.messages[0].unread, true);
+  assert.equal(result.messages[0].occurredLabel, '30 分钟前');
+  assert.equal(result.messages[0].canOpenItem, true);
+  assert.equal(result.messages[0].isInteraction, true);
+  assert.equal(result.messages[0].interactionVerb, '参与了讨论');
+  assert.equal(result.interactionCount, 1);
+  assert.equal(result.systemCount, 1);
   assert.equal(result.messages[1].title, '资料审核通过');
   assert.equal(result.messages[1].unread, false);
   assert.equal(formatMessageDate('2025-12-01T00:00:00.000Z', now), '2025.12.01');
+});
+
+test('decorates a direct reply with actor, quote and source context', () => {
+  const [message] = normalizeMessagesResult({
+    messages: [{
+      id: 'reply-message',
+      type: 'comment_received',
+      itemId: 'item-1',
+      itemTitle: '一条值得继续讨论的资讯',
+      commentId: 'reply-1',
+      parentCommentId: 'root-1',
+      replyToCommentId: 'target-1',
+      commentPreview: '我补充一个具体案例',
+      replyToPreview: '这个判断的依据是什么？',
+      actorNickname: '小林',
+      actorAvatarFileId: 'cloud://env/user-media/avatars/xiaolin.jpg'
+    }]
+  }).messages;
+
+  assert.equal(message.isInteraction, true);
+  assert.equal(message.interactionVerb, '回复了评论');
+  assert.equal(message.actorNickname, '小林');
+  assert.equal(message.actorInitial, '小');
+  assert.equal(message.commentPreview, '我补充一个具体案例');
+  assert.equal(message.replyToPreview, '这个判断的依据是什么？');
+  assert.equal(message.itemTitle, '一条值得继续讨论的资讯');
 });
 
 test('uses the agreed knowledgeFeed actions for listing and read mutations', async () => {

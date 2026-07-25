@@ -1,7 +1,9 @@
 const {
   createMessagesState,
-  normalizeMessagesResult
+  normalizeMessagesResult,
+  mergeResolvedMessageMedia
 } = require('../../features/messages/model.js');
+const { resolveMessageMedia } = require('../../features/messages/media.js');
 const {
   loadMessages: loadMessagesSession,
   markMessageRead,
@@ -11,7 +13,10 @@ const {
 function messageNavigationUrl(message) {
   if (!message || !message.itemId) return '';
   const comments = message.openComments ? '&comments=1' : '';
-  return `/pages/feed-detail/index?id=${encodeURIComponent(message.itemId)}${comments}`;
+  const comment = message.commentId
+    ? `&commentId=${encodeURIComponent(message.commentId)}`
+    : '';
+  return `/pages/feed-detail/index?id=${encodeURIComponent(message.itemId)}${comments}${comment}`;
 }
 
 function sameMessageIds(left = [], right = []) {
@@ -81,9 +86,12 @@ Page({
         loading: false,
         error: '',
         ...(messagesChanged ? { messages: result.messages } : {}),
+        interactionCount: result.interactionCount,
+        systemCount: result.systemCount,
         unreadCount: result.unreadCount,
         hasUnread: result.hasUnread
       });
+      this.resolveVisibleMessageMedia(result.messages);
       return true;
     } catch (error) {
       if (this.pageDisposed || requestId !== this.messagesLoadRequestId) return false;
@@ -95,6 +103,21 @@ Page({
         loading: false,
         error: (error && error.message) || '消息暂时无法加载，请稍后重试'
       });
+      return false;
+    }
+  },
+
+  async resolveVisibleMessageMedia(messages) {
+    const requestId = (this.messageMediaRequestId || 0) + 1;
+    this.messageMediaRequestId = requestId;
+    try {
+      const resolved = await resolveMessageMedia(messages);
+      if (this.pageDisposed || requestId !== this.messageMediaRequestId) return false;
+      this.setData({
+        messages: mergeResolvedMessageMedia(this.data.messages, resolved)
+      });
+      return true;
+    } catch (error) {
       return false;
     }
   },

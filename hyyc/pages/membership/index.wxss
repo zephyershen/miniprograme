@@ -1,0 +1,108 @@
+.membership-page { box-sizing: border-box; min-height: 100vh; padding: 34rpx var(--ui-gutter) 120rpx; }
+.membership-header { padding: 6rpx 4rpx 30rpx; }
+
+.membership-kicker {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  color: var(--ui-muted);
+  font-family: "DIN Alternate", -apple-system, sans-serif;
+  font-size: 18rpx;
+  font-weight: 700;
+  letter-spacing: 2rpx;
+}
+
+.membership-kicker text {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  background: var(--ui-accent);
+}
+
+.membership-title { margin-top: 16rpx; font-size: 50rpx; font-weight: 800; letter-spacing: -2rpx; line-height: 1.18; }
+.membership-deck { max-width: 590rpx; margin-top: 12rpx; color: var(--ui-muted); font-size: 24rpx; line-height: 1.65; }
+.membership-loading, .membership-error { padding: 80rpx 28rpx; border-radius: 32rpx; background: var(--ui-surface); box-shadow: var(--ui-shadow-soft); color: var(--ui-muted); font-size: 23rpx; }
+.text-action { margin-top: 20rpx; color: var(--ui-accent); font-weight: 700; }
+
+.identity-block {
+  overflow: hidden;
+  padding: 32rpx;
+  border: 1rpx solid rgba(29, 155, 240, 0.1);
+  border-radius: 34rpx;
+  background: var(--ui-surface-solid);
+  box-shadow: var(--ui-shadow-card);
+}
+
+.identity-block-active { border-color: rgba(29, 155, 240, 0.24); background: linear-gradient(180deg, var(--ui-accent-soft), var(--ui-surface-solid) 62%); }
+.identity-label { color: var(--ui-accent); font-size: 19rpx; font-weight: 740; }
+.identity-title { margin-top: 10rpx; font-size: 44rpx; font-weight: 770; letter-spacing: -1rpx; }
+.identity-copy { margin-top: 12rpx; color: var(--ui-muted); font-size: 24rpx; line-height: 1.65; }
+.identity-meta { margin-top: 12rpx; font-size: 21rpx; font-weight: 680; }
+
+.admin-note {
+  margin-top: 22rpx;
+  padding: 20rpx 22rpx;
+  border: 1rpx solid rgba(29, 155, 240, 0.1);
+  border-radius: 22rpx;
+  background: var(--ui-accent-soft);
+  color: var(--ui-muted);
+  font-size: 20rpx;
+  line-height: 1.65;
+}
+
+.pro-pass {
+  overflow: hidden;
+  margin-top: 22rpx;
+  padding: 0;
+  border: 1rpx solid var(--ui-hairline);
+  border-radius: 34rpx;
+  background: var(--ui-surface-solid);
+  box-shadow: var(--ui-shadow-card);
+  color: var(--ui-ink);
+}
+
+.pro-pass-body { box-sizing: border-box; min-width: 0; padding: 32rpx 30rpx 30rpx; }
+.pro-pass-topline { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; }
+.pro-pass-kicker { color: var(--ui-ink); font-size: 27rpx; font-weight: 760; }
+.pro-pass-status { flex: none; color: var(--ui-faint); font-size: 18rpx; }
+.pro-pass-title { max-width: 560rpx; margin-top: 26rpx; font-size: 37rpx; font-weight: 780; line-height: 1.34; letter-spacing: -1rpx; }
+.pro-pass-copy { max-width: 570rpx; margin-top: 10rpx; color: var(--ui-muted); font-size: 21rpx; line-height: 1.65; }
+
+.pro-offer {
+  margin-top: 24rpx;
+  padding: 21rpx 0;
+  border-top: 1rpx solid var(--ui-hairline);
+  border-bottom: 1rpx solid var(--ui-hairline);
+  color: var(--ui-ink);
+}
+
+.pro-offer-main { min-width: 0; }
+.pro-offer-label { color: var(--ui-muted); font-size: 17rpx; font-weight: 680; }
+.pro-offer-line { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8rpx 20rpx; margin-top: 2rpx; }
+.pro-offer-price { display: flex; align-items: baseline; gap: 9rpx; }
+.pro-offer-price text { font-family: "DIN Alternate", -apple-system, sans-serif; font-size: 52rpx; font-weight: 800; letter-spacing: -1rpx; }
+.pro-offer-price label { color: var(--ui-muted); font-size: 18rpx; }
+.pro-offer-compare { color: var(--ui-faint); font-family: "DIN Alternate", -apple-system, sans-serif; font-size: 18rpx; text-decoration: line-through; text-decoration-thickness: 2rpx; }
+.pro-offer-saving { display: flex; flex: none; align-items: center; gap: 7rpx; color: var(--ui-accent-strong); font-size: 17rpx; font-weight: 700; }
+.pro-offer-discount { font-family: "DIN Alternate", -apple-system, sans-serif; }
+.pro-offer-loading { margin-top: 24rpx; padding: 21rpx 0; border-top: 1rpx solid var(--ui-hairline); border-bottom: 1rpx solid var(--ui-hairline); color: var(--ui-muted); font-size: 21rpx; }
+
+.pro-benefits-head { display: flex; align-items: baseline; justify-content: space-between; gap: 18rpx; margin-top: 28rpx; }
+.pro-benefits-head view { font-size: 27rpx; font-weight: 760; }
+.pro-benefits-head text { color: var(--ui-faint); font-size: 17rpx; }
+.pro-benefit-list { margin-top: 8rpx; border-top: 1rpx solid var(--ui-hairline); }
+.pro-benefit-row { display: flex; align-items: flex-start; gap: 14rpx; padding: 21rpx 0; border-bottom: 1rpx solid var(--ui-hairline); }
+.pro-benefit-check { flex: none; width: 28rpx; margin-top: 1rpx; color: var(--ui-accent); font-size: 22rpx; font-weight: 800; line-height: 1.45; }
+.pro-benefit-copybox { flex: 1; min-width: 0; }
+.pro-benefit-title { font-size: 23rpx; font-weight: 720; line-height: 1.4; }
+.pro-benefit-copy { margin-top: 5rpx; color: var(--ui-muted); font-size: 18rpx; line-height: 1.55; }
+.pro-support-boundary { margin-top: 18rpx; color: var(--ui-faint); font-size: 17rpx; line-height: 1.55; }
+.pro-current-period { margin-top: 22rpx; padding: 20rpx 22rpx; border: 1rpx solid rgba(28, 156, 229, .18); border-radius: 16rpx; background: rgba(28, 156, 229, .07); color: var(--ui-ink); }
+.pro-current-period view { font-size: 22rpx; font-weight: 730; line-height: 1.45; }
+.pro-current-period text { display: block; margin-top: 7rpx; color: var(--ui-muted); font-size: 18rpx; line-height: 1.55; }
+.pro-purchase-button { display: flex; width: 100%; min-width: 0; min-height: 80rpx; align-items: center; justify-content: center; margin: 22rpx 0 0; padding: 0 24rpx; border: 0; border-radius: 18rpx; background: var(--ui-accent); color: #fff; font-size: 24rpx; font-weight: 760; line-height: 1; white-space: nowrap; }
+.pro-purchase-button::after { border: 0; }
+.pro-purchase-button[disabled] { opacity: .72; }
+.pro-purchase-footnote { margin-top: 20rpx; color: var(--ui-muted); font-size: 19rpx; line-height: 1.55; text-align: center; }
+.pro-account-note { margin-top: 15rpx; color: var(--ui-muted); font-size: 17rpx; line-height: 1.55; text-align: center; }
+.pro-renewal-note { margin-top: 15rpx; color: var(--ui-faint); font-size: 17rpx; text-align: center; }

@@ -3,7 +3,7 @@ title: "评论与资料采用后台 AI 审核，结果统一进入站内消息"
 type: decision
 tags: [comments, profile, moderation, messages, loading, payment, ai]
 sources: [../sources/2026-07-24-async-comments-message-center-and-stable-loading.md, ../sources/2026-07-24-visible-wechat-account-confirmation-and-payment-diagnostics.md, ../sources/2026-07-24-two-step-membership-login-and-optional-profile.md]
-last_updated: 2026-07-24
+last_updated: 2026-07-25
 status: accepted
 confidence: high
 ---
@@ -24,13 +24,19 @@ confidence: high
 2. 评论先以所有者可见的 `pending` 状态写入；作者立即看到“审核中”。后台 worker
    使用租约、版本和 claim 校验处理，允许结果才事务切换为 `active` 并增加公开计数；
    拒绝结果擦除正文和附件，只保留不含内容的最小幂等/审计墓碑。
+   客户端点击发送后先插入仅本机可见的“提交审核中”乐观评论并显示本地图片，
+   输入框立即清空收起；上传和入队成功后原地替换为服务端 `pending` 评论，失败
+   才撤回乐观评论并恢复草稿。
 3. 评论提交按所有者和资讯执行服务端限流：同一资讯 30 秒冷却，滚动 24 小时最多
    30 条；相同 `commentId` 的重试先按幂等结果返回，不重复计数。
 4. “我的”页新增站内消息入口。会员订阅成功、资料审核结果、评论审核结果和收到评论
    都通过确定性 outbox 事件投递到 `knowledge_user_messages`；客户端不依赖微信订阅
    消息权限才能查看结果。
-5. 当前产品没有回复或 @ 语义，“收到评论”定义为同一资讯下此前已通过评论的参与者
-   收到聚合提醒，排除新评论作者；每个所有者与资讯只保留一条可更新消息。
+5. 评论支持显式回复语义。回复记录根评论、直接被回复评论、两者作者和受控文字
+   摘要，仍走同一套文字/图片后台 AI 审核；公开后只通知直接被回复者与根评论
+   发起者，并排除回复作者本人。普通根评论可继续提醒此前参与同一资讯的用户。
+   收到的每次互动使用独立、确定性的消息文档，不再按“所有者 + 资讯”聚合覆盖，
+   因而消息页可以还原谁说了什么、回复了哪条评论。
 6. outbox 分批投递并保存收件人 checkpoint；消息以版本令牌防止旧的已读操作覆盖
    新通知。客户端按微信查看者隔离缓存，并串行化消息读写，避免切换账号或响应乱序
    造成跨账号显示和未读状态回退。
@@ -55,7 +61,9 @@ confidence: high
 
 - 后端评论和消息分别由独立 repository/service 编排；路由只装配 action。
 - 客户端消息中心由 `features/messages` 的 API、model、session 和
-  `pages/messages` 组成，页面不直接拼接云函数合同。
+  media、`pages/messages` 组成，页面不直接拼接云函数合同。互动区使用头像、
+  评论摘要、原评论引用和资讯上下文形成紧凑信息流；“我的评论”审核通过后也进入
+  互动区，便于回到原资讯，拒绝原因仍留在系统通知区。
 - 会员成功消息与订单/权益在同一数据库事务写入 outbox；对账只补缺失事件，不重开
   已完成或正在投递的事件。
 - `components/loading-state` 只负责可复用加载视觉，不持有业务请求状态。
@@ -72,6 +80,8 @@ confidence: high
   不保存微信原始错误文本。没有数字码时只能把边界定位到系统收银台，不能猜测
   具体 Apple 或微信账户原因。
 - 终态 outbox 和投递 checkpoint 后续需要按真实规模制定保留/归档策略。
+- 新互动合同只影响后续审核通过的评论；历史聚合消息没有保存逐条评论与回复快照，
+  无法凭空还原为完整互动记录。
 
 ## 被替代的结论
 

@@ -6,12 +6,20 @@ const {
   appealComment: appealCommentRequest,
   restoreComment: restoreCommentRequest
 } = require('../../features/engagement/api.js');
-const { decorateComments } = require('../../features/engagement/model.js');
+const {
+  arrangeCommentThreads,
+  decorateCommentThreads,
+  createOptimisticPendingComment,
+  updateOptimisticPendingComment,
+  mergeLocalCommentMedia,
+  mergeResolvedCommentMedia
+} = require('../../features/engagement/model.js');
 const {
   chooseCommentImages,
   uploadCommentImages,
   previewLocalImages,
   resolveCommentMedia,
+  resolveFreshCommentMedia,
   previewCommentImages
 } = require('../../features/engagement/media.js');
 const { loadUserProfile, rememberUserProfile } = require('../../features/user-profile/session.js');
@@ -20,9 +28,17 @@ const {
   COMMENT_EMOJIS,
   keyboardDockState
 } = require('../../features/engagement/composer-model.js');
+const {
+  COMMENT_LINK_MESSAGE,
+  commentContainsLink
+} = require('../../features/engagement/comment-policy.js');
 
 function mutationId() {
   return `comment_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function normalizeItemId(value) {
+  return typeof value === 'string' ? value.trim() : '';
 }
 
 function confirmAction(options) {
@@ -77,15 +93,19 @@ Component({
   properties: {
     visible: { type: Boolean, value: false },
     itemId: { type: String, value: '' },
-    commentCount: { type: Number, value: 0 }
+    commentCount: { type: Number, value: 0 },
+    canParticipateHint: { type: Boolean, value: false },
+    focusCommentId: { type: String, value: '' }
   },
 
   data: {
     commentsLoading: false,
+    commentsResolved: false,
     comments: [],
     canParticipate: false,
     commentDraft: '',
     commentDraftImages: [],
+    replyTarget: null,
     commentSubmitting: false,
     commentSubmitStatus: '',
     composerExpanded: false,
@@ -95,6 +115,7 @@ Component({
     emojiOpen: false,
     emojiOptions: COMMENT_EMOJIS,
     commentActionBusyId: '',
+    scrollIntoCommentId: '',
     viewerProfile: decorateUserProfile(null)
   },
 
@@ -119,10 +140,35 @@ Component({
         this.resetComposer();
       }
     },
-    itemId() {
+    itemId(value) {
+      const nextItemId = normalizeItemId(value);
+      const previousItemId = normalizeItemId(this.commentItemId);
+      if (nextItemId === previousItemId) return;
+      this.commentItemId = nextItemId;
       this.commentsLoaded = false;
+      this.commentLoadedItemId = '';
+      this.commentLoadingItemId = '';
+      this.commentLoadRequestId = (this.commentLoadRequestId || 0) + 1;
       this.commentMediaRequestId = (this.commentMediaRequestId || 0) + 1;
-      this.setData({ comments: [], canParticipate: false });
+      this.commentImageRecoveryRequests = new Set();
+      this.setData({
+        comments: [],
+        commentsLoading: false,
+        commentsResolved: false,
+        canParticipate: this.data.canParticipateHint === true,
+        scrollIntoCommentId: ''
+      }, () => {
+        if (nextItemId && this.data.visible) this.loadComments();
+      });
+    },
+    canParticipateHint(value) {
+      if (value !== true) {
+        if (this.data.canParticipate) this.setData({ canParticipate: false });
+        return;
+      }
+      if (!this.commentsLoaded && value === true && this.data.canParticipate !== true) {
+        this.setData({ canParticipate: true });
+      }
     }
   },
 
@@ -153,6 +199,7 @@ Component({
       this.setData({
         commentDraft: '',
         commentDraftImages: [],
+        replyTarget: null,
         composerExpanded: false,
         commentInputFocus: false,
         commentSubmitStatus: '',
@@ -163,29 +210,55 @@ Component({
     },
 
     async loadComments(force = false) {
-      if (!this.data.itemId || this.data.commentsLoading || (this.commentsLoaded && !force)) return;
-      this.setData({ commentsLoading: true });
+      const itemId = normalizeItemId(this.data.itemId);
+      if (!itemId) return;
+      if (!force && this.commentsLoaded && this.commentLoadedItemId === itemId) return;
+      if (!force && this.commentLoadingItemId === itemId) return;
+
+      const requestId = (this.commentLoadRequestId || 0) + 1;
+      this.commentLoadRequestId = requestId;
+      this.commentLoadingItemId = itemId;
+      const showBlockingLoading = !this.commentsLoaded || this.commentLoadedItemId !== itemId;
+      if (showBlockingLoading) this.setData({ commentsLoading: true });
       try {
-        const result = await getComments(this.data.itemId);
+        const result = await getComments(itemId);
+        if (requestId !== this.commentLoadRequestId
+          || itemId !== normalizeItemId(this.data.itemId)) return;
         this.commentsLoaded = true;
-        const comments = decorateComments(result.comments || []);
+        this.commentLoadedItemId = itemId;
+        const comments = decorateCommentThreads(result.comments || []);
         this.setData({
           comments,
+          commentsResolved: true,
           canParticipate: result.canParticipate === true,
-          viewerProfile: decorateUserProfile(result.viewerProfile)
+          viewerProfile: decorateUserProfile(result.viewerProfile),
+          ...(this.data.focusCommentId
+            ? { scrollIntoCommentId: `comment-${this.data.focusCommentId}` }
+            : {})
         });
         this.resolveVisibleCommentMedia(comments);
         rememberUserProfile(result.viewerProfile).then((viewerProfile) => {
-          if (this.data.itemId) this.setData({ viewerProfile });
+          if (requestId === this.commentLoadRequestId
+            && itemId === normalizeItemId(this.data.itemId)) {
+            this.setData({ viewerProfile });
+          }
         }).catch(() => {});
       } catch (error) {
+        if (requestId !== this.commentLoadRequestId
+          || itemId !== normalizeItemId(this.data.itemId)) return;
         if (error.code === 'ENTITLEMENT_REQUIRED') {
+          this.commentsLoaded = false;
+          this.commentLoadedItemId = '';
           this.triggerEvent('locked');
         } else {
           wx.showToast({ title: error.message || '评论暂时无法加载', icon: 'none' });
         }
       } finally {
-        this.setData({ commentsLoading: false });
+        if (requestId === this.commentLoadRequestId
+          && itemId === normalizeItemId(this.data.itemId)) {
+          this.commentLoadingItemId = '';
+          if (this.data.commentsLoading) this.setData({ commentsLoading: false });
+        }
       }
     },
 
@@ -250,8 +323,36 @@ Component({
       });
     },
 
-    previewDraftImage(event) {
-      previewLocalImages(this.data.commentDraftImages, event.currentTarget.dataset.path);
+    async previewDraftImage(event) {
+      try {
+        await previewLocalImages(this.data.commentDraftImages, event.currentTarget.dataset.path);
+      } catch (error) {
+        wx.showToast({ title: error.message || '图片暂时无法打开', icon: 'none' });
+      }
+    },
+
+    beginReply(event) {
+      const commentId = event.currentTarget.dataset.commentId || '';
+      const comment = this.data.comments.find((entry) => entry.id === commentId);
+      if (!comment || !comment.canReply || this.data.commentSubmitting) return;
+      const preview = String(comment.content || '').replace(/\s+/g, ' ').trim()
+        || ((comment.attachments || []).length ? '[图片]' : '这条评论');
+      this.setData({
+        replyTarget: {
+          id: comment.id,
+          parentCommentId: comment.parentCommentId || comment.id,
+          nickname: comment.author && comment.author.nickname || '读者',
+          preview: preview.slice(0, 100)
+        },
+        composerExpanded: true,
+        commentInputFocus: true,
+        emojiOpen: false
+      });
+    },
+
+    cancelReply() {
+      if (this.data.commentSubmitting) return;
+      this.setData({ replyTarget: null });
     },
 
     async resolveVisibleCommentMedia(comments) {
@@ -261,7 +362,9 @@ Component({
       try {
         const resolved = await resolveCommentMedia(comments);
         if (requestId === this.commentMediaRequestId && itemId === this.data.itemId) {
-          this.setData({ comments: resolved });
+          this.setData({
+            comments: mergeResolvedCommentMedia(this.data.comments, resolved)
+          });
         }
       } catch (error) {
         // Text and initials are already visible; media resolution is fail-open.
@@ -270,10 +373,103 @@ Component({
 
     async previewCommentImage(event) {
       const comment = this.data.comments.find((entry) => entry.id === event.currentTarget.dataset.commentId);
+      const attachment = comment && (comment.attachments || [])
+        .find((entry) => entry.fileId === event.currentTarget.dataset.fileId);
+      if (!comment || !attachment) return;
       try {
-        await previewCommentImages(comment, event.currentTarget.dataset.fileId);
+        if (attachment.localPath
+          && (comment.reviewPending
+            || !String(attachment.fileId || '').startsWith('cloud://'))) {
+          await previewLocalImages(
+            comment.attachments
+              .filter((entry) => entry.localPath)
+              .map((entry) => ({ tempFilePath: entry.localPath })),
+            attachment.localPath
+          );
+          return;
+        }
+        const resolvedComment = await previewCommentImages(
+          comment,
+          event.currentTarget.dataset.fileId
+        );
+        if (resolvedComment) {
+          this.setData({
+            comments: mergeResolvedCommentMedia(this.data.comments, [resolvedComment])
+          });
+        }
       } catch (error) {
+        if (attachment.localPath) {
+          try {
+            await previewLocalImages(
+              comment.attachments
+                .filter((entry) => entry.localPath)
+                .map((entry) => ({ tempFilePath: entry.localPath })),
+              attachment.localPath
+            );
+            return;
+          } catch (fallbackError) {
+            // Use the original cloud preview error below.
+          }
+        }
         wx.showToast({ title: error.message || '原图暂时无法打开', icon: 'none' });
+      }
+    },
+
+    markCommentImageUnavailable(commentId, fileId, attachmentIndex) {
+      const comments = this.data.comments.map((comment) => {
+        if (!comment || comment.id !== commentId) return comment;
+        const attachments = (comment.attachments || []).map((attachment, index) => (
+          (fileId && attachment.fileId === fileId) || index === attachmentIndex
+            ? { ...attachment, url: '', mediaUnavailable: true }
+            : attachment
+        ));
+        return {
+          ...comment,
+          attachments,
+          attachmentCount: attachments.length,
+          attachmentMediaCount: attachments.filter((attachment) => attachment.url).length
+        };
+      });
+      this.setData({ comments });
+    },
+
+    async handleCommentImageError(event) {
+      const commentId = event.currentTarget.dataset.commentId || '';
+      const fileId = event.currentTarget.dataset.fileId || '';
+      const attachmentIndex = Number(event.currentTarget.dataset.attachmentIndex);
+      const comment = this.data.comments.find((entry) => entry.id === commentId);
+      const attachment = comment && (comment.attachments || []).find((entry, index) => (
+        (fileId && entry.fileId === fileId) || index === attachmentIndex
+      ));
+      if (!comment || !attachment) return;
+
+      const recoveryKey = `${commentId}:${fileId || attachmentIndex}`;
+      this.commentImageRecoveryRequests = this.commentImageRecoveryRequests || new Set();
+      if (this.commentImageRecoveryRequests.has(recoveryKey)) return;
+      this.commentImageRecoveryRequests.add(recoveryKey);
+      const failedUrl = attachment.url || '';
+      const itemId = normalizeItemId(this.data.itemId);
+      try {
+        const resolvedComment = await resolveFreshCommentMedia(comment);
+        if (itemId !== normalizeItemId(this.data.itemId)) return;
+        const resolvedAttachment = (resolvedComment.attachments || [])
+          .find((entry, index) => (
+            (fileId && entry.fileId === fileId) || index === attachmentIndex
+          ));
+        const refreshedUrl = resolvedAttachment && resolvedAttachment.url || '';
+        if (!/^https:\/\//i.test(refreshedUrl) || refreshedUrl === failedUrl) {
+          this.markCommentImageUnavailable(commentId, fileId, attachmentIndex);
+          return;
+        }
+        this.setData({
+          comments: mergeResolvedCommentMedia(this.data.comments, [resolvedComment])
+        });
+      } catch (error) {
+        if (itemId === normalizeItemId(this.data.itemId)) {
+          this.markCommentImageUnavailable(commentId, fileId, attachmentIndex);
+        }
+      } finally {
+        this.commentImageRecoveryRequests.delete(recoveryKey);
       }
     },
 
@@ -336,19 +532,52 @@ Component({
 
     async submitComment() {
       const content = this.data.commentDraft.trim();
-      const draftImages = this.data.commentDraftImages;
+      const draftImages = [...this.data.commentDraftImages];
+      const replyTarget = this.data.replyTarget;
       if (!this.data.itemId || (!content && !draftImages.length) || this.data.commentSubmitting) return;
+      if (commentContainsLink(content)) {
+        wx.showToast({ title: COMMENT_LINK_MESSAGE, icon: 'none' });
+        return;
+      }
       if (!this.data.viewerProfile.isComplete) {
         this.openProfileEditor();
         return;
       }
+      const submissionMutationId = this.commentMutationId || mutationId();
+      const optimisticId = `local_${submissionMutationId}`;
+      this.commentMutationId = submissionMutationId;
+      const optimisticComment = createOptimisticPendingComment({
+        id: optimisticId,
+        content,
+        images: draftImages,
+        profile: this.data.viewerProfile,
+        replyTarget,
+        statusLabel: '提交审核中'
+      });
+      let draftForRetry = draftImages;
+      wx.hideKeyboard();
       this.setData({
+        comments: arrangeCommentThreads([optimisticComment, ...this.data.comments]),
+        scrollIntoCommentId: `comment-${optimisticId}`,
+        commentDraft: '',
+        commentDraftImages: [],
+        replyTarget: null,
         commentSubmitting: true,
-        commentSubmitStatus: draftImages.some((image) => !image.fileId) ? '正在上传图片…' : '正在提交审核…'
+        commentSubmitStatus: '',
+        composerExpanded: false,
+        commentInputFocus: false,
+        keyboardOpen: false,
+        sheetStyle: '',
+        emojiOpen: false
       });
       try {
         const pendingImages = draftImages.filter((image) => !image.fileId);
-        const uploaded = await uploadCommentImages(pendingImages);
+        const uploaded = await uploadCommentImages(pendingImages, {
+          canvas: {
+            component: this,
+            canvasId: 'commentMediaCompressor'
+          }
+        });
         let uploadedIndex = 0;
         const imagesWithFileIds = draftImages.map((image) => {
           if (image.fileId) return image;
@@ -356,9 +585,20 @@ Component({
           uploadedIndex += 1;
           return { ...image, ...attachment };
         });
-        this.setData({ commentDraftImages: imagesWithFileIds });
-        this.setData({ commentSubmitStatus: '正在提交审核…' });
-        this.commentMutationId = this.commentMutationId || mutationId();
+        draftForRetry = imagesWithFileIds;
+        const commentsWithUploadedMedia = updateOptimisticPendingComment(
+          this.data.comments,
+          optimisticId,
+          {
+            attachments: createOptimisticPendingComment({
+              id: optimisticId,
+              images: imagesWithFileIds,
+              profile: this.data.viewerProfile
+            }).attachments,
+            statusLabel: '提交审核中'
+          }
+        );
+        this.setData({ comments: commentsWithUploadedMedia });
         const result = await addComment(this.data.itemId, {
           content,
           attachments: imagesWithFileIds.map((image) => ({
@@ -366,23 +606,55 @@ Component({
             width: image.width,
             height: image.height
           })),
-          clientMutationId: this.commentMutationId
+          ...(replyTarget && replyTarget.id
+            ? { replyToCommentId: replyTarget.id }
+            : {}),
+          clientMutationId: submissionMutationId
         });
         this.commentMutationId = '';
-        const comments = decorateComments([result.comment, ...this.data.comments]);
-        this.setData({ comments });
+        const localComment = this.data.comments.find((entry) => entry.id === optimisticId)
+          || optimisticComment;
+        const acceptedComment = mergeLocalCommentMedia(result.comment, localComment);
+        const comments = decorateCommentThreads(this.data.comments.map((comment) => (
+          comment.id === optimisticId ? acceptedComment : comment
+        )));
+        this.setData({
+          comments,
+          scrollIntoCommentId: `comment-${result.comment.id}`
+        });
         this.resolveVisibleCommentMedia(comments);
-        this.resetComposer();
         this.triggerEvent('published', { commentCount: result.commentCount });
         wx.showToast({ title: '已提交，后台审核中', icon: 'none', duration: 2200 });
       } catch (error) {
+        const comments = this.data.comments.filter((comment) => comment.id !== optimisticId);
         if (error.code === 'PROFILE_REQUIRED') {
+          this.commentMutationId = '';
+          this.setData({
+            comments,
+            commentDraft: content,
+            commentDraftImages: draftForRetry,
+            replyTarget,
+            composerExpanded: true
+          });
           this.openProfileEditor();
         } else if (error.code === 'CONTENT_REJECTED') {
           this.commentMutationId = '';
-          this.setData({ commentDraftImages: [] });
+          this.setData({
+            comments,
+            commentDraft: content,
+            commentDraftImages: [],
+            replyTarget,
+            composerExpanded: true
+          });
           wx.showToast({ title: error.message || '评论包含不适合公开的内容', icon: 'none' });
         } else {
+          this.setData({
+            comments,
+            commentDraft: content,
+            commentDraftImages: draftForRetry,
+            replyTarget,
+            composerExpanded: true
+          });
           wx.showToast({ title: error.message || '评论发布失败', icon: 'none' });
         }
       } finally {

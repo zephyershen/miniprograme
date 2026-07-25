@@ -18,7 +18,12 @@ const {
 const {
   decorateEngagement,
   formatActionCount,
-  decorateFavorites
+  decorateFavorites,
+  createOptimisticPendingComment,
+  updateOptimisticPendingComment,
+  mergeLocalCommentMedia,
+  mergeResolvedCommentMedia,
+  arrangeCommentThreads
 } = require('../features/engagement/model');
 const { optimisticLike, optimisticFavorite } = require('../features/engagement/optimistic');
 const { createLatestTargetSync } = require('../features/engagement/latest-target-sync');
@@ -387,6 +392,10 @@ test('lets every signed-in viewer like, favorite, and manage private history whi
 test('validates comment copy and formats compact engagement labels', () => {
   assert.equal(normalizeCommentContent('  有用的判断  '), '有用的判断');
   assert.throws(() => normalizeCommentContent('   '), AppError);
+  assert.throws(
+    () => normalizeCommentContent('请访问 example.com'),
+    (error) => error.code === 'COMMENT_LINK_NOT_ALLOWED'
+  );
   assert.equal(normalizeCommentContent('', 280, true), '');
   assert.equal(normalizeCommentAttachments([
     { fileId: 'cloud://env/user-media/staging/a.jpg', width: 500, height: 400 }
@@ -408,6 +417,204 @@ test('validates comment copy and formats compact engagement labels', () => {
     commentLabel: ''
   });
   assert.equal(optimisticFavorite({ favorited: false }).favorited, true);
+});
+
+test('stores a reply against its visible root and keeps replies beside that root', async () => {
+  const repository = memoryRepository();
+  const root = (await repository.addComment(
+    OTHER,
+    ITEM.id,
+    {
+      content: '原评论',
+      attachments: [],
+      moderation: { status: 'approved' }
+    },
+    new Date(NOW - 1000),
+    'root_comment_123'
+  )).comment;
+  root.status = 'active';
+  root.reviewState = 'approved';
+  root.moderation = { status: 'approved' };
+  const profiles = new Map([
+    [OWNER, {
+      ownerKey: OWNER,
+      nickname: '回复者',
+      avatarFileId: 'cloud://env/user-media/avatars/replier.jpg',
+      moderation: { status: 'approved' }
+    }],
+    [OTHER, {
+      ownerKey: OTHER,
+      nickname: '原作者',
+      avatarFileId: 'cloud://env/user-media/avatars/root.jpg',
+      moderation: { status: 'approved' }
+    }]
+  ]);
+  const service = createFeedEngagementService({
+    repository,
+    profileRepository: {
+      get: async (ownerKey) => profiles.get(ownerKey) || null,
+      getMany: async (ownerKeys) => ownerKeys.map((key) => profiles.get(key)).filter(Boolean)
+    },
+    itemLoader: async () => ITEM,
+    config: {
+      commentMaxLength: 280,
+      commentPageSize: 30,
+      commentImageLimit: 3,
+      userMediaStagingFileIdPrefix: 'cloud://env/user-media/staging/',
+      favoriteListLimit: 100
+    },
+    now: () => NOW
+  });
+
+  const result = await service.addComment(ITEM.id, {
+    content: '这是回复',
+    replyToCommentId: root._id,
+    clientMutationId: 'reply_mutation_123'
+  }, { ownerKey: OWNER }, entitlement('member'));
+
+  assert.equal(result.comment.parentCommentId, root._id);
+  assert.equal(result.comment.replyToCommentId, root._id);
+  assert.equal(result.comment.replyToNickname, '原作者');
+  assert.equal(result.comment.replyToPreview, '原评论');
+  root.status = 'deleted';
+  root.moderation = { status: 'rejected' };
+  const replay = await service.addComment(ITEM.id, {
+    content: '这是回复',
+    replyToCommentId: root._id,
+    clientMutationId: 'reply_mutation_123'
+  }, { ownerKey: OWNER }, entitlement('member'));
+  assert.equal(replay.comment.id, result.comment.id);
+  const arranged = arrangeCommentThreads([
+    { id: result.comment.id, parentCommentId: root._id, createdAt: new Date(NOW) },
+    { id: root._id, createdAt: new Date(NOW - 1000) }
+  ]);
+  assert.deepEqual(arranged.map((comment) => comment.id), [root._id, result.comment.id]);
+});
+
+test('shows a local image comment immediately and preserves its preview while the server accepts it', () => {
+  const pending = createOptimisticPendingComment({
+    id: 'local_mutation_123',
+    content: '这条评论正在后台提交',
+    images: [{
+      tempFilePath: 'wxfile://local-photo.jpg',
+      width: 1200,
+      height: 900
+    }],
+    profile: {
+      nickname: '小明',
+      avatarFileId: 'cloud://avatar',
+      avatarUrl: 'https://temporary.example/avatar.jpg',
+      initial: '小'
+    },
+    createdAt: '2026-07-18T08:00:00.000Z',
+    statusLabel: '提交审核中'
+  });
+  assert.equal(pending.reviewPending, true);
+  assert.equal(pending.localPending, true);
+  assert.equal(pending.statusLabel, '提交审核中');
+  assert.equal(pending.attachments[0].url, 'wxfile://local-photo.jpg');
+  assert.equal(pending.attachmentMediaCount, 1);
+
+  const [uploaded] = updateOptimisticPendingComment([pending], pending.id, {
+    attachments: [{
+      type: 'image',
+      fileId: 'cloud://uploaded-photo',
+      width: 1200,
+      height: 900,
+      url: 'wxfile://local-photo.jpg',
+      localPath: 'wxfile://local-photo.jpg'
+    }]
+  });
+  const accepted = mergeLocalCommentMedia({
+    id: 'server-comment-1',
+    content: pending.content,
+    attachments: [{
+      type: 'image',
+      fileId: 'cloud://uploaded-photo',
+      width: 1200,
+      height: 900
+    }],
+    reviewPending: true,
+    statusLabel: '审核中'
+  }, uploaded);
+  assert.equal(accepted.id, 'server-comment-1');
+  assert.equal(accepted.attachments[0].url, 'wxfile://local-photo.jpg');
+  assert.equal(accepted.attachments[0].localPath, 'wxfile://local-photo.jpg');
+});
+
+test('merges resolved media without letting an old request remove a newer comment', () => {
+  const current = [{
+    id: 'server-comment-1',
+    attachments: [{
+      fileId: 'cloud://photo-1',
+      url: 'wxfile://local-photo.jpg',
+      localPath: 'wxfile://local-photo.jpg'
+    }],
+    author: { avatarFileId: 'cloud://avatar-1', avatarUrl: '' }
+  }, {
+    id: 'local-newer-comment',
+    localPending: true,
+    attachments: [{ fileId: 'local:photo', url: 'wxfile://newer.jpg' }],
+    author: { avatarUrl: '' }
+  }];
+  const merged = mergeResolvedCommentMedia(current, [{
+    id: 'server-comment-1',
+    attachments: [{
+      fileId: 'cloud://photo-1',
+      url: 'https://temporary.example/photo-1.jpg'
+    }],
+    author: {
+      avatarFileId: 'cloud://avatar-1',
+      avatarUrl: 'https://temporary.example/avatar-1.jpg'
+    }
+  }]);
+  assert.equal(merged.length, 2);
+  assert.equal(merged[0].attachments[0].url, 'https://temporary.example/photo-1.jpg');
+  assert.equal(merged[0].attachments[0].localPath, 'wxfile://local-photo.jpg');
+  assert.equal(merged[0].author.avatarUrl, 'https://temporary.example/avatar-1.jpg');
+  assert.equal(merged[1], current[1]);
+});
+
+test('merges staging attachments into published attachments by index', () => {
+  const current = [{
+    id: 'server-comment-1',
+    attachments: [{
+      fileId: 'cloud://env/user-media/staging/photo-a.jpg',
+      url: 'wxfile://local-photo-a.jpg',
+      localPath: 'wxfile://local-photo-a.jpg'
+    }, {
+      fileId: 'cloud://env/user-media/staging/photo-b.jpg',
+      url: 'wxfile://local-photo-b.jpg',
+      localPath: 'wxfile://local-photo-b.jpg'
+    }],
+    author: { avatarUrl: '' }
+  }];
+  const merged = mergeResolvedCommentMedia(current, [{
+    id: 'server-comment-1',
+    attachments: [{
+      fileId: 'cloud://env/user-media/published/photo-a.jpg',
+      url: 'https://temporary.example/photo-a.jpg'
+    }, {
+      fileId: 'cloud://env/user-media/published/photo-b.jpg',
+      url: 'https://temporary.example/photo-b.jpg'
+    }],
+    author: { avatarUrl: '' }
+  }]);
+
+  assert.deepEqual(
+    merged[0].attachments.map((attachment) => attachment.fileId),
+    [
+      'cloud://env/user-media/published/photo-a.jpg',
+      'cloud://env/user-media/published/photo-b.jpg'
+    ]
+  );
+  assert.deepEqual(
+    merged[0].attachments.map((attachment) => attachment.url),
+    [
+      'https://temporary.example/photo-a.jpg',
+      'https://temporary.example/photo-b.jpg'
+    ]
+  );
 });
 
 test('keeps the whole comment composer above the keyboard and offers a useful emoji palette', () => {

@@ -69,6 +69,7 @@ Page({
     sourceUrlCanExpand: false,
     sourceUrlExpanded: false,
     commentsOpen: false,
+    focusedCommentId: '',
     membershipPromptVisible: false,
     membershipPromptFeature: 'comments'
   },
@@ -77,6 +78,7 @@ Page({
     this.itemId = options.id || '';
     this.digestId = options.digestId || '';
     this.openCommentsAfterLoad = options.comments === '1';
+    this.setData({ focusedCommentId: options.commentId || '' });
     this.pageDisposed = false;
     this.detailLoadRequestId = 0;
     this.skipNextDetailRevalidation = true;

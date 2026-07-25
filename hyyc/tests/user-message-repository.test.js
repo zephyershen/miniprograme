@@ -222,7 +222,7 @@ test('keeps replayed direct events read and uses the business event time', async
   );
 });
 
-test('aggregates received comments per item without letting replayed or stale reads hide a newer event', async () => {
+test('keeps each received comment as a distinct replay-safe interaction', async () => {
   const db = createMemoryDb();
   const messages = repository(db);
   const first = {
@@ -278,11 +278,15 @@ test('aggregates received comments per item without letting replayed or stale re
   const listed = await messages.listOwnerMessages(PARTICIPANT, 50);
 
   assert.equal(replayed.unread, false);
-  assert.equal(firstMessage._id, secondMessage._id);
+  assert.notEqual(firstMessage._id, secondMessage._id);
   assert.equal(secondMessage.sourceEventId, second._id);
-  assert.equal(oldReplayAfterNew.sourceEventId, second._id);
+  assert.equal(oldReplayAfterNew.sourceEventId, first._id);
+  assert.equal(oldReplayAfterNew.unread, false);
   assert.equal(staleRead.unread, true);
-  assert.deepEqual(listed.map((message) => message._id), [secondMessage._id]);
+  assert.deepEqual(
+    listed.map((message) => message._id),
+    [secondMessage._id, firstMessage._id]
+  );
   assert.deepEqual(
     db.stores.get('events').get(first._id).deliveredOwnerKeys,
     [PARTICIPANT]
@@ -344,7 +348,7 @@ test('keeps a distinct same-millisecond received-comment event unread regardless
   );
 });
 
-test('keeps outbox delivery idempotent after more than sixty-four newer thread events', async () => {
+test('keeps an old interaction replay idempotent after more than sixty-four newer events', async () => {
   const db = createMemoryDb();
   const messages = repository(db);
   const claimedEvents = [];
@@ -376,8 +380,9 @@ test('keeps outbox delivery idempotent after more than sixty-four newer thread e
     claimedEvents[0],
     new Date(EVENT_AT.getTime() + 3000)
   );
-  assert.equal(replayed.sourceEventId, claimedEvents[64]._id);
-  assert.equal(replayed.unread, false);
+  assert.equal(replayed.sourceEventId, claimedEvents[0]._id);
+  assert.equal(replayed.unread, true);
+  assert.equal((await messages.listOwnerMessages(PARTICIPANT, 100)).length, 65);
 });
 
 test('marks unread messages only when their current version was delivered before the action', async () => {

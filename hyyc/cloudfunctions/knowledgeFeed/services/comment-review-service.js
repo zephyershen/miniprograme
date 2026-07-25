@@ -46,13 +46,21 @@ function createCommentReviewService({
     }
   }
 
-  async function reject(comment, claimId, failureCode, reviewState = 'rejected') {
+  async function reject(comment, claimId, {
+    failureCode,
+    reviewState = 'rejected',
+    moderation = null,
+    rejectionReason = ''
+  }) {
     const completedAt = new Date(now());
+    const rejection = { failureCode, reviewState };
+    if (moderation) rejection.moderation = moderation;
+    if (rejectionReason) rejection.rejectionReason = rejectionReason;
     const rejected = await repository.reject(
       comment._id,
       comment.reviewRevision,
       claimId,
-      { failureCode, reviewState },
+      rejection,
       completedAt
     );
     if (rejected) await discard(comment);
@@ -61,7 +69,10 @@ function createCommentReviewService({
 
   async function retry(comment, claimId, error) {
     if ((Number(comment.attemptCount) || 0) >= maxAttempts) {
-      await reject(comment, claimId, 'REVIEW_UNAVAILABLE', 'failed');
+      await reject(comment, claimId, {
+        failureCode: 'REVIEW_UNAVAILABLE',
+        reviewState: 'failed'
+      });
       return { status: 'failed' };
     }
     const retryAt = new Date(now() + retryDelay(comment.attemptCount));
@@ -176,11 +187,18 @@ function createCommentReviewService({
       return { status: 'approved' };
     } catch (error) {
       if (error && error.code === 'CONTENT_REJECTED') {
-        await reject(claimed, claimId, 'CONTENT_REJECTED');
+        await reject(claimed, claimId, {
+          failureCode: 'CONTENT_REJECTED',
+          moderation: error.moderation || null,
+          rejectionReason: error.rejectionReason || ''
+        });
         return { status: 'rejected' };
       }
       if (error && ['INVALID_REQUEST', 'ITEM_NOT_FOUND'].includes(error.code)) {
-        await reject(claimed, claimId, error.code);
+        await reject(claimed, claimId, {
+          failureCode: error.code,
+          rejectionReason: '评论格式或关联资讯不符合发布要求'
+        });
         return { status: 'rejected' };
       }
       return retry(claimed, claimId, error);

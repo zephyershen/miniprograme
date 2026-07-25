@@ -147,6 +147,13 @@ function createCommentReviewRepository(db, config) {
         content: input.content,
         attachments: input.attachments,
         reviewAttachments: input.reviewAttachments,
+        parentCommentId: input.parentCommentId || '',
+        replyToCommentId: input.replyToCommentId || '',
+        replyToOwnerKey: input.replyToOwnerKey || '',
+        threadOwnerKey: input.threadOwnerKey || '',
+        replyToNickname: input.replyToNickname || '',
+        replyToPreview: input.replyToPreview || '',
+        rootCommentPreview: input.rootCommentPreview || '',
         reviewRevision: input.reviewRevision,
         reviewState: 'pending',
         status: 'pending',
@@ -274,7 +281,17 @@ function createCommentReviewRepository(db, config) {
         ownerKey: current.authorKey,
         itemId: current.itemId,
         itemTitle: item.title || '',
-        commentId
+        itemThumbnailFileId: item.listVisualFileId || item.visualFileId || '',
+        commentId,
+        commentPreview: current.content || (
+          Array.isArray(current.attachments) && current.attachments.length ? '[图片]' : ''
+        ),
+        parentCommentId: current.parentCommentId || '',
+        replyToCommentId: current.replyToCommentId || '',
+        replyToOwnerKey: current.replyToOwnerKey || '',
+        threadOwnerKey: current.threadOwnerKey || '',
+        replyToPreview: current.replyToPreview || '',
+        rootCommentPreview: current.rootCommentPreview || ''
       }, completedAt);
       await commentReference.update({ data: patch });
       await itemReference.update({
@@ -311,13 +328,18 @@ function createCommentReviewRepository(db, config) {
         completedAt,
         updatedAt: completedAt
       };
+      const rejectionReason = typeof input.rejectionReason === 'string'
+        ? input.rejectionReason.trim().slice(0, 120)
+        : '';
+      if (rejectionReason) patch.rejectionReason = rejectionReason;
       const eventType = patch.reviewState === 'failed'
         ? 'comment_review_failed'
         : 'comment_rejected';
       const event = messageEventDocument(eventType, commentId, {
         ownerKey: current.authorKey,
         itemId: current.itemId,
-        commentId
+        commentId,
+        rejectionReason
       }, completedAt);
       await commentReference.update({ data: patch });
       await transaction.collection(eventsCollectionName).doc(event._id)

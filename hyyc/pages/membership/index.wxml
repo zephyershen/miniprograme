@@ -1,0 +1,89 @@
+<view class="membership-page">
+  <view class="membership-header">
+    <view class="membership-kicker"><text></text>PRO MEMBERSHIP</view>
+    <view class="membership-title">Pro 会员</view>
+    <view class="membership-deck">把值得读的内容和实用课程留在一起，一次开通即可使用。</view>
+  </view>
+
+  <view wx:if="{{loading}}" class="membership-loading"><loading-state label="正在读取会员信息" /></view>
+  <view wx:elif="{{error}}" class="membership-error"><view>{{error}}</view><view class="text-action" bindtap="loadMembership">重新加载 →</view></view>
+  <block wx:else>
+    <view class="identity-block {{membership.isPrivileged ? 'identity-block-active' : ''}}">
+      <view class="identity-label">当前身份</view>
+      <view class="identity-title">{{membership.roleLabel}}</view>
+      <view class="identity-copy">{{membership.roleCopy}}</view>
+      <view wx:if="{{membership.periodEndLabel}}" class="identity-meta">有效期至 {{membership.periodEndLabel}}</view>
+      <view wx:if="{{membership.renewalLabel}}" class="identity-meta">{{membership.renewalLabel}}</view>
+    </view>
+
+    <view wx:if="{{membership.isAdmin}}" class="admin-note">管理员已拥有全部会员权益，无需另外开通；下方权益仅供参考。</view>
+
+    <view class="pro-pass {{membership.isPrivileged ? 'pro-pass-active' : ''}}">
+      <view class="pro-pass-body">
+        <view class="pro-pass-topline">
+          <view class="pro-pass-kicker">Pro 会员</view>
+          <view class="pro-pass-status">{{membership.isPrivileged ? '已开通' : (billing.plan.durationLabel || '会员方案')}}</view>
+        </view>
+
+        <view class="pro-pass-title">{{membership.isPrivileged ? '你的 Pro 权益' : '把值得读的内容和实用课程留在一起'}}</view>
+        <view class="pro-pass-copy">精选资讯、30 天回看、基础课、动手课和三档简报，一次开通即可使用。</view>
+
+        <view wx:if="{{billing.loading}}" class="pro-offer-loading">正在读取会员价格</view>
+        <view wx:elif="{{billing.available && billing.plan.priceCents}}" class="pro-offer">
+          <view class="pro-offer-main">
+            <view class="pro-offer-label">{{billing.plan.offerTag || '当前会员价'}}</view>
+            <view class="pro-offer-line">
+              <view class="pro-offer-price"><text>{{billing.plan.priceLabel}}</text><label>/ {{billing.plan.durationLabel}}</label></view>
+              <view wx:if="{{billing.plan.hasDiscount}}" class="pro-offer-saving">
+                <text class="pro-offer-discount">{{billing.plan.discountLabel}}</text>
+                <text>· 立省 {{billing.plan.savingsLabel}}</text>
+              </view>
+            </view>
+            <view wx:if="{{billing.plan.compareAtPriceLabel}}" class="pro-offer-compare">日常价 {{billing.plan.compareAtPriceLabel}}</view>
+          </view>
+        </view>
+        <view wx:else class="pro-offer-loading">会员服务即将开放</view>
+
+        <view class="pro-benefits-head"><view>包含以下权益</view><text>共 {{membership.benefits.length}} 项</text></view>
+        <view class="pro-benefit-list">
+          <view wx:for="{{membership.benefits}}" wx:key="key" class="pro-benefit-row">
+            <view class="pro-benefit-check">✓</view>
+            <view class="pro-benefit-copybox">
+              <view class="pro-benefit-title">{{item.title}}</view>
+              <view class="pro-benefit-copy">{{item.copy}}</view>
+            </view>
+          </view>
+        </view>
+
+        <view class="pro-support-boundary">{{membership.membershipTerms.supportBoundary}}</view>
+        <view
+          wx:if="{{membership.purchaseMode === 'renew' && membership.periodEndLabel}}"
+          class="pro-current-period"
+        >
+          <view>当前有效期至 {{membership.periodEndLabel}}</view>
+          <text>本次续费成功后，将从该日顺延 {{billing.plan.durationLabel || '30 天'}}。</text>
+        </view>
+        <button
+          wx:if="{{billing.available && account.verified}}"
+          class="pro-purchase-button"
+          bindtap="purchaseMembership"
+          loading="{{billing.purchasing}}"
+          disabled="{{billing.purchasing}}"
+        >{{membership.purchaseMode === 'renew'
+          ? '续费 ' + (billing.plan.durationLabel || '30 天')
+          : '订阅并支付'}}</button>
+        <view wx:elif="{{billing.available}}" class="pro-purchase-footnote">微信账号尚未完成登录，请重新进入小程序后再订阅。</view>
+        <view wx:else class="pro-purchase-footnote">当前暂不可购买，请稍后再试。</view>
+        <view class="pro-account-note">
+          {{membership.purchaseMode === 'renew'
+            ? '点击续费并完成支付后，会员有效期会继续累加。'
+            : '点击订阅并支付后，将直接进入系统收银台。'}}
+        </view>
+        <view wx:if="{{account.verified && !userProfile.isComplete && !userProfile.reviewPending}}" class="pro-account-note">
+          微信不允许自动读取真实头像昵称；头像昵称为可选资料，不影响会员绑定。
+        </view>
+        <view class="pro-renewal-note">{{membership.membershipTerms.renewalCopy}}</view>
+      </view>
+    </view>
+  </block>
+</view>

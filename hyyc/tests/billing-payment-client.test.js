@@ -318,7 +318,7 @@ test('keeps an order pending until the matching server-confirmed order is cleare
   assert.equal(pendingMembershipOrderId(), '');
 });
 
-test('fails closed when the product gate or runtime environment is not verified', async () => {
+test('keeps purchase gates strict while account login remains independent of the product gate', async () => {
   const enabledAccess = {
     viewer: { role: 'free' },
     features: { memberPurchases: true }
@@ -331,10 +331,26 @@ test('fails closed when the product gate or runtime environment is not verified'
     () => createMembershipPayment('pro_30d', 'login-code', disabledAccess),
     (error) => error && error.code === 'PAYMENT_NOT_READY'
   );
-  assert.throws(
-    () => verifyMembershipAccount('login-code', disabledAccess),
-    (error) => error && error.code === 'PAYMENT_NOT_READY'
+  const calls = [];
+  global.wx = supportedWx({
+    getAccountInfoSync: () => ({ miniProgram: { envVersion: 'release' } }),
+    cloud: {
+      async callFunction(request) {
+        calls.push(request);
+        return {
+          result: {
+            ok: true,
+            data: { verified: true }
+          }
+        };
+      }
+    }
+  });
+  assert.deepEqual(
+    await verifyMembershipAccount('login-code', disabledAccess),
+    { verified: true }
   );
+  assert.equal(calls[0].data.action, 'verifyAccount');
 
   global.wx = supportedWx({
     getAccountInfoSync: () => ({ miniProgram: { envVersion: 'unknown-build' } }),

@@ -350,6 +350,8 @@ test('fails comments closed without letting moderation delete unverified media',
   await assert.rejects(
     () => rejected.review({ content: '点击链接', attachments: [{ fileId: 'cloud://image' }] }),
     (error) => error.code === 'CONTENT_REJECTED'
+      && error.rejectionReason === '包含垃圾灌水、重复营销或无关推广信息'
+      && error.moderation.categories[0] === 'spam'
   );
   assert.deepEqual(deleted, []);
 

@@ -9,7 +9,8 @@ const {
   createCommentReviewService
 } = require('../cloudfunctions/knowledgeFeed/services/comment-review-service');
 const {
-  createUserMessageService
+  createUserMessageService,
+  directMessage
 } = require('../cloudfunctions/knowledgeFeed/services/user-message-service');
 const {
   createScheduledWorkService
@@ -115,6 +116,14 @@ test('rejects unsafe queued content and removes its unpublished media', async ()
       review: async () => {
         const error = new Error('unsafe');
         error.code = 'CONTENT_REJECTED';
+        error.rejectionReason = '包含广告推广、带货或交易招揽信息';
+        error.moderation = {
+          status: 'rejected',
+          verdict: 'reject',
+          confidence: 0.99,
+          categories: ['advertising'],
+          reason: '检测到广告推广'
+        };
         throw error;
       }
     },
@@ -137,13 +146,39 @@ test('rejects unsafe queued content and removes its unpublished media', async ()
   assert.equal(rejection[2], 'claim-reject');
   assert.deepEqual(rejection[3], {
     failureCode: 'CONTENT_REJECTED',
-    reviewState: 'rejected'
+    reviewState: 'rejected',
+    moderation: {
+      status: 'rejected',
+      verdict: 'reject',
+      confidence: 0.99,
+      categories: ['advertising'],
+      reason: '检测到广告推广'
+    },
+    rejectionReason: '包含广告推广、带货或交易招揽信息'
   });
   assert.deepEqual(discarded, {
     actor: { ownerKey: OWNER },
     kind: 'comment',
     fileIds: [candidate.attachments[0].fileId]
   });
+});
+
+test('explains a rejected comment with a controlled reason and deletion result', () => {
+  const event = messageEventDocument(
+    'comment_rejected',
+    'comment-rejected-1',
+    {
+      ownerKey: OWNER,
+      itemId: 'item_async_1',
+      rejectionReason: '包含链接、域名、小程序链接或二维码链接'
+    },
+    new Date(NOW)
+  );
+  const message = directMessage(event);
+
+  assert.equal(event.rejectionReason, '包含链接、域名、小程序链接或二维码链接');
+  assert.match(message.body, /未通过原因：包含链接、域名、小程序链接或二维码链接/);
+  assert.match(message.body, /评论文字及待审图片已删除/);
 });
 
 test('retries a temporary review failure and extends the media hold', async () => {
@@ -281,6 +316,67 @@ test('delivers one approved-comment result and notifies prior participants once'
   assert.equal(completed.eventId, event._id);
   assert.equal(completed.claimId, 'message-claim');
   assert.equal(completed.patch.status, 'completed');
+});
+
+test('delivers a reply only to its direct and root comment owners with actor context', async () => {
+  const event = {
+    ...messageEventDocument('comment_approved', 'reply_async_1', {
+      ownerKey: OWNER,
+      itemId: 'item_async_1',
+      itemTitle: '测试资讯',
+      commentId: 'reply_async_1',
+      commentPreview: '我补充一个判断',
+      parentCommentId: 'root_async_1',
+      replyToCommentId: 'target_async_1',
+      replyToOwnerKey: PARTICIPANT_A,
+      threadOwnerKey: PARTICIPANT_B,
+      replyToPreview: '原来的判断'
+    }, new Date(NOW)),
+    _id: messageEventId('comment_approved', 'reply_async_1')
+  };
+  let delivered = null;
+  const repository = {
+    listDueEvents: async () => [event],
+    listStaleEvents: async () => [],
+    claimEvent: async (eventId, claimedAt, claimId, claimExpiresAt) => ({
+      ...event,
+      attemptCount: 1,
+      status: 'processing',
+      claimId,
+      claimedAt,
+      claimExpiresAt
+    }),
+    participantOwnerKeys: async () => {
+      throw new Error('direct replies must not fan out to every participant');
+    },
+    upsertDirectMessage: async () => null,
+    upsertCommentThreadMessages: async (ownerKeys, source) => {
+      delivered = { ownerKeys, source };
+    },
+    markEventDone: async () => event,
+    markEventRetry: async () => null
+  };
+  const service = createUserMessageService({
+    repository,
+    profileRepository: {
+      get: async () => ({
+        nickname: '回复者',
+        avatarFileId: 'cloud://env/user-media/avatars/replier.jpg'
+      })
+    },
+    config: {},
+    now: () => NOW,
+    createId: () => 'reply-message-claim'
+  });
+
+  assert.deepEqual(await service.processDue(), { scanned: 1, completed: 1 });
+  assert.deepEqual(delivered.ownerKeys.sort(), [PARTICIPANT_A, PARTICIPANT_B]);
+  assert.equal(delivered.source.actorNickname, '回复者');
+  assert.equal(
+    delivered.source.actorAvatarFileId,
+    'cloud://env/user-media/avatars/replier.jpg'
+  );
+  assert.equal(delivered.source.replyToPreview, '原来的判断');
 });
 
 test('uses deterministic outbox ids for replay-safe membership and profile events', () => {

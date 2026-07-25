@@ -179,6 +179,16 @@ function createUserMessageRepository(db, config) {
         title: message.title,
         body: message.body,
         itemId: message.itemId || '',
+        itemTitle: event.itemTitle || '',
+        itemThumbnailFileId: event.itemThumbnailFileId || '',
+        commentId: event.commentId || '',
+        parentCommentId: event.parentCommentId || '',
+        replyToCommentId: event.replyToCommentId || '',
+        commentPreview: event.commentPreview || '',
+        replyToPreview: event.replyToPreview || '',
+        rootCommentPreview: event.rootCommentPreview || '',
+        actorNickname: event.actorNickname || '',
+        actorAvatarFileId: event.actorAvatarFileId || '',
         sourceEventId: event._id,
         unread: true,
         deliveredAt: serverDate(db, createdAt),
@@ -214,7 +224,7 @@ function createUserMessageRepository(db, config) {
         const pendingOwnerKeys = ownerBatch.filter((ownerKey) => !delivered.has(ownerKey));
         const written = [];
         for (const safeOwnerKey of pendingOwnerKeys) {
-          const id = messageDocumentId('comment-thread', safeOwnerKey, event.itemId);
+          const id = messageDocumentId('comment-interaction', safeOwnerKey, event._id);
           const reference = transaction.collection(messagesCollectionName).doc(id);
           const current = await documentOrNull(reference);
           const eventDate = event.createdAt && typeof event.createdAt.toDate === 'function'
@@ -229,11 +239,25 @@ function createUserMessageRepository(db, config) {
             ownerKey: safeOwnerKey,
             type: 'comment_received',
             category: 'comments',
-            title: '你参与的资讯有新评论',
-            body: event.itemTitle
-              ? `《${String(event.itemTitle).slice(0, 48)}》出现了新的讨论`
-              : '你参与过的资讯出现了新的讨论',
+            title: event.replyToCommentId
+              ? `${event.actorNickname || '一位读者'}回复了评论`
+              : `${event.actorNickname || '一位读者'}参与了讨论`,
+            body: event.commentPreview || (
+              event.itemTitle
+                ? `《${String(event.itemTitle).slice(0, 48)}》出现了新的讨论`
+                : '你参与过的资讯出现了新的讨论'
+            ),
             itemId: event.itemId,
+            itemTitle: event.itemTitle || '',
+            itemThumbnailFileId: event.itemThumbnailFileId || '',
+            commentId: event.commentId || '',
+            parentCommentId: event.parentCommentId || '',
+            replyToCommentId: event.replyToCommentId || '',
+            commentPreview: event.commentPreview || '',
+            replyToPreview: event.replyToPreview || '',
+            rootCommentPreview: event.rootCommentPreview || '',
+            actorNickname: event.actorNickname || '读者',
+            actorAvatarFileId: event.actorAvatarFileId || '',
             sourceEventId: event._id,
             lastEventId: event._id,
             lastEventAt: occurredAt,
@@ -266,7 +290,7 @@ function createUserMessageRepository(db, config) {
     const [written] = await upsertCommentThreadMessages([safeOwnerKey], event, createdAt);
     if (written) return written;
     await ensureMessages();
-    const id = messageDocumentId('comment-thread', safeOwnerKey, event.itemId);
+    const id = messageDocumentId('comment-interaction', safeOwnerKey, event._id);
     const current = await documentOrNull(messages().doc(id));
     return current ? { _id: id, ...current } : null;
   }

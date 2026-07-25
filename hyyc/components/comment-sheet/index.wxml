@@ -4,14 +4,26 @@
       <view class="comments-title">评论 {{commentCount || ''}}</view>
       <view class="comments-close" bindtap="close">关闭</view>
     </view>
-    <scroll-view scroll-y enhanced show-scrollbar="{{false}}" class="comments-list">
+    <scroll-view
+      scroll-y
+      enhanced
+      show-scrollbar="{{false}}"
+      scroll-into-view="{{scrollIntoCommentId}}"
+      scroll-with-animation="{{true}}"
+      class="comments-list"
+    >
       <view wx:if="{{commentsLoading}}" class="comments-state">正在读取评论…</view>
       <view wx:elif="{{!comments.length}}" class="comments-state">
         <view class="comments-empty-title">{{canParticipate ? '还没有评论' : '没有待处理的评论'}}</view>
         <view>{{canParticipate ? '从一个具体判断开始，会更容易聊下去。' : '会员到期后，你仍可在这里查看、申诉或删除自己被隐藏的评论。'}}</view>
       </view>
       <block wx:else>
-        <view wx:for="{{comments}}" wx:key="id" class="comment-row {{item.isHidden ? 'is-hidden' : ''}} {{item.reviewPending ? 'is-reviewing' : ''}}">
+        <view
+          wx:for="{{comments}}"
+          wx:key="id"
+          id="comment-{{item.id}}"
+          class="comment-row {{item.isHidden ? 'is-hidden' : ''}} {{item.reviewPending ? 'is-reviewing' : ''}} {{item.isReply ? 'is-reply' : ''}}"
+        >
           <view class="comment-avatar-wrap">
             <image wx:if="{{item.author.avatarUrl}}" class="comment-avatar" src="{{item.author.avatarUrl}}" mode="aspectFill" lazy-load="{{true}}" />
             <view wx:else class="comment-avatar comment-avatar-empty">{{item.author.initial}}</view>
@@ -67,9 +79,18 @@
                 >恢复</text>
               </view>
             </view>
+            <view wx:if="{{item.isReply}}" class="comment-reply-context">
+              回复 <text>@{{item.replyToNickname || '读者'}}</text>
+              <text wx:if="{{item.replyToPreview}}" class="comment-reply-quote">“{{item.replyToPreview}}”</text>
+            </view>
             <view wx:if="{{item.content}}" class="comment-copy">{{item.content}}</view>
-            <view wx:if="{{item.attachmentMediaCount}}" class="comment-media-grid count-{{item.attachmentMediaCount}}">
-              <block wx:for="{{item.attachments}}" wx:for-item="attachment" wx:key="fileId">
+            <view wx:if="{{item.attachmentCount}}" class="comment-media-grid count-{{item.attachmentCount}}">
+              <block
+                wx:for="{{item.attachments}}"
+                wx:for-item="attachment"
+                wx:for-index="attachmentIndex"
+                wx:key="fileId"
+              >
                 <image
                   wx:if="{{attachment.url}}"
                   class="comment-media"
@@ -78,9 +99,27 @@
                   lazy-load="{{true}}"
                   data-comment-id="{{item.id}}"
                   data-file-id="{{attachment.fileId}}"
+                  data-attachment-index="{{attachmentIndex}}"
                   bindtap="previewCommentImage"
+                  binderror="handleCommentImageError"
                 />
+                <view
+                  wx:else
+                  class="comment-media comment-media-placeholder {{item.reviewPending ? 'is-reviewing' : ''}}"
+                  aria-label="{{item.reviewPending ? '图片审核中' : '图片暂时无法显示'}}"
+                >
+                  <view wx:if="{{item.reviewPending}}" class="comment-media-spinner"></view>
+                  <text>{{item.reviewPending ? '图片审核中' : '图片暂时无法显示'}}</text>
+                </view>
               </block>
+            </view>
+            <view wx:if="{{item.canReply}}" class="comment-thread-actions">
+              <text
+                data-comment-id="{{item.id}}"
+                aria-role="button"
+                aria-label="回复 {{item.author.nickname}}"
+                bindtap="beginReply"
+              >回复</text>
             </view>
           </view>
         </view>
@@ -92,6 +131,13 @@
         <view wx:if="{{viewerProfile.reviewPending}}"><view class="reminder-title">资料审核中</view><view class="reminder-copy">审核通过后即可发布评论</view></view>
         <view wx:else><view class="reminder-title">先设置头像和昵称</view><view class="reminder-copy">发布时会显示在你的评论旁边</view></view>
         <text>→</text>
+      </view>
+      <view wx:if="{{replyTarget}}" class="comment-replying">
+        <view>
+          <text>回复 @{{replyTarget.nickname}}</text>
+          <text class="comment-replying-preview">{{replyTarget.preview}}</text>
+        </view>
+        <text class="comment-replying-close" bindtap="cancelReply">取消</text>
       </view>
       <view wx:if="{{commentDraftImages.length}}" class="comment-draft-media">
         <view wx:for="{{commentDraftImages}}" wx:key="tempFilePath" class="comment-draft-image-wrap">
@@ -108,7 +154,7 @@
         cursor-spacing="24"
         show-confirm-bar="{{false}}"
         value="{{commentDraft}}"
-        placeholder="写下你看到的变化或判断…"
+        placeholder="{{replyTarget ? ('回复 @' + replyTarget.nickname + '…') : '写下你看到的变化或判断…'}}"
         bindinput="onCommentInput"
         bindfocus="onCommentFocus"
         bindblur="onCommentBlur"
@@ -133,9 +179,14 @@
         </view>
       </scroll-view>
     </view>
-    <view wx:else class="comment-governance-footer">
+    <view wx:elif="{{commentsResolved}}" class="comment-governance-footer">
       <view>这里只显示需要你处理的历史评论。</view>
       <button class="comment-governance-benefits" bindtap="showMembershipBenefits">查看会员评论权益</button>
     </view>
+    <canvas
+      type="2d"
+      id="commentMediaCompressor"
+      class="media-compressor-canvas"
+    />
   </view>
 </view>

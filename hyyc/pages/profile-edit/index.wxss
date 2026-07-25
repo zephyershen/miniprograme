@@ -26,3 +26,4 @@
 .review-note { margin-top: 18rpx; padding: 14rpx 16rpx; border-radius: 16rpx; background: #fff7e8; color: #91611e; font-size: 19rpx; line-height: 1.55; }
 .review-note-rejected { background: #fff0ef; color: #a34c45; }
 .privacy-note { padding: 24rpx 12rpx; color: var(--ui-faint); font-size: 19rpx; line-height: 1.65; }
+.media-compressor-canvas { position: fixed; top: 0; left: -2000px; width: 1px; height: 1px; opacity: 0; pointer-events: none; }

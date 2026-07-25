@@ -62,4 +62,22 @@ function applyUserProfileAvatar(profile = {}, avatarUrl = '', displayAvatarUrl =
   };
 }
 
-module.exports = { decorateUserProfile, applyUserProfileAvatar };
+function preserveUserProfileAvatar(next = {}, current = {}) {
+  const approvedUrl = next.avatarFileId
+    && next.avatarFileId === current.avatarFileId
+    && current.avatarUrl
+    ? current.avatarUrl
+    : next.avatarUrl;
+  const displayUrl = next.displayAvatarFileId
+    && next.displayAvatarFileId === current.displayAvatarFileId
+    && current.displayAvatarUrl
+    ? current.displayAvatarUrl
+    : next.displayAvatarUrl;
+  return applyUserProfileAvatar(next, approvedUrl, displayUrl);
+}
+
+module.exports = {
+  decorateUserProfile,
+  applyUserProfileAvatar,
+  preserveUserProfileAvatar
+};

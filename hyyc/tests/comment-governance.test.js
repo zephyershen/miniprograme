@@ -848,10 +848,20 @@ test('renders the governance lifecycle with confirmations, ARIA, and count synch
   assert.match(js, /title: '举报评论'/);
   assert.match(js, /title: '申诉评论'/);
   assert.match(js, /title: '恢复评论'/);
+  assert.match(
+    js,
+    /const optimisticComment = createOptimisticPendingComment[\s\S]*comments: arrangeCommentThreads\(\[optimisticComment, \.\.\.this\.data\.comments\]\)[\s\S]*await uploadCommentImages/
+  );
+  assert.match(wxml, /scroll-into-view="\{\{scrollIntoCommentId\}\}"/);
   assert.match(detail, /bindchanged="onCommentPublished"/);
+  assert.match(detail, /can-participate-hint="\{\{item\.engagement\.canComment\}\}"/);
   assert.match(detail, /class="detail-action"\s+bindtap="openComments"/);
   assert.match(wxml, /wx:if="\{\{canParticipate\}\}" class="comment-compose"/);
-  assert.match(wxml, /comment-governance-footer/);
+  assert.match(
+    wxml,
+    /wx:elif="\{\{commentsResolved\}\}" class="comment-governance-footer"/
+  );
+  assert.match(js, /canParticipateHint:\s*\{\s*type:\s*Boolean/);
   assert.match(js, /showMembershipBenefits\(\)/);
   assert.match(router, /deleteComment:\s*async/);
   assert.match(router, /reportComment:\s*async/);

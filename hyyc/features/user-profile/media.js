@@ -3,8 +3,9 @@ const {
   resolveCloudFileUrls
 } = require('../../services/cloud-media.js');
 
-function uploadAvatar(filePath) {
-  return uploadCloudFile(filePath, 'avatar');
+async function uploadAvatar(filePath, options = {}) {
+  const uploaded = await uploadCloudFile(filePath, 'avatar', options);
+  return uploaded.fileId;
 }
 
 async function resolveAvatarUrl(avatarFileId, resolver = resolveCloudFileUrls) {

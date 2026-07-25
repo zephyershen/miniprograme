@@ -326,6 +326,46 @@ test('profile page ignores an older account response after a viewer boundary', a
   assert.equal(context.data.userProfile.nickname, 'Bob');
 });
 
+test('profile background refresh preserves the current avatar URL when the file is unchanged', async () => {
+  const current = {
+    nickname: 'Alice',
+    avatarFileId: 'cloud://env/avatar.jpg',
+    avatarUrl: 'https://old.example/avatar.jpg',
+    review: { status: 'none', avatarUrl: '' },
+    reviewPending: false,
+    displayNickname: 'Alice',
+    displayAvatarFileId: 'cloud://env/avatar.jpg',
+    displayAvatarUrl: 'https://old.example/avatar.jpg',
+    initial: 'A',
+    isComplete: true
+  };
+  const page = loadPage('../pages/profile/index', [[
+    '../features/user-profile/session',
+    {
+      loadUserProfile: async () => ({
+        ...current,
+        avatarUrl: 'https://new.example/avatar.jpg',
+        displayAvatarUrl: 'https://new.example/avatar.jpg'
+      })
+    }
+  ]]);
+  let writes = 0;
+  const context = {
+    data: { userProfile: current },
+    pageDisposed: false,
+    profileLoadRequestId: 0,
+    setData(patch) {
+      writes += 1;
+      Object.assign(this.data, patch);
+    },
+    scheduleProfileReviewPolling() {}
+  };
+
+  assert.equal(await page.loadProfile.call(context, { force: true }), true);
+  assert.equal(writes, 0);
+  assert.equal(context.data.userProfile.displayAvatarUrl, 'https://old.example/avatar.jpg');
+});
+
 test('an older membership refresh cannot overwrite a newer role preview', async () => {
   const membershipApiPath = '../features/membership/api';
   const membershipSessionPath = '../features/membership/session';

@@ -1246,3 +1246,84 @@
   边界。运行时代码未改动。
 - Sensitive handling: 未读取或记录银行卡、商户号、用户标识、OpenID、订单号、
   支付签名、原始日志、环境变量值、访问令牌或回调密钥。
+
+## [2026-07-25] unbounded-comment-source-and-optimistic-submit | 取消原图业务限额并即时显示待审核评论
+
+- Session: local Codex task
+- Incident: 部分普通手机照片仍在选图或云函数调用前提示 size 太大；图片上传与
+  评论入队完成前，图文一直停留在输入区，用户无法确认是否已经发送。
+- Diagnosis: 图片最终存入 CloudBase 云存储，数据库只保存 File ID；错误来自
+  客户端原图大小拦截和云函数 Base64 请求体上限，与云存储剩余容量无关。评论
+  组件此前在 `await uploadCommentImages` 和 `await addComment` 全部结束后才
+  更新评论列表。
+- Change: 删除产品侧单张原图字节限制；本地文件超过安全请求体目标时，在读取
+  完整 Base64 前先执行 JPG 分级缩放或 iOS PNG 画布转 JPEG，最终请求体目标
+  收紧到 480 KiB。点击发送后立即在评论区插入带本地图片的“提交审核中”评论并
+  收起输入框；服务端接受后原地替换为私有 `pending` 评论，失败时恢复原草稿。
+- Structure: 乐观评论创建、状态更新与本地媒体承接由
+  `features/engagement/model.js` 负责；评论组件只编排 UI、上传和 API 生命周期，
+  共享上传边界继续由 `services/cloud-media.js` 负责。
+- Verification: 图片、互动、治理和页面入口专项 34/34；完整
+  `npm.cmd run verify` 通过，项目检查、环境/数据库/索引合同、全量测试、覆盖率
+  与生产依赖审计均成功。
+- Release boundary: 本次为客户端代码与项目记忆更新，未上传微信体验版、未部署
+  云函数、未修改生产数据库或云存储数据。
+- Sensitive handling: 未读取或记录用户标识、OpenID、评论正文、用户图片、
+  File ID、环境变量值、访问令牌或原始日志。
+
+## [2026-07-25] ios-comment-media-and-interaction-inbox | 修复评论黑图并建立回复互动流
+
+- Session: local Codex task
+- Incident: iOS 评论图片上传后显示为深色空图，打开预览也没有内容；退出预览时
+  评论会被旧的媒体解析结果暂时移除。消息页也只能看到聚合通知，不能辨认评论者、
+  原评论或所在资讯。
+- Diagnosis: 大 PNG 使用旧版离屏 `createCanvasContext`，没有真实图片节点加载
+  完成边界，iOS 可能导出空画布；媒体解析结束后又用请求开始时的整份评论数组
+  覆盖当前状态，导致新评论被旧快照抹掉。旧消息合同按资讯聚合，也没有回复关系、
+  评论摘要和用户资料快照。
+- Change: 头像与评论图片统一改为 Canvas 2D 节点，等待 `Image.onload` 后白底
+  绘制并导出 JPEG；评论媒体按 ID/附件合并，当前会话仍优先保留本地原图预览。
+  评论新增根评论与直接回复关系，文字、图片和回复继续先进入后台 AI 审核。
+  审核通过后，直接回复只投递给被回复者与根评论作者；消息页新增编辑蓝互动流，
+  显示评论者头像、评论摘要、原评论引用和资讯入口，“我的评论”也可从这里返回。
+- Structure: 回复合同由 `feed-engagement-service` 和 `comment-review` 仓储持有；
+  互动 outbox 由 `user-message-service/repository` 投递；客户端线程排列留在
+  `features/engagement/model.js`，消息媒体解析留在
+  `features/messages/media.js`，组件和页面只编排交互。
+- Verification: 完整 `npm.cmd run verify` 与 `git diff --check` 通过；Node
+  683/683，33 JSON、315 JavaScript、13 pages，覆盖率行 80.87%/分支
+  69.21%/函数 77.62%，环境、数据库规则、44 个索引合同和生产依赖审计均通过。
+- Release boundary: 本次未部署 `knowledgeFeed` 云函数、未上传微信体验版、未修改
+  生产数据库或云存储。新上传图片和新互动需部署/上传后生效；已经被旧画布写成
+  黑图的云文件没有原始像素，无法在服务端复原，只能删除原评论后重新上传原图。
+- Sensitive handling: 未读取或记录用户标识、OpenID、评论正文、用户图片、
+  File ID、环境变量值、访问令牌或原始日志。
+
+## [2026-07-25] comment-image-byte-preservation-and-preview-lifecycle | 修正黑图根因与预览返回清空
+
+- Session: local Codex task
+- Supersedes: 本条修正上一条日志中“仅旧版离屏画布导致黑图、旧媒体快照导致评论
+  消失”的不完整判断。两者是风险点，但不足以解释用户复测失败。
+- Production evidence: 对用户报告的单个已发布对象做只读诊断，确认临时 URL
+  正常且云端 JPEG 文件本体已是近乎均匀的深色像素，因此不是 WXML、CSS 或预览
+  组件遮挡；诊断副本已从本地删除，wiki 不记录对象标识或用户信息。
+- Root cause: 服务端 `jpeg-js decode → encode` 把真实手机 JPEG 的解释结果再次
+  写入云存储，存在静默色彩破坏；客户端此前又允许小图绕过 Canvas。预览返回会
+  触发详情页 `onShow`，相同 `itemId` 的 observer 仍无条件清空评论，而弹层一直
+  可见所以不会自动重载。
+- Change: 评论选图不做业务字节拒绝，所有生产头像和评论图都经 Canvas 2D 分级
+  JPEG 标准化，覆盖 8 种方向并验证导出文件；UI 保留实际上传文件的本地路径。
+  服务端继续严格解码、像素和结构校验，但不再二次编码 JPEG 像素，只清理隐私
+  元数据、缩略图、注释和尾随内容，必要时仅重建无隐私的方向标签。评论组件对
+  同 ID 重绑定保持状态，对真实切换使用 request generation 防止乱序覆盖；图片
+  预览前换取新 URL，加载失败时刷新单个附件或显示明确占位。
+- Verification: 图片/媒体/生命周期专项 32/32，评论、消息、安全与视觉相关专项
+  95/95；完整 `npm.cmd run verify` 通过，项目检查、环境/数据库/44 个索引合同、
+  全量测试、覆盖率和生产依赖审计均成功。
+- Recovery boundary: 旧流程已经写坏的云文件没有原始像素，代码无法反推恢复；
+  对应旧评论需删除后用原图重新上传。此次未删除生产评论、未修改生产数据库或
+  云存储。
+- Release boundary: 本次未部署 `knowledgeFeed` 云函数、未上传微信体验版、未
+  提交 Git；客户端和云函数更新需发布后才会影响真机。
+- Sensitive handling: 未记录用户标识、OpenID、评论正文、File ID、环境变量值、
+  访问令牌或原始日志；只读诊断产生的单个本地图片副本已清理。

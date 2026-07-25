@@ -1,3 +1,4 @@
+const { requestWechatLoginCode } = require('../account/wechat-login.js');
 const MINIMUM_VIRTUAL_PAYMENT_SDK = '2.19.2';
 const PENDING_MEMBERSHIP_ORDER_KEY = 'billing.pendingMembershipOrder';
 const VIRTUAL_PAYMENT_PLATFORMS = new Set([
@@ -69,22 +70,7 @@ function assertVirtualPaymentAvailable(wxApi = currentWxApi()) {
 }
 
 function loginForPayment() {
-  return new Promise((resolve, reject) => {
-    if (typeof wx === 'undefined' || typeof wx.login !== 'function') {
-      reject(new Error('暂时无法连接支付服务，请稍后重试'));
-      return;
-    }
-    wx.login({
-      success(result) {
-        const code = result && typeof result.code === 'string' ? result.code.trim() : '';
-        if (code) resolve(code);
-        else reject(new Error('登录状态获取失败，请重试'));
-      },
-      fail() {
-        reject(new Error('登录状态获取失败，请重试'));
-      }
-    });
-  });
+  return requestWechatLoginCode();
 }
 
 function requestMiniProgramVirtualPayment(payment) {

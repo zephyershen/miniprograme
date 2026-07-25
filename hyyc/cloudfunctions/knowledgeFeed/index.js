@@ -282,6 +282,7 @@ const commentReviewService = createCommentReviewService({
 });
 const userMessageService = createUserMessageService({
   repository: userMessageRepository,
+  profileRepository: userProfileRepository,
   config: ENGAGEMENT_CONFIG,
   logger
 });

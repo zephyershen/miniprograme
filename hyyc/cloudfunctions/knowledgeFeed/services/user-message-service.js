@@ -21,6 +21,12 @@ function isoDate(value) {
   return Number.isFinite(date.getTime()) ? date.toISOString() : null;
 }
 
+function rejectionReason(value) {
+  return typeof value === 'string' && value.trim()
+    ? value.trim().slice(0, 120)
+    : '内容不符合社区发布规范';
+}
+
 function messageView(message) {
   return {
     id: message && (message._id || message.id),
@@ -29,6 +35,16 @@ function messageView(message) {
     title: message && message.title || '系统消息',
     body: message && message.body || '',
     itemId: message && message.itemId || '',
+    itemTitle: message && message.itemTitle || '',
+    itemThumbnailFileId: message && message.itemThumbnailFileId || '',
+    commentId: message && message.commentId || '',
+    parentCommentId: message && message.parentCommentId || '',
+    replyToCommentId: message && message.replyToCommentId || '',
+    commentPreview: message && message.commentPreview || '',
+    replyToPreview: message && message.replyToPreview || '',
+    rootCommentPreview: message && message.rootCommentPreview || '',
+    actorNickname: message && message.actorNickname || '',
+    actorAvatarFileId: message && message.actorAvatarFileId || '',
     version: message && message.sourceEventId || '',
     openComments: Boolean(message && message.itemId
       && ['comment_approved', 'comment_rejected', 'comment_review_failed', 'comment_received']
@@ -79,7 +95,7 @@ function directMessage(event) {
       type: 'comment_rejected',
       category: 'comments',
       title: '评论未通过审核',
-      body: '该评论未公开，内容及待审图片已删除。',
+      body: `未通过原因：${rejectionReason(event.rejectionReason)}。该评论未公开，评论文字及待审图片已删除。`,
       itemId: event.itemId
     },
     comment_review_failed: {
@@ -95,6 +111,7 @@ function directMessage(event) {
 
 function createUserMessageService({
   repository,
+  profileRepository = null,
   config,
   logger = { warn: () => {} },
   now = () => Date.now(),
@@ -116,18 +133,50 @@ function createUserMessageService({
     );
     if (!event) return { status: 'skipped' };
     try {
-      const message = directMessage(event);
+      const actorProfile = event.type === 'comment_approved'
+        && profileRepository
+        && typeof profileRepository.get === 'function'
+        ? await profileRepository.get(event.ownerKey)
+        : null;
+      const deliveryEvent = actorProfile
+        ? {
+            ...event,
+            actorNickname: actorProfile.nickname || '读者',
+            actorAvatarFileId: actorProfile.avatarFileId || ''
+          }
+        : event;
+      const message = directMessage(deliveryEvent);
       if (message && event.ownerKey) {
-        await repository.upsertDirectMessage(event.ownerKey, event, message, new Date(now()));
+        await repository.upsertDirectMessage(
+          event.ownerKey,
+          deliveryEvent,
+          message,
+          new Date(now())
+        );
       }
       if (event.type === 'comment_approved' && event.itemId) {
-        const owners = await repository.participantOwnerKeys(
-          event.itemId,
-          event.ownerKey,
-          config.messageParticipantLimit,
-          event.createdAt
+        const enrichedEvent = {
+          ...deliveryEvent,
+          actorNickname: deliveryEvent.actorNickname || '读者',
+          actorAvatarFileId: deliveryEvent.actorAvatarFileId || ''
+        };
+        const directReplyOwners = event.replyToCommentId
+          ? [event.replyToOwnerKey, event.threadOwnerKey]
+              .filter((ownerKey) => ownerKey && ownerKey !== event.ownerKey)
+          : [];
+        const owners = directReplyOwners.length
+          ? [...new Set(directReplyOwners)]
+          : await repository.participantOwnerKeys(
+            event.itemId,
+            event.ownerKey,
+            config.messageParticipantLimit,
+            event.createdAt
+          );
+        await repository.upsertCommentThreadMessages(
+          owners,
+          enrichedEvent,
+          new Date(now())
         );
-        await repository.upsertCommentThreadMessages(owners, event, new Date(now()));
       }
       const completedAt = new Date(now());
       const completed = await repository.markEventDone(event._id, claimId, {

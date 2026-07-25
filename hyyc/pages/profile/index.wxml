@@ -15,107 +15,57 @@
         <view wx:if="{{userProfile.reviewPending}}" class="user-avatar-review">审核中</view>
       </view>
       <view class="user-profile-copy">
-        <view class="user-profile-name">{{userProfile.displayNickname || '设置头像和昵称'}}</view>
-        <view wx:if="{{userProfile.reviewPending}}" class="user-profile-hint">
-          {{userProfile.isComplete ? '审核通过前，评论仍使用原资料' : '资料审核中，通过后即可评论'}}
-        </view>
-        <view wx:elif="{{userProfile.review.status === 'rejected'}}" class="user-profile-hint user-profile-rejected">{{userProfile.review.message}}</view>
-        <view wx:else class="user-profile-hint">{{userProfile.isComplete ? '用于评论区展示，点击可修改' : '发布评论前需要完成个人资料'}}</view>
-      </view>
-      <text class="user-profile-arrow">→</text>
-    </view>
-
-    <view class="identity-block">
-      <view class="identity-label">当前身份</view>
-      <view class="identity-title">{{membership.roleLabel}}</view>
-      <view class="identity-copy">{{membership.roleCopy}}</view>
-      <view wx:if="{{membership.periodEndLabel}}" class="identity-meta">有效期至 {{membership.periodEndLabel}}</view>
-      <view wx:if="{{membership.renewalLabel}}" class="identity-meta">{{membership.renewalLabel}}</view>
-    </view>
-
-    <view wx:if="{{billing.accountVerified}}" class="account-session-block">
-      <view class="account-session-copy">
-        <view class="account-session-title">已完成订阅账号验证</view>
-        <view class="account-session-note">
-          退出只会清除本机的订阅验证状态，不会退出手机微信、取消会员或删除资料。
-        </view>
-      </view>
-      <button
-        class="account-session-button account-session-logout"
-        bindtap="logoutWechatAccount"
-        loading="{{accountLoggingOut}}"
-        disabled="{{accountLoggingOut || accountAuthenticating || billing.purchasing}}"
-      >退出登录</button>
-    </view>
-
-    <view wx:if="{{!membership.isAdmin}}" class="pro-pass {{membership.isPrivileged ? 'pro-pass-active' : ''}}">
-      <view class="pro-pass-body">
-        <view class="pro-pass-topline">
-          <view class="pro-pass-kicker">Pro 会员</view>
-          <view class="pro-pass-status">{{membership.isPrivileged ? '已开通' : (billing.plan.durationLabel || '会员方案')}}</view>
-        </view>
-
-        <view class="pro-pass-title">{{membership.isPrivileged ? '你的 Pro 权益' : '把值得读的内容和实用课程留在一起'}}</view>
-        <view class="pro-pass-copy">精选资讯、30 天回看、基础课、动手课和三档简报，一次开通即可使用。</view>
-
-        <view wx:if="{{billing.loading}}" class="pro-offer-loading">正在读取会员价格</view>
-        <view wx:elif="{{billing.available && billing.plan.priceCents}}" class="pro-offer">
-          <view class="pro-offer-main">
-            <view class="pro-offer-label">{{billing.plan.offerTag || '当前会员价'}}</view>
-            <view class="pro-offer-line">
-              <view class="pro-offer-price"><text>{{billing.plan.priceLabel}}</text><label>/ {{billing.plan.durationLabel}}</label></view>
-              <view wx:if="{{billing.plan.hasDiscount}}" class="pro-offer-saving">
-                <text class="pro-offer-discount">{{billing.plan.discountLabel}}</text>
-                <text>· 立省 {{billing.plan.savingsLabel}}</text>
-              </view>
-            </view>
-            <view wx:if="{{billing.plan.compareAtPriceLabel}}" class="pro-offer-compare">日常价 {{billing.plan.compareAtPriceLabel}}</view>
+        <view class="user-profile-headline">
+          <text class="user-profile-name">{{userProfile.displayNickname || '设置头像和昵称'}}</text>
+          <view class="user-role-badge user-role-{{membership.role}}" catchtap="openMembership">
+            <text wx:if="{{membership.isPrivileged}}" class="user-role-glyph">◆</text>
+            <text class="user-role-text">{{membership.roleLabel}}</text>
           </view>
         </view>
-        <view wx:else class="pro-offer-loading">会员服务即将开放</view>
+        <view wx:if="{{userProfile.reviewPending}}" class="user-profile-editline">
+          <text class="user-profile-editicon"></text>
+          <text class="user-profile-edittext">{{userProfile.isComplete ? '资料审核中，通过前评论仍用原资料' : '资料审核中，通过后即可评论'}}</text>
+        </view>
+        <view wx:elif="{{userProfile.review.status === 'rejected'}}" class="user-profile-editline is-rejected">
+          <text class="user-profile-editicon"></text>
+          <text class="user-profile-edittext">{{userProfile.review.message}}</text>
+        </view>
+        <view wx:else class="user-profile-editline">
+          <text class="user-profile-editicon"></text>
+          <text class="user-profile-edittext">{{userProfile.isComplete ? '编辑资料，展示我的头像和昵称' : '完善头像昵称，用作评论身份'}}</text>
+        </view>
+      </view>
+      <text class="user-profile-arrow">›</text>
+    </view>
 
-        <view class="pro-benefits-head"><view>包含以下权益</view><text>共 {{membership.benefits.length}} 项</text></view>
-        <view class="pro-benefit-list">
-          <view wx:for="{{membership.benefits}}" wx:key="key" class="pro-benefit-row">
-            <view class="pro-benefit-check">✓</view>
-            <view class="pro-benefit-copybox">
-              <view class="pro-benefit-title">{{item.title}}</view>
-              <view class="pro-benefit-copy">{{item.copy}}</view>
-            </view>
-          </view>
+    <view class="list-group">
+      <view class="list-row list-row-vip" bindtap="openMembership">
+        <view class="list-icon list-icon-vip"></view>
+        <text class="list-label">会员中心</text>
+        <view class="list-trailing">
+          <text wx:if="{{membership.isAdmin}}" class="list-hint is-vip">管理员</text>
+          <text wx:elif="{{membership.isPrivileged}}" class="list-hint is-vip">Pro 会员{{membership.periodEndLabel ? ' · 到期 ' + membership.periodEndLabel : ''}}</text>
+          <text wx:else class="list-hint is-vip">开通 Pro 会员</text>
         </view>
+        <text class="list-caret">›</text>
+      </view>
+    </view>
 
-        <view class="pro-support-boundary">{{membership.membershipTerms.supportBoundary}}</view>
-        <view
-          wx:if="{{membership.purchaseMode === 'renew' && membership.periodEndLabel}}"
-          class="pro-current-period"
-        >
-          <view>当前有效期至 {{membership.periodEndLabel}}</view>
-          <text>本次续费成功后，将从该日顺延 {{billing.plan.durationLabel || '30 天'}}。</text>
+    <view class="list-group">
+      <view class="list-row" bindtap="openMessages">
+        <view class="list-icon list-icon-message"></view>
+        <text class="list-label">消息</text>
+        <view class="list-trailing">
+          <text wx:if="{{messageCenter.hasUnread}}" class="list-badge">{{messageCenter.unreadCount > 99 ? '99+' : messageCenter.unreadCount}}</text>
         </view>
-        <button
-          wx:if="{{billing.available}}"
-          class="pro-purchase-button"
-          bindtap="purchaseMembership"
-          loading="{{billing.purchasing || accountAuthenticating}}"
-          disabled="{{billing.purchasing || accountAuthenticating || accountLoggingOut}}"
-        >{{billing.accountVerified
-          ? (membership.purchaseMode === 'renew'
-            ? '续费 ' + (billing.plan.durationLabel || '30 天')
-            : '订阅并支付')
-          : '使用当前微信账号登录'}}</button>
-        <view wx:else class="pro-purchase-footnote">当前暂不可购买，请稍后再试。</view>
-        <view class="pro-account-note">
-          {{billing.accountVerified
-            ? (membership.purchaseMode === 'renew'
-              ? '已登录当前微信账号。点击续费并完成支付后，会员有效期会继续累加。'
-              : '已登录当前微信账号。再次点击订阅并支付，才会进入系统收银台。')
-            : '首次订阅先登录当前微信账号；登录成功后，你可以完善头像昵称，再单独点击订阅并支付。'}}
-        </view>
-        <view wx:if="{{billing.accountVerified && !userProfile.isComplete && !userProfile.reviewPending}}" class="pro-account-note">
-          微信不允许自动读取真实头像昵称；头像昵称为可选资料，不影响会员绑定。
-        </view>
-        <view class="pro-renewal-note">{{membership.membershipTerms.renewalCopy}}</view>
+        <text class="list-caret">›</text>
+      </view>
+      <view class="list-divider"></view>
+      <view class="list-row" bindtap="openCards">
+        <view class="list-icon list-icon-bookmark"></view>
+        <text class="list-label">我的收藏</text>
+        <view class="list-trailing"></view>
+        <text class="list-caret">›</text>
       </view>
     </view>
 
@@ -135,21 +85,6 @@
         >{{item.label}}</button>
       </view>
       <view wx:if="{{membership.isRolePreview}}" class="role-preview-status">正在以 {{membership.roleLabel}} 查看小程序；切到资讯、专栏或简报，或从资讯顶部打开精选，即可检查对应体验。</view>
-    </view>
-
-    <view class="profile-section">
-      <view class="section-title">个人内容</view>
-      <view class="profile-link" bindtap="openMessages">
-        <view>
-          <view class="link-title link-title-with-badge">
-            <text>消息</text>
-            <text wx:if="{{messageCenter.hasUnread}}" class="message-count-badge">{{messageCenter.unreadCount > 99 ? '99+' : messageCenter.unreadCount}}</text>
-          </view>
-          <view class="link-copy">会员开通、资料与评论审核结果，以及你参与的讨论动态。</view>
-        </view>
-        <text>→</text>
-      </view>
-      <view class="profile-link" bindtap="openCards"><view><view class="link-title">我的收藏</view><view class="link-copy">用一行摘要保留阅读线索，回看时仍会校验当前权限。</view></view><text>→</text></view>
     </view>
 
     <view wx:if="{{membership.isAdmin}}" class="admin-note">管理员可以查看项目实际已归档的全部资讯；“全部”不代表平台之外未收录的数据。</view>

@@ -186,6 +186,8 @@
     visible="{{commentsOpen}}"
     item-id="{{item.id}}"
     comment-count="{{item.engagement.commentCount}}"
+    can-participate-hint="{{item.engagement.canComment}}"
+    focus-comment-id="{{focusedCommentId}}"
     bindclose="closeComments"
     bindlocked="handleCommentsLocked"
     bindpublished="onCommentPublished"

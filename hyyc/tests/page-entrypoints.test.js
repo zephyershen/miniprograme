@@ -17,7 +17,8 @@ test('loads every configured page entrypoint after feature-module migration', ()
       '../pages/profile-edit/index',
       '../pages/feed-detail/index',
       '../pages/source-view/index',
-      '../pages/cards/index'
+      '../pages/cards/index',
+      '../pages/membership/index'
     ].forEach((path) => {
       delete require.cache[require.resolve(path)];
       require(path);
@@ -26,7 +27,7 @@ test('loads every configured page entrypoint after feature-module migration', ()
     if (previousPage) global.Page = previousPage;
     else delete global.Page;
   }
-  assert.equal(registered.length, 11);
+  assert.equal(registered.length, 12);
   assert.equal(typeof registered[0].loadFeed, 'function');
   assert.equal(typeof registered[0].checkForFeedUpdates, 'function');
   assert.equal(typeof registered[0].applyNewItems, 'function');
@@ -46,6 +47,7 @@ test('loads every configured page entrypoint after feature-module migration', ()
   assert.equal(typeof registered[8].loadItem, 'function');
   assert.equal(typeof registered[9].onLoad, 'function');
   assert.equal(typeof registered[10].loadFavorites, 'function');
+  assert.equal(typeof registered[11].purchaseMembership, 'function');
 });
 
 test('keeps retired digest routes and stores out of the public collection flow', () => {

@@ -197,6 +197,33 @@ test('queues a comment and atomically records its submission without using the m
   assert.deepEqual(harness.writes.map(({ name }) => name), ['comments', 'engagements']);
 });
 
+test('keeps reply context private on the pending comment until moderation completes', async () => {
+  const harness = createHarness();
+  const input = {
+    ...commentInput(),
+    parentCommentId: 'root_comment_1',
+    replyToCommentId: 'target_comment_1',
+    replyToOwnerKey: 'b'.repeat(64),
+    threadOwnerKey: 'c'.repeat(64),
+    replyToNickname: '原作者',
+    replyToPreview: '原评论内容',
+    rootCommentPreview: '根评论内容'
+  };
+  const result = await harness.repository.enqueue(
+    OWNER,
+    ITEM_ID,
+    COMMENT_ID,
+    input,
+    CREATED_AT
+  );
+
+  assert.equal(result.comment.parentCommentId, 'root_comment_1');
+  assert.equal(result.comment.replyToCommentId, 'target_comment_1');
+  assert.equal(result.comment.replyToNickname, '原作者');
+  assert.equal(result.comment.replyToPreview, '原评论内容');
+  assert.equal(result.comment.rootCommentPreview, '根评论内容');
+});
+
 test('returns an existing deterministic comment before reading or applying rate limits', async () => {
   const recentTimes = Array.from(
     { length: 30 },

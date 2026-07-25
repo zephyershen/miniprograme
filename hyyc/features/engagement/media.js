@@ -5,7 +5,6 @@ const {
 const { applyCommentMedia } = require('./model.js');
 
 const COMMENT_IMAGE_LIMIT = 3;
-const COMMENT_IMAGE_MAX_BYTES = 3 * 1024 * 1024;
 const CLOUD_MEDIA_BATCH_SIZE = 50;
 
 async function chooseCommentImages(existingCount = 0) {
@@ -18,8 +17,6 @@ async function chooseCommentImages(existingCount = 0) {
     sizeType: ['compressed']
   });
   const files = ((result && result.tempFiles) || []).filter((file) => file && file.tempFilePath);
-  const oversized = files.find((file) => Number(file.size) > COMMENT_IMAGE_MAX_BYTES);
-  if (oversized) throw new Error('单张图片请控制在 3MB 内');
   return files.map((file) => ({
     tempFilePath: file.tempFilePath,
     width: Math.max(0, Math.floor(Number(file.width) || 0)),
@@ -28,12 +25,16 @@ async function chooseCommentImages(existingCount = 0) {
   }));
 }
 
-async function uploadCommentImages(images = []) {
+async function uploadCommentImages(images = [], options = {}) {
   const uploaded = [];
   for (const image of images) {
+    const result = await uploadCloudFile(image.tempFilePath, 'comment', options);
     uploaded.push({
       type: 'image',
-      fileId: await uploadCloudFile(image.tempFilePath, 'comment'),
+      fileId: result.fileId,
+      previewPath: result.previewPath || image.tempFilePath,
+      tempFilePath: result.previewPath || image.tempFilePath,
+      localPath: result.previewPath || image.tempFilePath,
       width: image.width,
       height: image.height
     });
@@ -43,8 +44,39 @@ async function uploadCommentImages(images = []) {
 
 function previewLocalImages(images, currentPath) {
   const urls = (images || []).map((image) => image.tempFilePath).filter(Boolean);
-  if (!urls.length) return;
-  wx.previewImage({ current: currentPath || urls[0], urls });
+  if (!urls.length) return Promise.resolve(false);
+  return openImagePreview(urls, currentPath || urls[0]);
+}
+
+function openImagePreview(urls, current) {
+  const values = (urls || []).filter(Boolean);
+  if (!values.length) return Promise.reject(new Error('图片暂时无法打开'));
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const success = () => {
+      if (settled) return;
+      settled = true;
+      resolve(true);
+    };
+    const fail = (error) => {
+      if (settled) return;
+      settled = true;
+      reject(error instanceof Error ? error : new Error('图片暂时无法打开'));
+    };
+    let task;
+    try {
+      task = wx.previewImage({
+        current: current || values[0],
+        urls: values,
+        success,
+        fail
+      });
+    } catch (error) {
+      fail(error);
+      return;
+    }
+    if (task && typeof task.then === 'function') task.then(success, fail);
+  });
 }
 
 function commentMediaFileIds(comments = []) {
@@ -82,23 +114,39 @@ async function resolveCommentMedia(comments = [], resolver = resolveCloudFileUrl
   return applyCommentMedia(comments, mediaUrls);
 }
 
+async function resolveFreshCommentMedia(comment, resolver = resolveCloudFileUrls) {
+  const refreshableComment = {
+    ...comment,
+    attachments: (comment && comment.attachments || []).map((attachment) => ({
+      ...attachment,
+      url: String(attachment && attachment.fileId || '').startsWith('cloud://')
+        ? ''
+        : attachment.url
+    }))
+  };
+  const [resolvedComment] = await resolveCommentMedia([refreshableComment], resolver);
+  return resolvedComment || refreshableComment;
+}
+
 async function previewCommentImages(comment, currentFileId, resolver = resolveCloudFileUrls) {
-  const [resolvedComment] = await resolveCommentMedia([comment], resolver);
+  const resolvedComment = await resolveFreshCommentMedia(comment, resolver);
   const attachments = resolvedComment && resolvedComment.attachments || [];
   const urls = attachments.map((attachment) => attachment.url).filter(Boolean);
   const current = (attachments.find((attachment) => attachment.fileId === currentFileId) || {}).url
     || urls[0];
   if (!current || !urls.length) throw new Error('图片暂时无法打开');
-  wx.previewImage({ current, urls });
+  await openImagePreview(urls, current);
+  return resolvedComment;
 }
 
 module.exports = {
   COMMENT_IMAGE_LIMIT,
-  COMMENT_IMAGE_MAX_BYTES,
   chooseCommentImages,
   uploadCommentImages,
   previewLocalImages,
+  openImagePreview,
   commentMediaFileIds,
   resolveCommentMedia,
+  resolveFreshCommentMedia,
   previewCommentImages
 };

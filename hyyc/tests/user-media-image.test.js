@@ -31,7 +31,7 @@ function pngInput(width = 2, height = 2) {
   return PNG.sync.write(rgba(width, height));
 }
 
-test('fully decodes and re-encodes JPEG and PNG uploads into static metadata-free images', () => {
+test('validates images while preserving JPEG pixels and removing private metadata', () => {
   const originalJpeg = jpegInput();
   const exif = Buffer.from([
     0xff, 0xe1, 0x00, 0x0e,
@@ -52,6 +52,7 @@ test('fully decodes and re-encodes JPEG and PNG uploads into static metadata-fre
   assert.equal(sanitizedJpeg.mimeType, 'image/jpeg');
   assert.equal(imageFormat(sanitizedJpeg.buffer), 'jpeg');
   assert.equal(sanitizedJpeg.buffer.includes(Buffer.from('Exif\u0000\u0000')), false);
+  assert.deepEqual(sanitizedJpeg.buffer, originalJpeg);
   assert.deepEqual(
     [jpeg.decode(sanitizedJpeg.buffer).width, jpeg.decode(sanitizedJpeg.buffer).height],
     [2, 2]

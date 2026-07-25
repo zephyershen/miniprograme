@@ -77,7 +77,12 @@ Page({
     this.setData({ saving: true });
     try {
       const avatarFileId = this.data.avatarChanged
-        ? await uploadAvatar(this.data.avatarUrl)
+        ? await uploadAvatar(this.data.avatarUrl, {
+          canvas: {
+            component: this,
+            canvasId: 'avatarMediaCompressor'
+          }
+        })
         : this.data.avatarFileId;
       await updateUserProfile({ nickname: this.data.nickname.trim(), avatarFileId });
       this.saveCompleted = true;

@@ -1,5 +1,8 @@
 const { runtimeCloudEnvironment } = require('./config/runtime-environment.js');
 const { refreshMembershipAccess } = require('./features/membership/session.js');
+const {
+  ensureViewerAccountSession
+} = require('./features/account/session.js');
 
 App({
   onLaunch() {
@@ -12,7 +15,7 @@ App({
     wx.cloud.init({ env: runtime.cloudEnvironmentId });
     this.globalData.runtimeEnvironment = runtime;
     this.skipNextMembershipResumeRefresh = true;
-    this.refreshMembershipAccess(true);
+    this.initializeViewerSession(true);
   },
 
   onShow() {
@@ -20,7 +23,7 @@ App({
       if (this.skipNextMembershipResumeRefresh) {
         this.skipNextMembershipResumeRefresh = false;
       } else {
-        this.refreshMembershipAccess(true);
+        this.initializeViewerSession(true);
       }
       this.scheduleMembershipOrderRecovery();
     }
@@ -48,6 +51,36 @@ App({
     }
   },
 
+  async initializeViewerSession(force) {
+    if (this.viewerAccountSessionPromise) return this.viewerAccountSessionPromise;
+    const pending = (async () => {
+      const access = await this.refreshMembershipAccess(force);
+      if (!access) return null;
+      const result = await ensureViewerAccountSession(access);
+      this.globalData.accountSession = {
+        verified: result && result.verified === true,
+        authenticating: false
+      };
+      return result;
+    })();
+    this.viewerAccountSessionPromise = pending;
+    try {
+      return await pending;
+    } catch (error) {
+      this.globalData.accountSession = {
+        verified: false,
+        authenticating: false,
+        errorCode: error && error.code || 'ACCOUNT_LOGIN_FAILED'
+      };
+      console.warn('微信账号暂时未登录', error && error.code ? error.code : error);
+      return null;
+    } finally {
+      if (this.viewerAccountSessionPromise === pending) {
+        this.viewerAccountSessionPromise = null;
+      }
+    }
+  },
+
   async recoverPendingMembershipOrder() {
     try {
       const { recoverPendingMembershipOrder } = require('./features/billing/recovery.js');
@@ -64,6 +97,10 @@ App({
     membership: null,
     curatedFeed: null,
     briefing: null,
+    accountSession: {
+      verified: false,
+      authenticating: false
+    },
     runtimeEnvironment: null
   }
 });

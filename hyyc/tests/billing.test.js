@@ -357,7 +357,12 @@ test('verifies the current WeChat account without creating a payment order', asy
         return { openId: 'open-id', sessionKey: 'must-not-leak' };
       }
     },
-    config: CONFIG,
+    config: {
+      ...CONFIG,
+      memberPurchasesEnabled: false,
+      enabled: false,
+      releaseApproved: false
+    },
     plan: PLAN,
     missingConfig: missingPaymentConfig
   });

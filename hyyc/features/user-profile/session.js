@@ -27,6 +27,10 @@ async function loadUserProfile({ force = false, scope = membershipCacheScope() }
   }, { force });
 }
 
+function cachedUserProfile({ scope = membershipCacheScope(), allowStale = true } = {}) {
+  return profileCache.peek(scope, { allowStale });
+}
+
 async function updateUserProfile(profile) {
   const scope = membershipCacheScope();
   const result = await saveUserProfile(profile);
@@ -53,6 +57,7 @@ registerViewerCache(clearUserProfile);
 
 module.exports = {
   loadUserProfile,
+  cachedUserProfile,
   updateUserProfile,
   rememberUserProfile,
   presentUserProfile,

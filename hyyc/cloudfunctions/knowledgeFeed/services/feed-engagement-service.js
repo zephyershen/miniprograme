@@ -1,5 +1,10 @@
 const crypto = require('node:crypto');
 const { AppError } = require('../lib/errors');
+const {
+  COMMENT_LINK_MESSAGE,
+  commentContainsLink
+} = require('../policies/comment-content-policy');
+const { moderationApproved } = require('../policies/moderation-policy');
 const { commentDocumentId } = require('../repositories/feed-engagement');
 const { profileView } = require('./user-profile-service');
 
@@ -21,6 +26,9 @@ function normalizeCommentContent(value, maxLength = 280, hasAttachments = false)
   if (!content && !hasAttachments) throw new AppError('INVALID_REQUEST', '写点内容或选择图片再发布');
   if (content.length > maxLength) {
     throw new AppError('INVALID_REQUEST', `评论最多 ${maxLength} 个字`);
+  }
+  if (commentContainsLink(content)) {
+    throw new AppError('COMMENT_LINK_NOT_ALLOWED', COMMENT_LINK_MESSAGE);
   }
   return content;
 }
@@ -52,6 +60,24 @@ function normalizeMutationId(value) {
   return crypto.randomBytes(18).toString('hex');
 }
 
+function normalizeReplyCommentId(value) {
+  if (value === undefined || value === null || value === '') return '';
+  if (typeof value !== 'string' || !/^[a-z0-9_-]{8,128}$/i.test(value)) {
+    throw new AppError('COMMENT_NOT_FOUND', '要回复的评论不存在或已不可见');
+  }
+  return value;
+}
+
+function commentPreview(comment) {
+  const content = typeof (comment && comment.content) === 'string'
+    ? comment.content.replace(/\s+/g, ' ').trim()
+    : '';
+  if (content) return content.slice(0, 100);
+  return Array.isArray(comment && comment.attachments) && comment.attachments.length
+    ? '[图片]'
+    : '这条评论';
+}
+
 function commentView(comment, ownerKey, profile = null, options = {}) {
   const createdAt = comment && comment.createdAt;
   const author = profileView(profile);
@@ -69,6 +95,11 @@ function commentView(comment, ownerKey, profile = null, options = {}) {
       initial: author.initial
     },
     authorLabel: author.nickname || '读者',
+    parentCommentId: comment && comment.parentCommentId || '',
+    replyToCommentId: comment && comment.replyToCommentId || '',
+    replyToNickname: comment && comment.replyToNickname || '',
+    replyToPreview: comment && comment.replyToPreview || '',
+    isReply: Boolean(comment && comment.parentCommentId),
     isMine,
     isHidden: privateStatus,
     reviewPending,
@@ -77,6 +108,9 @@ function commentView(comment, ownerKey, profile = null, options = {}) {
       ? '审核中'
       : (appealPending ? '申诉处理中' : (privateStatus ? '已隐藏' : '')),
     canDelete: isMine || options.isAdmin === true,
+    canReply: options.canParticipate === true
+      && !reviewPending
+      && !privateStatus,
     canReport: !reviewPending && !privateStatus && !isMine,
     canAppeal: privateStatus && !appealPending && isMine && options.isAdmin !== true,
     canRestore: privateStatus && options.isAdmin === true,
@@ -202,6 +236,7 @@ function createFeedEngagementService({
         profileMap.get(comment.authorKey),
         {
           isAdmin: admin,
+          canParticipate,
           reported: reportedCommentIds.has(comment._id)
         }
       )),
@@ -244,12 +279,57 @@ function createFeedEngagementService({
         };
       }
     }
+    const replyToCommentId = normalizeReplyCommentId(payload && payload.replyToCommentId);
+    let replyContext = {};
+    if (replyToCommentId) {
+      const targetResult = await repository.getComment(replyToCommentId, itemId);
+      const target = targetResult && targetResult.comment;
+      if (!target || target.status !== 'active' || !moderationApproved(target.moderation)) {
+        throw new AppError('COMMENT_NOT_FOUND', '要回复的评论不存在或已不可见');
+      }
+      const rootCommentId = target.parentCommentId || target._id;
+      const rootResult = rootCommentId === target._id
+        ? targetResult
+        : await repository.getComment(rootCommentId, itemId);
+      const root = rootResult && rootResult.comment;
+      if (!root || root.status !== 'active' || !moderationApproved(root.moderation)) {
+        throw new AppError('COMMENT_NOT_FOUND', '这组讨论已经不可见');
+      }
+      const targetProfile = await profileRepository.get(target.authorKey);
+      const targetPublicProfile = profileView(targetProfile);
+      replyContext = {
+        parentCommentId: root._id,
+        replyToCommentId: target._id,
+        replyToOwnerKey: target.authorKey,
+        threadOwnerKey: root.authorKey,
+        replyToNickname: targetPublicProfile.nickname || '读者',
+        replyToPreview: commentPreview(target),
+        rootCommentPreview: commentPreview(root)
+      };
+    }
     const attachments = normalizeCommentAttachments(payload && payload.attachments, config);
-    const content = normalizeCommentContent(
-      payload && payload.content,
-      config.commentMaxLength,
-      attachments.length > 0
-    );
+    let content;
+    try {
+      content = normalizeCommentContent(
+        payload && payload.content,
+        config.commentMaxLength,
+        attachments.length > 0
+      );
+    } catch (error) {
+      if (
+        error
+        && error.code === 'COMMENT_LINK_NOT_ALLOWED'
+        && userMediaService
+        && attachments.length
+      ) {
+        await userMediaService.discardUnpublished(
+          actor,
+          'comment',
+          attachments.map((attachment) => attachment.fileId)
+        ).catch(() => null);
+      }
+      throw error;
+    }
     let reviewAttachments = attachments;
     if (attachments.length) {
       if (!userMediaService) throw new Error('USER_MEDIA_SERVICE_REQUIRED');
@@ -283,7 +363,8 @@ function createFeedEngagementService({
             content,
             attachments,
             reviewAttachments,
-            reviewRevision: mutationId
+            reviewRevision: mutationId,
+            ...replyContext
           },
           new Date(now())
         );
@@ -296,6 +377,7 @@ function createFeedEngagementService({
             attachments,
             reviewAttachments,
             reviewRevision: mutationId,
+            ...replyContext,
             moderation: { status: 'pending' }
           },
           new Date(now()),
@@ -432,6 +514,8 @@ module.exports = {
   normalizeCommentContent,
   normalizeCommentAttachments,
   normalizeMutationId,
+  normalizeReplyCommentId,
+  commentPreview,
   commentView,
   engagementView,
   favoriteAvailable,

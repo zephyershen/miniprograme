@@ -695,7 +695,6 @@ function createBillingService({ repository, paymentClient, config, plan, missing
   }
 
   async function verifyAccount(loginCode, actor) {
-    assertSalesAvailable();
     const session = await paymentClient.exchangeLoginCode(loginCode);
     if (!session || !safeEqualText(session.openId, actor && actor.openId)) {
       throw new BillingError('PAYMENT_ACCOUNT_MISMATCH', '当前微信账号与小程序账号不一致', 401);

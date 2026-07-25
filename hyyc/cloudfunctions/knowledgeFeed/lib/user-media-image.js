@@ -7,7 +7,6 @@ const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png']);
 const IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png']);
 const DEFAULT_MAX_DIMENSION = 4096;
 const DEFAULT_MAX_PIXELS = 12 * 1024 * 1024;
-const JPEG_QUALITY_STEPS = Object.freeze([85, 75, 65, 55]);
 
 function invalidImage(message = 'Choose a valid JPG or PNG image') {
   return new AppError('INVALID_REQUEST', message);
@@ -92,6 +91,26 @@ function jpegDimensions(buffer, segments = jpegSegments(buffer)) {
   };
 }
 
+function jpegFrameInfo(buffer, segments = jpegSegments(buffer)) {
+  const frames = segments.filter((segment) => segment.marker === 0xc0 || segment.marker === 0xc2);
+  if (frames.length !== 1) throw invalidImage();
+  const frame = frames[0];
+  if (frame.end - frame.start < 6) throw invalidImage();
+  const components = buffer[frame.start + 5];
+  if (![1, 3].includes(components)
+    || frame.end - frame.start < 6 + (components * 3)
+    || buffer[frame.start] !== 8) {
+    throw invalidImage();
+  }
+  return {
+    marker: frame.marker,
+    precision: buffer[frame.start],
+    height: buffer.readUInt16BE(frame.start + 1),
+    width: buffer.readUInt16BE(frame.start + 3),
+    components
+  };
+}
+
 function exifOrientation(buffer, segments) {
   const app1 = segments.find((segment) => segment.marker === 0xe1
     && buffer.subarray(segment.start, segment.start + 6).toString('binary') === 'Exif\u0000\u0000');
@@ -138,41 +157,126 @@ function assertDimensions(dimensions, options = {}) {
   return { width, height };
 }
 
-function orientedPixels(decoded, orientation) {
-  if (orientation === 1) return decoded;
-  const sourceWidth = decoded.width;
-  const sourceHeight = decoded.height;
-  const swapsAxes = orientation >= 5 && orientation <= 8;
-  const width = swapsAxes ? sourceHeight : sourceWidth;
-  const height = swapsAxes ? sourceWidth : sourceHeight;
-  const data = Buffer.allocUnsafe(width * height * 4);
-  for (let sourceY = 0; sourceY < sourceHeight; sourceY += 1) {
-    for (let sourceX = 0; sourceX < sourceWidth; sourceX += 1) {
-      let targetX;
-      let targetY;
-      if (orientation === 2) [targetX, targetY] = [sourceWidth - 1 - sourceX, sourceY];
-      else if (orientation === 3) [targetX, targetY] = [sourceWidth - 1 - sourceX, sourceHeight - 1 - sourceY];
-      else if (orientation === 4) [targetX, targetY] = [sourceX, sourceHeight - 1 - sourceY];
-      else if (orientation === 5) [targetX, targetY] = [sourceY, sourceX];
-      else if (orientation === 6) [targetX, targetY] = [sourceHeight - 1 - sourceY, sourceX];
-      else if (orientation === 7) [targetX, targetY] = [sourceHeight - 1 - sourceY, sourceWidth - 1 - sourceX];
-      else [targetX, targetY] = [sourceY, sourceWidth - 1 - sourceX];
-      const sourceOffset = ((sourceY * sourceWidth) + sourceX) * 4;
-      const targetOffset = ((targetY * width) + targetX) * 4;
-      decoded.data.copy(data, targetOffset, sourceOffset, sourceOffset + 4);
+function jpegSegment(marker, data) {
+  if (!Buffer.isBuffer(data) || data.length > 0xffff - 2) throw invalidImage();
+  const header = Buffer.allocUnsafe(4);
+  header[0] = 0xff;
+  header[1] = marker;
+  header.writeUInt16BE(data.length + 2, 2);
+  return Buffer.concat([header, data]);
+}
+
+function minimalOrientationExif(orientation) {
+  if (!Number.isInteger(orientation) || orientation < 2 || orientation > 8) return null;
+  const data = Buffer.alloc(32);
+  data.write('Exif\u0000\u0000', 0, 'binary');
+  data.write('II', 6, 'ascii');
+  data.writeUInt16LE(42, 8);
+  data.writeUInt32LE(8, 10);
+  data.writeUInt16LE(1, 14);
+  data.writeUInt16LE(0x0112, 16);
+  data.writeUInt16LE(3, 18);
+  data.writeUInt32LE(1, 20);
+  data.writeUInt16LE(orientation, 24);
+  data.writeUInt32LE(0, 28);
+  return jpegSegment(0xe1, data);
+}
+
+function jpegImageEnd(buffer, scanOffset) {
+  let offset = scanOffset;
+  while (offset < buffer.length) {
+    if (buffer[offset] !== 0xff) {
+      offset += 1;
+      continue;
     }
+    const markerStart = offset;
+    while (offset < buffer.length && buffer[offset] === 0xff) offset += 1;
+    if (offset >= buffer.length) break;
+    const marker = buffer[offset];
+    offset += 1;
+    if (marker === 0x00 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+    if (marker === 0xd9) return offset;
+    if ((marker >= 0xe0 && marker <= 0xef) || marker === 0xfe) {
+      throw invalidImage();
+    }
+    if (marker === 0x01) continue;
+    if (offset + 2 > buffer.length) throw invalidImage();
+    const length = buffer.readUInt16BE(offset);
+    if (length < 2 || offset + length > buffer.length) throw invalidImage();
+    offset += length;
+    if (offset <= markerStart) throw invalidImage();
   }
-  return { width, height, data };
+  throw invalidImage();
+}
+
+function sanitizeJpegContainer(buffer, orientation) {
+  if (!Buffer.isBuffer(buffer)
+    || buffer.length < 4
+    || buffer[0] !== 0xff
+    || buffer[1] !== 0xd8) {
+    throw invalidImage();
+  }
+  const output = [buffer.subarray(0, 2)];
+  const orientationSegment = minimalOrientationExif(orientation);
+  let orientationInserted = false;
+  let offset = 2;
+
+  while (offset + 1 < buffer.length) {
+    if (buffer[offset] !== 0xff) throw invalidImage();
+    const markerStart = offset;
+    while (offset < buffer.length && buffer[offset] === 0xff) offset += 1;
+    if (offset >= buffer.length) throw invalidImage();
+    const marker = buffer[offset];
+    offset += 1;
+    if (marker === 0xd9) throw invalidImage();
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+      output.push(buffer.subarray(markerStart, offset));
+      continue;
+    }
+    if (offset + 2 > buffer.length) throw invalidImage();
+    const length = buffer.readUInt16BE(offset);
+    if (length < 2 || offset + length > buffer.length) throw invalidImage();
+
+    if (marker === 0xda) {
+      if (orientationSegment && !orientationInserted) output.push(orientationSegment);
+      const end = jpegImageEnd(buffer, offset + length);
+      output.push(buffer.subarray(markerStart, end));
+      return Buffer.concat(output);
+    }
+
+    const dataStart = offset + 2;
+    const segmentEnd = offset + length;
+    const data = buffer.subarray(dataStart, segmentEnd);
+    const isApplicationSegment = marker >= 0xe0 && marker <= 0xef;
+    if (!isApplicationSegment && marker !== 0xfe) {
+      if (orientationSegment && !orientationInserted) {
+        output.push(orientationSegment);
+        orientationInserted = true;
+      }
+      output.push(buffer.subarray(markerStart, segmentEnd));
+    } else if (marker === 0xe0
+      && data.length >= 14
+      && data.subarray(0, 5).toString('binary') === 'JFIF\u0000') {
+      const jfif = Buffer.from(data.subarray(0, 14));
+      jfif[12] = 0;
+      jfif[13] = 0;
+      output.push(jpegSegment(marker, jfif));
+    }
+    offset = segmentEnd;
+  }
+  throw invalidImage();
 }
 
 function sanitizeJpeg(buffer, maxBytes, options) {
   const segments = jpegSegments(buffer);
-  const dimensions = assertDimensions(jpegDimensions(buffer, segments), options);
+  const frame = jpegFrameInfo(buffer, segments);
+  const dimensions = assertDimensions(frame, options);
   let decoded;
   try {
     decoded = jpeg.decode(buffer, {
       useTArray: true,
       formatAsRGBA: true,
+      tolerantDecoding: false,
       maxResolutionInMP: Math.max(1, Math.ceil(
         (Number(options.maxPixels) || DEFAULT_MAX_PIXELS) / 1000000
       )),
@@ -184,18 +288,15 @@ function sanitizeJpeg(buffer, maxBytes, options) {
   if (!decoded || decoded.width !== dimensions.width || decoded.height !== dimensions.height) {
     throw invalidImage();
   }
-  const pixels = orientedPixels({
-    width: decoded.width,
-    height: decoded.height,
-    data: Buffer.from(decoded.data)
-  }, exifOrientation(buffer, segments));
-  let output = null;
-  for (const quality of JPEG_QUALITY_STEPS) {
-    output = Buffer.from(jpeg.encode(pixels, quality).data);
-    if (output.length <= maxBytes) break;
-  }
-  if (!output || output.length > maxBytes) throw invalidImage('The processed image is too large');
-  return { buffer: output, width: pixels.width, height: pixels.height };
+  const orientation = exifOrientation(buffer, segments);
+  const output = sanitizeJpegContainer(buffer, orientation);
+  if (output.length > maxBytes) throw invalidImage('The processed image is too large');
+  const swapsAxes = orientation >= 5 && orientation <= 8;
+  return {
+    buffer: output,
+    width: swapsAxes ? dimensions.height : dimensions.width,
+    height: swapsAxes ? dimensions.width : dimensions.height
+  };
 }
 
 function sanitizePng(buffer, maxBytes, options) {
@@ -256,8 +357,9 @@ module.exports = {
   imageFormat,
   pngDimensions,
   jpegDimensions,
+  jpegFrameInfo,
   exifOrientation,
   assertDimensions,
-  orientedPixels,
+  sanitizeJpegContainer,
   sanitizeImagePayload
 };

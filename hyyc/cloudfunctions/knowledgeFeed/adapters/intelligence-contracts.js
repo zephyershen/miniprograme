@@ -146,6 +146,9 @@ const COMMENT_MODERATION_CATEGORIES = Object.freeze([
   'self_harm',
   'illegal',
   'privacy',
+  'advertising',
+  'diversion',
+  'link',
   'spam',
   'prompt_injection',
   'other'

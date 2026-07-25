@@ -74,14 +74,14 @@ const MESSAGE_KINDS = Object.freeze({
     glyph: '评',
     tone: 'warning',
     title: '评论审核未通过',
-    body: '这条评论没有发布，可以修改后重新提交。'
+    body: '未通过原因：内容不符合社区发布规范。评论文字及待审图片已删除。'
   }),
   comment_rejected: Object.freeze({
     label: '评论审核',
     glyph: '评',
     tone: 'warning',
     title: '评论审核未通过',
-    body: '这条评论没有发布，可以修改后重新提交。'
+    body: '未通过原因：内容不符合社区发布规范。评论文字及待审图片已删除。'
   }),
   comment_review_failed: Object.freeze({
     label: '评论审核',
@@ -125,6 +125,11 @@ function safeString(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function messageInitial(value) {
+  const nickname = safeString(value) || '读者';
+  return [...nickname][0] || '读';
+}
+
 function formatMessageDate(value, now = Date.now()) {
   const timestamp = new Date(value).getTime();
   if (!Number.isFinite(timestamp)) return '';
@@ -156,6 +161,19 @@ function decorateMessage(source = {}, now = Date.now()) {
   const occurredAt = source.occurredAt || source.createdAt || null;
   const isRead = source.unread === false || source.isRead === true || Boolean(source.readAt);
   const itemId = messageItemId(source);
+  const actorNickname = safeString(source.actorNickname);
+  const replyToCommentId = safeString(source.replyToCommentId);
+  const isOwnComment = [
+    'comment_review_approved',
+    'comment_approved'
+  ].includes(kind);
+  const isInteraction = [
+    'thread_comment_published',
+    'comment_received',
+    'thread_activity',
+    'comment_review_approved',
+    'comment_approved'
+  ].includes(kind);
   return {
     id,
     version: safeString(source.version)
@@ -168,6 +186,26 @@ function decorateMessage(source = {}, now = Date.now()) {
     title: safeString(source.title) || presentation.title,
     body: safeString(source.body) || safeString(source.copy) || presentation.body,
     itemId,
+    itemTitle: safeString(source.itemTitle),
+    itemThumbnailFileId: safeString(source.itemThumbnailFileId),
+    itemThumbnailUrl: safeString(source.itemThumbnailUrl),
+    commentId: safeString(source.commentId),
+    parentCommentId: safeString(source.parentCommentId),
+    replyToCommentId,
+    commentPreview: safeString(source.commentPreview)
+      || safeString(source.body)
+      || safeString(source.copy),
+    replyToPreview: safeString(source.replyToPreview),
+    rootCommentPreview: safeString(source.rootCommentPreview),
+    actorNickname,
+    actorInitial: messageInitial(actorNickname),
+    actorAvatarFileId: safeString(source.actorAvatarFileId),
+    actorAvatarUrl: safeString(source.actorAvatarUrl),
+    isOwnComment,
+    isInteraction,
+    interactionVerb: isOwnComment
+      ? '已发布'
+      : (replyToCommentId ? '回复了评论' : '参与了讨论'),
     openComments: source.openComments === true || route.openComments === true,
     isRead,
     unread: !isRead,
@@ -175,6 +213,22 @@ function decorateMessage(source = {}, now = Date.now()) {
     occurredLabel: formatMessageDate(occurredAt, now),
     canOpenItem: Boolean(itemId)
   };
+}
+
+function mergeResolvedMessageMedia(currentMessages = [], resolvedMessages = []) {
+  const resolvedById = new Map(
+    resolvedMessages.filter((message) => message && message.id)
+      .map((message) => [message.id, message])
+  );
+  return currentMessages.map((message) => {
+    const resolved = resolvedById.get(message && message.id);
+    if (!resolved) return message;
+    return {
+      ...message,
+      actorAvatarUrl: resolved.actorAvatarUrl || message.actorAvatarUrl || '',
+      itemThumbnailUrl: resolved.itemThumbnailUrl || message.itemThumbnailUrl || ''
+    };
+  });
 }
 
 function normalizeMessagesResult(value = {}, now = Date.now()) {
@@ -200,6 +254,8 @@ function normalizeMessagesResult(value = {}, now = Date.now()) {
     : visibleUnreadCount;
   return {
     messages,
+    interactionCount: messages.filter((message) => message.isInteraction).length,
+    systemCount: messages.filter((message) => !message.isInteraction).length,
     unreadCount,
     hasUnread: unreadCount > 0
   };
@@ -210,6 +266,8 @@ function createMessagesState() {
     loading: true,
     error: '',
     messages: [],
+    interactionCount: 0,
+    systemCount: 0,
     unreadCount: 0,
     hasUnread: false,
     markingAll: false
@@ -220,6 +278,7 @@ module.exports = {
   MESSAGE_KINDS,
   formatMessageDate,
   decorateMessage,
+  mergeResolvedMessageMedia,
   normalizeMessagesResult,
   createMessagesState
 };

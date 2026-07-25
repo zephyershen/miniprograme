@@ -242,6 +242,8 @@ test('keeps launch copy free of internal-test and incomplete-coverage notices', 
     '../pages/curated/index.wxml',
     '../pages/profile/index.wxml',
     '../pages/profile/index.js',
+    '../pages/membership/index.wxml',
+    '../pages/membership/index.js',
     '../features/membership/prompt.js'
   ];
   const forbidden = /内测中|不会在这里发起扣款|数据仍在持续补全|完整起点/;
