@@ -106,3 +106,20 @@
 .pro-purchase-footnote { margin-top: 20rpx; color: var(--ui-muted); font-size: 19rpx; line-height: 1.55; text-align: center; }
 .pro-account-note { margin-top: 15rpx; color: var(--ui-muted); font-size: 17rpx; line-height: 1.55; text-align: center; }
 .pro-renewal-note { margin-top: 15rpx; color: var(--ui-faint); font-size: 17rpx; text-align: center; }
+
+.membership-contact {
+  display: flex;
+  align-items: center;
+  gap: 18rpx;
+  margin: 30rpx 4rpx 0;
+  padding: 26rpx 4rpx 2rpx;
+  border-top: 1rpx solid var(--ui-hairline);
+}
+
+.membership-contact-pressed { opacity: .68; }
+.membership-contact-accent { width: 8rpx; height: 42rpx; flex: none; border-radius: 999rpx; background: var(--ui-accent); }
+.membership-contact-copy { flex: 1; min-width: 0; }
+.membership-contact-label { color: var(--ui-faint); font-size: 17rpx; line-height: 1.3; }
+.membership-contact-handle { margin-top: 5rpx; color: var(--ui-muted); font-size: 22rpx; line-height: 1.35; }
+.membership-contact-handle text { margin-left: 7rpx; color: var(--ui-ink); font-family: "DIN Alternate", -apple-system, sans-serif; font-weight: 760; letter-spacing: .4rpx; }
+.membership-contact-action { flex: none; color: var(--ui-accent-strong); font-size: 18rpx; font-weight: 720; }

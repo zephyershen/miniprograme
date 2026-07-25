@@ -76,7 +76,7 @@ test('keeps administrator role-preview controls visible while rendering effectiv
     }
   }));
   assert.equal(memberPreview.isActiveMember, false);
-  assert.equal(memberPreview.purchaseMode, 'subscribe');
+  assert.equal(memberPreview.purchaseMode, 'renew');
   assert.equal(memberPreview.isPrivileged, true);
   assert.equal(memberPreview.roleOptions.find((item) => item.key === 'member').active, true);
 });
@@ -281,12 +281,20 @@ test('renders four native tabs and a state-aware Pro purchase or renewal entry',
   assert.match(membership, /disabled="\{\{billing\.purchasing\}\}"/);
   assert.match(membership, /订阅并支付/);
   assert.match(membership, /membership\.purchaseMode === 'renew'/);
-  assert.match(membership, /续费/);
+  assert.match(membership, /membership\.purchaseMode === 'renew' \? '续费' : '订阅并支付'/);
+  assert.doesNotMatch(membership, /\? '续费 ' \+/);
   assert.match(membership, /当前有效期至 \{\{membership\.periodEndLabel\}\}/);
   assert.match(membership, /从该日顺延 \{\{billing\.plan\.durationLabel \|\| '30 天'\}\}/);
   assert.match(membership, /会员有效期会继续累加/);
   assert.match(membership, /直接进入系统收银台/);
   assert.match(membership, /微信不允许自动读取真实头像昵称/);
+  assert.match(membership, /class="membership-contact"/);
+  assert.match(membership, /会员咨询/);
+  assert.match(membership, /bindtap="copyWechatContact"/);
+  assert.match(membership, /复制微信号 \{\{wechatContact\}\}/);
+  assert.match(membershipScript, /const WECHAT_CONTACT = 'MrShenzf'/);
+  assert.match(membershipScript, /wx\.setClipboardData\(\{\s*data: WECHAT_CONTACT/s);
+  assert.match(membershipScript, /微信号已复制/);
   assert.doesNotMatch(membership, /使用当前微信账号登录|bindtap="logoutWechatAccount"|已完成订阅账号验证/);
   assert.doesNotMatch(membershipScript, /verifyMembershipAccount|loginWechatAccount|loginForPayment|logoutViewerAccountSession/);
   assert.match(membershipScript, /checkoutMembership/);
@@ -299,6 +307,8 @@ test('renders four native tabs and a state-aware Pro purchase or renewal entry',
   assert.match(membershipStyles, /\.pro-current-period\s*\{/);
   assert.match(membershipStyles, /\.pro-offer-compare[^}]*text-decoration:\s*line-through/);
   assert.match(membershipStyles, /\.pro-purchase-button\s*\{[^}]*white-space:\s*nowrap/s);
+  assert.match(membershipStyles, /\.membership-contact\s*\{/);
+  assert.match(membershipStyles, /\.membership-contact-handle text\s*\{/);
   assert.doesNotMatch(`${membership}\n${membershipStyles}`, /pro-pass-rail/);
   assert.doesNotMatch(membershipStyles, /\.pro-pass::after/);
   assert.doesNotMatch(membership, /¥(?:5\.9|10\.9)/);
@@ -347,6 +357,35 @@ test('renders four native tabs and a state-aware Pro purchase or renewal entry',
   assert.doesNotMatch(`${prompt}\n${promptStyles}`, /member-card-rail/);
   assert.doesNotMatch(promptStyles, /\.member-card::after/);
   assert.doesNotMatch(prompt, /¥(?:5\.9|10\.9)/);
+});
+
+test('copies the membership contact WeChat id from the page footer', () => {
+  const previousPage = global.Page;
+  const previousWx = global.wx;
+  let definition;
+  let clipboardValue = '';
+  const toasts = [];
+  global.Page = (page) => { definition = page; };
+  global.wx = {
+    setClipboardData: ({ data, success }) => {
+      clipboardValue = data;
+      success();
+    },
+    showToast: (options) => toasts.push(options)
+  };
+  try {
+    const entrypoint = require.resolve('../pages/membership/index');
+    delete require.cache[entrypoint];
+    require(entrypoint);
+    definition.copyWechatContact.call({ pageDisposed: false });
+    assert.equal(clipboardValue, 'MrShenzf');
+    assert.deepEqual(toasts, [{ title: '微信号已复制', icon: 'success' }]);
+  } finally {
+    if (previousPage) global.Page = previousPage;
+    else delete global.Page;
+    if (previousWx) global.wx = previousWx;
+    else delete global.wx;
+  }
 });
 
 test('locks every host page while the shared membership prompt is visible', () => {

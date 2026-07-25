@@ -22,6 +22,7 @@ const {
   forgetPendingMembershipOrder
 } = require('../../features/billing/payment.js');
 
+const WECHAT_CONTACT = 'MrShenzf';
 const EMPTY_BILLING = Object.freeze({
   loading: true,
   available: false,
@@ -47,6 +48,7 @@ Page({
       verified: false,
       authenticating: true
     },
+    wechatContact: WECHAT_CONTACT,
     billing: { ...EMPTY_BILLING }
   },
 
@@ -70,6 +72,20 @@ Page({
   onPullDownRefresh() {
     this.refreshMembershipPage({ force: true })
       .finally(() => wx.stopPullDownRefresh());
+  },
+
+  copyWechatContact() {
+    wx.setClipboardData({
+      data: WECHAT_CONTACT,
+      success: () => {
+        if (this.pageDisposed) return;
+        wx.showToast({ title: '微信号已复制', icon: 'success' });
+      },
+      fail: () => {
+        if (this.pageDisposed) return;
+        wx.showToast({ title: '复制失败，请长按微信号', icon: 'none' });
+      }
+    });
   },
 
   async refreshMembershipPage({ force = false } = {}) {

@@ -39,7 +39,7 @@ function membershipPresentation(access, now = Date.now()) {
     roleLabel,
     roleCopy,
     isActiveMember,
-    purchaseMode: isActiveMember ? 'renew' : 'subscribe',
+    purchaseMode: role === 'member' ? 'renew' : 'subscribe',
     isPrivileged: role === 'member' || role === 'admin',
     isAdmin: role === 'admin',
     isActualAdmin: viewer.isActualAdmin === true,

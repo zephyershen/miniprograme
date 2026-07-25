@@ -69,9 +69,7 @@
           bindtap="purchaseMembership"
           loading="{{billing.purchasing}}"
           disabled="{{billing.purchasing}}"
-        >{{membership.purchaseMode === 'renew'
-          ? '续费 ' + (billing.plan.durationLabel || '30 天')
-          : '订阅并支付'}}</button>
+        >{{membership.purchaseMode === 'renew' ? '续费' : '订阅并支付'}}</button>
         <view wx:elif="{{billing.available}}" class="pro-purchase-footnote">微信账号尚未完成登录，请重新进入小程序后再订阅。</view>
         <view wx:else class="pro-purchase-footnote">当前暂不可购买，请稍后再试。</view>
         <view class="pro-account-note">
@@ -86,4 +84,19 @@
       </view>
     </view>
   </block>
+
+  <view
+    class="membership-contact"
+    hover-class="membership-contact-pressed"
+    role="button"
+    aria-label="复制微信号 {{wechatContact}}"
+    bindtap="copyWechatContact"
+  >
+    <view class="membership-contact-accent"></view>
+    <view class="membership-contact-copy">
+      <view class="membership-contact-label">会员咨询</view>
+      <view class="membership-contact-handle">微信 <text>{{wechatContact}}</text></view>
+    </view>
+    <view class="membership-contact-action">复制微信号</view>
+  </view>
 </view>
