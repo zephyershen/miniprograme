@@ -1327,3 +1327,27 @@
   提交 Git；客户端和云函数更新需发布后才会影响真机。
 - Sensitive handling: 未记录用户标识、OpenID、评论正文、File ID、环境变量值、
   访问令牌或原始日志；只读诊断产生的单个本地图片副本已清理。
+
+## [2026-07-25] comment-media-member-flow-trial-2.3.2 | 部署评论媒体与会员互动体验版
+
+- Session: local Codex task
+- Scope: 将评论图片字节保真、预览生命周期、回复互动消息、异步评论审核和会员
+  账户修正作为同一可运行版本部署；未提交微信审核或正式发布，未执行真实支付，
+  未修改生产数据库或云存储数据。
+- Code: 业务提交 `9da8cbd` 已推送至
+  `origin/codex/rebuild-digest-inbox`。部署前完整 `npm.cmd run verify`、
+  图片/媒体/生命周期专项 32/32、评论/消息/安全/视觉相关专项 95/95 和
+  `git diff --check` 均通过。
+- Cloud: `knowledgeFeed` 与 `membershipBilling` 以 code-only 方式更新并恢复
+  `Active / Available`；原运行时配置哈希未变，9/1 个触发器保持启用。部署后
+  下载回读分别与提交内本地函数 107/107、15/15 个业务文件逐字节一致，四函数
+  manifest 为 0 漂移。
+- Smoke: `membershipBilling plans` 真实调用返回
+  `ok=true / available=true`；`knowledgeFeed` 冷启动成功并对无效动作返回结构化
+  `INVALID_REQUEST`，未触发数据写入。
+- WeChat: 开发者工具已登录，体验版 `2.3.2` 上传成功，上传包 516,790 bytes，
+  描述绑定 `git-9da8cbd`。本次只上传体验版，没有提交审核或发布公开版本。
+- Recovery boundary: 旧流程已经写成深色像素的评论图片无法由代码恢复；验收时
+  需删除对应旧评论，并从手机原图重新上传。新上传图片才会经过本次修复链路。
+- Sensitive handling: 未记录用户标识、OpenID、订单号、评论正文、图片、
+  File ID、支付签名、环境变量值或访问令牌；云函数下载审计副本在验证后删除。
