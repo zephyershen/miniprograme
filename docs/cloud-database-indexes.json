@@ -4,6 +4,40 @@
   "preserveUnknownIndexes": true,
   "indexes": [
     {
+      "collection": "knowledge_column_entries",
+      "name": "status_kind_sort_order_id",
+      "unique": false,
+      "keys": [
+        { "field": "status", "direction": "1" },
+        { "field": "kind", "direction": "1" },
+        { "field": "sortOrder", "direction": "1" },
+        { "field": "_id", "direction": "1" }
+      ],
+      "owner": "column-content-management",
+      "reason": "List published and administrative column entries in stable editorial order."
+    },
+    {
+      "collection": "knowledge_column_media",
+      "name": "cleanup_after_1",
+      "unique": false,
+      "keys": [
+        { "field": "cleanupAfter", "direction": "1" }
+      ],
+      "owner": "column-media-cleanup",
+      "reason": "Claim expired unreferenced administrator course images."
+    },
+    {
+      "collection": "knowledge_column_media",
+      "name": "entry_id_doc_id",
+      "unique": false,
+      "keys": [
+        { "field": "entryId", "direction": "1" },
+        { "field": "_id", "direction": "1" }
+      ],
+      "owner": "column-content-management",
+      "reason": "Reconcile all uploaded images owned by one column entry."
+    },
+    {
       "collection": "knowledge_feed_analysis_jobs",
       "name": "status_priority_due",
       "unique": false,

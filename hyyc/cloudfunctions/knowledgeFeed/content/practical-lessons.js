@@ -383,7 +383,8 @@ function publicPracticalLesson(value, { includeCopy = true } = {}) {
     ...preview,
     subtitle: value.subtitle,
     duration: value.duration,
-    verifiedAt: value.verifiedAt
+    verifiedAt: value.verifiedAt,
+    tags: Array.isArray(value.tags) ? [...value.tags] : []
   } : preview;
 }
 

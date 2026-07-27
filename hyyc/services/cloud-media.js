@@ -40,7 +40,8 @@ const CANVAS_ORIENTATION_TRANSFORMS = Object.freeze({
 });
 const MAX_BASE64_LENGTH = Object.freeze({
   avatar: (Math.ceil(CLOUD_FUNCTION_UPLOAD_MAX_BYTES / 3) * 4) + 4,
-  comment: (Math.ceil(CLOUD_FUNCTION_UPLOAD_MAX_BYTES / 3) * 4) + 4
+  comment: (Math.ceil(CLOUD_FUNCTION_UPLOAD_MAX_BYTES / 3) * 4) + 4,
+  column: (Math.ceil(CLOUD_FUNCTION_UPLOAD_MAX_BYTES / 3) * 4) + 4
 });
 
 function fileExtension(filePath) {

@@ -11,6 +11,7 @@ page {
 
 button {
   box-sizing: border-box;
+  min-width: 0;
   min-height: 88rpx;
   border-radius: 999rpx;
   font-size: 27rpx;

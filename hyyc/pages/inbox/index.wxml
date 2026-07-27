@@ -53,39 +53,10 @@
                 <text class="timeline-time">{{dayItem.timeline.timeLabel}}</text>
                 <view class="timeline-node"></view>
               </view>
-              <view class="post post-tone-{{dayItem.coverTone}}" data-id="{{dayItem.id}}" bindtap="openFeedItem">
-                <view class="post-byline">
-                  <view class="post-author-avatar" aria-hidden="true">
-                    <text class="post-author-initial">{{dayItem.sourceAuthor.avatarInitial}}</text>
-                    <image wx:if="{{dayItem.sourceAuthor.avatarUrl || dayItem.sourceAuthor.fallbackAvatarUrl}}" class="post-author-image" src="{{dayItem.sourceAuthor.avatarUrl || dayItem.sourceAuthor.fallbackAvatarUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="feed:{{dayItem.id}}:avatar" data-file-id="{{dayItem.sourceAuthor.avatarFileId}}" data-media-url="{{dayItem.sourceAuthor.avatarUrl || dayItem.sourceAuthor.fallbackAvatarUrl}}" data-media-fallback="{{dayItem.sourceAuthor.fallbackAvatarUrl}}" data-media-path="feed.dayGroups[{{dayIndex}}].items[{{itemIndex}}].sourceAuthor.avatarUrl" binderror="handleMediaError" />
-                  </view>
-                  <view class="post-author-copy">
-                    <view wx:if="{{dayItem.sourceAuthor.hasIdentity}}" class="post-author-line">
-                      <text class="post-author-name">{{dayItem.sourceAuthor.displayName}}</text>
-                      <text wx:if="{{dayItem.sourceAuthor.handleLabel}}" class="post-author-handle">{{dayItem.sourceAuthor.handleLabel}}</text>
-                    </view>
-                    <text wx:else class="post-author-fallback">{{dayItem.sourceAuthor.fallbackLabel}}</text>
-                  </view>
-                </view>
-                <view class="post-title">{{dayItem.title}}</view>
-                <view wx:if="{{dayItem.summaryPreview}}" class="post-summary">
-                  <view class="post-summary-head"><view class="post-summary-icon"></view><text class="post-summary-tag">速览</text></view>
-                  <text class="post-summary-text">{{dayItem.summaryPreview}}</text>
-                </view>
-                <view wx:if="{{dayItem.listVisualFileId || dayItem.visualFileId || dayItem.listVisualUrl}}" class="post-media-shell" aria-hidden="{{!dayItem.listVisualUrl}}">
-                  <image wx:if="{{dayItem.listVisualUrl}}" class="post-media" src="{{dayItem.listVisualUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="feed:{{dayItem.id}}:list" data-file-id="{{dayItem.listVisualFileId || dayItem.visualFileId}}" data-media-url="{{dayItem.listVisualUrl}}" data-media-path="feed.dayGroups[{{dayIndex}}].items[{{itemIndex}}].listVisualUrl" binderror="handleMediaError" />
-                  <view wx:else class="post-media-placeholder"></view>
-                </view>
-                <view wx:if="{{dayItem.sourceTags.length}}" class="post-tags" aria-label="来源标签">
-                  <text wx:for="{{dayItem.sourceTags}}" wx:for-item="sourceTag" wx:key="*this" class="post-source-tag">{{sourceTag}}</text>
-                </view>
-                <view class="post-foot"><view class="post-actions" catchtap="stopPropagation">
-                  <view class="post-action {{dayItem.engagement.canComment ? '' : 'post-action-disabled'}}" data-id="{{dayItem.id}}" catchtap="openComments"><view class="action-icon icon-comment"></view><text wx:if="{{dayItem.engagement.commentLabel}}">{{dayItem.engagement.commentLabel}}</text></view>
-                  <view class="post-action {{dayItem.engagement.liked ? 'post-action-liked' : ''}}" data-id="{{dayItem.id}}" catchtap="handleLike"><view class="action-icon icon-like {{dayItem.engagement.liked ? 'icon-like-active' : ''}}"></view><text wx:if="{{dayItem.engagement.likeLabel}}">{{dayItem.engagement.likeLabel}}</text></view>
-                  <view class="post-action {{dayItem.engagement.favorited ? 'post-action-saved' : ''}}" data-id="{{dayItem.id}}" catchtap="handleFavorite"><view class="action-icon icon-bookmark {{dayItem.engagement.favorited ? 'icon-bookmark-active' : ''}}"></view></view>
-                  <button class="post-action post-share" open-type="share" data-id="{{dayItem.id}}" catchtap="noop"><view class="action-icon icon-share"></view></button>
-                </view></view>
-              </view>
+              <template
+                is="feed-post-card"
+                data="{{postItem: dayItem, mediaRoot: 'feed.dayGroups[' + dayIndex + '].items[' + itemIndex + ']'}}"
+              />
             </view>
             <view wx:if="{{dayGroup.hasMore}}" class="timeline-day-more" data-date-key="{{dayGroup.dateKey}}" bindtap="loadMoreTimelineDay">
               <loading-state wx:if="{{dayGroup.loading}}" compact="{{true}}" label="正在加载更多资讯" />
@@ -98,87 +69,19 @@
       <block wx:else>
       <view class="timeline-unit">
         <view class="timeline-entry timeline-entry-flat">
-          <view class="post post-tone-{{feed.leadItem.coverTone}}" data-id="{{feed.leadItem.id}}" bindtap="openFeedItem">
-            <view class="post-byline">
-              <view class="post-author-avatar" aria-hidden="true">
-                <text class="post-author-initial">{{feed.leadItem.sourceAuthor.avatarInitial}}</text>
-                <image wx:if="{{feed.leadItem.sourceAuthor.avatarUrl || feed.leadItem.sourceAuthor.fallbackAvatarUrl}}" class="post-author-image" src="{{feed.leadItem.sourceAuthor.avatarUrl || feed.leadItem.sourceAuthor.fallbackAvatarUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="feed:{{feed.leadItem.id}}:avatar" data-file-id="{{feed.leadItem.sourceAuthor.avatarFileId}}" data-media-url="{{feed.leadItem.sourceAuthor.avatarUrl || feed.leadItem.sourceAuthor.fallbackAvatarUrl}}" data-media-fallback="{{feed.leadItem.sourceAuthor.fallbackAvatarUrl}}" data-media-path="feed.leadItem.sourceAuthor.avatarUrl" binderror="handleMediaError" />
-              </view>
-              <view class="post-author-copy">
-                <view wx:if="{{feed.leadItem.sourceAuthor.hasIdentity}}" class="post-author-line">
-                  <text class="post-author-name">{{feed.leadItem.sourceAuthor.displayName}}</text>
-                  <text wx:if="{{feed.leadItem.sourceAuthor.handleLabel}}" class="post-author-handle">{{feed.leadItem.sourceAuthor.handleLabel}}</text>
-                </view>
-                <text wx:else class="post-author-fallback">{{feed.leadItem.sourceAuthor.fallbackLabel}}</text>
-              </view>
-            </view>
-            <view class="post-title">{{feed.leadItem.title}}</view>
-            <view wx:if="{{feed.leadItem.summaryPreview}}" class="post-summary">
-              <view class="post-summary-head">
-                <view class="post-summary-icon"></view>
-                <text class="post-summary-tag">速览</text>
-              </view>
-              <text class="post-summary-text">{{feed.leadItem.summaryPreview}}</text>
-            </view>
-            <view wx:if="{{feed.leadItem.listVisualFileId || feed.leadItem.visualFileId || feed.leadItem.listVisualUrl}}" class="post-media-shell" aria-hidden="{{!feed.leadItem.listVisualUrl}}">
-              <image wx:if="{{feed.leadItem.listVisualUrl}}" class="post-media" src="{{feed.leadItem.listVisualUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="feed:{{feed.leadItem.id}}:list" data-file-id="{{feed.leadItem.listVisualFileId || feed.leadItem.visualFileId}}" data-media-url="{{feed.leadItem.listVisualUrl}}" data-media-path="feed.leadItem.listVisualUrl" binderror="handleMediaError" />
-              <view wx:else class="post-media-placeholder"></view>
-            </view>
-            <view wx:if="{{feed.leadItem.sourceTags.length}}" class="post-tags" aria-label="来源标签">
-              <text wx:for="{{feed.leadItem.sourceTags}}" wx:for-item="sourceTag" wx:key="*this" class="post-source-tag">{{sourceTag}}</text>
-            </view>
-            <view class="post-foot">
-              <view class="post-actions" catchtap="stopPropagation">
-                <view class="post-action {{feed.leadItem.engagement.canComment ? '' : 'post-action-disabled'}}" data-id="{{feed.leadItem.id}}" catchtap="openComments"><view class="action-icon icon-comment"></view><text wx:if="{{feed.leadItem.engagement.commentLabel}}">{{feed.leadItem.engagement.commentLabel}}</text></view>
-                <view class="post-action {{feed.leadItem.engagement.liked ? 'post-action-liked' : ''}}" data-id="{{feed.leadItem.id}}" catchtap="handleLike"><view class="action-icon icon-like {{feed.leadItem.engagement.liked ? 'icon-like-active' : ''}}"></view><text wx:if="{{feed.leadItem.engagement.likeLabel}}">{{feed.leadItem.engagement.likeLabel}}</text></view>
-                <view class="post-action {{feed.leadItem.engagement.favorited ? 'post-action-saved' : ''}}" data-id="{{feed.leadItem.id}}" catchtap="handleFavorite"><view class="action-icon icon-bookmark {{feed.leadItem.engagement.favorited ? 'icon-bookmark-active' : ''}}"></view></view>
-                <button class="post-action post-share" open-type="share" data-id="{{feed.leadItem.id}}" catchtap="noop"><view class="action-icon icon-share"></view></button>
-              </view>
-            </view>
-          </view>
+          <template
+            is="feed-post-card"
+            data="{{postItem: feed.leadItem, mediaRoot: 'feed.leadItem'}}"
+          />
         </view>
       </view>
 
       <view wx:for="{{feed.remainingItems}}" wx:key="id" class="timeline-unit">
         <view class="timeline-entry timeline-entry-flat">
-          <view class="post post-tone-{{item.coverTone}}" data-id="{{item.id}}" bindtap="openFeedItem">
-            <view class="post-byline">
-              <view class="post-author-avatar" aria-hidden="true">
-                <text class="post-author-initial">{{item.sourceAuthor.avatarInitial}}</text>
-                <image wx:if="{{item.sourceAuthor.avatarUrl || item.sourceAuthor.fallbackAvatarUrl}}" class="post-author-image" src="{{item.sourceAuthor.avatarUrl || item.sourceAuthor.fallbackAvatarUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="feed:{{item.id}}:avatar" data-file-id="{{item.sourceAuthor.avatarFileId}}" data-media-url="{{item.sourceAuthor.avatarUrl || item.sourceAuthor.fallbackAvatarUrl}}" data-media-fallback="{{item.sourceAuthor.fallbackAvatarUrl}}" data-media-path="feed.remainingItems[{{index}}].sourceAuthor.avatarUrl" binderror="handleMediaError" />
-              </view>
-              <view class="post-author-copy">
-                <view wx:if="{{item.sourceAuthor.hasIdentity}}" class="post-author-line">
-                  <text class="post-author-name">{{item.sourceAuthor.displayName}}</text>
-                  <text wx:if="{{item.sourceAuthor.handleLabel}}" class="post-author-handle">{{item.sourceAuthor.handleLabel}}</text>
-                </view>
-                <text wx:else class="post-author-fallback">{{item.sourceAuthor.fallbackLabel}}</text>
-              </view>
-            </view>
-            <view class="post-title">{{item.title}}</view>
-            <view wx:if="{{item.summaryPreview}}" class="post-summary">
-              <view class="post-summary-head">
-                <view class="post-summary-icon"></view>
-                <text class="post-summary-tag">速览</text>
-              </view>
-              <text class="post-summary-text">{{item.summaryPreview}}</text>
-            </view>
-            <view wx:if="{{item.listVisualFileId || item.visualFileId || item.listVisualUrl}}" class="post-media-shell" aria-hidden="{{!item.listVisualUrl}}">
-              <image wx:if="{{item.listVisualUrl}}" class="post-media" src="{{item.listVisualUrl}}" mode="aspectFill" lazy-load="{{true}}" data-media-key="feed:{{item.id}}:list" data-file-id="{{item.listVisualFileId || item.visualFileId}}" data-media-url="{{item.listVisualUrl}}" data-media-path="feed.remainingItems[{{index}}].listVisualUrl" binderror="handleMediaError" />
-              <view wx:else class="post-media-placeholder"></view>
-            </view>
-            <view wx:if="{{item.sourceTags.length}}" class="post-tags" aria-label="来源标签">
-              <text wx:for="{{item.sourceTags}}" wx:for-item="sourceTag" wx:key="*this" class="post-source-tag">{{sourceTag}}</text>
-            </view>
-            <view class="post-foot">
-              <view class="post-actions" catchtap="stopPropagation">
-                <view class="post-action {{item.engagement.canComment ? '' : 'post-action-disabled'}}" data-id="{{item.id}}" catchtap="openComments"><view class="action-icon icon-comment"></view><text wx:if="{{item.engagement.commentLabel}}">{{item.engagement.commentLabel}}</text></view>
-                <view class="post-action {{item.engagement.liked ? 'post-action-liked' : ''}}" data-id="{{item.id}}" catchtap="handleLike"><view class="action-icon icon-like {{item.engagement.liked ? 'icon-like-active' : ''}}"></view><text wx:if="{{item.engagement.likeLabel}}">{{item.engagement.likeLabel}}</text></view>
-                <view class="post-action {{item.engagement.favorited ? 'post-action-saved' : ''}}" data-id="{{item.id}}" catchtap="handleFavorite"><view class="action-icon icon-bookmark {{item.engagement.favorited ? 'icon-bookmark-active' : ''}}"></view></view>
-                <button class="post-action post-share" open-type="share" data-id="{{item.id}}" catchtap="noop"><view class="action-icon icon-share"></view></button>
-              </view>
-            </view>
-          </view>
+          <template
+            is="feed-post-card"
+            data="{{postItem: item, mediaRoot: 'feed.remainingItems[' + index + ']'}}"
+          />
         </view>
       </view>
       </block>
@@ -339,3 +242,67 @@
     bindviewbenefits="openMembershipFromPrompt"
   />
 </view>
+
+<template name="feed-post-card">
+  <view class="post post-tone-{{postItem.coverTone}}" data-id="{{postItem.id}}" bindtap="openFeedItem">
+    <view class="post-byline">
+      <view class="post-author-avatar" aria-hidden="true">
+        <text class="post-author-initial">{{postItem.sourceAuthor.avatarInitial}}</text>
+        <image
+          wx:if="{{postItem.sourceAuthor.avatarUrl || postItem.sourceAuthor.fallbackAvatarUrl}}"
+          class="post-author-image"
+          src="{{postItem.sourceAuthor.avatarUrl || postItem.sourceAuthor.fallbackAvatarUrl}}"
+          mode="aspectFill"
+          lazy-load="{{true}}"
+          data-media-key="feed:{{postItem.id}}:avatar"
+          data-file-id="{{postItem.sourceAuthor.avatarFileId}}"
+          data-media-url="{{postItem.sourceAuthor.avatarUrl || postItem.sourceAuthor.fallbackAvatarUrl}}"
+          data-media-fallback="{{postItem.sourceAuthor.fallbackAvatarUrl}}"
+          data-media-path="{{mediaRoot}}.sourceAuthor.avatarUrl"
+          binderror="handleMediaError"
+        />
+      </view>
+      <view class="post-author-copy">
+        <view wx:if="{{postItem.sourceAuthor.hasIdentity}}" class="post-author-line">
+          <text class="post-author-name">{{postItem.sourceAuthor.displayName}}</text>
+          <text wx:if="{{postItem.sourceAuthor.handleLabel}}" class="post-author-handle">{{postItem.sourceAuthor.handleLabel}}</text>
+        </view>
+        <text wx:else class="post-author-fallback">{{postItem.sourceAuthor.fallbackLabel}}</text>
+      </view>
+    </view>
+    <view class="post-title">{{postItem.title}}</view>
+    <view wx:if="{{postItem.summaryPreview}}" class="post-summary">
+      <view class="post-summary-head">
+        <view class="post-summary-icon"></view>
+        <text class="post-summary-tag">速览</text>
+      </view>
+      <text class="post-summary-text">{{postItem.summaryPreview}}</text>
+    </view>
+    <view wx:if="{{postItem.listVisualFileId || postItem.visualFileId || postItem.listVisualUrl}}" class="post-media-shell" aria-hidden="{{!postItem.listVisualUrl}}">
+      <image
+        wx:if="{{postItem.listVisualUrl}}"
+        class="post-media"
+        src="{{postItem.listVisualUrl}}"
+        mode="aspectFill"
+        lazy-load="{{true}}"
+        data-media-key="feed:{{postItem.id}}:list"
+        data-file-id="{{postItem.listVisualFileId || postItem.visualFileId}}"
+        data-media-url="{{postItem.listVisualUrl}}"
+        data-media-path="{{mediaRoot}}.listVisualUrl"
+        binderror="handleMediaError"
+      />
+      <view wx:else class="post-media-placeholder"></view>
+    </view>
+    <view wx:if="{{postItem.sourceTags.length}}" class="post-tags" aria-label="来源标签">
+      <text wx:for="{{postItem.sourceTags}}" wx:for-item="sourceTag" wx:key="*this" class="post-source-tag">{{sourceTag}}</text>
+    </view>
+    <view class="post-foot">
+      <view class="post-actions" catchtap="stopPropagation">
+        <view class="post-action {{postItem.engagement.canComment ? '' : 'post-action-disabled'}}" data-id="{{postItem.id}}" catchtap="openComments"><view class="action-icon icon-comment"></view><text wx:if="{{postItem.engagement.commentLabel}}">{{postItem.engagement.commentLabel}}</text></view>
+        <view class="post-action {{postItem.engagement.liked ? 'post-action-liked' : ''}}" data-id="{{postItem.id}}" catchtap="handleLike"><view class="action-icon icon-like {{postItem.engagement.liked ? 'icon-like-active' : ''}}"></view><text wx:if="{{postItem.engagement.likeLabel}}">{{postItem.engagement.likeLabel}}</text></view>
+        <view class="post-action {{postItem.engagement.favorited ? 'post-action-saved' : ''}}" data-id="{{postItem.id}}" catchtap="handleFavorite"><view class="action-icon icon-bookmark {{postItem.engagement.favorited ? 'icon-bookmark-active' : ''}}"></view></view>
+        <button class="post-action post-share" open-type="share" data-id="{{postItem.id}}" catchtap="noop"><view class="action-icon icon-share"></view></button>
+      </view>
+    </view>
+  </view>
+</template>

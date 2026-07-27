@@ -459,6 +459,33 @@ test('detail hydration preserves the latest locally confirmed engagement', () =>
   assert.equal(context.data.item.engagement.likeCount, 8);
 });
 
+test('detail comment entry sends free viewers to membership without mounting comments', () => {
+  const page = loadPage('../pages/feed-detail/index');
+  const createContext = (canComment, commentsOpen = false) => ({
+    data: {
+      item: { engagement: { canComment } },
+      commentsOpen,
+      membershipPromptVisible: false,
+      membershipPromptFeature: ''
+    },
+    setData(patch) {
+      Object.assign(this.data, patch);
+    },
+    openMembershipPrompt: page.openMembershipPrompt
+  });
+
+  const freeViewer = createContext(false, true);
+  page.openComments.call(freeViewer);
+  assert.equal(freeViewer.data.commentsOpen, false);
+  assert.equal(freeViewer.data.membershipPromptVisible, true);
+  assert.equal(freeViewer.data.membershipPromptFeature, 'comments');
+
+  const member = createContext(true);
+  page.openComments.call(member);
+  assert.equal(member.data.commentsOpen, true);
+  assert.equal(member.data.membershipPromptVisible, false);
+});
+
 test('an authoritative detail denial never exposes an item from the feed cache', async () => {
   const denial = Object.assign(new Error('upgrade required'), { code: 'ENTITLEMENT_REQUIRED' });
   const page = loadPage('../pages/feed-detail/index', [[

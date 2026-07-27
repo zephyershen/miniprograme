@@ -69,6 +69,15 @@
       </view>
     </view>
 
+    <view wx:if="{{membership.isActualAdmin}}" class="list-group">
+      <view class="list-row" bindtap="openColumnAdmin">
+        <view class="list-icon list-icon-admin"></view>
+        <text class="list-label">专栏内容管理</text>
+        <view class="list-trailing"><text class="list-hint">草稿 · 预览 · 发布</text></view>
+        <text class="list-caret">›</text>
+      </view>
+    </view>
+
     <view wx:if="{{membership.canPreviewRoles}}" class="role-preview-block">
       <view class="role-preview-kicker">管理员测试工具</view>
       <view class="role-preview-title">切换当前账号看到的身份</view>

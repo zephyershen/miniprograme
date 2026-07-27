@@ -125,9 +125,9 @@ test('keeps the complete Pro benefit list in one model without claiming free eng
   assert.deepEqual(benefits.map((item) => item.key), [
     'curated', 'courses', 'practicals', 'briefings', 'history', 'comments', 'support'
   ]);
-  assert.match(benefits.find((item) => item.key === 'courses').copy, /24 节基础课全文/);
-  assert.match(benefits.find((item) => item.key === 'courses').copy, /高清手绘图文/);
-  assert.match(benefits.find((item) => item.key === 'practicals').copy, /6 节动手课/);
+  assert.match(benefits.find((item) => item.key === 'courses').copy, /持续更新的基础课全文/);
+  assert.match(benefits.find((item) => item.key === 'courses').title, /高清手绘图文/);
+  assert.match(benefits.find((item) => item.key === 'practicals').copy, /持续更新的动手课/);
   assert.match(benefits.find((item) => item.key === 'briefings').copy, /24 小时、7 天和 30 天/);
   assert.match(benefits.find((item) => item.key === 'support').title, /不另外收费/);
   assert.doesNotMatch(JSON.stringify(benefits), /喜欢|收藏功能|分享/);

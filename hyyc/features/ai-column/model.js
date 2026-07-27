@@ -351,7 +351,7 @@ function normalizeVisual(source, fallbackTitle) {
 
 function normalizePosters(source) {
   const posters = valueFromContent(source, ['posters', 'handdrawnPosters', 'posterGallery']);
-  return (Array.isArray(posters) ? posters : []).slice(0, 3).map((poster, index, items) => {
+  return (Array.isArray(posters) ? posters : []).map((poster, index, items) => {
     const item = isRecord(poster) ? poster : { image: poster };
     const image = text(firstValue(item, ['image', 'imageUrl', 'src', 'url']));
     return {
@@ -372,7 +372,7 @@ function posterLoadWindow(currentIndex = 0, total = 0) {
   const safeIndex = Math.min(Math.max(requestedIndex, 0), safeTotal - 1);
   return Array.from(
     { length: safeTotal },
-    (_, index) => index === safeIndex
+    (_, index) => Math.abs(index - safeIndex) <= 1
   );
 }
 
@@ -392,6 +392,7 @@ function normalizeLessonDetail(payload) {
     title: summary.title,
     subtitle: summary.subtitle,
     metaLabel: [summary.duration, summary.updatedLabel].filter(Boolean).join(' · '),
+    tags: firstArray(source, ['tags', 'labels']).map((item) => text(item)).filter(Boolean),
     leadLabel: '一句话',
     lead: text(valueFromContent(source, ['oneSentence', 'oneLiner', 'summary', 'definition', '一句话']), summary.subtitle),
     // The protected hand-drawn gallery is the explanatory visual for basic
@@ -427,6 +428,7 @@ function normalizePracticalDetail(payload) {
     title: summary.title,
     subtitle: summary.subtitle,
     metaLabel: [summary.duration, summary.updatedLabel].filter(Boolean).join(' · '),
+    tags: firstArray(source, ['tags', 'labels']).map((item) => text(item)).filter(Boolean),
     leadLabel: '这次要做什么',
     lead: text(
       valueFromContent(source, ['goal', 'outcome', 'oneSentence', 'summary', 'intro', '这次要做什么']),
@@ -475,6 +477,7 @@ function normalizeCaseDetail(payload) {
     title: summary.title,
     subtitle: summary.subtitle,
     metaLabel: summary.updatedLabel,
+    tags: [],
     leadLabel: '结论',
     lead: text(valueFromContent(source, ['conclusion', 'summary', '结论']), summary.subtitle),
     visual: normalizeVisual(source, summary.title),

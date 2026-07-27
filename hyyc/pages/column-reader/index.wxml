@@ -16,6 +16,9 @@
       <view class="reader-kicker">{{article.eyebrow}}</view>
       <view class="reader-title">{{article.title}}</view>
       <view class="reader-subtitle">{{article.subtitle}}</view>
+      <view wx:if="{{article.tags.length}}" class="reader-tags">
+        <text wx:for="{{article.tags}}" wx:key="*this" class="reader-tag">{{item}}</text>
+      </view>
       <view class="reader-meta">{{article.metaLabel}}</view>
     </view>
 

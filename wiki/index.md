@@ -2,7 +2,7 @@
 title: "知识获取平台小程序 Wiki 导航"
 type: index
 tags: [index, miniprogram, knowledge-platform, editorial-index]
-last_updated: 2026-07-25
+last_updated: 2026-07-27
 status: confirmed
 confidence: high
 ---
@@ -20,6 +20,10 @@ confidence: high
 - [历史：会员支付可见账号确认与完整安全诊断](sources/2026-07-24-visible-wechat-account-confirmation-and-payment-diagnostics.md) — 收银台诊断仍有效，旧单次点击交互已被两步流程取代
 - [异步评论、站内消息、稳定加载与会员绑定上线](sources/2026-07-24-async-comments-message-center-and-stable-loading.md) — 评论/资料后台审核、我的消息、全页懒加载、无闪屏互动、微信身份与商品价格边界
 - [评论回复持久化与消息左滑删除修复证据](sources/2026-07-25-threaded-comments-and-message-deletion.md) — `replyToCommentId` 入口漏传根因、线上 `deleteMessage` 更新、两次重进分组与测试数据清理
+- [会员专栏管理员发布系统实现与后台部署](sources/2026-07-27-column-admin-publishing-implementation.md) — 小程序内管理端、草稿/发布快照、30 节基线覆盖、图片生命周期、719 项回归，以及生产集合/索引/函数部署；微信审核与真机 canary 待完成
+- [小程序 UI 与功能审计分流及首批加固](syntheses/2026-07-27-ui-audit-triage.md) — 外部审计的采纳边界、按钮 v2 兼容基线、首页卡片模板去重，以及后续视觉与功能分期
+- [小红书推广冷启动与热点追踪](syntheses/2026-07-25-xiaohongshu-promotion-launch.md) — “普通人的信息焦虑减负”定位、首篇 7 页图文、每天四次热点检查与发布规则边界
+- [GitHub、小红书与抖音推广启动](syntheses/2026-07-26-multi-platform-promotion-launch.md) — 独立 GitHub 推广仓库、第二篇小红书与抖音公开内容、三平台合规边界
 - [资料异步审核、预览支付诊断与微信消息回调上线](sources/2026-07-24-async-profile-review-and-preview-payment-diagnostics.md) — “审核中”队列、真机支付故障边界、入站消息 webhook 与生产收敛
 - [资料保存审核超时修复与生产部署](sources/2026-07-24-profile-moderation-timeout-repair.md) — 预览版资料保存失败根因、模型无思考修复、代码-only 发布与真实 canary 边界
 - [2026-07-23 全项目生产就绪审计](reports/production-readiness-audit-2026-07-23.md) — 已被发布候选修复结果取代的审计前快照
@@ -39,6 +43,7 @@ confidence: high
 - [评论采用主动资料身份与原图附件，资讯互动使用乐观目标状态](decisions/2026-07-19-profiled-media-comments-and-optimistic-engagement.md) — 即时按钮反馈、幂等事务、头像昵称、表情与手机原图评论
 - [精选与简报采用 AI 自动发布，评论采用多模态 AI 先审后发](decisions/2026-07-19-automatic-ai-curation-and-comment-moderation.md) — 自动资讯分析、精选/简报发布、评论图文 fail-closed 审核与治理风险
 - [评论与资料采用后台 AI 审核，结果统一进入站内消息](decisions/2026-07-24-async-comments-and-message-center.md) — 取代评论同步等待；后台审核、可靠 outbox、消息中心、稳定加载与会员身份绑定
+- [会员专栏采用管理员草稿与发布快照](decisions/2026-07-27-column-admin-draft-publishing.md) — 真实管理员小程序后台、代码基线 + 数据库覆盖、版本冲突和发布媒体保护
 - [采用微信小程序虚拟支付销售一次性 30 天会员](decisions/2026-07-19-wechat-virtual-payment-membership.md) — 道具直购、官方查单/发货、幂等权益、退款回收与服务端内容保护；取代斗拱支付决策
 - [CloudBase 主模型与 Packy 自动兜底方案](decisions/2026-07-20-cloudbase-ai-primary-packy-fallback.md) — 已切换资源点计费；CloudBase 为主、Packy 做预算与故障兜底
 - [资讯采用四分钟有界等图，Pro 转化使用简约完整权益卡](decisions/2026-07-21-bounded-visual-publication-and-pro-access-pass.md) — 正常图文一起出现，失败或超时仍公开文字；简报动态计数，七项权益与折扣共用单一模型，会员界面采用无侧轨的白底平铺结构
@@ -129,7 +134,7 @@ confidence: high
 
 ## 当前模块
 
-- 小程序页面：资讯、专栏、简报、我的四个原生 Tab，资讯顶部另有会员精选入口；以及资讯详情、专栏阅读器、个人资料编辑、条件式原始出处、我的收藏和“我的消息”，共 11 个当前产品页面。`trend-detail` 仍注册为第 12 个兼容路由，但当前没有趋势入口。评论由独立 `comment-sheet` 组件承载，页面逻辑由 `features/knowledge-feed`、`engagement`、`user-profile`、`messages`、`membership`、`billing`、`curated-feed`、`ai-column` 与 `briefing` 承载
+- 小程序页面：资讯、专栏、简报、我的四个原生 Tab，以及精选、会员、消息、详情、阅读器、资料、来源、收藏和真实管理员专用的专栏列表/编辑器，共 14 个当前产品页面。`trend-detail` 仍注册为第 15 个兼容路由，但当前没有趋势入口。评论由独立 `comment-sheet` 组件承载，页面逻辑另新增 `features/column-admin` 管理边界
 - 云函数：`knowledgeFeed`、`sourcePreviewWorker`、`knowledgeOps`、`membershipBilling`
 - 数据：资讯为独立条目 + 按日索引 + 服务端权益，并有独立视觉任务、用户互动、会员评论及审核状态、公开资料、资料审核队列、消息 outbox、用户收件箱、会员、订单、分析、简报和模型预算表；历史周案例与趋势档案表只为兼容保留。服务端专用集合均为 `ADMINONLY`
 
@@ -167,6 +172,7 @@ confidence: high
 - CloudBase 主模型和 Packy 兜底均已生产运行；模型预算只影响后台分析路线，不会打开额外的超限按量计费。
 - 自动精选/简报按产品负责人要求零人工放行；历史 2 条评论和 1 份资料已补审，公开评论和完整资料的缺审计数均为 0。评论治理已在现有评论与互动集合内闭环：作者和真实管理员可删除，三个不同用户举报会事务隐藏，作者可申诉，真实管理员可恢复或删除；普通用户只能读取 active 评论，被隐藏媒体也仅对作者和真实管理员可解析。
 - 付费专栏当前为 24 节“基础课”与 6 节“动手课”，合同版本 4；本周案例和趋势档案已退出界面，周案例触发器已删除，旧 action/集合/路由仅作兼容。基础课保留生活例子和受保护手绘图，动手课只给直接步骤，不显示类比或概览图；安装目录按工具命名，详情支持 Windows、macOS、Linux/WSL 官方步骤，命令区为浅色卡片。简报已删除“跟你有什么关系”字段。免费用户只拿标题，全文服务端重鉴权；24 节基础课均可鉴权读取各 3 张短期签名手绘图，客户端只加载当前课程当前页，旧的蓝色概览流程图已停用。会员支付为一次性微信小程序虚拟支付；消息 webhook 已覆盖发货与退款事件，真实订单、退款和权益重锁仍需双端真机验收。
+- 2026-07-27 真实管理员专用的专栏草稿/预览/发布/下架后台已完成；现有 30 节内容作为内置基线并可由数据库覆盖。生产已收敛到 28 个 ADMINONLY 合同集合、47 个合同索引，并部署新版 `knowledgeFeed`；开发预览已成功编译。含管理页面的小程序审核版本和真实管理员 canary 仍待完成。
 - 任务已拆分降耗：来源每分钟、视觉每分钟四次轻量探测、分析每 10 分钟、归档/旧视觉每小时，日周月简报只在日历边界运行；视觉任务用 live/repair 独立查询和 fresh/recovery 四阶段轮转，有任务时最多调用 6 个隔离截图实例，fresh live 等待目标为 0。成功、已就绪和 stale 任务自动删除，`retry`/`cleanup` 留待收口，`blocked` 保留诊断。截图链路不再使用应用内每日点数硬停机，同批任务按发布时间优先补最新；客户端按日期与课程图片懒加载。60,000 点月度模型预算和 `overrunDetected` 熔断仍只约束模型链路，CloudBase 共享池继续依靠控制台总量告警观察。
 - 微信和 CloudBase 都提供可选的内容安全能力，但不会默认审核普通云存储上传。当前未调用微信内容安全接口、也未配置 COS 自动审核，评论图片继续走现有多模态审核；若改用官方异步审核，需要先完成回调和待发布状态。
 - 新专栏函数已部署，微信开发者工具真实页面自动化已读取合同版本 4、24 节基础课、6 节动手课、会员无锁状态、平台安装详情、无图资讯正文和无个人影响模块的简报；首发前先关闭 P2 日志残余并完成普通/Pro 双身份物理真机验收、微信审核发布及真实支付/退款矩阵。支付已开售但尚未完成资金 canary；免费资讯不依赖支付结果。其他频道、多来源和长期资源观察均为上线后扩展或运维任务。

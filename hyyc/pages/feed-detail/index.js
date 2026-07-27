@@ -260,6 +260,10 @@ Page({
   openComments() {
     const engagement = this.data.item && this.data.item.engagement;
     if (!engagement) return;
+    if (engagement.canComment !== true) {
+      this.openMembershipPrompt('comments');
+      return;
+    }
     this.setData({ commentsOpen: true });
   },
 
@@ -279,12 +283,12 @@ Page({
   },
 
   handleCommentsLocked() {
-    this.setData({ commentsOpen: false });
     this.openMembershipPrompt('comments');
   },
 
   openMembershipPrompt(featureKey) {
     this.setData({
+      commentsOpen: false,
       membershipPromptVisible: true,
       membershipPromptFeature: featureKey || 'comments'
     });

@@ -14,6 +14,7 @@ const {
   membershipCacheScope
 } = require('../../features/membership/session.js');
 const { membershipPresentation } = require('../../features/membership/presentation.js');
+const { getColumnDraftPreview } = require('../../features/column-admin/api.js');
 
 function safeDecode(value) {
   try {
@@ -44,8 +45,11 @@ Page({
       ? 'practical'
       : options.type === 'case' ? 'case' : 'lesson';
     this.articleId = safeDecode(options.id);
+    this.adminPreview = options.adminPreview === '1';
     const titles = { lesson: '基础课', practical: '动手课', case: '案例' };
-    wx.setNavigationBarTitle({ title: titles[this.articleType] });
+    wx.setNavigationBarTitle({
+      title: this.adminPreview ? '草稿预览' : titles[this.articleType]
+    });
     this.loadContent();
   },
 
@@ -65,6 +69,14 @@ Page({
   async resolveProtectedScope({ force = false } = {}) {
     const access = await refreshMembershipAccess({ force });
     const membership = membershipPresentation(access);
+    if (this.adminPreview) {
+      if (!membership.isActualAdmin) {
+        const error = new Error('只有真实管理员可以预览草稿');
+        error.code = 'ADMIN_REQUIRED';
+        throw error;
+      }
+      return `admin-draft:${membershipCacheScope(access)}`;
+    }
     if (!membership.isPrivileged) {
       clearColumnCache();
       const error = new Error('完整内容属于 Pro 权益');
@@ -86,7 +98,9 @@ Page({
     try {
       const scope = await this.resolveProtectedScope({ force: true });
       if (this.pageDisposed || requestId !== this.contentRequestId) return false;
-      const payload = this.articleType === 'practical'
+      const payload = this.adminPreview
+        ? await getColumnDraftPreview(this.articleId)
+        : this.articleType === 'practical'
         ? await loadColumnPractical(this.articleId, { force, scope })
         : this.articleType === 'case'
           ? await loadColumnCase(this.articleId, { force, scope })

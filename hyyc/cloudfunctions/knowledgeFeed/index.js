@@ -55,6 +55,8 @@ const { createFeedAnalysisRepository } = require('./repositories/feed-analysis')
 const { createFeedAnalysisJobRepository } = require('./repositories/feed-analysis-job');
 const { createFeedDigestRepository } = require('./repositories/feed-digest');
 const { createColumnEditorialRepository } = require('./repositories/column-editorial');
+const { createColumnEntryRepository } = require('./repositories/column-entry');
+const { createColumnMediaRepository } = require('./repositories/column-media');
 const {
   createModerationBackfillRepository
 } = require('./repositories/moderation-backfill');
@@ -100,6 +102,8 @@ const { createProfileModerationService } = require('./services/profile-moderatio
 const { createCommentReviewService } = require('./services/comment-review-service');
 const { createUserMessageService } = require('./services/user-message-service');
 const { createColumnContentService } = require('./services/column-content-service');
+const { createColumnCatalogService } = require('./services/column-catalog-service');
+const { createColumnAdminService } = require('./services/column-admin-service');
 const { createColumnEditorialService } = require('./services/column-editorial-service');
 const { createScheduledWorkService } = require('./services/scheduled-work-service');
 const {
@@ -138,6 +142,8 @@ const analysisRepository = createFeedAnalysisRepository(database, INTELLIGENCE_C
 const analysisJobRepository = createFeedAnalysisJobRepository(database, INTELLIGENCE_CONFIG);
 const digestRepository = createFeedDigestRepository(database, INTELLIGENCE_CONFIG);
 const columnEditorialRepository = createColumnEditorialRepository(database, COLUMN_CONFIG);
+const columnEntryRepository = createColumnEntryRepository(database, COLUMN_CONFIG);
+const columnMediaRepository = createColumnMediaRepository(database, COLUMN_CONFIG);
 const moderationBackfillRepository = createModerationBackfillRepository(database, ENGAGEMENT_CONFIG);
 const intelligenceProvider = createIntelligenceProvider(INTELLIGENCE_CONFIG, {
   cloud,
@@ -286,9 +292,24 @@ const userMessageService = createUserMessageService({
   config: ENGAGEMENT_CONFIG,
   logger
 });
+const columnCatalogService = createColumnCatalogService({
+  entryRepository: columnEntryRepository,
+  mediaRepository: columnMediaRepository,
+  getTempFileURL: (options) => cloud.getTempFileURL(options),
+  logger
+});
 const columnContentService = createColumnContentService({
   repository: columnEditorialRepository,
-  getTempFileURL: (options) => cloud.getTempFileURL(options)
+  getTempFileURL: (options) => cloud.getTempFileURL(options),
+  catalogService: columnCatalogService
+});
+const columnAdminService = createColumnAdminService({
+  entryRepository: columnEntryRepository,
+  mediaRepository: columnMediaRepository,
+  catalogService: columnCatalogService,
+  uploadFile: uploadUserMedia,
+  deleteFiles,
+  config: COLUMN_CONFIG
 });
 const cleanupService = createVisualCleanupService({
   repository: cacheRepository,
@@ -420,6 +441,7 @@ const scheduledWorkService = createScheduledWorkService({
   analysisWorkerService,
   digestGenerationService,
   columnEditorialService,
+  columnAdminService,
   userMediaService,
   userProfileService,
   commentReviewService,
@@ -636,6 +658,38 @@ const ACTION_HANDLERS = Object.freeze({
   columnPractical: async (event) => {
     const actor = actorService.resolve();
     return columnContentService.practical(event.practicalId, await resolveEntitlement(actor));
+  },
+  columnAdminList: async () => {
+    const actor = actorService.resolve();
+    return columnAdminService.list(await resolveEntitlement(actor));
+  },
+  columnAdminGet: async (event) => {
+    const actor = actorService.resolve();
+    return columnAdminService.get(event.id, await resolveEntitlement(actor));
+  },
+  columnAdminCreateDraft: async (event) => {
+    const actor = actorService.resolve();
+    return columnAdminService.create(event, actor, await resolveEntitlement(actor));
+  },
+  columnAdminSaveDraft: async (event) => {
+    const actor = actorService.resolve();
+    return columnAdminService.save(event, actor, await resolveEntitlement(actor));
+  },
+  columnAdminUploadMedia: async (event) => {
+    const actor = actorService.resolve();
+    return columnAdminService.uploadMedia(event, actor, await resolveEntitlement(actor));
+  },
+  columnAdminPreview: async (event) => {
+    const actor = actorService.resolve();
+    return columnAdminService.preview(event.id, await resolveEntitlement(actor));
+  },
+  columnAdminPublish: async (event) => {
+    const actor = actorService.resolve();
+    return columnAdminService.publish(event, actor, await resolveEntitlement(actor));
+  },
+  columnAdminUnpublish: async (event) => {
+    const actor = actorService.resolve();
+    return columnAdminService.unpublish(event, actor, await resolveEntitlement(actor));
   },
   columnCases: async (event) => {
     const actor = actorService.resolve();

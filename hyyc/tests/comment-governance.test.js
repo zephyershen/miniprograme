@@ -855,6 +855,7 @@ test('renders the governance lifecycle with confirmations, ARIA, and count synch
   );
   assert.match(wxml, /scroll-into-view="\{\{scrollIntoCommentId\}\}"/);
   assert.match(detail, /bindchanged="onCommentPublished"/);
+  assert.match(detail, /wx:if="\{\{item && item\.engagement\.canComment\}\}"/);
   assert.match(detail, /can-participate-hint="\{\{item\.engagement\.canComment\}\}"/);
   assert.match(detail, /class="detail-action"\s+bindtap="openComments"/);
   assert.match(wxml, /wx:if="\{\{canParticipate\}\}" class="comment-compose"/);

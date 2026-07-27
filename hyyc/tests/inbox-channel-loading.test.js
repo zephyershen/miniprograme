@@ -93,14 +93,11 @@ test('shows the shared loading component during pull-to-refresh', () => {
 test('reserves feed media height while durable cloud files resolve', () => {
   const markup = read('../pages/inbox/index.wxml');
   const styles = read('../pages/inbox/index.wxss');
-  assert.equal((markup.match(/class="post-media-shell"/g) || []).length, 3);
-  assert.equal((markup.match(/class="post-media-placeholder"/g) || []).length, 3);
+  assert.equal((markup.match(/class="post-media-shell"/g) || []).length, 1);
+  assert.equal((markup.match(/class="post-media-placeholder"/g) || []).length, 1);
   assert.match(markup,
-    /wx:if="\{\{dayItem\.listVisualFileId \|\| dayItem\.visualFileId \|\| dayItem\.listVisualUrl\}\}" class="post-media-shell"/);
-  assert.match(markup,
-    /wx:if="\{\{feed\.leadItem\.listVisualFileId \|\| feed\.leadItem\.visualFileId \|\| feed\.leadItem\.listVisualUrl\}\}" class="post-media-shell"/);
-  assert.match(markup,
-    /wx:if="\{\{item\.listVisualFileId \|\| item\.visualFileId \|\| item\.listVisualUrl\}\}" class="post-media-shell"/);
+    /wx:if="\{\{postItem\.listVisualFileId \|\| postItem\.visualFileId \|\| postItem\.listVisualUrl\}\}" class="post-media-shell"/);
+  assert.equal((markup.match(/<template\s+is="feed-post-card"/g) || []).length, 3);
   assert.match(styles,
     /\.post-media-shell\s*\{[^}]*overflow:\s*hidden;[^}]*height:\s*340rpx;/s);
   assert.match(styles,

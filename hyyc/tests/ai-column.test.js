@@ -90,6 +90,7 @@ test('keeps every locked fallback entry title-only', () => {
 test('uses everyday reader labels while preserving protected handdrawn posters', () => {
   const lesson = normalizeLessonDetail({ lesson: {
     id: 'agent', term: 'AGENT', title: '什么是 Agent？', subtitle: '围绕目标持续行动。',
+    tags: ['代理', '工作流'],
     sections: {
       summary: '围绕目标持续行动。',
       scenario: '整理一周客户反馈。',
@@ -110,9 +111,10 @@ test('uses everyday reader labels while preserving protected handdrawn posters',
   ]);
   assert.equal(lesson.visual.mode, 'none');
   assert.deepEqual(lesson.posters.map((poster) => poster.page), ['01', '02', '03']);
-  assert.deepEqual(posterLoadWindow(0, 3), [true, false, false]);
-  assert.deepEqual(posterLoadWindow(1, 3), [false, true, false]);
-  assert.deepEqual(posterLoadWindow(2, 3), [false, false, true]);
+  assert.deepEqual(lesson.tags, ['代理', '工作流']);
+  assert.deepEqual(posterLoadWindow(0, 3), [true, true, false]);
+  assert.deepEqual(posterLoadWindow(1, 3), [true, true, true]);
+  assert.deepEqual(posterLoadWindow(2, 3), [false, true, true]);
   assert.match(posterPreviewUrls(lesson)[0], /agent-1-hd\.jpg$/);
 });
 

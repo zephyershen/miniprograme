@@ -1,0 +1,129 @@
+<view class="editor-page">
+  <view wx:if="{{loading}}" class="editor-state"><loading-state label="正在读取草稿" /></view>
+  <view wx:elif="{{error}}" class="editor-state">
+    <view class="state-title">草稿没有加载完成</view>
+    <view class="state-copy">{{error}}</view>
+    <view class="state-action" bindtap="loadEntry">重新读取 →</view>
+  </view>
+  <block wx:elif="{{form}}">
+    <view class="editor-head">
+      <view class="editor-kicker">{{form.kind === 'practical' ? '动手课草稿' : '基础课草稿'}}</view>
+      <view class="editor-status">
+        <text class="status-dot status-dot-{{statusView.tone}}"></text>
+        <text>{{statusView.label}}</text>
+        <text class="revision">R{{entry.publishedRevision || 0}} · V{{entry.version}}</text>
+      </view>
+      <view class="editor-title">{{form.title || '未命名草稿'}}</view>
+      <view class="editor-copy">保存只更新草稿；发布后，会员端才会切换到这个版本。</view>
+    </view>
+
+    <view class="form-section">
+      <view class="section-head"><text class="section-index">01</text><text class="section-title">目录信息</text></view>
+      <view class="field">
+        <view class="field-label">标题 <text>{{form.title.length}} / 100</text></view>
+        <input class="field-input field-title" maxlength="100" value="{{form.title}}" placeholder="这篇内容帮助会员解决什么" data-field="title" bindinput="onFieldInput" />
+      </view>
+      <view class="field">
+        <view class="field-label">副标题 <text>{{form.subtitle.length}} / 240</text></view>
+        <textarea class="field-textarea field-textarea-short" maxlength="240" value="{{form.subtitle}}" placeholder="用一句话说明内容和结果" data-field="subtitle" bindinput="onFieldInput" />
+      </view>
+      <view class="field-grid">
+        <view class="field">
+          <view class="field-label">分类</view>
+          <picker range="{{tracks}}" range-key="label" value="{{trackIndex}}" bindchange="onTrackChange">
+            <view class="picker-value">{{tracks[trackIndex].label}} <text>⌄</text></view>
+          </picker>
+        </view>
+        <view class="field">
+          <view class="field-label">目录排序</view>
+          <input class="field-input" type="digit" value="{{form.order}}" placeholder="1" data-field="order" bindinput="onFieldInput" />
+        </view>
+      </view>
+      <view class="field-grid">
+        <view class="field">
+          <view class="field-label">短标签</view>
+          <input class="field-input" maxlength="40" value="{{form.term}}" placeholder="例如：AI 基础" data-field="term" bindinput="onFieldInput" />
+        </view>
+        <view class="field">
+          <view class="field-label">预计时长</view>
+          <input class="field-input" maxlength="80" value="{{form.duration}}" placeholder="约 6 分钟" data-field="duration" bindinput="onFieldInput" />
+        </view>
+      </view>
+      <view class="field">
+        <view class="field-label">标签 <text>每行一个，最多 20 个</text></view>
+        <textarea class="field-textarea field-textarea-short" value="{{form.tagsText}}" placeholder="AI 基础&#10;工作方法" data-field="tagsText" bindinput="onFieldInput" />
+      </view>
+    </view>
+
+    <view class="form-section">
+      <view class="section-head">
+        <text class="section-index">02</text><text class="section-title">讲解图片</text>
+        <text class="section-note">{{form.posters.length}} 张 · 不限总数</text>
+      </view>
+      <view class="image-note">图片按这里的顺序进入会员阅读器；一次最多选择 9 张，可重复添加。</view>
+      <button class="image-add" bindtap="addImages" loading="{{uploading}}" disabled="{{busy || uploading}}">＋ {{uploading ? uploadProgress : '添加图片'}}</button>
+      <view wx:for="{{form.posters}}" wx:key="key" class="image-row">
+        <image class="image-preview" src="{{item.previewImage || item.image}}" mode="aspectFill" lazy-load="{{true}}" />
+        <view class="image-main">
+          <view class="image-position">图片 {{index + 1}} / {{form.posters.length}}</view>
+          <input class="image-alt" maxlength="240" value="{{item.alt}}" placeholder="说明这张图讲什么" data-index="{{index}}" bindinput="onPosterAltInput" />
+        </view>
+        <view class="image-tools">
+          <view class="image-move {{index === 0 ? 'is-disabled' : ''}}" data-index="{{index}}" data-direction="-1" bindtap="movePoster">↑</view>
+          <view class="image-move {{index === form.posters.length - 1 ? 'is-disabled' : ''}}" data-index="{{index}}" data-direction="1" bindtap="movePoster">↓</view>
+          <view class="image-delete" data-index="{{index}}" bindtap="removePoster">移除</view>
+        </view>
+      </view>
+      <view wx:if="{{!form.posters.length}}" class="empty-inline">可以保持纯文字，也可以添加任意数量的步骤图、手绘图或界面截图。</view>
+    </view>
+
+    <view wx:if="{{form.kind === 'course'}}" class="form-section">
+      <view class="section-head"><text class="section-index">03</text><text class="section-title">基础课正文</text></view>
+      <view class="field"><view class="field-label">一句话说明</view><textarea class="field-textarea" value="{{form.summary}}" placeholder="先把最重要的结论讲清楚" data-field="summary" bindinput="onFieldInput" /></view>
+      <view class="field"><view class="field-label">举个例子</view><textarea class="field-textarea" value="{{form.scenario}}" placeholder="用会员熟悉的工作或生活场景解释" data-field="scenario" bindinput="onFieldInput" /></view>
+      <view class="field"><view class="field-label">照着做 <text>每行一步</text></view><textarea class="field-textarea" value="{{form.stepsText}}" placeholder="第一步&#10;第二步&#10;第三步" data-field="stepsText" bindinput="onFieldInput" /></view>
+      <view class="field"><view class="field-label">容易踩坑 <text>每行一项</text></view><textarea class="field-textarea" value="{{form.pitfallsText}}" placeholder="不要把……&#10;不要直接……" data-field="pitfallsText" bindinput="onFieldInput" /></view>
+      <view class="field"><view class="field-label">安全边界</view><textarea class="field-textarea" value="{{form.avoid}}" placeholder="哪些情况不应交给 AI 或自动执行" data-field="avoid" bindinput="onFieldInput" /></view>
+      <view class="field"><view class="field-label">记住这一句</view><textarea class="field-textarea field-textarea-short" value="{{form.takeaway}}" placeholder="会员读完后应该带走的一句话" data-field="takeaway" bindinput="onFieldInput" /></view>
+    </view>
+
+    <view wx:else class="form-section">
+      <view class="section-head"><text class="section-index">03</text><text class="section-title">动手课正文</text></view>
+      <view class="field"><view class="field-label">这次要完成什么</view><textarea class="field-textarea" value="{{form.goal}}" placeholder="写清最终能完成的结果" data-field="goal" bindinput="onFieldInput" /></view>
+      <view class="field"><view class="field-label">开始前准备 <text>每行一项</text></view><textarea class="field-textarea" value="{{form.prerequisitesText}}" placeholder="需要的账号&#10;需要打开的工具" data-field="prerequisitesText" bindinput="onFieldInput" /></view>
+
+      <view class="platform-head"><text class="platform-head-title">按平台操作</text><view class="platform-add" bindtap="addPlatform">＋ 添加平台</view></view>
+      <view wx:for="{{form.platforms}}" wx:key="id" class="platform-card">
+        <view class="platform-card-head"><text class="platform-card-index">平台 {{index + 1}}</text><view class="platform-remove" data-index="{{index}}" bindtap="removePlatform">移除</view></view>
+        <input class="field-input" value="{{item.label}}" placeholder="例如 Windows" data-index="{{index}}" data-field="label" bindinput="onPlatformInput" />
+        <input class="field-input compact-input" value="{{item.terminal}}" placeholder="例如 PowerShell" data-index="{{index}}" data-field="terminal" bindinput="onPlatformInput" />
+        <view class="field"><view class="field-label">命令 <text>每行：名称 | 命令 | 环境</text></view><textarea class="field-textarea" value="{{item.commandsText}}" placeholder="检查版本 | codex --version | PowerShell" data-index="{{index}}" data-field="commandsText" bindinput="onPlatformInput" /></view>
+        <view class="field"><view class="field-label">平台步骤 <text>每行一步</text></view><textarea class="field-textarea" value="{{item.stepsText}}" placeholder="打开终端&#10;运行命令&#10;检查结果" data-index="{{index}}" data-field="stepsText" bindinput="onPlatformInput" /></view>
+      </view>
+
+      <view class="field"><view class="field-label">通用步骤 <text>每行一步</text></view><textarea class="field-textarea" value="{{form.stepsText}}" placeholder="不区分平台的操作步骤" data-field="stepsText" bindinput="onFieldInput" /></view>
+      <view class="field"><view class="field-label">通用命令 <text>每行：名称 | 命令 | 环境</text></view><textarea class="field-textarea" value="{{form.commandsText}}" placeholder="检查状态 | tool status | 终端" data-field="commandsText" bindinput="onFieldInput" /></view>
+      <view class="field"><view class="field-label">怎么确认成功 <text>每行一项</text></view><textarea class="field-textarea" value="{{form.verificationText}}" placeholder="看到什么结果才算完成" data-field="verificationText" bindinput="onFieldInput" /></view>
+      <view class="field"><view class="field-label">卡住了先看这里 <text>每行一项</text></view><textarea class="field-textarea" value="{{form.troubleshootingText}}" placeholder="常见问题和对应处理" data-field="troubleshootingText" bindinput="onFieldInput" /></view>
+      <view class="field"><view class="field-label">容易踩坑 <text>每行一项</text></view><textarea class="field-textarea" value="{{form.pitfallsText}}" placeholder="容易造成返工或风险的做法" data-field="pitfallsText" bindinput="onFieldInput" /></view>
+      <view class="field"><view class="field-label">安全边界</view><textarea class="field-textarea" value="{{form.avoid}}" placeholder="哪些操作需要停下来确认" data-field="avoid" bindinput="onFieldInput" /></view>
+      <view class="field"><view class="field-label">记住这一句</view><textarea class="field-textarea field-textarea-short" value="{{form.takeaway}}" placeholder="完成操作后应该记住什么" data-field="takeaway" bindinput="onFieldInput" /></view>
+      <view class="field"><view class="field-label">原始来源 <text>每行：标题 | HTTPS 链接</text></view><textarea class="field-textarea" value="{{form.sourcesText}}" placeholder="官方安装说明 | https://example.com/docs" data-field="sourcesText" bindinput="onFieldInput" /></view>
+    </view>
+
+    <view class="form-section">
+      <view class="section-head"><text class="section-index">04</text><text class="section-title">关联阅读</text></view>
+      <view class="field"><view class="field-label">关联基础课 ID <text>每行一个</text></view><textarea class="field-textarea field-textarea-short" value="{{form.relatedCourseText}}" placeholder="model-basics&#10;security" data-field="relatedCourseText" bindinput="onFieldInput" /></view>
+      <view class="field"><view class="field-label">关联动手课 ID <text>每行一个</text></view><textarea class="field-textarea field-textarea-short" value="{{form.relatedPracticalText}}" placeholder="codex-cli-install" data-field="relatedPracticalText" bindinput="onFieldInput" /></view>
+    </view>
+
+    <view class="action-dock">
+      <button class="dock-button dock-secondary" bindtap="saveDraft" loading="{{busyAction === 'save'}}" disabled="{{busy || uploading}}">保存草稿</button>
+      <button class="dock-button dock-secondary" bindtap="previewDraft" loading="{{busyAction === 'preview'}}" disabled="{{busy || uploading}}">预览</button>
+      <button class="dock-button dock-primary" bindtap="publishDraft" loading="{{busyAction === 'publish'}}" disabled="{{busy || uploading}}">{{entry.status === 'published' ? '发布新版本' : '发布'}}</button>
+    </view>
+    <button wx:if="{{entry.status === 'published'}}" class="unpublish-button" bindtap="unpublishEntry" loading="{{busyAction === 'unpublish'}}" disabled="{{busy || uploading}}">下架这篇内容</button>
+  </block>
+
+  <canvas type="2d" id="columnMediaCompressor" class="media-compressor-canvas" />
+</view>

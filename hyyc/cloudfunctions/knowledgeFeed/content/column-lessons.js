@@ -343,7 +343,12 @@ function publicLesson(value, { includeCopy = true } = {}) {
     title: value.title
   };
   return includeCopy
-    ? { ...preview, subtitle: value.subtitle, duration: value.duration }
+    ? {
+      ...preview,
+      subtitle: value.subtitle,
+      duration: value.duration,
+      tags: Array.isArray(value.tags) ? [...value.tags] : []
+    }
     : preview;
 }
 

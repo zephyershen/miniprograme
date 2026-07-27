@@ -20,11 +20,13 @@ const {
 
 const ENV_ID = 'test-environment';
 
-test('collection control derives all 26 resources from the existing database rules contract', () => {
+test('collection control derives all 28 resources from the existing database rules contract', () => {
   const collections = loadReleaseContracts().database.collections;
-  assert.equal(collections.length, 26);
+  assert.equal(collections.length, 28);
   assert.equal(collections.includes('knowledge_membership_checkout_locks'), true);
   assert.equal(collections.includes('knowledge_user_media'), true);
+  assert.equal(collections.includes('knowledge_column_entries'), true);
+  assert.equal(collections.includes('knowledge_column_media'), true);
   assert.equal(collections.includes('knowledge_message_events'), true);
   assert.equal(collections.includes('knowledge_user_messages'), true);
   assert.equal(collections.includes('knowledge_user_profile_reviews'), true);

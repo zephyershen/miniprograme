@@ -220,6 +220,11 @@ Page({
     wx.navigateTo({ url: '/pages/membership/index' });
   },
 
+  openColumnAdmin() {
+    if (!this.data.membership.isActualAdmin) return;
+    wx.navigateTo({ url: '/pages/column-admin/index' });
+  },
+
   openFeed() {
     wx.switchTab({ url: '/pages/inbox/index' });
   }

@@ -1445,3 +1445,160 @@
   `2.3.4 / 审核中`，预计 1–7 天且当前无加急额度；公开线上仍为 `2.3.2`。
 - Sensitive handling: Wiki 未记录公众平台会话参数、管理员身份标识、OpenID、
   Cookie、访问令牌、用户数据、订单号或原始浏览器日志。
+
+## [2026-07-25] xiaohongshu-promotion-launch | 启动小红书内容推广
+
+- Session: local Codex task
+- Positioning: 小红书账号定位为“普通人的信息焦虑减负”，围绕“不知道去哪获取
+  信息、看完不知道哪些重要、害怕跟不上时代”输出；固定产品价值为筛掉噪音、
+  解释重要性、给出下一步。
+- Creative: 已完成首篇 7 页 3:4 图文、正文、话题、manifest 和可复用
+  HTML/CSS 源文件，保存在
+  `marketing/xiaohongshu/2026-07-25-information-anxiety/`；发布图为
+  1620×2160 PNG，逐页视觉检查无裁切。
+- Monitoring: 已建立本地定时任务“看懂今天·小红书热点追踪”，每天四次检查最近
+  24 小时的合格热点；只生成有用户影响、可解释且可行动的草稿，自动发布保持关闭。
+- Platform: 账号持有人完成登录后，已于 2026-07-25 23:29 发布首篇笔记
+  “刷得越多，为什么越焦虑？”。笔记管理页回读为“审核中”，并确认 7 张图片、
+  5 个平台识别话题和“AI 新手村”活动关联。
+- Compliance: 已声明原创并标注“笔记含 AI 合成内容”；没有添加微信号、二维码、
+  站外链接、诱导评论或私信领资料。
+- Sensitive handling: Wiki 未记录手机号、短信验证码、Cookie、登录会话、个人
+  账号标识或其他凭据。
+
+## [2026-07-26] xiaohongshu-product-proof-update | 补强小程序身份与真实首页展示
+
+- Session: local Codex task
+- Scope: 修订首篇“刷得越多，为什么越焦虑？”图文，让用户能立即识别产品是
+  微信小程序，并知道小程序名称为“看懂今天”；没有添加二维码、微信号、站外链接
+  或诱导私信话术。
+- Creative: 首图新增“微信小程序”标识和真实首页预览；第 6 页使用真实首页截图
+  展示筛选、速览、评论与收藏；第 7 页及正文写明“微信小程序｜看懂今天”和
+  微信内使用方式。7 张 V3 均为 1620×2160。
+- Verification: 上传草稿去重后为 7 张，顺序 1–7；逐张 SHA-256 与本地
+  `exports-v2/` 文件完全一致。标题、9 个话题、“AI 新手村”活动、原创声明、
+  AI 合成内容声明及公开设置均保留。
+- Platform: 2026-07-26 00:21 创作服务平台返回“更新成功”；笔记管理页回读同一
+  笔记为“审核中”，原有浏览与互动数据保留，没有创建重复笔记。
+- Sensitive handling: Wiki 未记录手机号、验证码、Cookie、会话值、浏览器配置、
+  账号标识或其他凭据。
+
+## [2026-07-26] xiaohongshu-compliance-revision-v4 | 移除第三方平台推广信号
+
+- Session: local Codex task
+- Trigger: 小红书审核详情显示 V3 因“推广第三方平台”被限制流量，具体规则覆盖
+  引导去其他平台、教程测评式宣传、福利跳转和宣传其他平台产品服务；平台状态为
+  “未通过”。
+- Revision: V4 删除所有微信、小程序、搜索、下载和站外使用入口；移除产品首页
+  截图，将第 6 页改为“筛选重要信息、讲清关系、给出下一步”的纯内容方法；
+  正文改为“持续做看懂今天内容”，并移除 `#小程序`、`#OpenAI`、`#Claude`
+  产品导向话题。
+- Reference: 用户提供的最新真实首页只保存为
+  `marketing/xiaohongshu/2026-07-25-information-anxiety/references/latest-homepage-2026-07-26.jpg`
+  供后续产品素材参考，未用于本篇受限笔记。
+- Verification: 7 张 V4 为 1620×2160，上传后逐张 SHA-256 与本地文件一致；
+  正文不含微信、小程序、搜索或下载引导；6 个内容型话题、原创声明、AI 内容声明
+  和“AI 新手村”活动均保留。
+- Platform: 2026-07-26 00:34 创作服务平台返回“更新成功”，笔记管理页回读同一
+  笔记为“审核中”，12 次浏览和原互动数据保留，没有创建重复笔记。
+- Sensitive handling: Wiki 未记录手机号、验证码、Cookie、会话值、浏览器配置、
+  账号标识或其他凭据。
+
+## [2026-07-26] multi-platform-promotion-launch | 启动 GitHub、小红书与抖音推广
+
+- Session: local Codex task
+- GitHub: 新建独立公开仓库 `https://github.com/zephyershen/kandong-jintian`，
+  没有把推广文章写入小程序源码仓库；README、产品长文、真实首页截图和社交预览图
+  已由提交 `5bcc233` 推送到 `main`。
+- Xiaohongshu: 第二篇“AI 开始替你盯事了”于 2026-07-26 10:03 发布，
+  笔记管理页在“已发布”回读成功；公开地址为
+  `https://www.xiaohongshu.com/explore/6a656b0a0000000001003868`。
+- Douyin: 34 秒视频“AI 开始替你盯事了，但别把工作全交出去”于
+  2026-07-26 10:23 提交；作品、双比例封面和发文助手检查均通过，随后作品管理页
+  回读为“已发布”。作品 ID 为 `7666656648458407206`，公开地址为
+  `https://www.douyin.com/video/7666656648458407206`。
+- Compliance: 小红书和抖音均移除小程序、搜索、下载、二维码和站外跳转，
+  声明 AI 合成内容；GitHub 独立仓库保留清晰的小程序使用入口。
+- Sensitive handling: Wiki 未记录手机号、验证码、Cookie、登录会话、访问令牌
+  或其他账号凭据。
+
+## [2026-07-26] douyin-product-story-v2 | 用 GitHub 产品表达替换热点旁白版
+
+- Session: local Codex task
+- Trigger: 旧抖音视频聚焦热点并使用旁白，不符合产品推广方向；用户要求直接沿用
+  GitHub 独立推广仓库中更自然的图片与文案，只保留 BGM，不做 AI 阅读。
+- Creative: 新版保存在 `marketing/douyin/2026-07-26-product-story-v2/`，使用
+  GitHub 提交 `5bcc233` 的产品表达、社交预览图和真实小程序首页截图；成片为
+  1080×1920、29 秒、H.264/AAC、8 段纯图文节奏片，音轨只有原创轻量 BGM，
+  无旁白、无人声、无 AI 阅读。3:4 与 4:3 双封面均已生成。
+- Verification: 首、中、尾帧与 8 张画面逐张复核无裁切；音轨均值 -21.1 dB、
+  峰值 -7.4 dB；抖音发文助手回读“作品未见异常”，封面检测通过。公开页面
+  `https://www.douyin.com/video/7666663355465207081` 返回 HTTP 200，
+  页面显示 29 秒、标题与正文正确。
+- Platform: 2026-07-26 10:49 提交新版，约 10:50 回读为“已发布”，作品 ID
+  为 `7666663355465207081`。确认新版公开后，精确删除旧作品
+  `7666656648458407206`；作品管理总数从 34 回到 33，旧标题消失且新版保留。
+- Sensitive handling: Wiki 未记录 Cookie、登录会话、访问令牌、设备标识、
+  浏览器配置或其他账号凭据。
+
+## [2026-07-27] column-admin-draft-publishing | 实现会员专栏管理员发布系统
+
+- Session: local Codex task
+- Scope: 新增真实管理员专用的专栏目录和结构化编辑器；现有 24 节基础课与 6 节
+  动手课成为内置基线，数据库覆盖可保存草稿、发布快照、排序和下架状态。
+- Security: 八个管理 action 每次重新解析微信身份并要求 `isActualAdmin`；保存、
+  发布和下架使用 `expectedVersion` 与幂等操作 ID。图片绑定内容归属，跨内容注入
+  被拒绝，发布版本引用图片不能清理。
+- Data: 本地数据库合同从 26 增为 28 个 ADMINONLY 集合、索引从 44 增为 47；
+  图片无业务张数上限，短期地址每 50 张签发，孤儿仅在云存储确认删除后移除记录。
+- Verification: `npm.cmd run verify` 通过 718/718 Node 测试、覆盖率、项目结构、
+  数据库/索引合同和生产依赖审计；微信开发者工具 CLI `auto`、`open` 成功。
+- Release boundary: 没有创建生产集合、应用索引、部署云函数、上传小程序、提交
+  审核或写入生产专栏数据。后续必须按数据库 → 云函数 → 小程序 → 真实管理员
+  canary 的顺序发布。
+- Memory: 新增
+  [决策](decisions/2026-07-27-column-admin-draft-publishing.md) 与
+  [实现证据](sources/2026-07-27-column-admin-publishing-implementation.md)。
+- Sensitive handling: Wiki 未记录管理员身份标识、OpenID、会话、令牌、生产日志、
+  用户数据或其他敏感值。
+
+## [2026-07-27] column-admin-backend-cutover | 修复管理页版本错配并部署后台
+
+- Session: local Codex task
+- Incident: 新管理页面连接生产旧版 `knowledgeFeed`，因此列表显示 0 且返回
+  `INVALID_REQUEST / 不支持的操作`；同时页面使用“基础知识 / 应用操作”和英文标题，
+  与会员端“基础课 / 动手课”的产品术语不一致。
+- UI repair: 管理列表和编辑器统一为“基础课 / 动手课”，去掉英文和“内置基线”等
+  开发术语；旧路由错误转换为明确部署状态，不再直接暴露原始错误。
+- Production: 增量创建并回读两个 ADMINONLY 集合，应用并回读三个索引；生产合同
+  收敛为 28 个集合和 47 个索引。新版 `knowledgeFeed` code-only 部署成功，匿名
+  `columnAdminList` 返回 `AUTH_REQUIRED`，函数 manifest、集合、索引检查均 converged。
+- Verification: `npm.cmd run verify` 与 719/719 Node 测试通过；微信开发者工具
+  `open`、`auto`、`preview` 成功，预览包 582,442 bytes。
+- Release boundary: 尚未上传或提交含管理页面的微信审核版本，也未进行真实管理员
+  生产写入 canary；后台已部署不等于小程序正式上线。
+- Memory: 更新
+  [决策](decisions/2026-07-27-column-admin-draft-publishing.md)、
+  [实现与部署证据](sources/2026-07-27-column-admin-publishing-implementation.md)、
+  `overview.md` 与 `index.md`。
+- Sensitive handling: Wiki 未记录管理员身份标识、OpenID、会话、令牌、生产日志、
+  用户数据或其他敏感值。
+
+## [2026-07-27] ui-audit-triage | 分流外部 UI 审计并完成首批低风险加固
+
+- Session: local Codex task
+- Assessment: 外部评价总体有价值，但把兼容缺陷、视觉重构和新功能混在同一顺序；
+  深色模式、Tab 图标、统一下拉刷新和删除兼容路由均不能按零风险小修改直接执行。
+- Changes: `app.wxss` 的全局按钮基线加入 `min-width: 0`，保护微信 v2 下固定按钮
+  与弹性按钮并排布局；资讯首页三份重复卡片收敛为一个同页 WXML 模板。
+- Contracts: UI 测试改为验证单模板被 timeline、lead、remaining 三处调用，并保留
+  媒体错误恢复元数据、会员弹层页面锁定和图片占位高度合同。
+- Verification: `npm.cmd run verify` 通过 719/719；微信开发者工具 `open`、
+  `preview` 成功，预览包 578,944 bytes。
+- Release boundary: 未部署云函数、未改生产数据、未上传或提交微信审核；会员专栏
+  管理端审核和真实管理员 canary 仍优先于扩大 UI 与功能改造。
+- Memory: 新增
+  [审计分流与首批加固](syntheses/2026-07-27-ui-audit-triage.md)，并修正
+  `overview.md` 中过时的生产集合与索引数量。
+- Sensitive handling: Wiki 未记录管理员身份、OpenID、会话、令牌、生产日志、
+  用户数据或其他敏感值。

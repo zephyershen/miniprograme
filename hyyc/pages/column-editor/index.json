@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "编辑会员专栏",
+  "usingComponents": {
+    "loading-state": "/components/loading-state/index"
+  }
+}

@@ -11,16 +11,16 @@ const PRO_BENEFITS = Object.freeze([
   Object.freeze({
     key: 'courses',
     featureKeys: Object.freeze(['ai_column']),
-    label: '24 节基础课',
+    label: '基础课持续更新',
     title: '基础课全文与高清手绘图文',
-    copy: '解锁 24 节基础课全文，以及课程已经配套的高清手绘图文。'
+    copy: '解锁持续更新的基础课全文，以及课程配套的高清图文讲解。'
   }),
   Object.freeze({
     key: 'practicals',
     featureKeys: Object.freeze(['ai_column']),
-    label: '6 节动手课',
+    label: '动手课持续更新',
     title: '多系统动手操作手册',
-    copy: '解锁 6 节动手课，按 Windows、macOS、Linux 或 WSL 查看官方安装与操作步骤。'
+    copy: '解锁持续更新的动手课，按 Windows、macOS、Linux 或 WSL 查看安装与操作步骤。'
   }),
   Object.freeze({
     key: 'briefings',
@@ -61,7 +61,7 @@ const MEMBERSHIP_TERMS = Object.freeze({
 const PRO_METRICS = Object.freeze([
   Object.freeze({ label: '30 天', copy: '资讯回看' }),
   Object.freeze({ label: '3 档', copy: '滚动简报' }),
-  Object.freeze({ label: '30 节', copy: '基础课与动手课' })
+  Object.freeze({ label: '持续更新', copy: '基础课与动手课' })
 ]);
 
 function cloneBenefit(item, featured = false) {

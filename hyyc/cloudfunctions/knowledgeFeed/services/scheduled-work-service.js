@@ -16,6 +16,7 @@ function createScheduledWorkService({
   analysisWorkerService,
   digestGenerationService,
   columnEditorialService,
+  columnAdminService,
   userMediaService,
   userProfileService,
   commentReviewService,
@@ -45,6 +46,10 @@ function createScheduledWorkService({
       && typeof userMediaService.cleanupExpired === 'function'
       ? userMediaService.cleanupExpired().catch(() => ({ status: 'deferred' }))
       : Promise.resolve(null);
+    const columnMediaCleanupPromise = columnAdminService
+      && typeof columnAdminService.cleanupExpired === 'function'
+      ? columnAdminService.cleanupExpired().catch(() => ({ status: 'deferred' }))
+      : Promise.resolve(null);
     // Keep the lightweight AIGCLINK head poll ahead of the heavier AI HOT
     // refresh chain so upstream delays cannot starve the GitHub library.
     const openSourceLibrary = aigclinkSyncService && typeof aigclinkSyncService.run === 'function'
@@ -59,11 +64,13 @@ function createScheduledWorkService({
       force: event && event.force === true
     });
     const mediaCleanup = await mediaCleanupPromise;
+    const columnMediaCleanup = await columnMediaCleanupPromise;
     return {
       ...publicSourceResult(source),
       itemStore,
       openSourceLibrary,
-      ...(mediaCleanup ? { mediaCleanup } : {})
+      ...(mediaCleanup ? { mediaCleanup } : {}),
+      ...(columnMediaCleanup ? { columnMediaCleanup } : {})
     };
   }
 

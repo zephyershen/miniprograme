@@ -74,7 +74,7 @@ function publicCase(document) {
   };
 }
 
-function createColumnContentService({ repository, getTempFileURL }) {
+function createColumnContentService({ repository, getTempFileURL, catalogService = null }) {
   async function tempFileUrls(fileIds) {
     const requested = [...new Set((Array.isArray(fileIds) ? fileIds : []).filter(Boolean))];
     if (!requested.length) return new Map();
@@ -112,6 +112,13 @@ function createColumnContentService({ repository, getTempFileURL }) {
 
   async function home(entitlement) {
     const unlocked = featureEnabled(entitlement, 'ai_column');
+    const published = catalogService ? await catalogService.publishedEntries() : [];
+    const courses = catalogService
+      ? published.filter((entry) => entry.kind === 'course').map((entry) => entry.content)
+      : COLUMN_LESSONS;
+    const practicals = catalogService
+      ? published.filter((entry) => entry.kind === 'practical').map((entry) => entry.content)
+      : PRACTICAL_LESSONS;
     return {
       contractVersion: 4,
       access: {
@@ -124,25 +131,55 @@ function createColumnContentService({ repository, getTempFileURL }) {
       practicalTracks: PRACTICAL_TRACKS.map((track) => (unlocked
         ? { ...track }
         : { key: track.key, label: track.label })),
-      courses: COLUMN_LESSONS.map((value) => publicLesson(value, { includeCopy: unlocked })),
-      practicals: PRACTICAL_LESSONS.map((value) => publicPracticalLesson(value, {
+      courses: courses.map((value) => publicLesson(value, { includeCopy: unlocked })),
+      practicals: practicals.map((value) => publicPracticalLesson(value, {
         includeCopy: unlocked
       })),
-      featuredCourseId: COLUMN_LESSONS[0].id,
-      featuredPracticalId: PRACTICAL_LESSONS[0].id,
+      featuredCourseId: courses[0] && courses[0].id || '',
+      featuredPracticalId: practicals[0] && practicals[0].id || '',
       practicalSupport: { ...PRACTICAL_SUPPORT_NOTICE }
     };
   }
 
   async function lesson(lessonId, entitlement) {
     requireFeature(entitlement, 'ai_column', '本节内容需要 Pro 会员');
-    const value = findLesson(lessonId);
+    const entry = catalogService
+      ? await catalogService.publishedEntry(lessonId, 'course')
+      : null;
+    const value = catalogService
+      ? entry && entry.content
+      : findLesson(lessonId);
     if (!value) throw new AppError('ITEM_NOT_FOUND', '这节课程不存在');
-    const media = await lessonMedia(value);
+    const media = catalogService
+      ? { posters: (await catalogService.resolveContent(value)).posters, illustrationUrl: '' }
+      : await lessonMedia(value);
+    const published = catalogService ? await catalogService.publishedEntries() : [];
+    const courses = published.filter((item) => item.kind === 'course').map((item) => item.content);
+    const practicals = published.filter((item) => item.kind === 'practical').map((item) => item.content);
+    const sameTrack = courses.filter((item) => item.track === value.track);
+    const position = sameTrack.findIndex((item) => item.id === value.id);
+    const automaticRelated = sameTrack.slice(position + 1, position + 3).map((item) => item.id);
+    const relatedCourseIds = [...new Set([
+      ...(value.relatedCourseIds || []),
+      ...(catalogService ? automaticRelated : lessonRelations(value).relatedLessonIds)
+    ])].filter((id) => id !== value.id);
+    const relatedLessonIds = catalogService
+      ? relatedCourseIds.map((id) => courses.find((item) => item.id === id))
+        .filter(Boolean).map((item) => publicLesson(item, { includeCopy: true }))
+      : lessonRelations(value).relatedLessonIds;
+    const relatedPracticalIds = catalogService
+      ? (value.relatedPracticalIds || []).map((id) => practicals.find((item) => item.id === id))
+        .filter(Boolean).map((item) => publicPracticalLesson(item, { includeCopy: true }))
+      : [];
     return {
       ...value,
-      ...lessonRelations(value),
-      visual: { ...value.visual, nodes: [...value.visual.nodes] },
+      relatedLessonIds,
+      relatedPracticalIds,
+      dossiers: catalogService ? [] : lessonRelations(value).dossiers,
+      visual: {
+        ...(value.visual || { mode: 'none' }),
+        nodes: [...(value.visual && value.visual.nodes || [])]
+      },
       sections: {
         ...value.sections,
         steps: [...value.sections.steps],
@@ -154,18 +191,34 @@ function createColumnContentService({ repository, getTempFileURL }) {
 
   async function practical(practicalId, entitlement) {
     requireFeature(entitlement, 'ai_column', '本节实操需要 Pro 会员');
-    const value = findPracticalLesson(practicalId);
+    const entry = catalogService
+      ? await catalogService.publishedEntry(practicalId, 'practical')
+      : null;
+    const value = catalogService
+      ? entry && entry.content
+      : findPracticalLesson(practicalId);
     if (!value) throw new AppError('ITEM_NOT_FOUND', '这节实操不存在');
+    const resolved = catalogService ? await catalogService.resolveContent(value) : value;
+    const published = catalogService ? await catalogService.publishedEntries() : [];
+    const courses = published.filter((item) => item.kind === 'course').map((item) => item.content);
+    const practicals = published.filter((item) => item.kind === 'practical').map((item) => item.content);
     return {
-      ...value,
-      platformGuides: value.platformGuides.map((guide) => ({
+      ...resolved,
+      platformGuides: (value.platformGuides || []).map((guide) => ({
         ...guide,
         commands: guide.commands.map((item) => ({ ...item })),
         steps: [...guide.steps]
       })),
-      commands: value.commands.map((item) => ({ ...item })),
-      sources: value.sources.map((item) => ({ ...item })),
-      relatedCourseIds: [...value.relatedCourseIds],
+      commands: (value.commands || []).map((item) => ({ ...item })),
+      sources: (value.sources || []).map((item) => ({ ...item })),
+      relatedCourseIds: catalogService
+        ? (value.relatedCourseIds || []).map((id) => courses.find((item) => item.id === id))
+          .filter(Boolean).map((item) => publicLesson(item, { includeCopy: true }))
+        : [...value.relatedCourseIds],
+      relatedPracticalIds: catalogService
+        ? (value.relatedPracticalIds || []).map((id) => practicals.find((item) => item.id === id))
+          .filter(Boolean).map((item) => publicPracticalLesson(item, { includeCopy: true }))
+        : [],
       sections: Object.fromEntries(Object.entries(value.sections).map(([key, entry]) => [
         key,
         Array.isArray(entry) ? [...entry] : entry

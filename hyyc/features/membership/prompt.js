@@ -23,7 +23,7 @@ const PROMPTS = Object.freeze({
   ai_column: {
     eyebrow: '实用学习专栏',
     title: '先把原理讲明白，再带你亲手做一遍',
-    copy: '24 节基础课讲清原理，6 节动手课提供按系统拆开的官方安装与操作步骤。'
+    copy: '持续更新的基础课讲清原理，动手课提供按系统拆开的安装与操作步骤。'
   },
   digests: {
     eyebrow: '会员简报',
@@ -35,7 +35,7 @@ const PROMPTS = Object.freeze({
 const AI_COLUMN_PROMPT = Object.freeze({
   eyebrow: '从听懂到会用',
   title: '先把原理讲明白，再带你亲手做一遍',
-  copy: '24 节基础课用生活里的例子讲清概念，动手课带你安装和使用 Codex CLI、Claude Code 等工具。Pro 会员遇到安装或使用问题，可私聊我的微信排查，技术支持不另外收费。'
+  copy: '基础课会持续用生活里的例子讲清概念，动手课带你安装和使用 Codex CLI、Claude Code 等工具。Pro 会员遇到安装或使用问题，可私聊我的微信排查，技术支持不另外收费。'
 });
 
 function membershipPrompt(featureKey) {

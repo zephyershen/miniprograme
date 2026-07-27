@@ -183,6 +183,7 @@
   </block>
 
   <comment-sheet
+    wx:if="{{item && item.engagement.canComment}}"
     visible="{{commentsOpen}}"
     item-id="{{item.id}}"
     comment-count="{{item.engagement.commentCount}}"

@@ -170,9 +170,18 @@ const ENGAGEMENT_CONFIG = Object.freeze({
 });
 
 const COLUMN_CONFIG = Object.freeze({
+  entriesCollectionName: 'knowledge_column_entries',
+  mediaCollectionName: 'knowledge_column_media',
   casesCollectionName: 'knowledge_column_cases',
   dossiersCollectionName: 'knowledge_trend_dossiers',
   eventsCollectionName: 'knowledge_trend_events',
+  mediaFileIdRoot: 'cloud://hyyc-1gi3f5sqc5becabf.6879-hyyc-1gi3f5sqc5becabf-1395663220/',
+  mediaPathPrefix: 'knowledge-column-media/',
+  mediaMaxBytes: 3 * 1024 * 1024,
+  mediaMaxDimension: 4096,
+  mediaMaxPixels: 12 * 1024 * 1024,
+  mediaOrphanTtlMs: 24 * 60 * 60 * 1000,
+  mediaCleanupBatchSize: 20,
   casePageSize: 8,
   caseMaxPageSize: 20,
   sourceLimit: 24,

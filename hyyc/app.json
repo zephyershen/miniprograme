@@ -4,6 +4,8 @@
     "pages/featured/index",
     "pages/curated/index",
     "pages/column-reader/index",
+    "pages/column-admin/index",
+    "pages/column-editor/index",
     "pages/trend-detail/index",
     "pages/briefing/index",
     "pages/profile/index",
