@@ -6,7 +6,14 @@
   </view>
 
   <view wx:if="{{loading}}" class="membership-loading"><loading-state label="正在读取会员信息" /></view>
-  <view wx:elif="{{error}}" class="membership-error"><view>{{error}}</view><view class="text-action" bindtap="loadMembership">重新加载 →</view></view>
+  <view wx:elif="{{error}}" class="membership-error">
+    <empty-state
+      title="会员信息暂时没有加载成功"
+      copy="{{error}}"
+      action-label="重新加载"
+      bindaction="loadMembership"
+    />
+  </view>
   <block wx:else>
     <view class="identity-block {{membership.isPrivileged ? 'identity-block-active' : ''}}">
       <view class="identity-label">当前身份</view>
@@ -33,7 +40,7 @@
           <view class="pro-offer-main">
             <view class="pro-offer-label">{{billing.plan.offerTag || '当前会员价'}}</view>
             <view class="pro-offer-line">
-              <view class="pro-offer-price"><text>{{billing.plan.priceLabel}}</text><label>/ {{billing.plan.durationLabel}}</label></view>
+              <view class="pro-offer-price"><text class="pro-offer-amount">{{billing.plan.priceLabel}}</text><text class="pro-offer-duration">/ {{billing.plan.durationLabel}}</text></view>
               <view wx:if="{{billing.plan.hasDiscount}}" class="pro-offer-saving">
                 <text class="pro-offer-discount">{{billing.plan.discountLabel}}</text>
                 <text>· 立省 {{billing.plan.savingsLabel}}</text>

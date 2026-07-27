@@ -10,6 +10,7 @@
     "knowledge_column_cases",
     "knowledge_column_entries",
     "knowledge_column_media",
+    "knowledge_column_progress",
     "knowledge_feed_access_grants",
     "knowledge_feed_analysis_jobs",
     "knowledge_feed_archive",

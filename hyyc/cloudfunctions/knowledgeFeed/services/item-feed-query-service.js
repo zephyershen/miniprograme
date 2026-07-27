@@ -6,10 +6,20 @@ const { entriesFromDocument } = require('../repositories/feed-day-index');
 const { buildFacetMatrix } = require('../lib/facet-matrix');
 const { visualPublicationVisible } = require('../policies/visual-publication');
 const { matchesSourceChannel } = require('../lib/source-channels');
+const {
+  SEARCH_TOKEN_VERSION,
+  normalizeSearchText,
+  querySearchTokens
+} = require('../lib/search-terms');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000;
 const WEEKDAYS = Object.freeze(['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']);
+
+function searchIndexReady(state) {
+  return Number(state && state.searchTokenBackfillVersion) === SEARCH_TOKEN_VERSION
+    && Boolean(state && state.searchTokenBackfillCompletedAt);
+}
 
 function shanghaiDateKey(value) {
   return new Date(Number(value) + SHANGHAI_OFFSET_MS).toISOString().slice(0, 10);
@@ -162,6 +172,25 @@ function querySince(timeKey, entitlement, currentTime) {
   return requestedCutoff > entitlementCutoff ? requestedCutoff : entitlementCutoff;
 }
 
+function normalizeSearchRequest(input = {}) {
+  const query = normalizeSearchText(input.query);
+  const length = Array.from(query).length;
+  if (length < 2 || length > 50) {
+    throw new AppError('INVALID_REQUEST', '请输入 2–50 个字符的关键词');
+  }
+  const searchTokens = querySearchTokens(query);
+  if (!searchTokens.length) {
+    throw new AppError('INVALID_REQUEST', '请输入中文或英文关键词');
+  }
+  return {
+    query,
+    searchTokens,
+    scope: input.scope === 'openSource' ? 'openSource' : 'news',
+    cursor: typeof input.cursor === 'string' && input.cursor.length <= 1000 ? input.cursor : '',
+    limit: Math.min(20, Math.max(1, Math.floor(Number(input.limit) || 10)))
+  };
+}
+
 function createItemFeedQueryService({
   itemRepository,
   dayIndexRepository,
@@ -205,6 +234,7 @@ function createItemFeedQueryService({
       access: entitlement.access,
       archiveCoverage: { state: 'partial', completeFrom: null },
       appliedFilters: { ...((input && input.filters) || {}), time: fallbackTime },
+      searchReady: false,
       coverage: 'legacy-selected'
     };
   }
@@ -310,6 +340,7 @@ function createItemFeedQueryService({
       features: entitlement.features,
       access: entitlement.access,
       appliedFilters: query.filters,
+      searchReady: searchIndexReady(store.state),
       ...(firstPage ? {
         totalAvailable,
         resultCount: Number(page.resultCount) || 0,
@@ -428,6 +459,49 @@ function createItemFeedQueryService({
     };
   }
 
+  async function search(input = {}, entitlement) {
+    const store = await allStoreReady();
+    if (!store.ready || !searchIndexReady(store.state)) {
+      throw new AppError('SEARCH_UNAVAILABLE', '搜索索引正在准备，请稍后再试');
+    }
+    const request = normalizeSearchRequest(input);
+    const currentTime = now();
+    const openSource = request.scope === 'openSource';
+    await releaseExpiredVisualPublicationHolds(currentTime);
+    const page = await itemRepository.queryPage({
+      since: openSource ? null : entitlementSince(entitlement, currentTime),
+      sourceChannel: openSource ? 'openSource' : 'all',
+      topicKeys: [],
+      sourceTags: [],
+      qualityTier: '',
+      searchTokens: request.searchTokens,
+      sort: 'latest',
+      offset: 0,
+      cursor: request.cursor,
+      limit: request.limit,
+      includeCount: !request.cursor,
+      ...publicQueryOptions()
+    });
+    const items = (page.items || []).filter((item) => item.publicState === 'active');
+    const history = entitlement && entitlement.entitlements && entitlement.entitlements.history;
+    const historyLabel = history && history.mode === 'all'
+      ? '全部历史资讯'
+      : `近 ${Math.max(1, Number(history && history.days) || entitlement.historyDays || 1)} 天资讯`;
+    return {
+      query: request.query,
+      scope: request.scope,
+      scopeLabel: openSource ? '全部 GitHub 项目' : historyLabel,
+      ...(request.cursor ? {} : { resultCount: Number(page.resultCount) || 0 }),
+      nextCursor: page.nextCursor || '',
+      hasMore: page.hasMore === true,
+      items: items.map((item) => publicItem(item)),
+      viewer: entitlement.viewer,
+      entitlements: entitlement.entitlements,
+      access: entitlement.access,
+      updatedAt: toIso(openSource ? store.state.aigclinkSyncedAt : store.state.allItemsSyncedAt)
+    };
+  }
+
   async function getItem(id, entitlement) {
     if (typeof id !== 'string' || !/^[a-z0-9_-]{8,80}$/i.test(id)) {
       throw new AppError('ITEM_NOT_FOUND', '这条资讯不存在');
@@ -471,7 +545,7 @@ function createItemFeedQueryService({
     };
   }
 
-  return { getFeed, getDay, getUpdates, getItem, allStoreReady };
+  return { getFeed, getDay, getUpdates, search, getItem, allStoreReady };
 }
 
 module.exports = {
@@ -484,6 +558,8 @@ module.exports = {
   uniqueEntries,
   entitlementSince,
   querySince,
+  normalizeSearchRequest,
+  searchIndexReady,
   shanghaiDateKey,
   dayKeysForTime,
   shanghaiDayRange,

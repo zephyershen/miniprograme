@@ -38,6 +38,18 @@
       "reason": "Reconcile all uploaded images owned by one column entry."
     },
     {
+      "collection": "knowledge_column_progress",
+      "name": "owner_last_read_at",
+      "unique": false,
+      "keys": [
+        { "field": "ownerKey", "direction": "1" },
+        { "field": "lastReadAt", "direction": "-1" },
+        { "field": "_id", "direction": "-1" }
+      ],
+      "owner": "column-progress",
+      "reason": "List the current viewer's newest column reading progress without scanning other users."
+    },
+    {
       "collection": "knowledge_feed_analysis_jobs",
       "name": "status_priority_due",
       "unique": false,
@@ -245,6 +257,20 @@
     },
     {
       "collection": "knowledge_feed_items",
+      "name": "ps_sc_search_pub_id",
+      "unique": false,
+      "keys": [
+        { "field": "publicState", "direction": "1" },
+        { "field": "sourceChannelKey", "direction": "1" },
+        { "field": "searchTokens", "direction": "1" },
+        { "field": "publishedAt", "direction": "-1" },
+        { "field": "_id", "direction": "-1" }
+      ],
+      "owner": "feed-search",
+      "reason": "Search the complete GitHub project library by normalized keyword tokens and newest publication."
+    },
+    {
+      "collection": "knowledge_feed_items",
       "name": "ps_sc_tags_pub_id",
       "unique": false,
       "keys": [
@@ -313,6 +339,19 @@
       ],
       "owner": "feed-query",
       "reason": "Page the active feed by heat."
+    },
+    {
+      "collection": "knowledge_feed_items",
+      "name": "ps_search_pub_id",
+      "unique": false,
+      "keys": [
+        { "field": "publicState", "direction": "1" },
+        { "field": "searchTokens", "direction": "1" },
+        { "field": "publishedAt", "direction": "-1" },
+        { "field": "_id", "direction": "-1" }
+      ],
+      "owner": "feed-search",
+      "reason": "Search entitled news history by normalized keyword tokens and newest publication."
     },
     {
       "collection": "knowledge_feed_items",

@@ -1,6 +1,7 @@
 {
   "pages": [
     "pages/inbox/index",
+    "pages/search/index",
     "pages/featured/index",
     "pages/curated/index",
     "pages/column-reader/index",
@@ -26,7 +27,9 @@
   "usingComponents": {
     "membership-prompt": "/components/membership-prompt/index",
     "comment-sheet": "/components/comment-sheet/index",
-    "loading-state": "/components/loading-state/index"
+    "loading-state": "/components/loading-state/index",
+    "empty-state": "/components/empty-state/index",
+    "skeleton-state": "/components/skeleton-state/index"
   },
   "tabBar": {
     "color": "#536471",
@@ -36,19 +39,27 @@
     "list": [
       {
         "pagePath": "pages/inbox/index",
-        "text": "资讯"
+        "text": "资讯",
+        "iconPath": "assets/tabbar/news.png",
+        "selectedIconPath": "assets/tabbar/news-selected.png"
       },
       {
         "pagePath": "pages/curated/index",
-        "text": "专栏"
+        "text": "专栏",
+        "iconPath": "assets/tabbar/column.png",
+        "selectedIconPath": "assets/tabbar/column-selected.png"
       },
       {
         "pagePath": "pages/briefing/index",
-        "text": "简报"
+        "text": "简报",
+        "iconPath": "assets/tabbar/briefing.png",
+        "selectedIconPath": "assets/tabbar/briefing-selected.png"
       },
       {
         "pagePath": "pages/profile/index",
-        "text": "我的"
+        "text": "我的",
+        "iconPath": "assets/tabbar/profile.png",
+        "selectedIconPath": "assets/tabbar/profile-selected.png"
       }
     ]
   },

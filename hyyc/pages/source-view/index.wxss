@@ -12,7 +12,7 @@
   border-radius: 24rpx;
   background: var(--ui-accent);
   content: "↗";
-  color: #fff;
+  color: var(--ui-on-accent);
   font-size: 32rpx;
   line-height: 70rpx;
   text-align: center;
@@ -27,7 +27,7 @@
   margin: 38rpx 0 0;
   border-radius: 24rpx;
   background: var(--ui-ink);
-  color: #ffffff;
+  color: var(--ui-on-accent);
   font-size: 25rpx;
   line-height: 88rpx;
 }

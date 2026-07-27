@@ -15,6 +15,11 @@ const {
 } = require('../../features/membership/session.js');
 const { membershipPresentation } = require('../../features/membership/presentation.js');
 const { getColumnDraftPreview } = require('../../features/column-admin/api.js');
+const { finishPullDownRefresh } = require('../../features/runtime/pull-down-refresh.js');
+const { createPosterRecovery } = require('../../features/ai-column/poster-recovery.js');
+const { saveColumnProgress } = require('../../features/ai-column/api.js');
+const { readingProgressPercent } = require('../../features/ai-column/progress.js');
+const { createProgressReporter } = require('../../features/ai-column/progress-reporter.js');
 
 function safeDecode(value) {
   try {
@@ -22,6 +27,22 @@ function safeDecode(value) {
   } catch (error) {
     return value || '';
   }
+}
+
+function shouldTrackReadingProgress(page) {
+  return !page.adminPreview
+    && ['lesson', 'practical'].includes(page.articleType)
+    && Boolean(page.articleId);
+}
+
+function reportReadingProgress(page, progressPercent, lastPosterIndex, options = {}) {
+  if (!shouldTrackReadingProgress(page) || !page.progressReporter) return Promise.resolve(false);
+  return page.progressReporter.report({
+    entryType: page.articleType,
+    entryId: page.articleId,
+    progressPercent,
+    lastPosterIndex
+  }, options);
 }
 
 Page({
@@ -33,6 +54,7 @@ Page({
     activePosterIndex: 0,
     posterLoads: [],
     posterError: '',
+    readingCompleted: false,
     membershipPromptVisible: false,
     membershipPromptFeature: 'ai_column'
   },
@@ -41,11 +63,24 @@ Page({
     this.pageDisposed = false;
     this.contentRequestId = 0;
     this.skipNextContentRevalidation = true;
+    this.posterRecovery = createPosterRecovery({
+      reload: () => this.loadContent({ force: true, preserveCurrent: true }),
+      remount: (index) => this.remountPoster(index),
+      onFailure: (key) => this.showPosterFailure(key),
+      isDisposed: () => this.pageDisposed
+    });
     this.articleType = options.type === 'practical'
       ? 'practical'
       : options.type === 'case' ? 'case' : 'lesson';
     this.articleId = safeDecode(options.id);
     this.adminPreview = options.adminPreview === '1';
+    const requestedPosterIndex = Number(options.poster);
+    this.requestedPosterIndex = Number.isFinite(requestedPosterIndex)
+      ? Math.max(0, Math.floor(requestedPosterIndex))
+      : 0;
+    this.progressReporter = createProgressReporter({
+      save: saveColumnProgress
+    });
     const titles = { lesson: '基础课', practical: '动手课', case: '案例' };
     wx.setNavigationBarTitle({
       title: this.adminPreview ? '草稿预览' : titles[this.articleType]
@@ -61,9 +96,19 @@ Page({
     return this.loadContent({ force: true, preserveCurrent: true });
   },
 
+  onPullDownRefresh() {
+    if (this.posterRecovery) this.posterRecovery.reset();
+    return finishPullDownRefresh(() => this.loadContent({
+      force: true,
+      preserveCurrent: Boolean(this.data.article)
+    }));
+  },
+
   onUnload() {
     this.pageDisposed = true;
     this.contentRequestId = (this.contentRequestId || 0) + 1;
+    if (this.posterRecovery) this.posterRecovery.dispose();
+    if (this.progressReporter) this.progressReporter.dispose();
   },
 
   async resolveProtectedScope({ force = false } = {}) {
@@ -111,7 +156,7 @@ Page({
         || JSON.stringify(currentArticle) !== JSON.stringify(article);
       const activePosterIndex = currentArticle
         ? Math.min(this.data.activePosterIndex, Math.max(0, article.posters.length - 1))
-        : 0;
+        : Math.min(this.requestedPosterIndex, Math.max(0, article.posters.length - 1));
       this.setData({
         loading: false,
         error: '',
@@ -123,6 +168,14 @@ Page({
           visualLoading: article.visual.mode === 'image'
         } : {})
       });
+      if (shouldTrackReadingProgress(this) && !this.progressOpened) {
+        this.progressOpened = true;
+        reportReadingProgress(
+          this,
+          readingProgressPercent(activePosterIndex, article.posters.length),
+          activePosterIndex
+        );
+      }
       return true;
     } catch (error) {
       if (this.pageDisposed || requestId !== this.contentRequestId) return false;
@@ -142,6 +195,7 @@ Page({
   },
 
   retry() {
+    if (this.posterRecovery) this.posterRecovery.reset();
     this.loadContent({ force: true });
   },
 
@@ -169,11 +223,57 @@ Page({
       posterLoads: posterLoadWindow(activePosterIndex, total),
       posterError: ''
     });
+    reportReadingProgress(
+      this,
+      readingProgressPercent(activePosterIndex, total),
+      activePosterIndex
+    );
+  },
+
+  shouldTrackProgress() {
+    return shouldTrackReadingProgress(this);
+  },
+
+  reportReadingProgress(progressPercent, lastPosterIndex, options = {}) {
+    return reportReadingProgress(this, progressPercent, lastPosterIndex, options);
+  },
+
+  onReachBottom() {
+    if (!shouldTrackReadingProgress(this) || !this.data.article) return;
+    if (!this.data.readingCompleted) this.setData({ readingCompleted: true });
+    reportReadingProgress(this, 100, this.data.activePosterIndex, { immediate: true });
   },
 
   handlePosterError(event) {
     const posterKey = event.currentTarget.dataset.key || 'unknown';
+    const posterIndex = Number(event.currentTarget.dataset.index);
     console.error('[ai-column] poster failed to load', posterKey, event.detail && event.detail.errMsg);
+    if (!this.posterRecovery) {
+      this.showPosterFailure(posterKey);
+      return Promise.resolve(false);
+    }
+    this.setData({ posterError: '' });
+    return this.posterRecovery.recover({ key: posterKey, index: posterIndex });
+  },
+
+  remountPoster(index) {
+    const article = this.data.article;
+    const posters = article && Array.isArray(article.posters) ? article.posters : [];
+    if (this.pageDisposed || !posters[index]) return Promise.resolve(false);
+    const path = `posterLoads[${index}]`;
+    return new Promise((resolve) => {
+      this.setData({ [path]: false, posterError: '' }, () => {
+        if (this.pageDisposed) {
+          resolve(false);
+          return;
+        }
+        this.setData({ [path]: true }, () => resolve(true));
+      });
+    });
+  },
+
+  showPosterFailure(posterKey) {
+    if (this.pageDisposed || !this.data.article) return;
     this.setData({ posterError: posterKey });
     wx.showToast({ title: '手绘图加载失败，请重试', icon: 'none' });
   },

@@ -416,6 +416,7 @@ function createFeedAppendPatch(currentFeed, nextFeed, previousLoadedCount) {
     'feed.loadedCount': nextFeed.loadedCount,
     'feed.totalAvailable': nextFeed.totalAvailable,
     'feed.hasMore': nextFeed.hasMore,
+    'feed.searchReady': nextFeed.searchReady,
     'feed.accessSummary': nextFeed.accessSummary,
     'feed.historyBoundary': nextFeed.historyBoundary
   };
@@ -548,6 +549,7 @@ function decorateFeed(raw = { items: [], facets: [] }, activeChannel = 'all', fi
     loadedCount: visibleItems.length,
     totalAvailable,
     hasMore: raw.hasMore === true,
+    searchReady: raw.searchReady === true,
     filterSummary: activeChannel === 'openSource'
       ? (filters.sourceTag === 'all' ? '全部标签 · 不限时间' : `${filters.sourceTag} · 不限时间`)
       : filterSummary(filters, filterOptions),

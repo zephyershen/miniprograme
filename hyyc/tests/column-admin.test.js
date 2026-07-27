@@ -188,6 +188,34 @@ test('allows list reordering only between adjacent entries in the same category'
   ]);
 });
 
+test('filters the administrator list by status and text without offering unsafe moves', () => {
+  const payload = { items: [
+    {
+      id: 'course_live',
+      kind: 'course',
+      track: 'understand',
+      order: 1,
+      status: 'published',
+      title: '提示词基础'
+    },
+    {
+      id: 'course_draft',
+      kind: 'course',
+      track: 'understand',
+      order: 2,
+      status: 'draft',
+      title: 'Agent 实践'
+    }
+  ] };
+  const published = decorateEntryList(payload, 'course', {
+    status: 'published',
+    query: '提示词'
+  });
+  assert.deepEqual(published.map((item) => item.id), ['course_live']);
+  assert.equal(published[0].canMoveUp, false);
+  assert.equal(published[0].canMoveDown, false);
+});
+
 test('explains an undeployed administrator backend instead of exposing the raw route error', () => {
   const undeployed = columnAdminLoadError({
     code: 'INVALID_REQUEST',

@@ -6,6 +6,9 @@ const {
 const {
   createVisualRepairService
 } = require('./services/visual-repair-service');
+const {
+  createSearchBackfillStatusService
+} = require('./services/search-backfill-status-service');
 const { logUnexpectedError } = require('./services/safe-log');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
@@ -19,7 +22,8 @@ const COLLECTIONS = Object.freeze({
   cache: 'knowledge_feed_cache',
   analysis: 'knowledge_feed_item_analysis',
   analysisJobs: 'knowledge_feed_analysis_jobs',
-  digests: 'knowledge_feed_digests'
+  digests: 'knowledge_feed_digests',
+  syncState: 'knowledge_feed_sync_state'
 });
 
 function localRuntimeConfig() {
@@ -82,6 +86,11 @@ const visualRepairService = createVisualRepairService({
 const moderationBackfillProxy = createModerationBackfillProxy({
   authorize,
   callFunction: (options) => cloud.callFunction(options)
+});
+const searchBackfillStatusService = createSearchBackfillStatusService({
+  db,
+  collectionName: COLLECTIONS.syncState,
+  documentId: 'aihot_all'
 });
 
 function ownerKeyForOpenId(openId) {
@@ -354,7 +363,8 @@ async function status(event) {
   authorize(event.token);
   const [
     items, analyzed, jobs, pendingJobs, retryJobs, leasedJobs,
-    blockedJobs, completedJobs, curatedItems, digests, memberships, recent30d, intelligenceUsage30d
+    blockedJobs, completedJobs, curatedItems, digests, memberships, recent30d,
+    intelligenceUsage30d, searchBackfill
   ] = await Promise.all([
     count(COLLECTIONS.items),
     count(COLLECTIONS.analysis, { status: 'ready' }),
@@ -368,7 +378,8 @@ async function status(event) {
     count(COLLECTIONS.digests, { status: 'published' }),
     count(COLLECTIONS.memberships, { status: db.command.in(['active', 'grace']) }),
     recentAnalysisCoverage(30),
-    recentIntelligenceUsage(30)
+    recentIntelligenceUsage(30),
+    searchBackfillStatusService.get()
   ]);
   return {
     items,
@@ -383,6 +394,7 @@ async function status(event) {
     },
     recent30d,
     intelligenceUsage30d,
+    searchBackfill,
     curatedItems,
     digests,
     memberships

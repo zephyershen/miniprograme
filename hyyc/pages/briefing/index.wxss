@@ -6,7 +6,6 @@
   align-items: center;
   gap: 12rpx;
   color: var(--ui-muted);
-  font-family: "DIN Alternate", -apple-system, sans-serif;
   font-size: 18rpx;
   font-weight: 700;
   letter-spacing: 2rpx;
@@ -60,7 +59,7 @@
 .gate-title { margin-top: 10rpx; font-size: 35rpx; font-weight: 750; }
 .gate-copy { margin-top: 14rpx; color: var(--ui-muted); font-size: 23rpx; line-height: 1.7; }
 
-.gate-link, .text-action {
+.gate-link {
   display: inline-flex;
   min-height: 62rpx;
   align-items: center;
@@ -74,11 +73,6 @@
 }
 
 .briefing-loading, .briefing-empty { margin-top: 20rpx; padding: 82rpx 30rpx; border-radius: 32rpx; background: var(--ui-surface); box-shadow: var(--ui-shadow-soft); }
-.loading-line { width: 78%; height: 18rpx; margin-top: 20rpx; border-radius: 10rpx; background: #e0e2e8; }
-.loading-line-strong { width: 94%; height: 34rpx; background: #c2c5cf; }
-.loading-line-short { width: 46%; }
-.empty-title { font-size: 34rpx; font-weight: 740; }
-.empty-copy { margin-top: 16rpx; color: var(--ui-muted); font-size: 23rpx; line-height: 1.7; }
 .pending-state { margin-top: 20rpx; }
 
 .briefing-meta { display: flex; flex-wrap: wrap; gap: 10rpx; padding: 20rpx 0 8rpx; color: var(--ui-muted); font-size: 18rpx; }
@@ -159,7 +153,7 @@
 }
 
 .must-row { display: flex; gap: 18rpx; }
-.must-index { flex: none; color: var(--ui-accent); font-family: "DIN Alternate", -apple-system, sans-serif; font-size: 19rpx; font-weight: 760; }
+.must-index { flex: none; color: var(--ui-accent); font-size: 19rpx; font-weight: 760; }
 .must-copy { flex: 1; min-width: 0; }
 .must-title { font-size: 27rpx; font-weight: 710; line-height: 1.45; }
 .must-why, .radar-copy { margin-top: 9rpx; color: var(--ui-muted); font-size: 22rpx; line-height: 1.65; }

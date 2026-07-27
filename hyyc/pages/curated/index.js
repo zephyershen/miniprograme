@@ -13,6 +13,9 @@ const {
   membershipCacheScope
 } = require('../../features/membership/session.js');
 const { membershipPresentation } = require('../../features/membership/presentation.js');
+const { finishPullDownRefresh } = require('../../features/runtime/pull-down-refresh.js');
+const { getColumnProgress } = require('../../features/ai-column/api.js');
+const { applyColumnProgress } = require('../../features/ai-column/progress.js');
 
 function accessScope(access) {
   return membershipCacheScope(access);
@@ -36,6 +39,13 @@ Page({
     this.resolveAccess({ force: true, preserveCurrent: this.contentLoaded === true });
   },
 
+  onPullDownRefresh() {
+    return finishPullDownRefresh(() => this.resolveAccess({
+      force: true,
+      preserveCurrent: this.contentLoaded === true
+    }));
+  },
+
   async resolveAccess({ force = false, preserveCurrent = false } = {}) {
     this.setData(preserveCurrent ? { error: '' } : { loading: true, error: '' });
     try {
@@ -56,6 +66,16 @@ Page({
         home = previewColumnHome();
         usedFallback = true;
       }
+      if (locked) {
+        this.columnProgress = null;
+      } else {
+        try {
+          this.columnProgress = await getColumnProgress();
+        } catch (error) {
+          this.columnProgress = this.columnProgress || { items: [] };
+        }
+      }
+      home = applyColumnProgress(home, this.columnProgress || { items: [] });
       this.columnAccessScope = scope;
       this.accessResolvedAt = Date.now();
       this.contentLoaded = true;
@@ -87,7 +107,14 @@ Page({
     this.openReader('practical', event.currentTarget.dataset.id);
   },
 
-  openReader(type, id) {
+  resumeLearning() {
+    const summary = this.data.home && this.data.home.progressSummary;
+    const resume = summary && summary.resume;
+    if (!resume) return;
+    this.openReader(resume.type, resume.id, resume.lastPosterIndex);
+  },
+
+  openReader(type, id, posterIndex = 0) {
     const readerContractReady = this.data.locked || hasReadableColumnContract(this.data.home);
     if (!readerContractReady) {
       wx.showToast({ title: '专栏服务正在更新，请稍后重新读取', icon: 'none' });
@@ -98,8 +125,11 @@ Page({
       return;
     }
     if (!id) return;
+    const resumeQuery = Number(posterIndex) > 0
+      ? `&poster=${Math.floor(Number(posterIndex))}`
+      : '';
     wx.navigateTo({
-      url: `/pages/column-reader/index?type=${type}&id=${encodeURIComponent(id)}`
+      url: `/pages/column-reader/index?type=${type}&id=${encodeURIComponent(id)}${resumeQuery}`
     });
   },
 
@@ -121,5 +151,19 @@ Page({
 
   retry() {
     this.resolveAccess({ force: true });
+  },
+
+  onShareAppMessage() {
+    return {
+      title: 'AI 会员专栏｜基础知识与应用操作持续更新',
+      path: '/pages/curated/index'
+    };
+  },
+
+  onShareTimeline() {
+    return {
+      title: 'AI 会员专栏｜基础知识与应用操作持续更新',
+      query: ''
+    };
   }
 });

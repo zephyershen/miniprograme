@@ -18,6 +18,14 @@ Page({
     movingId: '',
     error: null,
     activeKind: 'course',
+    statusFilter: 'all',
+    statusFilters: [
+      { key: 'all', label: '全部' },
+      { key: 'published', label: '已发布' },
+      { key: 'draft', label: '草稿' },
+      { key: 'unpublished', label: '已下架' }
+    ],
+    query: '',
     source: { items: [] },
     items: [],
     courseCount: 0,
@@ -46,7 +54,10 @@ Page({
         source,
         courseCount: all.filter((item) => item.kind === 'course').length,
         practicalCount: all.filter((item) => item.kind === 'practical').length,
-        items: decorateEntryList(source, this.data.activeKind)
+        items: decorateEntryList(source, this.data.activeKind, {
+          status: this.data.statusFilter,
+          query: this.data.query
+        })
       });
     } catch (error) {
       this.setData({
@@ -59,10 +70,31 @@ Page({
   selectKind(event) {
     const activeKind = event.currentTarget.dataset.kind;
     if (!['course', 'practical'].includes(activeKind) || activeKind === this.data.activeKind) return;
+    this.setData({ activeKind }, () => this.applyFilters());
+  },
+
+  applyFilters() {
     this.setData({
-      activeKind,
-      items: decorateEntryList(this.data.source, activeKind)
+      items: decorateEntryList(this.data.source, this.data.activeKind, {
+        status: this.data.statusFilter,
+        query: this.data.query
+      })
     });
+  },
+
+  onQueryInput(event) {
+    this.setData({ query: event.detail.value || '' }, () => this.applyFilters());
+  },
+
+  clearQuery() {
+    this.setData({ query: '' }, () => this.applyFilters());
+  },
+
+  selectStatus(event) {
+    const statusFilter = event.currentTarget.dataset.status;
+    if (!['all', 'published', 'draft', 'unpublished'].includes(statusFilter)
+      || statusFilter === this.data.statusFilter) return;
+    this.setData({ statusFilter }, () => this.applyFilters());
   },
 
   async createEntry(event) {

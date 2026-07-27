@@ -6,6 +6,7 @@ page {
   color: var(--ui-ink);
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif;
   font-size: 28rpx;
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -41,7 +42,6 @@ button:active { opacity: 0.82; transform: scale(0.985); }
   align-items: center;
   gap: 12rpx;
   color: var(--ui-muted);
-  font-family: "DIN Alternate", -apple-system, "PingFang SC", sans-serif;
   font-size: 20rpx;
   font-weight: 700;
   letter-spacing: 2rpx;
@@ -175,6 +175,3 @@ button:active { opacity: 0.82; transform: scale(0.985); }
   box-shadow: inset 0 2rpx 8rpx rgba(24, 27, 36, 0.04);
   line-height: 1.55;
 }
-
-.button-row { display: flex; gap: 18rpx; margin-top: 24rpx; }
-.button-row button { flex: 1; }

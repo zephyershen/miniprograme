@@ -17,6 +17,11 @@
           "config": "0 * * * * * *"
         },
         {
+          "name": "knowledge-feed-search-token-backfill",
+          "type": "timer",
+          "config": "2 * * * * * *"
+        },
+        {
           "name": "knowledge-feed-visual-worker",
           "type": "timer",
           "config": "10,25,40,55 * * * * * *"
@@ -61,7 +66,7 @@
         "node_modules/**",
         "config.local.js"
       ],
-      "description": "Runs isolated source, archive, visual, intelligence, and calendar digest schedules."
+      "description": "Runs isolated source, search backfill, archive, visual, intelligence, and calendar digest schedules."
     },
     {
       "name": "sourcePreviewWorker",

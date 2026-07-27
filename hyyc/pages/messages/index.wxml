@@ -19,16 +19,20 @@
   </view>
 
   <view wx:elif="{{error}}" class="messages-state-card messages-error-card">
-    <view class="state-mark">!</view>
-    <view class="state-title">消息暂时无法加载</view>
-    <view class="state-copy">{{error}}</view>
-    <button class="state-action" bindtap="retryLoadMessages">重新加载</button>
+    <empty-state
+      title="消息暂时无法加载"
+      copy="{{error}}"
+      action-label="重新加载"
+      bindaction="retryLoadMessages"
+    />
   </view>
 
   <view wx:elif="{{!messages.length}}" class="messages-state-card messages-empty-card">
-    <view class="state-mark state-mark-empty">✓</view>
-    <view class="state-title">暂时没有消息</view>
-    <view class="state-copy">会员开通、资料或评论审核结果，以及你参与资讯的新评论，会出现在这里。</view>
+    <empty-state
+      title="暂时没有消息"
+      copy="会员开通、资料或评论审核结果，以及你参与资讯的新评论，会出现在这里。"
+      action-label=""
+    />
   </view>
 
   <block wx:else>
@@ -52,8 +56,11 @@
     </view>
     <view class="message-list" wx:if="{{activeMessageTab === 'interaction'}}">
       <view wx:if="{{!interactionCount}}" class="interaction-empty">
-        <text>还没有评论互动</text>
-        <text>有人回复你的评论，或参与同一资讯讨论时，会出现在这里。</text>
+        <empty-state
+          title="还没有评论互动"
+          copy="有人回复你的评论，或参与同一资讯讨论时，会出现在这里。"
+          action-label=""
+        />
       </view>
       <block wx:for="{{messages}}" wx:key="id">
         <view
@@ -113,7 +120,9 @@
       </block>
     </view>
     <view class="message-list" wx:if="{{activeMessageTab === 'system'}}">
-      <view wx:if="{{!systemCount}}" class="system-empty">暂时没有系统通知</view>
+      <view wx:if="{{!systemCount}}" class="system-empty">
+        <empty-state title="暂时没有系统通知" copy="会员与审核通知会保留在这里。" action-label="" />
+      </view>
       <block wx:for="{{messages}}" wx:key="id">
         <view
           wx:if="{{!item.isInteraction}}"

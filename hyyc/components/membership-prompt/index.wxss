@@ -39,7 +39,7 @@
 }
 
 .member-brand { display: flex; min-width: 0; align-items: baseline; gap: 14rpx; }
-.member-brand-name { background-image: linear-gradient(102deg, #9a6410 0%, #d99a17 45%, #f0bd3d 60%, #b9810f 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; font-size: 27rpx; font-weight: 820; }
+.member-brand-name { background-image: linear-gradient(102deg, var(--ui-warning-strong) 0%, var(--ui-amber) 45%, var(--ui-amber) 60%, var(--ui-amber) 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; font-size: 27rpx; font-weight: 820; }
 .member-brand-note { color: var(--ui-faint); font-size: 18rpx; }
 .member-close { display: flex; flex: none; width: 52rpx; height: 52rpx; align-items: center; justify-content: center; border-radius: 50%; background: var(--ui-surface-muted); color: var(--ui-muted); font-size: 30rpx; font-weight: 300; line-height: 1; }
 
@@ -59,14 +59,14 @@
 }
 
 .member-offer-main { min-width: 0; }
-.member-offer-label { color: #a6740f; font-size: 17rpx; font-weight: 740; letter-spacing: .5rpx; }
+.member-offer-label { color: var(--ui-amber); font-size: 17rpx; font-weight: 740; letter-spacing: .5rpx; }
 .member-offer-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8rpx 20rpx; margin-top: 6rpx; }
 .member-offer-price { display: flex; align-items: baseline; gap: 8rpx; }
-.member-offer-price text { font-family: "DIN Alternate", -apple-system, sans-serif; font-size: 50rpx; font-weight: 800; letter-spacing: -1rpx; }
+.member-offer-price text { font-size: 50rpx; font-weight: 800; letter-spacing: -1rpx; }
 .member-offer-price label { color: var(--ui-muted); font-size: 17rpx; }
-.member-offer-compare { color: var(--ui-faint); font-family: "DIN Alternate", -apple-system, sans-serif; font-size: 17rpx; text-decoration: line-through; text-decoration-thickness: 2rpx; }
-.member-offer-saving { display: inline-flex; flex: none; align-items: center; gap: 7rpx; padding: 6rpx 13rpx; border-radius: 999rpx; background: var(--ui-accent); color: #fff; font-size: 17rpx; font-weight: 720; }
-.member-offer-discount { font-family: "DIN Alternate", -apple-system, sans-serif; }
+.member-offer-compare { color: var(--ui-faint); font-size: 17rpx; text-decoration: line-through; text-decoration-thickness: 2rpx; }
+.member-offer-saving { display: inline-flex; flex: none; align-items: center; gap: 7rpx; padding: 6rpx 13rpx; border-radius: 999rpx; background: var(--ui-accent); color: var(--ui-on-accent); font-size: 17rpx; font-weight: 720; }
+.member-offer-discount { font-variant-numeric: tabular-nums; }
 
 .member-benefit-head { display: flex; align-items: baseline; justify-content: space-between; gap: 18rpx; margin-top: 25rpx; }
 .member-benefit-head view { font-size: 26rpx; font-weight: 750; }
@@ -78,12 +78,12 @@
 .member-benefit-title { font-size: 22rpx; font-weight: 720; line-height: 1.42; }
 .member-benefit-copy { margin-top: 4rpx; color: var(--ui-muted); font-size: 17rpx; line-height: 1.5; }
 .member-benefit-featured { background: linear-gradient(90deg, rgba(240, 189, 61, .16), rgba(240, 189, 61, 0)); }
-.member-benefit-featured .member-benefit-check { color: #b8860b; }
-.member-benefit-featured .member-benefit-title { color: #8a5f0c; }
+.member-benefit-featured .member-benefit-check { color: var(--ui-amber); }
+.member-benefit-featured .member-benefit-title { color: var(--ui-warning-strong); }
 .member-boundary { margin-top: 18rpx; color: var(--ui-faint); font-size: 16rpx; line-height: 1.55; }
 
 .member-card-footer { flex: none; padding: 16rpx 28rpx 24rpx; border-top: 1rpx solid var(--ui-hairline); background: var(--ui-surface-solid); }
-.member-primary { display: flex; width: 100%; min-width: 0; min-height: 78rpx; align-items: center; justify-content: center; margin: 0; padding: 0 24rpx; border: 0; border-radius: 18rpx; background: var(--ui-accent); color: #fff; font-size: 23rpx; font-weight: 760; line-height: 1; white-space: nowrap; }
+.member-primary { display: flex; width: 100%; min-width: 0; min-height: 78rpx; align-items: center; justify-content: center; margin: 0; padding: 0 24rpx; border: 0; border-radius: 18rpx; background: var(--ui-accent); color: var(--ui-on-accent); font-size: 23rpx; font-weight: 760; line-height: 1; white-space: nowrap; }
 .member-primary::after { border: 0; }
 .member-note { margin-top: 13rpx; color: var(--ui-faint); font-size: 16rpx; text-align: center; }
 

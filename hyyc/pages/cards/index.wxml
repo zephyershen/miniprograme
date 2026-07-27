@@ -12,7 +12,13 @@
 
   <block wx:else>
     <view class="saved-section-head"><view><view class="saved-section-title">资讯收藏</view><view class="saved-section-copy">{{favorites.length}} 条阅读线索</view></view></view>
-    <view wx:if="{{!favorites.length}}" class="saved-empty">在资讯页点下书签后，会以一行摘要出现在这里。</view>
+    <view wx:if="{{!favorites.length}}" class="saved-empty">
+      <empty-state
+        title="还没有收藏"
+        copy="在资讯页点下书签后，会以一行摘要出现在这里。"
+        action-label=""
+      />
+    </view>
     <view wx:else class="favorite-list">
       <view
         wx:for="{{favorites}}"

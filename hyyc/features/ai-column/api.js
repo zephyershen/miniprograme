@@ -26,6 +26,29 @@ function getColumnPractical(id) {
   });
 }
 
+function getColumnProgress() {
+  return callCloudFunction('knowledgeFeed', {
+    action: 'columnProgressList'
+  });
+}
+
+function saveColumnProgress({
+  entryType,
+  entryId,
+  progressPercent,
+  lastPosterIndex,
+  mutationId
+}) {
+  return callCloudFunction('knowledgeFeed', {
+    action: 'columnProgressSave',
+    entryType,
+    entryId,
+    progressPercent,
+    lastPosterIndex,
+    mutationId
+  });
+}
+
 function getColumnCases({ cursor = null, limit = 8 } = {}) {
   return callCloudFunction('knowledgeFeed', {
     action: 'columnCases',
@@ -61,6 +84,8 @@ module.exports = {
   getColumnHome,
   getColumnLesson,
   getColumnPractical,
+  getColumnProgress,
+  saveColumnProgress,
   getColumnCases,
   getColumnCase,
   getTrendDossier

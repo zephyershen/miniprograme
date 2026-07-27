@@ -5,6 +5,7 @@ const path = require('node:path');
 
 const { createAihotSource } = require('../cloudfunctions/knowledgeFeed/adapters/aihot-source');
 const { toStoredFeedItem } = require('../cloudfunctions/knowledgeFeed/lib/stored-feed-item');
+const { SEARCH_TOKEN_VERSION } = require('../cloudfunctions/knowledgeFeed/lib/search-terms');
 const { ownerKeyForOpenId } = require('../cloudfunctions/knowledgeFeed/services/actor-service');
 const {
   entitlementView,
@@ -306,7 +307,13 @@ test('holds new image-less cards briefly, then releases text without weakening h
   const service = createItemFeedQueryService({
     itemRepository: memoryItemRepository([current, queued, failed, old]),
     dayIndexRepository: memoryDayIndexRepository([current, queued, failed, old]),
-    syncStateRepository: { get: async () => ({ allItemsSyncedAt: new Date(NOW) }) },
+    syncStateRepository: {
+      get: async () => ({
+        allItemsSyncedAt: new Date(NOW),
+        searchTokenBackfillVersion: SEARCH_TOKEN_VERSION,
+        searchTokenBackfillCompletedAt: new Date(NOW)
+      })
+    },
     legacyFeedService: { getFeed: async () => { throw new Error('legacy not expected'); } },
     config: ITEM_CONFIG,
     now: () => currentTime
@@ -319,6 +326,7 @@ test('holds new image-less cards briefly, then releases text without weakening h
     return true;
   });
   const freeFeed = await service.getFeed({}, free);
+  assert.equal(freeFeed.searchReady, true);
   assert.equal(freeFeed.appliedFilters.time, '1d');
   assert.deepEqual(freeFeed.items.map((item) => item.id), ['item1004', 'item1001']);
   assert.equal(freeFeed.items[0].visualKind, '');

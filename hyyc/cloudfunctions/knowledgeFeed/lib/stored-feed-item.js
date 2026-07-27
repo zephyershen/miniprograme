@@ -1,6 +1,10 @@
 const crypto = require('node:crypto');
 const { analysisInputHash } = require('../policies/feed-curation');
 const { sourceMetadataFields } = require('./source-metadata');
+const {
+  SEARCH_TOKEN_VERSION,
+  buildSearchTokens
+} = require('./search-terms');
 
 function storedDocumentId(provider, itemId) {
   if (!/^[a-z0-9_-]{2,24}$/i.test(provider || '')
@@ -38,6 +42,13 @@ function stableContent(item) {
 
 function contentHash(item) {
   return crypto.createHash('sha256').update(JSON.stringify(stableContent(item))).digest('hex');
+}
+
+function searchFields(item) {
+  return {
+    searchTokenVersion: SEARCH_TOKEN_VERSION,
+    searchTokens: buildSearchTokens(item)
+  };
 }
 
 function visualFields(item) {
@@ -87,6 +98,7 @@ function toStoredFeedItem(item, {
     id: item.id,
     provider,
     ...normalized,
+    ...searchFields(item),
     ...sourceMetadataFields(item),
     baseScore,
     score: baseScore,
@@ -123,6 +135,7 @@ module.exports = {
   storedDocumentId,
   publishedDay,
   contentHash,
+  searchFields,
   visualFields,
   hasStoredVisual,
   toStoredFeedItem,

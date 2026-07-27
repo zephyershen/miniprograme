@@ -17,21 +17,25 @@
   <view wx:elif="{{loading}}" class="loading-editorial">
     <loading-state compact="{{true}}" label="正在加载资讯" />
     <view class="loading-media"></view>
-    <view class="loading-line loading-line-strong"></view>
-    <view class="loading-line"></view>
-    <view class="loading-line loading-line-short"></view>
+      <skeleton-state />
   </view>
 
   <view wx:elif="{{feedError}}" class="empty-editorial">
-    <view class="empty-title">资讯暂时没有加载成功</view>
-    <view class="empty-copy">{{feedError}}</view>
-    <button class="empty-action" bindtap="retryFeed">重新加载</button>
+    <empty-state
+      title="资讯暂时没有加载成功"
+      copy="{{feedError}}"
+      action-label="重新加载"
+      bindaction="retryFeed"
+    />
   </view>
 
   <view wx:elif="{{!feed.leadItem && (flatFeedMode || !feed.dayGroups.length)}}" class="empty-editorial">
-    <view class="empty-title">没有符合当前条件的资讯</view>
-    <view class="empty-copy">{{libraryMode ? '可以换一个项目标签，或查看全部标签。' : '可以调整时间或主题，也可以切换其他来源查看。'}}</view>
-    <button class="empty-action" bindtap="openFilters">调整筛选</button>
+    <empty-state
+      title="没有符合当前条件的资讯"
+      copy="{{libraryMode ? '可以换一个项目标签，或查看全部标签。' : '可以调整时间或主题，也可以切换其他来源查看。'}}"
+      action-label="调整筛选"
+      bindaction="openFilters"
+    />
   </view>
 
   <block wx:else>
@@ -123,6 +127,10 @@
     </view>
 
     <view class="filter-sort-row">
+      <view wx:if="{{feed.searchReady}}" class="feed-search-shortcut" bindtap="openSearch" aria-role="button" aria-label="搜索资讯、GitHub、会员专栏与知识简报">
+        <view class="feed-search-icon"></view>
+        <text>搜索</text>
+      </view>
       <view class="filter-bar" bindtap="openFilters">
         <view class="filter-bar-copy">
           <text class="filter-bar-title">筛选</text>

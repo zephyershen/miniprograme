@@ -2,13 +2,16 @@
 <view class="reader-page">
   <view wx:if="{{loading}}" class="reader-state">
     <loading-state compact="{{true}}" label="正在加载趋势档案" />
-    <view class="state-rule state-rule-strong"></view><view class="state-rule"></view><view class="state-rule state-rule-short"></view>
+    <skeleton-state />
   </view>
 
   <view wx:elif="{{error}}" class="reader-state">
-    <view class="state-title">这份档案暂时无法打开</view>
-    <view class="state-copy">{{error}}</view>
-    <view wx:if="{{!membershipPromptVisible}}" class="state-action" bindtap="retry">重新读取 →</view>
+    <empty-state
+      title="这份档案暂时无法打开"
+      copy="{{error}}"
+      action-label="{{membershipPromptVisible ? '' : '重新读取'}}"
+      bindaction="retry"
+    />
   </view>
 
   <block wx:elif="{{dossier}}">

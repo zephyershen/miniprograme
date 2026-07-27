@@ -5,7 +5,7 @@
   align-items: center;
   justify-content: center;
   gap: 18rpx;
-  color: #72808b;
+  color: var(--ui-muted-soft);
   font-size: 21rpx;
   line-height: 1.5;
 }
@@ -21,7 +21,7 @@
   width: 46rpx;
   height: 46rpx;
   border: 4rpx solid rgba(29, 155, 240, 0.18);
-  border-top-color: #1d9bf0;
+  border-top-color: var(--ui-accent);
   border-radius: 50%;
   animation: loading-state-spin 0.76s linear infinite;
 }

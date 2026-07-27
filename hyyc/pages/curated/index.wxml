@@ -16,22 +16,23 @@
       bindtap="selectSection"
       role="tab"
     >
-      <text>{{item.label}}</text>
-      <label>{{item.note}}</label>
+      <text class="section-tab-label">{{item.label}}</text>
+      <text class="section-tab-note">{{item.note}}</text>
     </view>
   </view>
 
   <view wx:if="{{loading}}" class="manual-state">
     <loading-state compact="{{true}}" label="正在加载专栏" />
-    <view class="state-rule state-rule-wide"></view>
-    <view class="state-rule"></view>
-    <view class="state-rule state-rule-short"></view>
+      <skeleton-state />
   </view>
 
   <view wx:elif="{{error}}" class="manual-state">
-    <view class="state-title">这一页暂时没有加载好</view>
-    <view class="state-copy">{{error}}</view>
-    <view class="text-action" bindtap="retry">重新读取 →</view>
+    <empty-state
+      title="这一页暂时没有加载好"
+      copy="{{error}}"
+      action-label="重新读取"
+      bindaction="retry"
+    />
   </view>
 
   <block wx:else>
@@ -39,8 +40,34 @@
       <view><text class="access-mark">PRO</text><text>Pro 专属 · 当前展示目录预览</text></view>
       <text class="access-link">查看完整内容 →</text>
     </view>
+    <view wx:if="{{locked}}" class="progress-hook" bindtap="openMembershipPrompt">
+      <view class="progress-hook-mark">PRO</view>
+      <view class="progress-hook-copy">
+        <view class="progress-hook-title">自动记录学习进度</view>
+        <view class="progress-hook-note">开通后会记住每节课读到哪里，并在目录提供“继续学习”。</view>
+      </view>
+      <text class="progress-hook-link">了解权益 →</text>
+    </view>
 
     <view wx:if="{{homeNotice}}" class="home-notice" bindtap="retry">{{homeNotice}} <text>重新读取 →</text></view>
+
+    <view wx:if="{{!locked && home.progressSummary.startedCount}}" class="progress-card">
+      <view class="progress-card-head">
+        <view>
+          <view class="progress-kicker">学习进度</view>
+          <view class="progress-title">已完成 {{home.progressSummary.completedCount}} / {{home.progressSummary.totalCount}} 节</view>
+        </view>
+        <view class="progress-percent">{{home.progressSummary.overallPercent}}%</view>
+      </view>
+      <view class="progress-track"><view class="progress-fill" style="width: {{home.progressSummary.overallPercent}}%;"></view></view>
+      <view wx:if="{{home.progressSummary.resume}}" class="progress-resume" bindtap="resumeLearning">
+        <view class="progress-resume-copy">
+          <view class="progress-resume-label">继续学习 · {{home.progressSummary.resume.progressLabel}}</view>
+          <view class="progress-resume-title">{{home.progressSummary.resume.title}}</view>
+        </view>
+        <text>继续 →</text>
+      </view>
+    </view>
 
     <view wx:if="{{activeSection === 'courses'}}" class="manual-section">
       <view class="section-heading">
@@ -66,7 +93,7 @@
                 <view class="row-eyebrow">{{lesson.eyebrow}}</view>
                 <view class="row-title">{{lesson.title}}</view>
                 <view wx:if="{{lesson.subtitle}}" class="row-subtitle">{{lesson.subtitle}}</view>
-                <view wx:if="{{lesson.duration || lesson.updatedLabel}}" class="row-meta"><text wx:if="{{lesson.duration}}">{{lesson.duration}}</text><text wx:if="{{lesson.updatedLabel}}">{{lesson.updatedLabel}}</text></view>
+                <view wx:if="{{lesson.duration || lesson.updatedLabel || lesson.progressLabel}}" class="row-meta"><text wx:if="{{lesson.duration}}">{{lesson.duration}}</text><text wx:if="{{lesson.updatedLabel}}">{{lesson.updatedLabel}}</text><text wx:if="{{lesson.progressLabel}}" class="row-progress">{{lesson.progressLabel}}</text></view>
               </view>
               <view class="row-end"><view wx:if="{{locked}}" class="row-lock"></view><text wx:else>↗</text></view>
             </view>
@@ -92,7 +119,7 @@
             <view class="row-eyebrow">{{item.eyebrow}}</view>
             <view class="row-title">{{item.title}}</view>
             <view wx:if="{{item.subtitle}}" class="row-subtitle">{{item.subtitle}}</view>
-            <view wx:if="{{item.duration || item.updatedLabel}}" class="row-meta"><text wx:if="{{item.duration}}">{{item.duration}}</text><text wx:if="{{item.updatedLabel}}">{{item.updatedLabel}}</text></view>
+            <view wx:if="{{item.duration || item.updatedLabel || item.progressLabel}}" class="row-meta"><text wx:if="{{item.duration}}">{{item.duration}}</text><text wx:if="{{item.updatedLabel}}">{{item.updatedLabel}}</text><text wx:if="{{item.progressLabel}}" class="row-progress">{{item.progressLabel}}</text></view>
           </view>
           <view class="row-end"><view wx:if="{{locked}}" class="row-lock"></view><text wx:else>↗</text></view>
         </view>

@@ -180,7 +180,7 @@ test('keeps official practical commands copyable and links the server course rel
   assert.match(view, /bindtap="copyPlatformCommand"/);
   assert.match(view, /bindtap="copyCommand"/);
   assert.match(page, /setClipboardData/);
-  assert.match(styles, /\.command-row[^}]*background:\s*#f4f8fb/s);
+  assert.match(styles, /\.command-row[^}]*background:\s*var\(--ui-surface-hover\)/s);
   assert.doesNotMatch(styles, /\.command-card[^}]*background:\s*#101a24/s);
 });
 

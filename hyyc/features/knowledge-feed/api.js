@@ -13,6 +13,10 @@ function getKnowledgeFeedDay(options = {}) {
   return callCloudFunction('knowledgeFeed', { action: 'feedDay', ...options });
 }
 
+function searchKnowledgeFeed(options = {}) {
+  return callCloudFunction('knowledgeFeed', { action: 'feedSearch', ...options });
+}
+
 function getKnowledgeItem(id) {
   return callCloudFunction('knowledgeFeed', { action: 'item', id });
 }
@@ -21,5 +25,6 @@ module.exports = {
   getKnowledgeFeed,
   getKnowledgeFeedDay,
   getKnowledgeFeedUpdates,
+  searchKnowledgeFeed,
   getKnowledgeItem
 };

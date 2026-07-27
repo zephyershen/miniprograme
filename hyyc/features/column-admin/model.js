@@ -186,10 +186,10 @@ function columnAdminLoadError(error) {
   };
 }
 
-function decorateEntryList(payload, activeKind = 'course') {
+function decorateEntryList(payload, activeKind = 'course', filters = {}) {
   const items = payload && Array.isArray(payload.items) ? payload.items : [];
   const filtered = items.filter((item) => item.kind === activeKind);
-  return filtered.map((item, index) => {
+  const decorated = filtered.map((item, index) => {
     const track = tracksForKind(item.kind).find((value) => value.key === item.track);
     return {
       ...item,
@@ -201,6 +201,20 @@ function decorateEntryList(payload, activeKind = 'course') {
       canMoveDown: index < filtered.length - 1 && filtered[index + 1].track === item.track
     };
   });
+  const status = ['published', 'draft', 'unpublished'].includes(filters.status)
+    ? filters.status
+    : 'all';
+  const query = String(filters.query || '').trim().toLowerCase();
+  const filtering = status !== 'all' || Boolean(query);
+  return decorated.filter((item) => (
+    (status === 'all' || item.status === status)
+      && (!query || [item.title, item.subtitle, item.trackLabel]
+        .some((value) => String(value || '').toLowerCase().includes(query)))
+  )).map((item) => filtering ? {
+    ...item,
+    canMoveUp: false,
+    canMoveDown: false
+  } : item);
 }
 
 function tracksForKind(kind) {

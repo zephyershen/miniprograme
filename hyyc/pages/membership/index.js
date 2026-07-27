@@ -263,5 +263,19 @@ Page({
       this.setData({ 'billing.purchasing': false });
       this.membershipPurchaseInFlight = false;
     }
+  },
+
+  onShareAppMessage() {
+    return {
+      title: 'AI 前沿知识 Pro 会员',
+      path: '/pages/membership/index'
+    };
+  },
+
+  onShareTimeline() {
+    return {
+      title: 'AI 前沿知识 Pro 会员',
+      query: ''
+    };
   }
 });

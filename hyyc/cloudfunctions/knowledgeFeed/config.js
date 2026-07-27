@@ -172,6 +172,7 @@ const ENGAGEMENT_CONFIG = Object.freeze({
 const COLUMN_CONFIG = Object.freeze({
   entriesCollectionName: 'knowledge_column_entries',
   mediaCollectionName: 'knowledge_column_media',
+  progressCollectionName: 'knowledge_column_progress',
   casesCollectionName: 'knowledge_column_cases',
   dossiersCollectionName: 'knowledge_trend_dossiers',
   eventsCollectionName: 'knowledge_trend_events',
@@ -519,6 +520,7 @@ const VISUAL_JOB_CONFIG = Object.freeze({
 
 const TIMER_CONFIG = Object.freeze({
   source: SOURCE_SYNC_CONFIG.triggerName,
+  searchBackfill: 'knowledge-feed-search-token-backfill',
   archive: ARCHIVE_CONFIG.triggerName,
   legacyVisual: 'knowledge-feed-legacy-visual-maintenance',
   visualWorker: 'knowledge-feed-visual-worker',

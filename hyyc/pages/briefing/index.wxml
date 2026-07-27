@@ -21,16 +21,21 @@
 
   <view wx:if="{{loading}}" class="briefing-loading">
     <loading-state compact="{{true}}" label="正在加载简报" />
-    <view class="loading-line loading-line-strong"></view><view class="loading-line"></view><view class="loading-line loading-line-short"></view>
+      <skeleton-state />
   </view>
   <view wx:elif="{{error}}" class="briefing-empty">
-    <view class="empty-title">简报暂时没有加载成功</view>
-    <view class="empty-copy">{{error}}</view>
-    <view class="text-action" bindtap="retry">重新加载 →</view>
+    <empty-state
+      title="简报暂时没有加载成功"
+      copy="{{error}}"
+      action-label="重新加载"
+      bindaction="retry"
+    />
   </view>
   <view wx:elif="{{providerPending && !locked}}" class="briefing-empty pending-state">
-    <view class="empty-title">本期真实简报尚未发布</view>
-    <view class="empty-copy">本期简报正在整理，稍后再来看看。</view>
+    <empty-state
+      title="本期真实简报尚未发布"
+      copy="本期简报正在整理，稍后再来看看。"
+    />
   </view>
 
   <view wx:else class="briefing-body">

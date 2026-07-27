@@ -21,6 +21,7 @@ const {
 const {
   createPageMediaRecovery
 } = require('../../features/knowledge-feed/cloud-media-recovery.js');
+const { finishPullDownRefresh } = require('../../features/runtime/pull-down-refresh.js');
 
 const PAGE_SIZE = 8;
 
@@ -55,6 +56,13 @@ Page({
   onShow() {
     if (this.mediaRecovery) this.mediaRecovery.resume();
     this.resolveAccess({ force: true, preserveCurrent: this.contentLoaded === true });
+  },
+
+  onPullDownRefresh() {
+    return finishPullDownRefresh(() => this.resolveAccess({
+      force: true,
+      preserveCurrent: this.contentLoaded === true
+    }));
   },
 
   onHide() {

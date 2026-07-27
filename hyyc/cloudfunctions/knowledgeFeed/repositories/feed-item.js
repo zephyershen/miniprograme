@@ -4,7 +4,13 @@ const {
   isNotFound,
   mapWithConcurrency
 } = require('./collection-support');
-const { storedDocumentId } = require('../lib/stored-feed-item');
+const {
+  storedDocumentId
+} = require('../lib/stored-feed-item');
+const {
+  SEARCH_TOKEN_VERSION,
+  buildSearchTokens
+} = require('../lib/search-terms');
 const {
   sourceMetadataFields,
   sourceMetadataHash,
@@ -326,6 +332,32 @@ function createFeedItemRepository(db, config) {
     return (response && response.data) || [];
   }
 
+  async function backfillSearchTokens(documentId, updatedAt) {
+    await ensureCollection();
+    return db.runTransaction(async (transaction) => {
+      const reference = transaction.collection(config.itemsCollectionName).doc(documentId);
+      let current;
+      try {
+        current = (await reference.get()).data;
+      } catch (error) {
+        if (isNotFound(error)) return { state: 'missing' };
+        throw error;
+      }
+      if (Number(current.searchTokenVersion) === SEARCH_TOKEN_VERSION
+        && Array.isArray(current.searchTokens)) {
+        return { state: 'skipped' };
+      }
+      await reference.update({
+        data: {
+          searchTokenVersion: SEARCH_TOKEN_VERSION,
+          searchTokens: buildSearchTokens(current),
+          updatedAt
+        }
+      });
+      return { state: 'updated' };
+    });
+  }
+
   async function markVisualQueued(documents, updatedAt) {
     await ensureCollection();
     const values = (Array.isArray(documents) ? documents : []).filter((item) => item && item.id);
@@ -435,6 +467,7 @@ function createFeedItemRepository(db, config) {
     sourceTags = [],
     includeWithdrawn = false,
     qualityTier = '',
+    searchTokens = [],
     excludeVisualPublicationHolds = false
   }) {
     const where = {};
@@ -450,6 +483,7 @@ function createFeedItemRepository(db, config) {
     if (topicKeys.length) where.topicKeys = command.all(topicKeys);
     if (sourceTags.length) where.sourceTags = command.all(sourceTags);
     if (qualityTier) where.qualityTier = qualityTier;
+    if (searchTokens.length) where.searchTokens = command.all(searchTokens);
     if (excludeVisualPublicationHolds) {
       // $ne also includes documents created before this rollout, so existing
       // text-only news remains public without a migration.
@@ -607,6 +641,7 @@ function createFeedItemRepository(db, config) {
     getByItemId,
     getManyByItemIds,
     listByIdCursor,
+    backfillSearchTokens,
     markVisualQueued,
     releaseExpiredVisualPublicationHolds,
     visualStats,

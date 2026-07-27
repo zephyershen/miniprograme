@@ -38,9 +38,12 @@
   </view>
 
   <view wx:elif="{{error}}" class="curated-empty">
-    <view class="empty-title">精选暂时没有加载成功</view>
-    <view class="empty-copy">{{error}}</view>
-    <view class="text-action" bindtap="retry">重新加载 →</view>
+    <empty-state
+      title="精选暂时没有加载成功"
+      copy="{{error}}"
+      action-label="重新加载"
+      bindaction="retry"
+    />
   </view>
 
   <block wx:else>
@@ -64,12 +67,16 @@
     </view>
 
     <view wx:if="{{providerPending}}" class="curated-empty pending-state">
-      <view class="empty-title">真实精选尚未发布</view>
-      <view class="empty-copy">本期精选正在整理，稍后再来看看。</view>
+      <empty-state
+        title="真实精选尚未发布"
+        copy="本期精选正在整理，稍后再来看看。"
+      />
     </view>
     <view wx:elif="{{!view.leadItem}}" class="curated-empty">
-      <view class="empty-title">这一范围没有值得打扰你的更新</view>
-      <view class="empty-copy">精选不为数量凑内容。可以切换时间或主题再看。</view>
+      <empty-state
+        title="这一范围没有值得打扰你的更新"
+        copy="精选不为数量凑内容。可以切换时间或主题再看。"
+      />
     </view>
     <block wx:else>
       <view class="curated-lead" data-id="{{view.leadItem.id}}" bindtap="openItem">

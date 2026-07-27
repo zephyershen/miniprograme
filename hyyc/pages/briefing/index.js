@@ -12,6 +12,7 @@ const {
   membershipCacheScope
 } = require('../../features/membership/session.js');
 const { membershipPresentation } = require('../../features/membership/presentation.js');
+const { finishPullDownRefresh } = require('../../features/runtime/pull-down-refresh.js');
 
 function activate(options, key) {
   return options.map((item) => ({ ...item, active: item.key === key }));
@@ -26,8 +27,25 @@ Page({
     membershipPromptFeature: 'digests'
   },
 
+  onLoad(options = {}) {
+    const windowKey = WINDOW_OPTIONS.some((item) => item.key === options.windowKey)
+      ? options.windowKey
+      : '24h';
+    this.setData({
+      windowKey,
+      windowOptions: activate(WINDOW_OPTIONS, windowKey)
+    });
+  },
+
   onShow() {
     this.resolveAccess({ force: true, preserveCurrent: this.contentLoaded === true });
+  },
+
+  onPullDownRefresh() {
+    return finishPullDownRefresh(() => this.resolveAccess({
+      force: true,
+      preserveCurrent: this.contentLoaded === true
+    }));
   },
 
   async resolveAccess({ force = false, preserveCurrent = false } = {}) {
@@ -140,5 +158,23 @@ Page({
 
   retry() {
     this.resolveAccess({ force: true });
+  },
+
+  onShareAppMessage() {
+    const windowKey = this.data.windowKey || '24h';
+    const option = WINDOW_OPTIONS.find((item) => item.key === windowKey);
+    return {
+      title: `AI 知识简报｜${option ? option.label : '日报'}`,
+      path: `/pages/briefing/index?windowKey=${windowKey}`
+    };
+  },
+
+  onShareTimeline() {
+    const windowKey = this.data.windowKey || '24h';
+    const option = WINDOW_OPTIONS.find((item) => item.key === windowKey);
+    return {
+      title: `AI 知识简报｜${option ? option.label : '日报'}`,
+      query: `windowKey=${windowKey}`
+    };
   }
 });

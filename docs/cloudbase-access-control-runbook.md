@@ -66,7 +66,7 @@ node scripts/cloudbase-retired-functions.js apply `
 
 数据库脚本先读取全部集合，只修改不是 `ADMINONLY` 的集合，再分批回读。存储脚本只在当前规则与版本化合同不一致时更新为 `CUSTOM`，随后回读。两者重复执行都是幂等的；控制面尚未收敛时默认最多回读 6 次、每次间隔 5 秒。
 
-集合脚本以现有 `docs/cloud-database-rules.json` 的 23 个集合为唯一创建
+集合脚本以现有 `docs/cloud-database-rules.json` 中列出的全部集合为唯一创建
 允许列表。apply 在任何写入前完整调用 `ListTables`，只通过 TCB
 `CreateTable` 创建缺失合同集合，从不调用 `DeleteTable`、读取文档、删除或
 重命名未知集合。创建请求同时设置 `PermissionInfo.AclTag=ADMINONLY` 和目标
@@ -99,7 +99,7 @@ canary。索引脚本本身不会创建集合或读取任何媒体记录。
 4. 完成服务端正向冒烟，再运行退休 plan；确认只列出两个固定历史函数后，显式执行退休 apply。
 5. 再运行函数 check，线上清单必须精确为四个函数且配置全部收敛。
 6. 运行集合 plan/check 保存变更前差异，再执行带环境确认的集合 apply；
-   readback 必须确认合同中的 23 个集合全部存在。
+   readback 必须确认版本化合同中的全部集合都存在。
 7. 立即运行数据库规则 check/apply/check，确认所有合同集合均为
    `ADMINONLY`。
 8. 运行索引和存储的 `check`，保存变更前差异，再逐项执行带环境确认的
@@ -112,3 +112,33 @@ canary。索引脚本本身不会创建集合或读取任何媒体记录。
     任意客户端直写被拒绝。
 
 不要把旧的不安全规则作为自动回滚目标。确需回滚时，先审阅并检出一个已知安全的合同版本，再运行同一套 `apply + check` 流程。
+
+### 阅读进度与搜索的增量发布
+
+当发布包含 `knowledge_column_progress`、搜索索引和 `feedSearch` 时，必须先完成
+新增数据合同，再部署会读取这些合同的函数：
+
+1. 从同一个已提交 SHA 运行完整 `npm run verify`。
+2. 执行集合 `plan/apply/readback`，随后执行数据库规则 `check/apply/check`，确认
+   `knowledge_column_progress` 存在且为 `ADMINONLY`。
+3. 执行索引 `plan/apply/readback`，确认三个进度/搜索索引全部收敛。
+4. 部署并回读 `knowledgeFeed`；新版公共搜索在存量 token 回填完成前会返回
+   `SEARCH_UNAVAILABLE`，不得绕过该门禁。
+5. 部署后由独立的 `knowledge-feed-search-token-backfill` 定时器每分钟自动推进一个
+   有界批次；它与来源同步使用不同云函数调用预算。维护令牌 action 仅用于人工加速
+   或故障恢复。中断后定时器或手动调用都会从持久化游标继续，不要从客户端传入或
+   伪造扫描游标。
+6. 用维护令牌调用 `knowledgeOps.status`，读取 `searchBackfill`：扫描期间
+   `phase=scanning`；主扫描完成且索引可用时 `ready=true` 并有非空 `completedAt`。
+   `phase=blocked` 表示有稳定失败的单条文档已在五次失败后隔离，主游标不会被它
+   永久卡住；`failures` 只返回文档 ID、次数、安全错误码和时间，不返回正文或原始
+   错误。独立定时器会继续重试隔离条目。上传前应优先修复到 `blockedCount=0`；
+   若明确接受少量已登记漏项，必须把 ID、错误码和处置人写入发布记录，不能把
+   `ready=true` 误写成“零失败”。
+7. 完成前新版首页隐藏搜索入口，深链请求保持 `SEARCH_UNAVAILABLE`。索引可用后，
+   分别用免费、Pro 和真实管理员做关键词 canary，核对 24 小时、30 天、全部归档、
+   完整 GitHub 库、会员专栏和 Pro 简报的权限范围，再上传小程序版本。
+
+后续升级分词算法时，不能直接复用当前 token 字段并提高版本号。先增加 vNext token
+字段和并行索引，部署双写，完成全量回填后再切换查询与 readiness；稳定观察后才删除
+旧字段和索引。搜索 token 迁移不得更新内容/视觉 `contentHash`。

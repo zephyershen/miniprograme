@@ -17,16 +17,46 @@
       <text class="kind-name">动手课</text><text class="kind-count">{{practicalCount}}</text>
     </view>
   </view>
+  <view class="admin-filter">
+    <view class="admin-search">
+      <input
+        class="admin-search-input"
+        value="{{query}}"
+        placeholder="搜索标题、分类"
+        maxlength="50"
+        bindinput="onQueryInput"
+      />
+      <text wx:if="{{query}}" class="admin-search-clear" bindtap="clearQuery">清除</text>
+    </view>
+    <view class="status-filter">
+      <view
+        wx:for="{{statusFilters}}"
+        wx:key="key"
+        class="status-filter-item {{statusFilter === item.key ? 'is-active' : ''}}"
+        data-status="{{item.key}}"
+        bindtap="selectStatus"
+      >{{item.label}}</view>
+    </view>
+    <view wx:if="{{query || statusFilter !== 'all'}}" class="filter-note">
+      已筛选 {{items.length}} 条；清除筛选后可上下调整排序。
+    </view>
+  </view>
 
   <view wx:if="{{loading}}" class="admin-state"><loading-state label="正在读取会员专栏" /></view>
   <view wx:elif="{{error}}" class="admin-state admin-error">
-    <view class="state-title">{{error.title}}</view>
-    <view class="state-copy">{{error.copy}}</view>
-    <view class="state-action" bindtap="loadEntries">重新读取</view>
+    <empty-state
+      title="{{error.title}}"
+      copy="{{error.copy}}"
+      action-label="重新读取"
+      bindaction="loadEntries"
+    />
   </view>
   <view wx:elif="{{!items.length}}" class="admin-state">
-    <view class="state-title">这里还没有内容</view>
-    <view class="state-copy">从上方新建一篇，保存草稿后再预览和发布。</view>
+    <empty-state
+      title="{{query || statusFilter !== 'all' ? '没有符合筛选的内容' : '这里还没有内容'}}"
+      copy="{{query || statusFilter !== 'all' ? '换个关键词或状态再试。' : '从上方新建一篇，保存草稿后再预览和发布。'}}"
+      action-label=""
+    />
   </view>
   <view wx:else class="entry-list">
     <view wx:for="{{items}}" wx:key="id" class="entry-card {{movingId === item.id ? 'is-saving' : ''}}">

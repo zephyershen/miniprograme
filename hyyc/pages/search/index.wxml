@@ -1,0 +1,137 @@
+<view class="search-page">
+  <view class="search-head">
+    <view class="search-box">
+      <view class="search-icon"></view>
+      <input
+        class="search-input"
+        value="{{query}}"
+        focus="{{searchFocus}}"
+        maxlength="50"
+        confirm-type="search"
+        placeholder="搜索模型、工具、公司或项目"
+        bindinput="onQueryInput"
+        bindconfirm="submitSearch"
+      />
+      <view wx:if="{{query}}" class="search-clear" bindtap="clearQuery">清除</view>
+      <view class="search-submit" bindtap="submitSearch">搜索</view>
+    </view>
+
+    <view class="search-scopes">
+      <view
+        wx:for="{{scopeTabs}}"
+        wx:key="key"
+        class="search-scope {{item.active ? 'search-scope-active' : ''}}"
+        data-key="{{item.key}}"
+        bindtap="selectScope"
+      >
+        <text class="search-scope-label">{{item.label}}</text>
+        <text class="search-scope-note">{{item.note}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{searched && !loading && !error}}" class="search-summary">
+      在 {{scopeLabel}} 中找到 {{resultCount}} 条
+    </view>
+  </view>
+
+  <view wx:if="{{!searched}}" class="search-intro">
+    <view class="intro-kicker">SEARCH THE ARCHIVE</view>
+    <view class="intro-title">把看过的那条找回来</view>
+    <view class="intro-copy">搜索资讯、GitHub 项目、会员专栏与知识简报；受保护内容仍按当前会员身份读取。</view>
+    <view wx:if="{{history.length}}" class="history-block">
+      <view class="history-head">
+        <text>最近搜索</text>
+        <text class="history-clear" bindtap="clearHistory">清空</text>
+      </view>
+      <view class="suggestion-list history-list">
+        <view
+          wx:for="{{history}}"
+          wx:key="*this"
+          class="suggestion history-item"
+          data-query="{{item}}"
+          bindtap="useHistory"
+        >{{item}}</view>
+      </view>
+    </view>
+    <view class="suggestion-head">推荐关键词</view>
+    <view class="suggestion-list">
+      <view wx:for="{{suggestions}}" wx:key="*this" class="suggestion" data-query="{{item}}" bindtap="useSuggestion">{{item}}</view>
+    </view>
+  </view>
+
+  <view wx:elif="{{loading}}" class="search-state">
+    <loading-state compact="{{true}}" label="正在搜索" />
+  </view>
+
+  <view wx:elif="{{error && !items.length}}" class="search-state">
+    <empty-state
+      title="{{indexPreparing ? '搜索正在准备' : '搜索暂时没有完成'}}"
+      copy="{{error}}"
+      action-label="{{indexPreparing ? '' : (membershipRequired ? '查看 Pro 会员' : '重新搜索')}}"
+      bindaction="handleStateAction"
+    />
+  </view>
+
+  <view wx:elif="{{!items.length}}" class="search-state">
+    <empty-state title="没有找到匹配内容" copy="可以减少关键词，或切换其他内容范围再试。" action-label="" />
+  </view>
+
+  <view wx:else class="result-list">
+    <view wx:if="{{error}}" class="result-error" bindtap="retry">{{error}} · 点击重试</view>
+    <view
+      wx:for="{{items}}"
+      wx:key="id"
+      class="result-card"
+      data-id="{{item.id}}"
+      data-kind="{{item.kind}}"
+      data-entry-type="{{item.entryType}}"
+      data-window-key="{{item.windowKey}}"
+      bindtap="openItem"
+    >
+      <view class="result-copy">
+        <view class="result-byline">
+          <text>{{item.sourceAuthor.displayName || item.sourceAuthor.fallbackLabel}}</text>
+          <text>{{item.publishedLabel}}</text>
+        </view>
+        <view class="result-title">
+          <text
+            wx:for="{{item.titleParts}}"
+            wx:for-item="part"
+            wx:key="index"
+            class="{{part.highlighted ? 'search-highlight' : ''}}"
+          >{{part.text}}</text>
+        </view>
+        <view wx:if="{{item.summary}}" class="result-summary">
+          <text
+            wx:for="{{item.summaryParts}}"
+            wx:for-item="part"
+            wx:key="index"
+            class="{{part.highlighted ? 'search-highlight' : ''}}"
+          >{{part.text}}</text>
+        </view>
+        <view class="result-meta">
+          <text>{{item.categoryDisplay}}</text>
+          <text wx:if="{{item.sourceTags.length}}">{{item.sourceTags[0]}}</text>
+        </view>
+      </view>
+      <image
+        wx:if="{{item.listVisualUrl}}"
+        class="result-image"
+        src="{{item.listVisualUrl}}"
+        mode="aspectFill"
+        lazy-load="{{true}}"
+        data-media-key="{{item.id}}:list"
+        data-file-id="{{item.listVisualFileId}}"
+        data-media-url="{{item.listVisualUrl}}"
+        data-media-fallback=""
+        data-media-path="items[{{index}}].listVisualUrl"
+        binderror="handleMediaError"
+      />
+      <view wx:else class="result-mark">{{item.categoryMarker || 'AI'}}</view>
+    </view>
+
+    <view wx:if="{{loadingMore}}" class="search-more"><loading-state compact="{{true}}" label="正在加载更多" /></view>
+    <view wx:elif="{{hasMore}}" class="search-more search-more-action" bindtap="loadMore">加载更多结果</view>
+    <view wx:else class="search-more">已显示全部 {{resultCount}} 条</view>
+  </view>
+</view>

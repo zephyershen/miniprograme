@@ -22,6 +22,7 @@ confidence: high
 - [评论回复持久化与消息左滑删除修复证据](sources/2026-07-25-threaded-comments-and-message-deletion.md) — `replyToCommentId` 入口漏传根因、线上 `deleteMessage` 更新、两次重进分组与测试数据清理
 - [会员专栏管理员发布系统实现与后台部署](sources/2026-07-27-column-admin-publishing-implementation.md) — 小程序内管理端、草稿/发布快照、30 节基线覆盖、图片生命周期、719 项回归，以及生产集合/索引/函数部署；微信审核与真机 canary 待完成
 - [小程序 UI 与功能审计分流及首批加固](syntheses/2026-07-27-ui-audit-triage.md) — 外部审计的采纳边界、按钮 v2 兼容基线、首页卡片模板去重，以及后续视觉与功能分期
+- [会员学习进度、跨历史搜索与界面一致性加固](sources/2026-07-27-learning-progress-search-and-ui-hardening.md) — 阅读进度、继续学习、关键词搜索、统一空态与刷新、图片签名恢复，以及本地 29 集合/50 索引待发布边界
 - [小红书推广冷启动与热点追踪](syntheses/2026-07-25-xiaohongshu-promotion-launch.md) — “普通人的信息焦虑减负”定位、首篇 7 页图文、每天四次热点检查与发布规则边界
 - [GitHub、小红书与抖音推广启动](syntheses/2026-07-26-multi-platform-promotion-launch.md) — 独立 GitHub 推广仓库、第二篇小红书与抖音公开内容、三平台合规边界
 - [资料异步审核、预览支付诊断与微信消息回调上线](sources/2026-07-24-async-profile-review-and-preview-payment-diagnostics.md) — “审核中”队列、真机支付故障边界、入站消息 webhook 与生产收敛

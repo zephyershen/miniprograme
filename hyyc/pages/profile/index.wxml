@@ -6,7 +6,14 @@
   </view>
 
   <view wx:if="{{loading}}" class="profile-loading"><loading-state label="正在确认当前身份" /></view>
-  <view wx:elif="{{error}}" class="profile-error"><view>{{error}}</view><view class="text-action" bindtap="loadMembership">重新加载 →</view></view>
+  <view wx:elif="{{error}}" class="profile-error">
+    <empty-state
+      title="当前身份暂时没有确认成功"
+      copy="{{error}}"
+      action-label="重新加载"
+      bindaction="loadMembership"
+    />
+  </view>
   <block wx:else>
     <view class="user-profile-card" bindtap="openProfileEditor">
       <view class="user-avatar-wrap">

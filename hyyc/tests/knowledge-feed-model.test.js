@@ -31,6 +31,7 @@ test('creates one stable initial state for the knowledge feed page', () => {
   assert.equal(state.sortMode, 'latest');
   assert.equal(state.libraryMode, false);
   assert.equal(state.flatFeedMode, false);
+  assert.equal(state.feed.searchReady, false);
   assert.equal(state.sortHint, '时间从新到旧');
   assert.equal(state.sortOptions[0].key, 'latest');
   assert.equal(state.sortOptions[0].active, true);
@@ -143,7 +144,12 @@ test('merges paginated items without duplicates and builds the page view model',
       { id: 'second', title: 'B', publishedAt: '2026-07-15T00:00:00.000Z', channelKey: 'tech', topicKeys: [] }
     ]
   );
-  const view = decorateFeed({ facets: loaded, resultCount: 2, totalAvailable: 2 }, 'all', {
+  const view = decorateFeed({
+    facets: loaded,
+    resultCount: 2,
+    totalAvailable: 2,
+    searchReady: true
+  }, 'all', {
     time: '7d',
     company: 'all',
     direction: 'all'
@@ -152,6 +158,7 @@ test('merges paginated items without duplicates and builds the page view model',
   assert.equal(view.leadItem.sequenceLabel, '01');
   assert.equal(view.remainingItems[0].sequenceLabel, '02');
   assert.equal(view.resultCount, 2);
+  assert.equal(view.searchReady, true);
 });
 
 test('uses capability access metadata for free, member and administrator time choices', () => {
@@ -513,6 +520,7 @@ test('appends only new rows when lazy loading keeps the same lead item', () => {
     loadedCount: 4,
     totalAvailable: 4,
     hasMore: false,
+    searchReady: true,
     accessSummary: '4 items'
   };
   const patch = createFeedAppendPatch(current, next, 2);
@@ -520,5 +528,6 @@ test('appends only new rows when lazy loading keeps the same lead item', () => {
   assert.equal(patch['feed.remainingItems[2]'].id, 'row-3');
   assert.equal(Object.prototype.hasOwnProperty.call(patch, 'feed.remainingItems[0]'), false);
   assert.equal(patch['feed.hasMore'], false);
+  assert.equal(patch['feed.searchReady'], true);
   assert.equal(createFeedAppendPatch({ leadItem: { id: 'old' } }, next, 2), null);
 });

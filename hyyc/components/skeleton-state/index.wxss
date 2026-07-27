@@ -1,0 +1,10 @@
+.skeleton-state { width: 100%; padding-top: 12rpx; }
+.skeleton-line { width: 72%; height: 16rpx; margin-top: 22rpx; border-radius: 999rpx; background: linear-gradient(90deg, var(--ui-surface-muted) 0%, var(--ui-skeleton-highlight) 50%, var(--ui-surface-muted) 100%); background-size: 220% 100%; animation: skeleton-shift 1.35s ease-in-out infinite; }
+.skeleton-line-strong { width: 92%; height: 30rpx; }
+.skeleton-line-short { width: 44%; }
+.skeleton-state-compact .skeleton-line { margin-top: 16rpx; }
+
+@keyframes skeleton-shift {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}

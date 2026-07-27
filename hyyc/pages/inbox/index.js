@@ -133,6 +133,7 @@ function cacheLoadedFeed(page) {
     access: page.rawFeed && page.rawFeed.access,
     entitlements: page.rawFeed && page.rawFeed.entitlements,
     coverage: page.rawFeed && page.rawFeed.coverage,
+    searchReady: page.rawFeed && page.rawFeed.searchReady === true,
     updatedAt: page.rawFeed && page.rawFeed.updatedAt
   };
 }
@@ -713,6 +714,11 @@ Page({
     const id = event.currentTarget.dataset.id;
     if (!id) return;
     wx.navigateTo({ url: `/pages/feed-detail/index?id=${encodeURIComponent(id)}` });
+  },
+
+  openSearch() {
+    if (!this.data.feed || this.data.feed.searchReady !== true) return;
+    wx.navigateTo({ url: '/pages/search/index' });
   },
 
   syncRememberedEngagement() {

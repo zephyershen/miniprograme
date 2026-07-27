@@ -2,13 +2,16 @@
 <view class="reader-page">
   <view wx:if="{{loading}}" class="reader-state">
     <loading-state compact="{{true}}" label="正在加载专栏内容" />
-    <view class="state-rule state-rule-strong"></view><view class="state-rule"></view><view class="state-rule state-rule-short"></view>
+    <skeleton-state />
   </view>
 
   <view wx:elif="{{error}}" class="reader-state">
-    <view class="state-title">这页暂时无法打开</view>
-    <view class="state-copy">{{error}}</view>
-    <view wx:if="{{!membershipPromptVisible}}" class="state-action" bindtap="retry">重新读取 →</view>
+    <empty-state
+      title="这页暂时无法打开"
+      copy="{{error}}"
+      action-label="{{membershipPromptVisible ? '' : '重新读取'}}"
+      bindaction="retry"
+    />
   </view>
 
   <block wx:elif="{{article}}">
@@ -43,7 +46,7 @@
       >
         <swiper-item wx:for="{{article.posters}}" wx:for-item="poster" wx:for-index="posterIndex" wx:key="key">
           <view class="poster-frame">
-            <view class="poster-fallback">{{posterError === poster.key ? '手绘图加载失败，请重新读取' : '正在加载手绘图…'}}</view>
+            <view class="poster-fallback">{{posterError === poster.key ? '图片仍未加载，请下拉刷新后重试' : '正在重新获取手绘图…'}}</view>
             <image
               wx:if="{{posterLoads[posterIndex]}}"
               class="poster-image"
@@ -177,6 +180,8 @@
         <view class="related-mark">来源</view><view class="related-copy"><view class="related-title">{{item.title}}</view><view wx:if="{{item.subtitle}}" class="related-subtitle">{{item.subtitle}}</view></view><view class="related-arrow">{{item.itemId || item.url ? '↗' : ''}}</view>
       </view>
     </view>
+
+    <view wx:if="{{readingCompleted}}" class="reader-complete">本节已读完 · 学习进度已记录</view>
   </block>
 
   <membership-prompt visible="{{membershipPromptVisible}}" feature-key="{{membershipPromptFeature}}" bindclose="closeMembershipPrompt" bindviewbenefits="openMembershipFromPrompt" />

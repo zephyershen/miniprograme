@@ -1,0 +1,39 @@
+.empty-state-content {
+  box-sizing: border-box;
+  width: 100%;
+  text-align: center;
+}
+
+.empty-state-title {
+  color: var(--ui-ink);
+  font-size: 34rpx;
+  font-weight: 760;
+  line-height: 1.42;
+}
+
+.empty-state-copy {
+  max-width: 500rpx;
+  margin: 16rpx auto 0;
+  color: var(--ui-muted);
+  font-size: 23rpx;
+  line-height: 1.7;
+}
+
+.empty-state-action {
+  width: auto;
+  min-width: 210rpx;
+  min-height: 88rpx;
+  margin: 30rpx auto 0;
+  padding: 0 30rpx;
+  border: 0;
+  border-radius: 999rpx;
+  background: var(--ui-ink);
+  color: var(--ui-on-accent);
+  font-size: 23rpx;
+  font-weight: 740;
+  line-height: 88rpx;
+}
+
+.empty-state-action::after {
+  border: 0;
+}

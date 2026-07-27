@@ -1,0 +1,9 @@
+<view class="empty-state-content" aria-live="polite">
+  <view class="empty-state-title">{{title}}</view>
+  <view wx:if="{{copy}}" class="empty-state-copy">{{copy}}</view>
+  <button
+    wx:if="{{actionLabel}}"
+    class="empty-state-action"
+    bindtap="handleAction"
+  >{{actionLabel}}</button>
+</view>

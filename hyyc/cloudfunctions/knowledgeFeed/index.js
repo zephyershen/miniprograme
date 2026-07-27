@@ -57,6 +57,7 @@ const { createFeedDigestRepository } = require('./repositories/feed-digest');
 const { createColumnEditorialRepository } = require('./repositories/column-editorial');
 const { createColumnEntryRepository } = require('./repositories/column-entry');
 const { createColumnMediaRepository } = require('./repositories/column-media');
+const { createColumnProgressRepository } = require('./repositories/column-progress');
 const {
   createModerationBackfillRepository
 } = require('./repositories/moderation-backfill');
@@ -104,11 +105,18 @@ const { createUserMessageService } = require('./services/user-message-service');
 const { createColumnContentService } = require('./services/column-content-service');
 const { createColumnCatalogService } = require('./services/column-catalog-service');
 const { createColumnAdminService } = require('./services/column-admin-service');
+const { createColumnProgressService } = require('./services/column-progress-service');
 const { createColumnEditorialService } = require('./services/column-editorial-service');
 const { createScheduledWorkService } = require('./services/scheduled-work-service');
 const {
   createModerationBackfillService
 } = require('./services/moderation-backfill-service');
+const {
+  createSearchTokenBackfillService
+} = require('./services/search-token-backfill-service');
+const {
+  createContentSearchService
+} = require('./services/content-search-service');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const cloudbaseApp = cloudbase.init({ env: cloudbase.SYMBOL_CURRENT_ENV });
@@ -144,6 +152,7 @@ const digestRepository = createFeedDigestRepository(database, INTELLIGENCE_CONFI
 const columnEditorialRepository = createColumnEditorialRepository(database, COLUMN_CONFIG);
 const columnEntryRepository = createColumnEntryRepository(database, COLUMN_CONFIG);
 const columnMediaRepository = createColumnMediaRepository(database, COLUMN_CONFIG);
+const columnProgressRepository = createColumnProgressRepository(database, COLUMN_CONFIG);
 const moderationBackfillRepository = createModerationBackfillRepository(database, ENGAGEMENT_CONFIG);
 const intelligenceProvider = createIntelligenceProvider(INTELLIGENCE_CONFIG, {
   cloud,
@@ -311,6 +320,10 @@ const columnAdminService = createColumnAdminService({
   deleteFiles,
   config: COLUMN_CONFIG
 });
+const columnProgressService = createColumnProgressService({
+  repository: columnProgressRepository,
+  catalogService: columnCatalogService
+});
 const cleanupService = createVisualCleanupService({
   repository: cacheRepository,
   deleteFiles,
@@ -371,6 +384,11 @@ const digestQueryService = createDigestQueryService({
   itemFeedQueryService,
   liveEnabled: MEMBERSHIP_FEATURE_FLAGS.liveDigests
 });
+const contentSearchService = createContentSearchService({
+  columnCatalogService,
+  digestRepository,
+  liveDigests: MEMBERSHIP_FEATURE_FLAGS.liveDigests
+});
 const allFeedSyncService = createAllFeedSyncService({
   source,
   cacheRepository,
@@ -395,6 +413,12 @@ const aigclinkSyncService = createAigclinkSyncService({
 const feedSyncMaintenanceService = createFeedSyncMaintenanceService({
   allFeedSyncService,
   maintenanceToken: PREVIEW_CONFIG.maintenanceToken
+});
+const searchTokenBackfillService = createSearchTokenBackfillService({
+  itemRepository,
+  syncStateRepository,
+  maintenanceToken: PREVIEW_CONFIG.maintenanceToken,
+  logger
 });
 const visualWorkerService = createFeedVisualWorkerService({
   jobRepository: visualJobRepository,
@@ -451,6 +475,7 @@ const scheduledWorkService = createScheduledWorkService({
 
 const SCHEDULED_HANDLERS = Object.freeze({
   source: (event) => scheduledWorkService.syncSource(event),
+  searchBackfill: () => searchTokenBackfillService.runScheduled({ limit: 100 }),
   archive: () => scheduledWorkService.maintainArchive(),
   legacyVisual: () => scheduledWorkService.maintainLegacyVisuals(),
   visualWorker: () => scheduledWorkService.processVisuals(),
@@ -544,6 +569,18 @@ const ACTION_HANDLERS = Object.freeze({
     );
   },
   feedUpdates: async (event) => itemFeedQueryService.getUpdates(event, await resolveEntitlement()),
+  feedSearch: async (event) => {
+    const actor = actorService.resolve();
+    const entitlement = await resolveEntitlement(actor);
+    if (['column', 'briefing'].includes(event.scope)) {
+      return contentSearchService.search(event, entitlement);
+    }
+    return engagementService.decorateFeed(
+      await itemFeedQueryService.search(event, entitlement),
+      actor,
+      entitlement
+    );
+  },
   item: async (event) => {
     const actor = actorService.resolve();
     const entitlement = await resolveEntitlement(actor);
@@ -659,6 +696,14 @@ const ACTION_HANDLERS = Object.freeze({
     const actor = actorService.resolve();
     return columnContentService.practical(event.practicalId, await resolveEntitlement(actor));
   },
+  columnProgressList: async () => {
+    const actor = actorService.resolve();
+    return columnProgressService.list(actor, await resolveEntitlement(actor));
+  },
+  columnProgressSave: async (event) => {
+    const actor = actorService.resolve();
+    return columnProgressService.save(event, actor, await resolveEntitlement(actor));
+  },
   columnAdminList: async () => {
     const actor = actorService.resolve();
     return columnAdminService.list(await resolveEntitlement(actor));
@@ -715,6 +760,7 @@ const ACTION_HANDLERS = Object.freeze({
   ),
   digestRegenerate: async (event) => digestMaintenanceService.regenerate(event),
   feedRefresh: async (event) => feedSyncMaintenanceService.refresh(event),
+  searchTokenBackfill: async (event) => searchTokenBackfillService.run(event),
   moderationBackfill: async (event) => moderationBackfillService.run(event)
 });
 

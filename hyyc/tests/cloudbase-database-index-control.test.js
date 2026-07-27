@@ -71,6 +71,9 @@ test('versioned index contract covers media, feed, engagement, and billing hot p
     'knowledge_message_events/status_next_attempt_at',
     'knowledge_message_events/status_claim_expires_at',
     'knowledge_feed_archive/date_desc',
+    'knowledge_column_progress/owner_last_read_at',
+    'knowledge_feed_items/ps_search_pub_id',
+    'knowledge_feed_items/ps_sc_search_pub_id',
     'knowledge_feed_items/ps_sc_tags_pub_id',
     'knowledge_feed_items/ps_sc_tags_score_pub_id'
   ].forEach((identifier) => assert.equal(identifiers.has(identifier), true, identifier));

@@ -1,1 +1,3 @@
 @import "../../features/ai-column/manual-detail.wxss";
+
+.reader-complete { margin: 36rpx 0 12rpx; padding: 24rpx; border: 1rpx solid var(--ui-hairline); border-radius: var(--ui-radius-md); background: var(--ui-surface-solid); color: var(--ui-accent-strong); font-size: 21rpx; font-weight: 720; text-align: center; }

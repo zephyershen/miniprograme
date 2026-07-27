@@ -1,0 +1,9 @@
+<view
+  class="skeleton-state {{compact ? 'skeleton-state-compact' : ''}}"
+  aria-role="progressbar"
+  aria-label="内容加载中"
+>
+  <view class="skeleton-line skeleton-line-strong"></view>
+  <view class="skeleton-line"></view>
+  <view class="skeleton-line skeleton-line-short"></view>
+</view>

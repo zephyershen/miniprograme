@@ -1,9 +1,12 @@
 <view class="editor-page">
   <view wx:if="{{loading}}" class="editor-state"><loading-state label="正在读取草稿" /></view>
   <view wx:elif="{{error}}" class="editor-state">
-    <view class="state-title">草稿没有加载完成</view>
-    <view class="state-copy">{{error}}</view>
-    <view class="state-action" bindtap="loadEntry">重新读取 →</view>
+    <empty-state
+      title="草稿没有加载完成"
+      copy="{{error}}"
+      action-label="重新读取"
+      bindaction="loadEntry"
+    />
   </view>
   <block wx:elif="{{form}}">
     <view class="editor-head">

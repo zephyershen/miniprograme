@@ -1602,3 +1602,102 @@
   `overview.md` 中过时的生产集合与索引数量。
 - Sensitive handling: Wiki 未记录管理员身份、OpenID、会话、令牌、生产日志、
   用户数据或其他敏感值。
+
+## [2026-07-27] learning-progress-search-ui-hardening | 完成阅读进度、搜索与一致性加固
+
+- Session: local Codex task
+- Checkpoint: 会员专栏管理端既有改动先通过 `git diff --check` 并整体暂存；随后
+  的 UI、阅读进度与搜索改动保持未暂存，`marketing/` 未纳入，形成可独立回退边界。
+- UI: 全局按钮兼容微信 v2 最小宽度，统一数字字体与核心灰阶，扩大资讯互动热区，
+  并为四个原生 Tab 补齐成对线性图标；新增共享空态，补齐精选、简报、专栏目录和
+  阅读器下拉刷新；阅读器图片失败只自动
+  强制换签一次。
+- Progress: 新增私有 `knowledge_column_progress`，服务端重验会员与已发布内容；
+  目录展示总进度、单课状态和继续学习，草稿预览不记录。
+- Search: 新增独立搜索页和 `feedSearch`，免费/Pro/管理员历史边界保持为
+  24 小时/30 天/全部，GitHub 范围覆盖完整开源库；搜索 token 受索引字节预算限制
+  且不进入公开 DTO。
+- Contracts: 本地待发布合同为 29 个 `ADMINONLY` 集合和 50 个增量索引；生产仍为
+  此前回读的 28 个集合和 47 个索引。
+- Verification: `npm.cmd run check` 通过 37 个 JSON、343 个 JavaScript、16 个
+  注册页面和约 0.68 MiB 客户端包；`npm.cmd run verify` 的环境、数据库、索引、
+  全量测试、覆盖率与生产依赖审计全部通过；微信开发者工具 CLI `auto` 与 `open`
+  成功。
+- Blocker: 微信订阅消息缺少公众平台真实模板 ID 和关键词字段合同；未填假 ID，
+  未暴露不可用授权入口，现有站内消息 outbox 保持不变。
+- Release boundary: 未创建或修改生产集合/索引/数据，未部署云函数，未上传或提交
+  小程序审核。
+- Memory: 新增
+  [实现证据](sources/2026-07-27-learning-progress-search-and-ui-hardening.md)，
+  并更新 `overview.md`、`index.md` 和访问控制发布手册。
+- Sensitive handling: Wiki 未记录 OpenID、管理员标识、会话、令牌、生产日志、
+  用户阅读记录或其他敏感值。
+
+## [2026-07-27] search-token-backfill-gate | 补齐搜索存量迁移与上线门禁
+
+- Session: local Codex task
+- Finding: AIHOT 当前窗口约 7 天，而 Pro 可搜索 30 天；只靠后续来源同步无法覆盖
+  7–30 天内不再被上游返回的既有条目，会造成无错误提示的漏搜。
+- Change: 新增维护令牌保护的 `searchTokenBackfill`，以服务端持久化游标有界扫描，
+  单条事务补写 token 与稳定内容哈希；中断可续跑、重复执行幂等，并发旧游标不能
+  推进状态。回填完成标记写入前 `feedSearch` 明确返回 `SEARCH_UNAVAILABLE`。
+- UI: 将精选/搜索/会员价格的非表单 `<label>` 改为明确文字类；资讯和精选筛选
+  选项最小点按高度提升到 88rpx，并加入回归守卫。
+- Verification: 定向回归 15/15；完整 `npm.cmd run verify` 与 749/749 Node 测试
+  通过，项目检查为 37 个 JSON、345 个 JavaScript、16 个页面和约 0.68 MiB。
+- Release boundary: 没有创建或修改生产集合、索引和数据，没有部署云函数，也没有
+  上传或提交小程序。原会员专栏管理改动的 Git 暂存快照保持不变；本轮新增优化仍
+  未暂存，`marketing/` 继续不纳入。
+- Release order: 集合与规则 → 索引 → `knowledgeFeed` → `searchTokenBackfill`
+  完成与三角色搜索 canary → 小程序上传审核。
+- Sensitive handling: Wiki 未记录维护令牌、OpenID、管理员标识、生产日志、条目
+  内容或其他敏感值。
+
+## [2026-07-27] search-backfill-automation | 自动回填与搜索入口门禁
+
+- Session: local Codex task
+- Finding: 仅提供维护 action 仍依赖人工逐批调用，容易让索引长期停留在未完成状态；
+  回填同时改写 `contentHash` 会令以旧哈希排队的视觉任务失效。
+- Change: 既有来源定时器现在并行推进每批 100 条的搜索 token 回填，失败通过
+  `settle` 延后且不阻断资讯同步；维护令牌 action 保留为恢复入口。token 回填只写
+  搜索字段与更新时间，不再改变内容/视觉哈希。
+- UI: 公共 feed DTO 新增 `searchReady`。客户端只有在服务端确认当前 token 版本
+  全量完成后才显示搜索入口；旧深链收到 `SEARCH_UNAVAILABLE` 时显示“搜索正在准备”
+  且不提供无效重试按钮。
+- Migration: 当前精确版本门禁保留。未来分词升级必须使用并行 vNext 字段与索引，
+  完成回填后再切换查询和 readiness，避免直接提高版本导致搜索停机。
+- Verification: 定向回归 49/49；完整 `npm.cmd run verify` 与 750/750 Node 测试
+  通过，项目检查仍为 37 个 JSON、345 个 JavaScript、16 个页面和约 0.68 MiB；
+  微信开发者工具 CLI `auto` 与 `open` 成功。
+- Release boundary: 本轮未创建或修改生产集合、索引和数据，未部署云函数，也未上传
+  或提交小程序；现有 Git 暂存快照保持不变。
+- Sensitive handling: Wiki 未记录维护令牌、OpenID、管理员标识、生产日志、条目
+  内容或其他敏感值。
+
+## [2026-07-27] release-candidate-hardening | 收口可送审候选但不执行发布
+
+- Session: local Codex task
+- Checkpoint: 先把会员专栏管理系统固化为 Git 提交 `a3d5c5a`，作为可恢复基线；
+  后续发布候选继续排除无关的 `marketing/` 工作目录。
+- Backfill: 修正上一条“与来源同步并行”的实现。搜索回填改为独立定时器，不再共享
+  来源同步的 300 秒调用预算；单条文档连续五次失败后进入最多 50 条的隔离列表并
+  推进主游标，批量数据库故障保持整批延后。隔离条目继续由定时器重试，搜索可用状态
+  不会被一个毒丸永久卡住。
+- Operations: `knowledgeOps.status.searchBackfill` 新增阶段、扫描/更新/跳过计数、
+  累计失败数、隔离 ID、安全错误码、批次耗时和完成时间；不返回原始错误或内容。
+- Search: 搜索范围扩展为资讯、GitHub、会员专栏和知识简报；增加本地最近搜索、
+  关键词高亮、分享和跨内容跳转。普通用户只匹配专栏公开目录，Pro 才匹配正文和
+  简报，既有资讯历史权限边界不变。
+- UI: 空态覆盖账号、收藏、消息和专栏管理页，骨架屏抽成共享组件；页面、组件和
+  专栏样式中的 206 处十六进制色值收敛为设计 token，常驻筛选/排序/搜索等热区
+  提升到 88rpx。免费专栏目录新增真实的进度权益提示；管理列表新增关键词与状态筛选。
+- Verification: `npm.cmd run check` 为 38 个 JSON、351 个 JavaScript、16 个页面
+  和约 0.70 MiB；完整 `npm.cmd run verify` 与 761/761 Node 测试通过。
+- Release boundary: 本轮没有创建或修改生产集合、索引和数据，没有部署云函数，
+  没有上传体验版、提交微信审核或正式发布。生产仍为 28 个合同集合、47 个索引和
+  九个 `knowledgeFeed` 触发器；本地候选为 29 个集合、50 个索引，并将在未来部署
+  时增加第十个独立回填触发器。
+- Deferred: 微信订阅消息仍缺公众平台真实模板合同；深色模式仍缺插图、原生导航、
+  遮罩和语义色的完整验收合同。两项均未用假配置或半套主题进入本次候选。
+- Sensitive handling: Wiki 未记录维护令牌、OpenID、管理员标识、搜索词、生产日志、
+  用户阅读记录、条目内容或其他敏感值。
