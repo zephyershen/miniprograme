@@ -285,7 +285,7 @@ test('searches only column titles for free viewers and protected copy for Pro', 
     publishedAt: '2026-07-27T08:00:00.000Z',
     content: {
       id: 'course_prompt_001',
-      title: '提示词基础',
+      title: 'AI 为什么会回答问题？',
       subtitle: '写清任务、上下文和验收标准',
       category: 'private-category',
       categoryLabel: '基础知识',
@@ -306,7 +306,7 @@ test('searches only column titles for free viewers and protected copy for Pro', 
   };
 
   const freeTitle = await service.search({
-    query: '提示词',
+    query: 'AI 为什么会回答问题？',
     scope: 'column'
   }, free);
   assert.equal(freeTitle.items[0].locked, true);

@@ -45,7 +45,8 @@ function stringValues(value, output = []) {
 }
 
 function matches(value, query) {
-  return stringValues(value).join(' ').toLowerCase().includes(query.toLowerCase());
+  return normalizeSearchText(stringValues(value).join(' '))
+    .includes(normalizeSearchText(query));
 }
 
 function paged(items, request, scopeLabel) {
