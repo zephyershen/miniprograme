@@ -1738,3 +1738,31 @@
   提交微信审核；无关 `marketing/` 目录继续排除。
 - Sensitive handling: 未记录搜索词、OpenID、管理员标识、维护令牌、生产日志或
   其他敏感值。
+
+## [2026-07-28] member-column-search-production-prep | 生产依赖、回填与送审候选收口
+
+- Session: local Codex task
+- Release anchor: 从隔离干净工作树锁定并验证提交
+  `03657d7cd97783e49f34c7b52083d7b9019a34bc`；本地 RC 标签为
+  `rc/2026-07-28-member-admin-global-search`。主工作区后来出现的资讯时间线
+  WXML/WXSS 修改和 `marketing/` 未跟踪目录均未进入候选。
+- CloudBase: 增量创建 `knowledge_column_progress`，生产 29 个合同集合及其
+  `ADMINONLY` 规则回读收敛；新增三个搜索/进度索引，50 个合同索引收敛。
+  存储规则不变。依次部署 `knowledgeOps`、`knowledgeFeed`，四函数 manifest 和
+  `knowledgeFeed` 十个触发器回读收敛。
+- Backfill: `knowledgeOps.status.searchBackfill` 最终确认版本 1
+  `ready=true`；8,152 条扫描完成，7,658 条更新、494 条跳过，累计 6 次瞬时失败
+  已恢复，待失败和隔离数均为 0。
+- Canary: 真实管理员在普通、Pro、管理员预览下完成全站搜索与权限检查；管理权限
+  在低角色预览中继续有效。新建基础课、逐张上传两图、草稿预览、发布、Pro 正文与
+  进度、普通标题目录与正文拒绝、下架及详情 `ITEM_NOT_FOUND` 全链路通过。测试内容
+  已下架并保留为明确命名的运维记录。
+- UI: 生产管理页正常加载，搜索页为单输入框并显示高亮和推荐热度；首页搜索、筛选、
+  最新/热度控件均存在且实画面高度为 45px。
+- Verification: 最终 `npm.cmd run verify` 与 767/767 测试通过；38 个 JSON、
+  354 个 JavaScript、16 个页面、29 个集合、50 个索引、覆盖率和依赖审计全部通过。
+  微信 `preview` 成功生成 627,501-byte 候选。
+- Release boundary: 没有执行小程序正式上传、审核提交或发布。历史 `2.3.4` 当前平台
+  状态仍需人工确认；远端分支还未包含四个新候选提交和本地 RC 标签。
+- Sensitive handling: 维护令牌仅在内存和一次性临时事件文件中使用；Wiki 未记录
+  令牌、OpenID、管理员标识、搜索词、原始生产错误或用户阅读记录。

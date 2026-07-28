@@ -3,7 +3,7 @@ title: "会员学习进度、跨历史搜索与界面一致性加固"
 type: source
 tags: [miniprogram, membership, progress, search, ui, cloudbase]
 last_updated: 2026-07-28
-status: local-verified
+status: superseded-by-production-release
 confidence: high
 ---
 
@@ -65,6 +65,11 @@ confidence: high
   列表和详情显示相同推荐热度，真实互动栏仍为“评论 / 喜欢 / 收藏 / 分享”。
 
 ## 发布边界
+
+本节记录的是部署前历史边界，已被
+[会员专栏、学习进度与全站搜索生产发布准备](2026-07-28-member-column-search-release-prep.md)
+取代：29 个集合、50 个合同索引、两个云函数、独立回填触发器、8,152 条存量回填和
+三角色 canary 均已完成；当前只剩小程序平台上传与审核。
 
 - 本轮没有创建或修改生产集合、索引和数据，没有部署云函数，也没有上传或提交
   微信小程序版本。

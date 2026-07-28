@@ -3,7 +3,7 @@ title: "会员专栏管理员发布系统实现与后台部署"
 type: source
 tags: [column, admin, cloudbase, publishing, testing]
 observed_at: 2026-07-27
-status: backend-deployed-preview-built
+status: superseded-by-production-canary
 confidence: high
 ---
 
@@ -59,6 +59,11 @@ confidence: high
   未部署后台的旧错误也会转换为可行动说明，不再直接展示“不支持的操作”。
 
 ## 剩余发布边界
+
+本节是 2026-07-27 的历史边界，已被
+[会员专栏、学习进度与全站搜索生产发布准备](2026-07-28-member-column-search-release-prep.md)
+取代：真实管理员双图草稿、预览、发布、普通/Pro 双态和下架 canary 已完成，新的
+微信预览候选也已生成，但仍未正式上传或提交审核。
 
 生产数据库和云函数已经部署，但含新管理页面与修正文案的小程序版本仍未上传审核或
 正式发布，也未用真实管理员完成生产数据写入。下一步只剩微信版本上传/审核，以及
