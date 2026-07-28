@@ -167,6 +167,17 @@ test('keeps sharing enabled on the directory, briefing, membership, and search p
   });
 });
 
+test('labels recommendation heat separately from real like actions', () => {
+  const inboxMarkup = read('pages/inbox/index.wxml');
+  const detailMarkup = read('pages/feed-detail/index.wxml');
+  const searchMarkup = read('pages/search/index.wxml');
+  assert.match(inboxMarkup, /post-recommendation-heat[^>]*>\{\{postItem\.recommendationHeatLabel\}\}/);
+  assert.match(detailMarkup, /detail-recommendation-heat[^>]*>\{\{item\.recommendationHeatLabel\}\}/);
+  assert.match(searchMarkup, /result-recommendation-heat[^>]*>\{\{item\.recommendationHeatLabel\}\}/);
+  assert.doesNotMatch(inboxMarkup, /icon-like[^<]*recommendationHeat/);
+  assert.doesNotMatch(detailMarkup, /icon-like[^<]*recommendationHeat/);
+});
+
 test('ships a complete restrained icon pair for every native tab', () => {
   const appConfig = JSON.parse(read('app.json'));
 

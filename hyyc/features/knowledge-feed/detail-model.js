@@ -2,6 +2,7 @@ const { DIRECT_WEBVIEW_HOSTS } = require('../../config/constants.js');
 const { buildReadingGuide, buildRelatedItems, getOriginAction } = require('./reading.js');
 const { decorateItemEngagement } = require('../engagement/model.js');
 const { decorateSourcePresentation } = require('./source-presentation.js');
+const { decorateRecommendationHeat } = require('./recommendation-heat.js');
 
 function formatDetailDate(value) {
   const date = new Date(value);
@@ -31,7 +32,7 @@ function decorateKnowledgeItem(item, feedItems = []) {
   const related = source.relatedItems && source.relatedItems.length
     ? source.relatedItems
     : buildRelatedItems(feedItems, source);
-  return decorateItemEngagement(decorateSourcePresentation({
+  return decorateRecommendationHeat(decorateItemEngagement(decorateSourcePresentation({
     ...source,
     previewFileIds,
     previewSlides: previewSlides(previewFileIds, 0),
@@ -42,7 +43,7 @@ function decorateKnowledgeItem(item, feedItems = []) {
       ...entry,
       publishedLabel: formatDetailDate(entry.publishedAt)
     }))
-  }));
+  })));
 }
 
 module.exports = { decorateKnowledgeItem, previewSlides };

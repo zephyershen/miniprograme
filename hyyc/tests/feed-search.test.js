@@ -29,6 +29,10 @@ const {
 const {
   createContentSearchService
 } = require('../cloudfunctions/knowledgeFeed/services/content-search-service');
+const {
+  decodeCursor,
+  createGlobalSearchService
+} = require('../cloudfunctions/knowledgeFeed/services/global-search-service');
 
 const NOW = Date.parse('2026-07-27T08:00:00.000Z');
 
@@ -166,11 +170,11 @@ test('searches only entitled news history while keeping the full GitHub library 
   }, entitlement(30));
 
   assert.match(queries[0].since, /^2026-06-27/);
-  assert.equal(queries[0].sourceChannel, 'all');
+  assert.equal(queries[0].sourceChannel, 'news');
   assert.deepEqual(queries[0].searchTokens, ['l:claude']);
   assert.equal(queries[1].since, null);
   assert.equal(queries[1].sourceChannel, 'openSource');
-  assert.equal(news.scopeLabel, '近 30 天资讯');
+  assert.equal(news.scopeLabel, '近 30 天资讯 · 资讯');
   assert.equal(projects.scopeLabel, '全部 GitHub 项目');
   assert.equal(news.items[0].title, item.title);
   assert.equal(Object.hasOwn(news.items[0], 'searchTokens'), false);
@@ -326,6 +330,133 @@ test('searches protected live digests without exposing them to free users', asyn
   assert.equal(result.items[0].windowKey, '7d');
 });
 
+test('searches every accessible content type from one global request', async () => {
+  const calls = [];
+  const feedPages = {
+    firstParty: {
+      items: [],
+      resultCount: 0,
+      nextCursor: '',
+      hasMore: false
+    },
+    news: {
+      items: [{ id: 'news_1', title: 'News', publishedAt: '2026-07-27T10:00:00.000Z' }],
+      resultCount: 4,
+      nextCursor: 'news-next',
+      hasMore: true
+    },
+    openSource: {
+      items: [{ id: 'repo_1', title: 'Repo', publishedAt: '2026-07-25T10:00:00.000Z' }],
+      resultCount: 1,
+      nextCursor: '',
+      hasMore: false
+    },
+    x: {
+      items: [],
+      resultCount: 0,
+      nextCursor: '',
+      hasMore: false
+    }
+  };
+  const contentPages = {
+    column: {
+      items: [{
+        id: 'column_1',
+        kind: 'column',
+        title: 'Column',
+        publishedAt: '2026-07-26T10:00:00.000Z'
+      }],
+      resultCount: 2,
+      nextCursor: '',
+      hasMore: false
+    },
+    briefing: {
+      items: [{
+        id: 'briefing_1',
+        kind: 'briefing',
+        title: 'Briefing',
+        publishedAt: '2026-07-28T10:00:00.000Z'
+      }],
+      resultCount: 1,
+      nextCursor: '',
+      hasMore: false
+    }
+  };
+  const service = createGlobalSearchService({
+    async searchFeed(input) {
+      calls.push(input);
+      return feedPages[input.scope];
+    },
+    async searchContent(input) {
+      calls.push(input);
+      return contentPages[input.scope];
+    }
+  });
+  const pro = entitlement(30);
+  pro.entitlements.aiColumn = true;
+  pro.entitlements.digests = ['24h', '7d', '30d'];
+  const first = await service.search({ query: 'Agent', scope: 'all', limit: 10 }, {
+    entitlement: pro
+  });
+
+  assert.deepEqual(calls.map((call) => call.scope), [
+    'firstParty', 'news', 'x', 'openSource', 'column', 'briefing'
+  ]);
+  assert.deepEqual(first.items.map((item) => item.id), [
+    'briefing_1', 'news_1', 'column_1', 'repo_1'
+  ]);
+  assert.equal(first.resultCount, 8);
+  assert.equal(first.scope, 'all');
+  assert.equal(first.scopeLabel, '全部可访问内容');
+  assert.equal(first.hasMore, true);
+  const cursor = decodeCursor(first.nextCursor);
+  assert.equal(cursor.news.cursor, 'news-next');
+  assert.equal(cursor.news.done, false);
+  assert.equal(cursor.openSource.done, true);
+
+  calls.length = 0;
+  feedPages.news = {
+    items: [{ id: 'news_2', title: 'Older news', publishedAt: '2026-07-20T10:00:00.000Z' }],
+    nextCursor: '',
+    hasMore: false
+  };
+  const second = await service.search({
+    query: 'Agent',
+    scope: 'all',
+    cursor: first.nextCursor,
+    limit: 10
+  }, { entitlement: pro });
+  assert.deepEqual(calls.map((call) => call.scope), ['news']);
+  assert.equal(calls[0].cursor, 'news-next');
+  assert.deepEqual(second.items.map((item) => item.id), ['news_2']);
+  assert.equal(second.hasMore, false);
+  assert.equal(Object.hasOwn(second, 'resultCount'), false);
+});
+
+test('global search omits protected briefings for free viewers', async () => {
+  const calls = [];
+  const service = createGlobalSearchService({
+    async searchFeed(input) {
+      calls.push(input.scope);
+      return { items: [], resultCount: 0, nextCursor: '', hasMore: false };
+    },
+    async searchContent(input) {
+      calls.push(input.scope);
+      return { items: [], resultCount: 0, nextCursor: '', hasMore: false };
+    }
+  });
+  const free = entitlement(1);
+  free.viewer.role = 'free';
+  free.entitlements.aiColumn = false;
+  free.entitlements.digests = [];
+  await service.search({ query: 'Agent' }, { entitlement: free });
+  assert.deepEqual(calls, ['firstParty', 'news', 'x', 'openSource', 'column']);
+  await assert.rejects(
+    () => service.search({ query: 'Agent', cursor: 'all:not-json' }, { entitlement: free }),
+    { code: 'INVALID_REQUEST', message: '搜索分页参数无效' }
+  );
+});
+
 test('registers the search route, server action, additive indexes, and persistent inbox entry', () => {
   const app = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'app.json'), 'utf8'));
   assert.ok(app.pages.includes('pages/search/index'));
@@ -354,6 +485,7 @@ test('registers the search route, server action, additive indexes, and persisten
   assert.match(searchPage, /会员专栏与知识简报/);
   assert.match(searchPage, /item\.titleParts/);
   assert.match(searchPage, /useHistory/);
+  assert.doesNotMatch(searchPage, /search-scopes|selectScope/);
 
   const indexes = JSON.parse(fs.readFileSync(path.join(
     __dirname,

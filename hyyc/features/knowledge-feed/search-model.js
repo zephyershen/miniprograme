@@ -1,23 +1,10 @@
 const { decorateSourcePresentation } = require('./source-presentation.js');
-
-const SEARCH_SCOPES = Object.freeze([
-  Object.freeze({ key: 'news', label: '资讯', note: '按会员历史范围' }),
-  Object.freeze({ key: 'openSource', label: 'GitHub', note: '全部收录项目' }),
-  Object.freeze({ key: 'column', label: '会员专栏', note: '基础知识与应用操作' }),
-  Object.freeze({ key: 'briefing', label: '知识简报', note: 'Pro 日报、周报与月报' })
-]);
+const { decorateRecommendationHeat } = require('./recommendation-heat.js');
 
 function formatSearchDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '时间待确认';
   return `${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function scopeTabs(activeScope = 'news') {
-  const key = SEARCH_SCOPES.some((scope) => scope.key === activeScope)
-    ? activeScope
-    : 'news';
-  return SEARCH_SCOPES.map((scope) => ({ ...scope, active: scope.key === key }));
 }
 
 function highlightText(value, query) {
@@ -43,20 +30,27 @@ function highlightText(value, query) {
 }
 
 function decorateSearchItem(item = {}, query = '') {
-  return decorateSourcePresentation({
+  const searchKind = item.kind || 'feed';
+  const decorated = decorateSourcePresentation({
     ...item,
+    searchKey: `${searchKind}:${item.id || ''}`,
     publishedLabel: formatSearchDate(item.publishedAt),
     categoryDisplay: item.categoryLabel || item.category || 'AI 资讯',
     listVisualUrl: item.listVisualUrl || '',
     titleParts: highlightText(item.title, query),
     summaryParts: highlightText(item.summary, query)
   });
+  return ['column', 'briefing'].includes(item.kind)
+    ? decorated
+    : decorateRecommendationHeat(decorated);
 }
 
 function mergeSearchItems(current = [], incoming = [], query = '') {
   const byId = new Map();
   [...current, ...incoming].forEach((item) => {
-    if (item && item.id) byId.set(item.id, decorateSearchItem(item, query));
+    if (!item || !item.id) return;
+    const decorated = decorateSearchItem(item, query);
+    byId.set(decorated.searchKey, decorated);
   });
   return [...byId.values()];
 }
@@ -81,9 +75,7 @@ function searchFailureState(error = {}) {
 }
 
 module.exports = {
-  SEARCH_SCOPES,
   formatSearchDate,
-  scopeTabs,
   highlightText,
   decorateSearchItem,
   mergeSearchItems,

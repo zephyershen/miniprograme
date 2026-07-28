@@ -421,6 +421,13 @@
   margin-top: 16rpx;
 }
 
+.post-recommendation-heat {
+  flex: none;
+  color: var(--ui-accent-strong);
+  font-size: 20rpx;
+  font-weight: 720;
+}
+
 .post-source-tag {
   overflow: hidden;
   min-width: 0;

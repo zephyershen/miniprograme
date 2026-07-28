@@ -10,6 +10,7 @@ const { filterFeedItems, filterSummary, filterOptionsWithCounts } = require('./f
 const { isFacetMatrix, facetMatrixCount } = require('./facet-matrix.js');
 const { buildReadingGuide } = require('./reading.js');
 const { decorateSourcePresentation } = require('./source-presentation.js');
+const { decorateRecommendationHeat } = require('./recommendation-heat.js');
 const { normalizeMembershipAccess } = require('../membership/access.js');
 const { decorateItemEngagement } = require('../engagement/model.js');
 const {
@@ -280,14 +281,16 @@ function applyTimelineDayStates(feed = {}, states = {}) {
 }
 
 function prepareFeedItems(items = []) {
-  return decorateFeedTimeline(items.map((item) => decorateItemEngagement(decorateSourcePresentation({
+  return decorateFeedTimeline(items.map((item) => decorateRecommendationHeat(
+    decorateItemEngagement(decorateSourcePresentation({
     ...item,
     publishedLabel: formatFeedDate(item.publishedAt),
     scoreLabel: Number.isFinite(Number(item.score))
       ? `热度 ${item.score}`
       : (item.qualityTier === 'curated' ? '编辑精选' : '热度待评估'),
     summaryPreview: buildReadingGuide(item.summary).brief
-  }))));
+    }))
+  )));
 }
 
 function filterByChannel(items, activeChannel) {

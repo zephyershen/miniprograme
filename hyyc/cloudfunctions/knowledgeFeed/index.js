@@ -117,6 +117,9 @@ const {
 const {
   createContentSearchService
 } = require('./services/content-search-service');
+const {
+  createGlobalSearchService
+} = require('./services/global-search-service');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const cloudbaseApp = cloudbase.init({ env: cloudbase.SYMBOL_CURRENT_ENV });
@@ -389,6 +392,17 @@ const contentSearchService = createContentSearchService({
   digestRepository,
   liveDigests: MEMBERSHIP_FEATURE_FLAGS.liveDigests
 });
+const globalSearchService = createGlobalSearchService({
+  searchFeed: async (event, context) => engagementService.decorateFeed(
+    await itemFeedQueryService.search(event, context.entitlement),
+    context.actor,
+    context.entitlement
+  ),
+  searchContent: (event, context) => contentSearchService.search(
+    event,
+    context.entitlement
+  )
+});
 const allFeedSyncService = createAllFeedSyncService({
   source,
   cacheRepository,
@@ -572,6 +586,9 @@ const ACTION_HANDLERS = Object.freeze({
   feedSearch: async (event) => {
     const actor = actorService.resolve();
     const entitlement = await resolveEntitlement(actor);
+    if (!event.scope || event.scope === 'all') {
+      return globalSearchService.search(event, { actor, entitlement });
+    }
     if (['column', 'briefing'].includes(event.scope)) {
       return contentSearchService.search(event, entitlement);
     }

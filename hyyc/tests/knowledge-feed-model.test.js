@@ -161,6 +161,39 @@ test('merges paginated items without duplicates and builds the page view model',
   assert.equal(view.searchReady, true);
 });
 
+test('keeps recommendation heat consistent while preserving real engagement counts', () => {
+  const item = {
+    id: 'recommendation_heat_0001',
+    title: '推荐热度与真实喜欢互不混用',
+    summary: '一条用于验证展示模型的资讯。',
+    publishedAt: '2026-07-27T08:00:00.000Z',
+    channelKey: 'ai',
+    topicKeys: [],
+    engagement: {
+      liked: true,
+      likeCount: 7,
+      commentCount: 2,
+      canComment: true
+    }
+  };
+  const list = decorateFeed({
+    facets: [item],
+    resultCount: 1,
+    totalAvailable: 1
+  }, 'all', {
+    time: '7d',
+    company: 'all',
+    direction: 'all'
+  }, [item]).leadItem;
+  const detail = decorateKnowledgeItem(item);
+  assert.equal(list.recommendationHeat, detail.recommendationHeat);
+  assert.match(list.recommendationHeatLabel, /^推荐热度 \d+$/);
+  assert.equal(list.engagement.likeCount, 7);
+  assert.equal(list.engagement.likeLabel, '7');
+  assert.equal(detail.engagement.likeCount, 7);
+  assert.equal(detail.engagement.likeLabel, '7');
+});
+
 test('uses capability access metadata for free, member and administrator time choices', () => {
   const free = normalizeFeedAccess({
     viewer: { role: 'free', isAdmin: false },

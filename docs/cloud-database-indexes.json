@@ -267,7 +267,7 @@
         { "field": "_id", "direction": "-1" }
       ],
       "owner": "feed-search",
-      "reason": "Search the complete GitHub project library by normalized keyword tokens and newest publication."
+      "reason": "Search each source channel in global knowledge search by normalized keyword tokens and newest publication."
     },
     {
       "collection": "knowledge_feed_items",

@@ -301,7 +301,8 @@
       />
       <view wx:else class="post-media-placeholder"></view>
     </view>
-    <view wx:if="{{postItem.sourceTags.length}}" class="post-tags" aria-label="来源标签">
+    <view wx:if="{{postItem.recommendationHeatLabel || postItem.sourceTags.length}}" class="post-tags" aria-label="内容信息">
+      <text wx:if="{{postItem.recommendationHeatLabel}}" class="post-recommendation-heat">{{postItem.recommendationHeatLabel}}</text>
       <text wx:for="{{postItem.sourceTags}}" wx:for-item="sourceTag" wx:key="*this" class="post-source-tag">{{sourceTag}}</text>
     </view>
     <view class="post-foot">

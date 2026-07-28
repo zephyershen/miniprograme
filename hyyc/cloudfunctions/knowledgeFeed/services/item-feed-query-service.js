@@ -15,6 +15,13 @@ const {
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000;
 const WEEKDAYS = Object.freeze(['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']);
+const FEED_SEARCH_SCOPES = Object.freeze(['firstParty', 'news', 'x', 'openSource']);
+const FEED_SEARCH_SCOPE_LABELS = Object.freeze({
+  firstParty: '官方动态',
+  news: '资讯',
+  x: '推文',
+  openSource: '全部 GitHub 项目'
+});
 
 function searchIndexReady(state) {
   return Number(state && state.searchTokenBackfillVersion) === SEARCH_TOKEN_VERSION
@@ -185,7 +192,7 @@ function normalizeSearchRequest(input = {}) {
   return {
     query,
     searchTokens,
-    scope: input.scope === 'openSource' ? 'openSource' : 'news',
+    scope: FEED_SEARCH_SCOPES.includes(input.scope) ? input.scope : 'news',
     cursor: typeof input.cursor === 'string' && input.cursor.length <= 1000 ? input.cursor : '',
     limit: Math.min(20, Math.max(1, Math.floor(Number(input.limit) || 10)))
   };
@@ -470,7 +477,7 @@ function createItemFeedQueryService({
     await releaseExpiredVisualPublicationHolds(currentTime);
     const page = await itemRepository.queryPage({
       since: openSource ? null : entitlementSince(entitlement, currentTime),
-      sourceChannel: openSource ? 'openSource' : 'all',
+      sourceChannel: request.scope,
       topicKeys: [],
       sourceTags: [],
       qualityTier: '',
@@ -490,7 +497,9 @@ function createItemFeedQueryService({
     return {
       query: request.query,
       scope: request.scope,
-      scopeLabel: openSource ? '全部 GitHub 项目' : historyLabel,
+      scopeLabel: openSource
+        ? FEED_SEARCH_SCOPE_LABELS.openSource
+        : `${historyLabel} · ${FEED_SEARCH_SCOPE_LABELS[request.scope]}`,
       ...(request.cursor ? {} : { resultCount: Number(page.resultCount) || 0 }),
       nextCursor: page.nextCursor || '',
       hasMore: page.hasMore === true,
@@ -549,6 +558,8 @@ function createItemFeedQueryService({
 }
 
 module.exports = {
+  FEED_SEARCH_SCOPES,
+  FEED_SEARCH_SCOPE_LABELS,
   requestedTimeKey,
   publicFacet,
   libraryTagFacets,

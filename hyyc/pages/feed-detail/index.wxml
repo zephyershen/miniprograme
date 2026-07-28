@@ -71,7 +71,8 @@
       </view>
     </view>
 
-    <view wx:if="{{item.sourceTags.length}}" class="detail-tags" aria-label="来源标签">
+    <view wx:if="{{item.recommendationHeatLabel || item.sourceTags.length}}" class="detail-tags" aria-label="内容信息">
+      <text wx:if="{{item.recommendationHeatLabel}}" class="detail-recommendation-heat">{{item.recommendationHeatLabel}}</text>
       <text wx:for="{{item.sourceTags}}" wx:for-item="sourceTag" wx:key="*this" class="detail-source-tag">{{sourceTag}}</text>
     </view>
 

@@ -1,6 +1,5 @@
 const { searchKnowledgeFeed } = require('../../features/knowledge-feed/api.js');
 const {
-  scopeTabs,
   mergeSearchItems,
   searchQueryError,
   searchFailureState
@@ -18,9 +17,8 @@ const {
   clearSearchHistory
 } = require('../../features/knowledge-feed/search-history.js');
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
 const SUGGESTIONS = Object.freeze(['Claude Code', 'MCP', 'Agent', '视频生成']);
-const SEARCH_SCOPES = Object.freeze(['news', 'openSource', 'column', 'briefing']);
 
 function safeDecode(value) {
   try {
@@ -39,8 +37,6 @@ Page({
   data: {
     query: '',
     currentQuery: '',
-    activeScope: 'news',
-    scopeTabs: scopeTabs('news'),
     suggestions: SUGGESTIONS,
     history: [],
     searched: false,
@@ -51,7 +47,6 @@ Page({
     membershipRequired: false,
     items: [],
     resultCount: 0,
-    scopeLabel: '',
     hasMore: false,
     searchFocus: true
   },
@@ -63,11 +58,8 @@ Page({
     this.mediaRequestId = 0;
     this.mediaRecovery = createPageMediaRecovery(this);
     const query = safeDecode(options.query).trim();
-    const activeScope = SEARCH_SCOPES.includes(options.scope) ? options.scope : 'news';
     this.setData({
       query,
-      activeScope,
-      scopeTabs: scopeTabs(activeScope),
       history: loadSearchHistory(),
       searchFocus: !query
     });
@@ -117,7 +109,6 @@ Page({
       membershipRequired: false,
       items: [],
       resultCount: 0,
-      scopeLabel: '',
       hasMore: false,
       searchFocus: true
     });
@@ -151,17 +142,6 @@ Page({
       searchFocus: false
     });
     return this.loadResults(true);
-  },
-
-  selectScope(event) {
-    const scope = event.currentTarget.dataset.key;
-    if (!SEARCH_SCOPES.includes(scope) || scope === this.data.activeScope) return;
-    this.setData({
-      activeScope: scope,
-      scopeTabs: scopeTabs(scope)
-    }, () => {
-      if (this.data.currentQuery) this.loadResults(true);
-    });
   },
 
   async loadResults(reset, { preserveCurrent = false } = {}) {
@@ -198,7 +178,7 @@ Page({
     try {
       const page = await searchKnowledgeFeed({
         query: this.data.currentQuery,
-        scope: this.data.activeScope,
+        scope: 'all',
         cursor: reset ? '' : this.nextCursor,
         limit: PAGE_SIZE
       });
@@ -221,7 +201,6 @@ Page({
         membershipRequired: false,
         items,
         resultCount: reset ? (Number(page.resultCount) || 0) : this.data.resultCount,
-        scopeLabel: page.scopeLabel || '',
         hasMore: page.hasMore === true
       });
       this.resolveResultMedia(items, mediaRequestId);
@@ -308,19 +287,17 @@ Page({
 
   onShareAppMessage() {
     const query = this.data.currentQuery || this.data.query || '';
-    const scope = this.data.activeScope || 'news';
     return {
       title: query ? `知识搜索：${query}` : 'AI 知识搜索',
-      path: `/pages/search/index?query=${encodeURIComponent(query)}&scope=${scope}`
+      path: `/pages/search/index?query=${encodeURIComponent(query)}`
     };
   },
 
   onShareTimeline() {
     const query = this.data.currentQuery || this.data.query || '';
-    const scope = this.data.activeScope || 'news';
     return {
       title: query ? `知识搜索：${query}` : 'AI 知识搜索',
-      query: `query=${encodeURIComponent(query)}&scope=${scope}`
+      query: `query=${encodeURIComponent(query)}`
     };
   }
 });

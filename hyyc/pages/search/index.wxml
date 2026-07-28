@@ -16,21 +16,8 @@
       <view class="search-submit" bindtap="submitSearch">搜索</view>
     </view>
 
-    <view class="search-scopes">
-      <view
-        wx:for="{{scopeTabs}}"
-        wx:key="key"
-        class="search-scope {{item.active ? 'search-scope-active' : ''}}"
-        data-key="{{item.key}}"
-        bindtap="selectScope"
-      >
-        <text class="search-scope-label">{{item.label}}</text>
-        <text class="search-scope-note">{{item.note}}</text>
-      </view>
-    </view>
-
     <view wx:if="{{searched && !loading && !error}}" class="search-summary">
-      在 {{scopeLabel}} 中找到 {{resultCount}} 条
+      共找到 {{resultCount}} 条可访问内容
     </view>
   </view>
 
@@ -73,14 +60,14 @@
   </view>
 
   <view wx:elif="{{!items.length}}" class="search-state">
-    <empty-state title="没有找到匹配内容" copy="可以减少关键词，或切换其他内容范围再试。" action-label="" />
+    <empty-state title="没有找到匹配内容" copy="可以减少关键词或换一个说法再试。" action-label="" />
   </view>
 
   <view wx:else class="result-list">
     <view wx:if="{{error}}" class="result-error" bindtap="retry">{{error}} · 点击重试</view>
     <view
       wx:for="{{items}}"
-      wx:key="id"
+      wx:key="searchKey"
       class="result-card"
       data-id="{{item.id}}"
       data-kind="{{item.kind}}"
@@ -111,6 +98,7 @@
         </view>
         <view class="result-meta">
           <text>{{item.categoryDisplay}}</text>
+          <text wx:if="{{item.recommendationHeatLabel}}" class="result-recommendation-heat">{{item.recommendationHeatLabel}}</text>
           <text wx:if="{{item.sourceTags.length}}">{{item.sourceTags[0]}}</text>
         </view>
       </view>

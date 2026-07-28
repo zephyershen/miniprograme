@@ -6,11 +6,6 @@
 .search-input { min-width: 0; height: 84rpx; flex: 1; color: var(--ui-ink); font-size: 25rpx; }
 .search-clear { display: flex; min-height: 60rpx; align-items: center; padding: 0 8rpx; color: var(--ui-muted-soft); font-size: 19rpx; }
 .search-submit { display: flex; min-width: 96rpx; min-height: 64rpx; align-items: center; justify-content: center; border-radius: 999rpx; background: var(--ui-ink); color: var(--ui-on-accent); font-size: 22rpx; font-weight: 740; }
-.search-scopes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12rpx; margin-top: 16rpx; }
-.search-scope { position: relative; min-width: 0; min-height: 88rpx; box-sizing: border-box; padding: 14rpx 18rpx; border: 1rpx solid var(--ui-hairline); border-radius: var(--ui-radius-md); background: var(--ui-surface-solid); color: var(--ui-muted); }
-.search-scope-label { display: block; font-size: 22rpx; font-weight: 740; }
-.search-scope-note { display: block; overflow: hidden; margin-top: 3rpx; font-size: 16rpx; text-overflow: ellipsis; white-space: nowrap; }
-.search-scope-active { border-color: var(--ui-accent); background: var(--ui-accent-soft); color: var(--ui-accent-strong); }
 .search-summary { margin-top: 14rpx; color: var(--ui-muted); font-size: 19rpx; }
 .search-intro { margin-top: 34rpx; padding: 42rpx 34rpx; border: 1rpx solid var(--ui-hairline); border-radius: var(--ui-radius-xl); background: var(--ui-surface-solid); box-shadow: var(--ui-shadow-card); }
 .intro-kicker { color: var(--ui-accent-strong); font-size: 17rpx; font-weight: 780; letter-spacing: 1.5rpx; }
@@ -34,6 +29,7 @@
 .result-summary { display: -webkit-box; overflow: hidden; margin-top: 10rpx; color: var(--ui-muted); font-size: 21rpx; line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .search-highlight { border-radius: 4rpx; background: var(--ui-accent-soft); color: var(--ui-accent-strong); }
 .result-meta { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 15rpx; color: var(--ui-faint); font-size: 17rpx; }
+.result-recommendation-heat { color: var(--ui-accent-strong); font-weight: 700; }
 .result-image, .result-mark { width: 156rpx; height: 156rpx; flex: none; align-self: center; border-radius: var(--ui-radius-md); background: var(--ui-surface-muted); }
 .result-image { display: block; }
 .result-mark { display: flex; align-items: center; justify-content: center; color: var(--ui-accent-strong); font-size: 24rpx; font-weight: 820; letter-spacing: 1rpx; }

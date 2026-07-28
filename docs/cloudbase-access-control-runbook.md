@@ -122,8 +122,10 @@ canary。索引脚本本身不会创建集合或读取任何媒体记录。
 2. 执行集合 `plan/apply/readback`，随后执行数据库规则 `check/apply/check`，确认
    `knowledge_column_progress` 存在且为 `ADMINONLY`。
 3. 执行索引 `plan/apply/readback`，确认三个进度/搜索索引全部收敛。
-4. 部署并回读 `knowledgeFeed`；新版公共搜索在存量 token 回填完成前会返回
-   `SEARCH_UNAVAILABLE`，不得绕过该门禁。
+4. 从同一个已提交 SHA 部署并回读 `knowledgeFeed` 与 `knowledgeOps`：
+   `knowledgeFeed` 承载检索和独立回填触发器，`knowledgeOps.status` 承载可观测的
+   `searchBackfill` 状态。新版公共搜索在存量 token 回填完成前会返回
+   `SEARCH_UNAVAILABLE`，不得绕过该门禁，也不能只部署其中一个函数。
 5. 部署后由独立的 `knowledge-feed-search-token-backfill` 定时器每分钟自动推进一个
    有界批次；它与来源同步使用不同云函数调用预算。维护令牌 action 仅用于人工加速
    或故障恢复。中断后定时器或手动调用都会从持久化游标继续，不要从客户端传入或
@@ -135,9 +137,10 @@ canary。索引脚本本身不会创建集合或读取任何媒体记录。
    错误。独立定时器会继续重试隔离条目。上传前应优先修复到 `blockedCount=0`；
    若明确接受少量已登记漏项，必须把 ID、错误码和处置人写入发布记录，不能把
    `ready=true` 误写成“零失败”。
-7. 完成前新版首页隐藏搜索入口，深链请求保持 `SEARCH_UNAVAILABLE`。索引可用后，
-   分别用免费、Pro 和真实管理员做关键词 canary，核对 24 小时、30 天、全部归档、
-   完整 GitHub 库、会员专栏和 Pro 简报的权限范围，再上传小程序版本。
+7. 搜索入口在回填期间保持可见，查询会明确显示“搜索索引正在准备”；这不代表后端
+   已可发布。只有第 6 步门禁满足后，才分别用免费、Pro 和真实管理员做全站关键词
+   canary，核对官方动态、资讯、推文、完整 GitHub 库、会员专栏和 Pro 简报，以及
+   24 小时、30 天和全部归档的权限范围，再上传小程序版本。
 
 后续升级分词算法时，不能直接复用当前 token 字段并提高版本号。先增加 vNext token
 字段和并行索引，部署双写，完成全量回填后再切换查询与 readiness；稳定观察后才删除

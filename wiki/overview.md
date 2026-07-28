@@ -3,7 +3,7 @@ title: "知识获取平台小程序项目总览"
 type: overview
 tags: [overview, miniprogram, wechat, knowledge-platform, editorial-index]
 sources: [sources/2026-07-13-digest-inbox-implementation.md, sources/2026-07-14-cloud-cleanup-and-deployment.md, sources/2026-07-15-wechat-e2e-and-runtime-fixes.md, sources/2026-07-15-editorial-ui-implementation.md, sources/2026-07-15-aihot-feed-integration.md, sources/2026-07-16-modular-refactor.md, sources/2026-07-16-source-preview-deployment.md, sources/2026-07-17-fingerprint-sync-and-carousel.md, sources/2026-07-17-feed-history-and-long-preview.md, sources/2026-07-17-full-feed-admin-and-capacity.md, sources/2026-07-17-visual-backfill-quality-and-performance.md, sources/2026-07-17-pro-membership-implementation.md, sources/2026-07-17-luma-ui-redesign.md, sources/2026-07-18-premium-ia-and-copy.md, sources/2026-07-18-focus-previews-and-handdrawn-column.md, sources/2026-07-19-interaction-reliability-and-comment-media.md, sources/2026-07-19-packy-grok-intelligence.md, sources/2026-07-19-profile-moderation-and-huifu-payment.md, sources/2026-07-19-infrastructure-pricing-and-huifu-mode.md, sources/2026-07-19-wechat-virtual-payment.md, sources/2026-07-20-cloudbase-ai-cost-and-hybrid-routing.md, sources/2026-07-20-launch-readiness-remediation.md, sources/2026-07-20-practical-column-implementation.md, sources/2026-07-21-column-reader-restoration.md, sources/2026-07-21-timeout-feed-and-manual-production-validation.md, sources/2026-07-21-bounded-visual-and-membership-conversion.md, sources/2026-07-21-source-preview-v3-quality-and-repair.md, sources/2026-07-22-cloudbase-scf-source-preview-and-mobile-timeline.md, sources/2026-07-22-parallel-visual-worker-and-column-media-v2.md, sources/2026-07-22-public-proxy-capacity-and-traffic-audit.md, sources/2026-07-22-new-relay-route-canary.md, sources/2026-07-22-cloud-media-proactive-renewal.md, sources/2026-07-22-replacement-relay-ip-cutover.md, sources/2026-07-22-six-concurrency-and-personal-proxy-headroom.md, sources/2026-07-22-runtime-reliability-performance-and-feed-spacing.md, sources/2026-07-24-async-comments-message-center-and-stable-loading.md, sources/2026-07-24-visible-wechat-account-confirmation-and-payment-diagnostics.md, sources/2026-07-24-two-step-membership-login-and-optional-profile.md, sources/2026-07-24-ios-membership-payment-recovery.md, sources/2026-07-24-ios-refund-profile-review-and-renewal-ui.md, sources/2026-07-25-threaded-comments-and-message-deletion.md, decisions/2026-07-15-engaging-news-detail.md, decisions/2026-07-16-modular-architecture.md, decisions/2026-07-16-source-preview-renderer.md, decisions/2026-07-17-fingerprint-driven-feed-sync.md, decisions/2026-07-17-full-feed-and-role-entitlements.md, decisions/2026-07-17-full-feed-visual-queue-and-quality.md, decisions/2026-07-17-pro-membership-and-intelligence.md, decisions/2026-07-17-luma-ui-redesign.md, decisions/2026-07-18-premium-learning-and-curation-ia.md, decisions/2026-07-18-forward-only-focus-previews-and-handdrawn-column.md, decisions/2026-07-19-profiled-media-comments-and-optimistic-engagement.md, decisions/2026-07-19-automatic-ai-curation-and-comment-moderation.md, decisions/2026-07-19-wechat-virtual-payment-membership.md, decisions/2026-07-20-cloudbase-ai-primary-packy-fallback.md, decisions/2026-07-20-practical-column-editorial-system.md, decisions/2026-07-21-restore-protected-handdrawn-galleries.md, decisions/2026-07-21-image-independent-feed-and-direct-practical-manual.md, decisions/2026-07-21-bounded-visual-publication-and-pro-access-pass.md, decisions/2026-07-21-aihot-source-metadata-contract.md, decisions/2026-07-22-cloudbase-scf-source-preview.md, decisions/2026-07-24-async-comments-and-message-center.md]
-last_updated: 2026-07-27
+last_updated: 2026-07-28
 status: confirmed
 confidence: high
 ---
@@ -17,8 +17,8 @@ confidence: high
 2026-07-27 当前工作树把 24 节基础课和 6 节动手课改为可持续更新的内置安全基线，
 并新增真实管理员专用的草稿、预览、发布和下架后台。免费目录和 Pro 服务端鉴权边界
 不变；生产集合、索引和新版 `knowledgeFeed` 已部署，开发预览已编译，但含管理页面
-的小程序版本尚未提交审核。后续本地层已增加云端阅读进度、继续学习、跨历史关键词
-搜索、共享空态/骨架屏、下拉刷新和图片签名自动恢复；该层尚未部署，生产仍为 28 个合同集合
+的小程序版本尚未提交审核。后续本地层已增加云端阅读进度、继续学习、一框全站关键词
+搜索、明确标注的推荐热度、共享空态/骨架屏、下拉刷新和图片签名自动恢复；该层尚未部署，生产仍为 28 个合同集合
 和 47 个合同索引，本地待发布合同为 29 个集合和 50 个索引。
 
 ## 最新生产审计状态
@@ -53,7 +53,7 @@ confidence: high
 | --- | --- | --- |
 | AppID、云环境 ID、Git 历史和远程地址已保留 | confirmed | 项目配置、应用入口、Git 命令 |
 | 旧社区、商品、任务、聊天、实名、定位、钱包、支付和图片审核代码已从活跃树移除 | confirmed | 当前文件树与重建历史 |
-| 15 个注册页面、4 个正式云函数及本地测试已实现 | confirmed | 当前工作树、719/719 个 Node 测试；含两个真实管理员专栏页面和一个兼容趋势路由 |
+| 16 个注册页面、4 个正式云函数及本地测试已实现 | confirmed | 当前工作树、767/767 个 Node 测试；含搜索页、两个真实管理员专栏页面和一个兼容趋势路由 |
 | 旧云资源清空及 5 个新集合创建 | confirmed | 2026-07-14 CloudBase 清单与复核 |
 | `digestIngest`、`digestStore` 已退休 | confirmed | 正式函数冒烟后按固定允许列表删除，最终函数清单精确为四个 |
 | 真实 OpenID、数据库闭环和开发者工具编译 | confirmed | 2026-07-15 微信开发者工具端到端验证 |
@@ -74,7 +74,7 @@ confidence: high
 | 会员学习与精选信息架构 | confirmed | 资讯顶部精选锁入口、底部 AI 专栏、频道数字移除、微信模拟器六场景截图 |
 | 实用会员专栏 | backend-deployed-preview-built | 24+6 节内置基线、标题级免费目录和服务端正文鉴权保持；管理员草稿/发布快照、覆盖排序、下架和媒体生命周期已通过回归，生产集合/索引/函数已部署，微信审核与真机 canary 待完成 |
 | 专栏阅读进度与继续学习 | local-verified | 私有进度集合、服务端会员重鉴权、单课与总进度、继续学习和草稿预览隔离均通过回归；尚未部署 |
-| 跨内容关键词搜索 | local-verified | 资讯、GitHub、会员专栏和知识简报四范围，含本地历史、高亮、分享、权益边界与分页；既有资讯由可续跑、可隔离毒丸且可观测的独立定时回填补齐，完成前公共搜索 fail-closed，尚未部署 |
+| 跨内容关键词搜索 | local-verified | 页面一框直搜官方动态、资讯、推文、完整 GitHub 库、会员专栏和知识简报，含本地历史、高亮、分享、权益边界与稳定分页；既有资讯由可续跑、可隔离毒丸且可观测的独立定时回填补齐，完成前公共搜索 fail-closed，尚未部署 |
 | 微信订阅消息 | blocked-by-platform-config | 站内消息 outbox 继续有效；缺少公众平台真实模板 ID 与关键词字段合同，未写假配置或暴露不可用授权入口 |
 | 周案例与趋势档案产品入口 | superseded | 生成和历史数据结构仅作兼容；当前界面与周案例触发器已移除 |
 | 资讯互动与会员转化界面 | confirmed | 喜爱计入热度、紧凑收藏记录、会员评论门禁、详情分享路由；“我的”页和全部受限入口共用七项 Pro 权益、服务端价格与动态折扣，使用无侧轨、无“当前”标签的简约白底订阅卡；弹层打开时锁住底页，卡片内部独立滚动 |
@@ -118,7 +118,7 @@ confidence: high
 
 ## 代码与数据
 
-- 页面：`pages/inbox/index`、`pages/curated/index`、`pages/briefing/index`、`pages/profile/index` 为资讯、专栏、简报、我的四个原生 Tab；真实管理员另有 `pages/column-admin/index` 和 `pages/column-editor/index`。加上精选、会员、消息、详情、阅读器、资料、来源、收藏和兼容趋势详情，共 15 个注册页面。
+- 页面：`pages/inbox/index`、`pages/curated/index`、`pages/briefing/index`、`pages/profile/index` 为资讯、专栏、简报、我的四个原生 Tab；真实管理员另有 `pages/column-admin/index` 和 `pages/column-editor/index`。加上搜索、精选、会员、消息、详情、阅读器、资料、来源、收藏和兼容趋势详情，共 16 个注册页面。
 - 小程序模块：`features/knowledge-feed/`、`membership/`、`billing/`、`curated-feed/`、`ai-column/`、`column-admin/`、`briefing/`、`engagement/`、`user-profile/` 与 `messages/` 分别拥有独立查询或展示模型；`services/cloud-functions.js` 是共享传输层。
 - CloudBase 图片只持久化 `cloud://` File ID；知识资讯、个人资料和评论分别在 feature media session 中批量换取 HTTPS 临时地址。WXML 只绑定 URL；TCB 地址中的 `t` 是签名生成时间而非到期时间，正缓存优先服从 SDK `maxAge`，SDK 未返回寿命时最多缓存 5 分钟。资讯、详情、精选和收藏页只在前台批量续签；图片失败仍只强制换签一次后降级为首字母或无图，文字内容不受影响。
 - 微信运行时模块引用统一使用带 `.js` 扩展名的相对 `require`，页面直接引用具体 feature 文件，不再使用 `...require(...)` 聚合入口；项目检查会阻止这两类已验证不兼容写法。
@@ -126,13 +126,14 @@ confidence: high
 - 知识智能在同一云函数内保持独立边界：contract 约束严格分析/合批/简报/评论审核 JSON；CloudBase adapter 是关闭思考模式的主路由，Packy adapter 固定最低 `low` 推理强度作为预算与故障兜底，resilient provider 负责熔断；确定性 policy 计算精选分，worker 负责租约与重试，审核 service 负责临时图片 URL、fail-closed 决策和拒绝文件清理。
 - 会员专栏沿用单向公共边界：页面 → `features/ai-column` → 云函数 action → 内容 service；管理边界为 `features/column-admin` → 真实管理员 action → entry/media repository。现有 24+6 节正文和 72 张手绘图作为代码基线，`knowledge_column_entries` 的发布快照可覆盖、重排或下架，`knowledge_column_media` 管理新增图片归属和延迟清理。会员接口永远不读草稿。
 - 专栏阅读进度通过 `knowledge_column_progress` 按查看者、类型与稳定内容 ID 隔离；服务端只接受当前已发布内容并重新校验会员权益。客户端在目录显示总进度、单课进度和最近未完成内容，管理员草稿预览与兼容案例不写进度。
-- 关键词搜索使用专用页面和服务端 `feedSearch` action，覆盖资讯、GitHub、会员专栏和知识简报。普通用户只搜索滚动 24 小时资讯和专栏公开目录，Pro 搜索 30 天资讯、专栏正文与简报，管理员可搜索全部资讯归档；GitHub 范围继续覆盖完整开源库。新条目同步时生成受字节预算限制的中文双字与英文前缀 token；旧条目由独立定时器每分钟推进一批 `searchTokenBackfill`，单条稳定失败五次后隔离并继续主扫描，批量故障则整批延后。`knowledgeOps.status` 返回进度、隔离 ID、安全错误码与耗时；维护令牌 action 仅作人工恢复。搜索 token 与内容/视觉 `contentHash` 解耦，不会令在途截图任务失效；主扫描完成标记写入前首页不显示搜索入口，深链搜索返回“索引正在准备”，查询结果不暴露内部索引字段。
+- 关键词搜索使用专用页面和服务端 `feedSearch` action。页面移除内容范围选择，只用一个输入框聚合官方动态、资讯、推文、完整 GitHub 库、会员专栏和知识简报；内部按来源独立分页，避免近期 GitHub 条目与“全部资讯”重复。普通用户只搜索滚动 24 小时资讯和专栏公开目录，Pro 搜索 30 天资讯、专栏正文与简报，管理员可搜索全部资讯归档；GitHub 继续覆盖完整开源库。新条目同步时生成受字节预算限制的中文双字与英文前缀 token；旧条目由独立定时器每分钟推进一批 `searchTokenBackfill`，单条稳定失败五次后隔离并继续主扫描，批量故障则整批延后。`knowledgeOps.status` 返回进度、隔离 ID、安全错误码与耗时；维护令牌 action 仅作人工恢复。搜索 token 与内容/视觉 `contentHash` 解耦，不会令在途截图任务失效；首页入口保持常驻，主扫描完成前实际查询显示“索引正在准备”，查询结果不暴露内部索引字段。
 - 资讯顶部：来源范围为“全部 / 官方动态 / 资讯 / 推文 / GitHub”。`官方动态` 只是 `firstParty` 的用户界面名称，内部来源合同不变；前四个使用 AIHOT 上游成员关系而不是本地关键词分类。`GitHub` 使用 AIGCLINK 公开方案索引并由独立同步服务维护，卡片来源显示为“GitHub 开源库”；“精选”作为独立会员能力入口，不参与来源过滤。独立频道使用连续卡片列表，不显示日期分组、折叠、时间线或时间点，只按 AIGCLINK 原生标签筛选且不限时间；同一条目在“全部”频道仍按普通资讯时间线、主题和权限显示。生产已同步 1,728 条记录和 528 个标签。
 - 首页筛选：普通用户只可选 24 小时并看见锁定的会员历史入口；Pro 可选 24 小时、近 3 天、近 7 天和近 30 天；管理员另有“全部归档”。15 个公司与模型主题、14 个技术方向可组合，选项显示当前资讯数，零结果项不可选。
 - 首页排序：默认选中“最新”，当前频道和筛选范围内的全部资讯显式按发布时间从新到旧；用户切换“热度”后，全部资讯按上游热度值从高到低，同热度按发布时间倒序。放大主稿始终只是当前排序的第一条，不再有独立选稿规则。两种模式都在分页前执行，切换会从第一页重新加载。
 - 首页资讯分页：云函数先按频道和筛选条件查询，再下发 8 条列表 DTO；第一页携带计数矩阵，后续使用稳定 `nextCursor`，不再重复 count 或矩阵计算。客户端兼容旧 offset，但优先游标，并通过 `feed.remainingItems[n]` 只追加新增行。
 - 首页性能边界：忽略云函数、测试和运维脚本后，小程序代码/静态文件约 0.41 MiB；列表图片、来源头像、日期内容和课程海报均按需加载。2026-07-22 开发者工具实测同一会话重新进入资讯页到首批 8 条文字与图片同时可用约 4.4–7.9 秒，滚动数据量受控但冷启动并非亚秒级，不能表述为所有网络下都“瞬时打开”。
 - 互动能力：`features/engagement/` 拥有客户端 API、展示转换、乐观状态、最新目标同步、页面间状态与评论输入模型；`components/comment-sheet` 独立管理评论输入、64 个表情、手机图片、原图预览和资料补全。键盘高度变化时整块输入坞贴住键盘顶部，发送占据工具行最右列；详情页通过 `page-meta` 锁住底层页面，评论列表继续独立滚动。评论提交后先以所有者可见的 `pending` 状态返回，后台审核通过才事务公开；同一资讯 30 秒冷却、滚动 24 小时最多 30 条。云端 service 负责权限、审核、公开视图与校验，repository 负责目标状态、幂等事务和收藏快照。评论仅 Pro 可读写，喜爱与收藏对所有真实微信用户开放；喜爱数加入公开热度。
+- 资讯列表、详情和资讯类搜索结果另显示 `100–1000` 的稳定“推荐热度”，由稳定内容标识生成并明确使用推荐语义；它不写入数据库、不冒充用户行为，也不改变真实喜欢数、喜欢状态或上游排序分。
 - 站内消息：`features/messages/` 按 API/model/session 隔离读取、已读和查看者缓存，`pages/messages` 只负责展示。`knowledge_message_events` 作为可靠 outbox，`knowledge_user_messages` 保存会员成功、资料结果、评论结果和收到评论通知；聚合消息以版本令牌避免旧已读覆盖新通知。
 - 加载与稳定刷新：全局 `components/loading-state` 已接入资讯、精选、专栏、简报、详情、收藏、资料和消息等懒加载区域；共享 `components/empty-state` 统一核心空态与错误态。精选、简报、专栏目录和阅读器支持下拉刷新。后台换签和轮询保留现有内容，喜爱、收藏、媒体与当前详情只更新叶子字段；固定媒体壳保留高度，阅读器图片失败会强制换签一次，避免列表、滚动位置和轮播闪动。
 - 视觉基线：`styles/design-tokens.wxss`，以冷白画布、白色实体内容面、深墨正文和 `#1d9bf0` 编辑蓝建立层级；喜爱粉和成功绿只表达状态，模糊仅用于临时遮罩。四个原生 Tab 使用同尺寸同笔画的深灰/编辑蓝线性图标。旧蓝紫渐变、微光和大面积珍珠材质已被替代。
@@ -174,8 +175,10 @@ confidence: high
 
 - `npm.cmd run verify`：通过项目结构、环境、数据库、索引、全量 Node 测试、
   覆盖率和生产依赖审计。
-- `npm.cmd run check`：37 个 JSON、343 个 JavaScript、16 个注册页面通过结构、
-  语法与微信模块引用兼容性检查；客户端包约 0.68 MiB。
+- `npm.cmd run check`：38 个 JSON、354 个 JavaScript、16 个注册页面通过结构、
+  语法与微信模块引用兼容性检查；客户端包约 0.70 MiB。
+- `npm.cmd test`：767/767 个 Node 测试通过；完整 `npm.cmd run verify` 同时通过
+  环境、29 个集合、50 个索引、覆盖率和生产依赖审计。
 - `git diff --check`：通过。
 - 微信开发者工具 CLI `auto` 与 `open`：通过；本轮未执行上传或审核提交。
 - 微信开发者工具模拟器已覆盖资讯、详情、精选、专栏、简报和我的页面；2026-07-21 最新回归确认专栏首页返回 `contractVersion=4`、会员无锁、六节动手课目录不含操作系统名，“安装 Codex CLI”按 Windows/macOS/Linux 展开且视觉模式为 `none`，简报不含 `trends` 且核心标题按 5 条显示“先看这5件事”。普通用户真实点击精选会打开可滚动的七项权益订阅卡，弹层和“我的”页均为白底、无侧轨并使用单行“订阅”按钮；测试后恢复 Pro 预览状态。
@@ -232,7 +235,7 @@ confidence: high
    审核含管理页面的小程序版本，再用真实管理员完成“读取 24+6 基线 → 草稿 →
    多图预览 → 发布 → Pro/普通双态 → 下架”canary。
 8. 阅读进度和跨历史搜索当前只在本地通过验证。发布时先应用新增集合、规则和索引，
-   再部署云函数；独立定时器随后会自动推进 `searchTokenBackfill`，维护 action 可用于
+   再从同一提交部署并回读 `knowledgeFeed` 与 `knowledgeOps`；独立定时器随后会自动推进 `searchTokenBackfill`，维护 action 可用于
    人工加速或恢复。通过 `knowledgeOps.status` 核对 `ready=true`、版本、完成时间和
    隔离状态后完成免费/Pro/管理员关键词
    canary，最后再上传小程序。
