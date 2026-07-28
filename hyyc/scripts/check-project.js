@@ -186,7 +186,7 @@ const ignoredPackageFolders = new Set(
     .filter((entry) => entry && entry.type === 'folder')
     .map((entry) => String(entry.value || '').replaceAll('/', path.sep))
 );
-for (const expectedIgnore of ['cloudrun', 'scripts', 'tests']) {
+for (const expectedIgnore of ['cloudfunctions', 'cloudrun', 'scripts', 'tests']) {
   if (!ignoredPackageFolders.has(expectedIgnore)) {
     throw new Error(`project.config.json must exclude ${expectedIgnore} from the mini-program package`);
   }
@@ -196,8 +196,7 @@ for (const expectedIgnore of ['cloudrun', 'scripts', 'tests']) {
 const clientPackageFiles = files.filter((file) => {
   const relative = path.relative(root, file);
   const topLevel = relative.split(path.sep, 1)[0];
-  return topLevel !== 'cloudfunctions'
-    && !ignoredPackageFolders.has(topLevel)
+  return !ignoredPackageFolders.has(topLevel)
     && !skipped.has(topLevel);
 });
 const clientPackageBytes = clientPackageFiles.reduce((total, file) => (
