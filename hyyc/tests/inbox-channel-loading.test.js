@@ -103,3 +103,25 @@ test('reserves feed media height while durable cloud files resolve', () => {
   assert.match(styles,
     /\.post-media,\s*\.post-media-placeholder\s*\{[^}]*height:\s*100%;/s);
 });
+
+test('keeps lazy timeline continuation visible until the selected day is complete', () => {
+  const markup = read('../pages/inbox/index.wxml');
+  const styles = read('../pages/inbox/index.wxss');
+
+  assert.match(
+    markup,
+    /itemIndex === dayGroup\.items\.length - 1 && !dayGroup\.hasMore \? 'timeline-entry-end' : ''/
+  );
+  assert.match(
+    markup,
+    /wx:if="\{\{dayGroup\.error && dayGroup\.items\.length\}\}"[^>]*aria-role="button"[\s\S]*?timeline-line-stub[\s\S]*?timeline-day-more-button-error[\s\S]*?wx:elif="\{\{dayGroup\.hasMore && dayGroup\.items\.length\}\}"[^>]*aria-role="button"[^>]*aria-label="加载这一天的更多资讯"/
+  );
+  assert.match(markup, />展开更多<\/text>/);
+  assert.match(
+    markup,
+    /dayGroup\.count > dayGroup\.loadedCount[\s\S]*剩余 \{\{dayGroup\.count - dayGroup\.loadedCount\}\} 条/
+  );
+  assert.match(styles, /\.timeline-day-more\s*\{[^}]*min-height:\s*92rpx;/s);
+  assert.match(styles, /\.timeline-day-more-button\s*\{[^}]*min-height:\s*68rpx;/s);
+  assert.match(styles, /\.timeline-line-stub\s*\{[^}]*height:\s*calc\(50% \+ 22rpx\);/s);
+});

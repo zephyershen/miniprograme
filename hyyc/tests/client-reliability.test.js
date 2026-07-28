@@ -812,6 +812,95 @@ test('appends a loaded timeline day with leaf patches and no full presentation',
   assert.deepEqual(mediaLoads[0].items.map((item) => item.id), ['incoming']);
 });
 
+test('keeps a failed timeline page retryable and appends it on the next attempt', async () => {
+  const dateKey = '2026-07-22';
+  const existing = {
+    id: 'existing-retry',
+    title: 'Existing',
+    summary: '',
+    publishedAt: '2026-07-22T02:00:00.000Z'
+  };
+  const incoming = {
+    id: 'incoming-retry',
+    title: 'Incoming',
+    summary: '',
+    publishedAt: '2026-07-22T01:00:00.000Z'
+  };
+  let requestCount = 0;
+  const page = loadPage('../pages/inbox/index', [[
+    '../features/knowledge-feed/api',
+    {
+      getKnowledgeFeed: async () => ({ items: [] }),
+      getKnowledgeFeedUpdates: async () => ({ newCount: 0 }),
+      getKnowledgeFeedDay: async () => {
+        requestCount += 1;
+        if (requestCount === 1) throw new Error('网络开小差');
+        return { items: [incoming], hasMore: false, nextCursor: '' };
+      }
+    }
+  ]]);
+  const patches = [];
+  const context = {
+    data: {
+      activeChannel: 'news',
+      sortMode: 'latest',
+      filters: { time: '30d', company: 'all', direction: 'all', sourceTag: 'all' },
+      feed: {
+        loadedCount: 1,
+        dayGroups: [{
+          dateKey,
+          count: 2,
+          loadedCount: 1,
+          items: [{ ...existing }],
+          loading: false,
+          error: '',
+          pageInitialized: true,
+          hasMore: true,
+          nextCursor: 'cursor-1'
+        }]
+      }
+    },
+    rawFeed: {
+      items: [existing],
+      facets: [],
+      dayBuckets: [{ dateKey, count: 2 }]
+    },
+    loadedItems: [existing],
+    feedRequestId: 4,
+    timelineDayStates: {
+      [dateKey]: {
+        loading: false,
+        pageInitialized: true,
+        hasMore: true,
+        nextCursor: 'cursor-1',
+        requestToken: 0
+      }
+    },
+    timelineDayRequestToken: 0,
+    collapsedTimelineDays: new Set(),
+    setData(patch) { patches.push(patch); },
+    resolveTimelineDayMedia() {}
+  };
+
+  assert.equal(await page.loadTimelineDay.call(context, dateKey, { append: true }), true);
+  assert.equal(context.timelineDayStates[dateKey].hasMore, true);
+  assert.equal(context.timelineDayStates[dateKey].error, '网络开小差');
+  assert.equal(patches[1]['feed.dayGroups[0].error'], '网络开小差');
+  assert.equal(patches[1]['feed.dayGroups[0].hasMore'], true);
+  assert.deepEqual(context.loadedItems.map((item) => item.id), ['existing-retry']);
+
+  assert.equal(await page.loadTimelineDay.call(context, dateKey, { append: true }), true);
+  assert.equal(requestCount, 2);
+  assert.equal(context.timelineDayStates[dateKey].error, '');
+  assert.equal(context.timelineDayStates[dateKey].hasMore, false);
+  assert.deepEqual(context.loadedItems.map((item) => item.id), [
+    'existing-retry',
+    'incoming-retry'
+  ]);
+  assert.equal(patches.at(-1)['feed.dayGroups[0].items[1]'].id, 'incoming-retry');
+  assert.equal(patches.at(-1)['feed.dayGroups[0].hasMore'], false);
+});
+
 test('a first-page refresh reapplies locally confirmed engagement over an older response', async () => {
   let resolveFeed;
   const page = loadPage('../pages/inbox/index', [[

@@ -51,7 +51,7 @@
             <view wx:if="{{dayGroup.loading && !dayGroup.items.length}}" class="timeline-day-state"><loading-state compact="{{true}}" label="正在加载这一天的资讯" /></view>
             <view wx:elif="{{dayGroup.error && !dayGroup.items.length}}" class="timeline-day-state timeline-day-state-action" data-date-key="{{dayGroup.dateKey}}" bindtap="loadMoreTimelineDay">{{dayGroup.error}} · 点击重试</view>
             <view wx:elif="{{!dayGroup.count}}" class="timeline-day-state">这一天暂无符合条件的资讯</view>
-            <view wx:for="{{dayGroup.items}}" wx:for-item="dayItem" wx:for-index="itemIndex" wx:key="id" class="timeline-entry timeline-entry-active {{itemIndex === 0 ? 'timeline-entry-start' : ''}} {{itemIndex === dayGroup.items.length - 1 ? 'timeline-entry-end' : ''}}">
+            <view wx:for="{{dayGroup.items}}" wx:for-item="dayItem" wx:for-index="itemIndex" wx:key="id" class="timeline-entry timeline-entry-active {{itemIndex === 0 ? 'timeline-entry-start' : ''}} {{itemIndex === dayGroup.items.length - 1 && !dayGroup.hasMore ? 'timeline-entry-end' : ''}}">
               <view class="timeline-rail" aria-hidden="true">
                 <view class="timeline-line"></view>
                 <text class="timeline-time">{{dayItem.timeline.timeLabel}}</text>
@@ -62,11 +62,29 @@
                 data="{{postItem: dayItem, mediaRoot: 'feed.dayGroups[' + dayIndex + '].items[' + itemIndex + ']'}}"
               />
             </view>
-            <view wx:if="{{dayGroup.hasMore}}" class="timeline-day-more" data-date-key="{{dayGroup.dateKey}}" bindtap="loadMoreTimelineDay">
-              <loading-state wx:if="{{dayGroup.loading}}" compact="{{true}}" label="正在加载更多资讯" />
-              <text wx:else>加载这一天的更多资讯</text>
+            <view wx:if="{{dayGroup.error && dayGroup.items.length}}" class="timeline-day-more" data-date-key="{{dayGroup.dateKey}}" bindtap="loadMoreTimelineDay" aria-role="button" aria-label="{{dayGroup.error}}，点击重试">
+              <view class="timeline-rail" aria-hidden="true">
+                <view class="timeline-line timeline-line-stub"></view>
+                <view class="timeline-node timeline-node-more"></view>
+              </view>
+              <view class="timeline-day-more-button timeline-day-more-button-error">
+                <text class="timeline-day-more-label">{{dayGroup.error}} · 重试</text>
+              </view>
             </view>
-            <view wx:elif="{{dayGroup.error}}" class="timeline-day-more timeline-day-state-action" data-date-key="{{dayGroup.dateKey}}" bindtap="loadMoreTimelineDay">{{dayGroup.error}} · 重试</view>
+            <view wx:elif="{{dayGroup.hasMore && dayGroup.items.length}}" class="timeline-day-more" data-date-key="{{dayGroup.dateKey}}" bindtap="loadMoreTimelineDay" aria-role="button" aria-label="加载这一天的更多资讯">
+              <view class="timeline-rail" aria-hidden="true">
+                <view class="timeline-line timeline-line-stub"></view>
+                <view class="timeline-node timeline-node-more"></view>
+              </view>
+              <view class="timeline-day-more-button {{dayGroup.loading ? 'timeline-day-more-button-loading' : ''}}">
+                <loading-state wx:if="{{dayGroup.loading}}" compact="{{true}}" label="正在加载" />
+                <block wx:else>
+                  <text class="timeline-day-more-label">展开更多</text>
+                  <text wx:if="{{dayGroup.count > dayGroup.loadedCount}}" class="timeline-day-more-count">剩余 {{dayGroup.count - dayGroup.loadedCount}} 条</text>
+                  <view class="timeline-day-more-chevron" aria-hidden="true"></view>
+                </block>
+              </view>
+            </view>
           </view>
         </view>
       </block>
