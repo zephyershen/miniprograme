@@ -21,8 +21,8 @@ confidence: high
 和 10 个 `knowledgeFeed` 触发器；8,152 条搜索存量回填及普通/Pro/管理员双图发布
 canary 已通过。最终小程序代码锚点 `d88c155` 继续纳入资讯按日续载、滚动日期权限、
 免费专栏标题级搜索、简报 Tab 跳转、管理排序防误触、空资讯分享和进度 revision
-兼容修复，并完整归档 `marketing/`。632,253-byte 微信预览已生成，但尚未部署该
-提交中的 `knowledgeFeed` 修复，也尚未正式上传或提交审核。
+兼容修复。632,253-byte 微信预览已生成，但尚未部署该提交中的 `knowledgeFeed`
+修复，也尚未正式上传或提交审核。
 
 ## 最新生产审计状态
 
@@ -115,8 +115,6 @@ canary 已通过。最终小程序代码锚点 `d88c155` 继续纳入资讯按�
 - AppID：`wxcb0f641838abf6e6`
 - 云环境 ID：`hyyc-1gi3f5sqc5becabf`
 - 唯一项目配置：仓库根部 `project.config.json`，小程序根为 `hyyc/`
-- 推广归档：仓库根部 `marketing/` 共 88 个资产文件、约 57.16 MiB；由资产合同测试
-  验证媒体头、引用和状态，但因位于 `hyyc/` 之外不会进入小程序包。
 
 `D:\miniprogramcode\miniprogram` 是早期审计的历史路径；后续命令以当前工作仓库为准。
 

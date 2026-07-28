@@ -1,8 +1,0 @@
-file 'D:\miniprogram\marketing\douyin\2026-07-26-product-story-v2\work\segment-01.mp4'
-file 'D:\miniprogram\marketing\douyin\2026-07-26-product-story-v2\work\segment-02.mp4'
-file 'D:\miniprogram\marketing\douyin\2026-07-26-product-story-v2\work\segment-03.mp4'
-file 'D:\miniprogram\marketing\douyin\2026-07-26-product-story-v2\work\segment-04.mp4'
-file 'D:\miniprogram\marketing\douyin\2026-07-26-product-story-v2\work\segment-05.mp4'
-file 'D:\miniprogram\marketing\douyin\2026-07-26-product-story-v2\work\segment-06.mp4'
-file 'D:\miniprogram\marketing\douyin\2026-07-26-product-story-v2\work\segment-07.mp4'
-file 'D:\miniprogram\marketing\douyin\2026-07-26-product-story-v2\work\segment-08.mp4'

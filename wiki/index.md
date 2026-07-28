@@ -23,9 +23,7 @@ confidence: high
 - [会员专栏管理员发布系统实现与后台部署](sources/2026-07-27-column-admin-publishing-implementation.md) — 小程序内管理端、草稿/发布快照、30 节基线覆盖、图片生命周期和首次后台部署的历史记录；后续生产 canary 以 7 月 28 日记录为准
 - [小程序 UI 与功能审计分流及首批加固](syntheses/2026-07-27-ui-audit-triage.md) — 外部审计的采纳边界、按钮 v2 兼容基线、首页卡片模板去重，以及后续视觉与功能分期
 - [会员学习进度、跨历史搜索与界面一致性加固](sources/2026-07-27-learning-progress-search-and-ui-hardening.md) — 阅读进度、继续学习、一框全站搜索、稳定推荐热度、统一空态与刷新、图片签名恢复的本地实现记录
-- [会员专栏、学习进度与全站搜索生产发布准备](sources/2026-07-28-member-column-search-release-prep.md) — 29 集合/50 索引生产收敛、8,152 条搜索回填、三角色双图发布 canary、最终代码加固、推广归档、632,253-byte 微信预览候选和待部署/未提交审核边界
-- [小红书推广冷启动与热点追踪](syntheses/2026-07-25-xiaohongshu-promotion-launch.md) — “普通人的信息焦虑减负”定位、首篇 7 页图文、每天四次热点检查与发布规则边界
-- [GitHub、小红书与抖音推广启动](syntheses/2026-07-26-multi-platform-promotion-launch.md) — 独立 GitHub 推广仓库、第二篇小红书与抖音公开内容、三平台合规边界
+- [会员专栏、学习进度与全站搜索生产发布准备](sources/2026-07-28-member-column-search-release-prep.md) — 29 集合/50 索引生产收敛、8,152 条搜索回填、三角色双图发布 canary、最终代码加固、632,253-byte 微信预览候选和待部署/未提交审核边界
 - [资料异步审核、预览支付诊断与微信消息回调上线](sources/2026-07-24-async-profile-review-and-preview-payment-diagnostics.md) — “审核中”队列、真机支付故障边界、入站消息 webhook 与生产收敛
 - [资料保存审核超时修复与生产部署](sources/2026-07-24-profile-moderation-timeout-repair.md) — 预览版资料保存失败根因、模型无思考修复、代码-only 发布与真实 canary 边界
 - [2026-07-23 全项目生产就绪审计](reports/production-readiness-audit-2026-07-23.md) — 已被发布候选修复结果取代的审计前快照
@@ -142,9 +140,8 @@ confidence: high
 
 ## 当前发布边界与下一入口
 
-- 最终小程序代码锚点为 `d88c155`：资讯按日续载和 `marketing/` 已纳入，滚动日期
-  权限、免费标题级专栏搜索、发布 revision、简报 Tab 跳转、管理排序防误触和空资讯
-  分享已加固。仓库根部 `marketing/` 共 88 个资产文件，但不在 `hyyc/` 小程序包内。
+- 最终小程序代码锚点为 `d88c155`：资讯按日续载、滚动日期权限、免费标题级专栏
+  搜索、发布 revision、简报 Tab 跳转、管理排序防误触和空资讯分享已加固。
 - 当前生产合同为 29 个 `ADMINONLY` 集合、50 个索引、4 个正式函数和
   `knowledgeFeed` 10 个定时触发器；生产后端锚点仍为 `03657d7`。8,152 条搜索
   存量回填、三角色搜索和管理员双图草稿/发布/下架 canary 已通过。

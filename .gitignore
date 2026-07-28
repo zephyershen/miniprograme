@@ -13,6 +13,9 @@ hyyc/cloudfunctions/**/node_modules/
 png/
 output/
 
+# Non-product workspaces are outside the mini-program release scope.
+marketing/
+
 # Cloud function local secrets (do not commit)
 hyyc/cloudfunctions/**/config.local.js
 hyyc/cloudfunctions/**/cert/

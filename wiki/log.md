@@ -1446,101 +1446,6 @@
 - Sensitive handling: Wiki 未记录公众平台会话参数、管理员身份标识、OpenID、
   Cookie、访问令牌、用户数据、订单号或原始浏览器日志。
 
-## [2026-07-25] xiaohongshu-promotion-launch | 启动小红书内容推广
-
-- Session: local Codex task
-- Positioning: 小红书账号定位为“普通人的信息焦虑减负”，围绕“不知道去哪获取
-  信息、看完不知道哪些重要、害怕跟不上时代”输出；固定产品价值为筛掉噪音、
-  解释重要性、给出下一步。
-- Creative: 已完成首篇 7 页 3:4 图文、正文、话题、manifest 和可复用
-  HTML/CSS 源文件，保存在
-  `marketing/xiaohongshu/2026-07-25-information-anxiety/`；发布图为
-  1620×2160 PNG，逐页视觉检查无裁切。
-- Monitoring: 已建立本地定时任务“看懂今天·小红书热点追踪”，每天四次检查最近
-  24 小时的合格热点；只生成有用户影响、可解释且可行动的草稿，自动发布保持关闭。
-- Platform: 账号持有人完成登录后，已于 2026-07-25 23:29 发布首篇笔记
-  “刷得越多，为什么越焦虑？”。笔记管理页回读为“审核中”，并确认 7 张图片、
-  5 个平台识别话题和“AI 新手村”活动关联。
-- Compliance: 已声明原创并标注“笔记含 AI 合成内容”；没有添加微信号、二维码、
-  站外链接、诱导评论或私信领资料。
-- Sensitive handling: Wiki 未记录手机号、短信验证码、Cookie、登录会话、个人
-  账号标识或其他凭据。
-
-## [2026-07-26] xiaohongshu-product-proof-update | 补强小程序身份与真实首页展示
-
-- Session: local Codex task
-- Scope: 修订首篇“刷得越多，为什么越焦虑？”图文，让用户能立即识别产品是
-  微信小程序，并知道小程序名称为“看懂今天”；没有添加二维码、微信号、站外链接
-  或诱导私信话术。
-- Creative: 首图新增“微信小程序”标识和真实首页预览；第 6 页使用真实首页截图
-  展示筛选、速览、评论与收藏；第 7 页及正文写明“微信小程序｜看懂今天”和
-  微信内使用方式。7 张 V3 均为 1620×2160。
-- Verification: 上传草稿去重后为 7 张，顺序 1–7；逐张 SHA-256 与本地
-  `exports-v2/` 文件完全一致。标题、9 个话题、“AI 新手村”活动、原创声明、
-  AI 合成内容声明及公开设置均保留。
-- Platform: 2026-07-26 00:21 创作服务平台返回“更新成功”；笔记管理页回读同一
-  笔记为“审核中”，原有浏览与互动数据保留，没有创建重复笔记。
-- Sensitive handling: Wiki 未记录手机号、验证码、Cookie、会话值、浏览器配置、
-  账号标识或其他凭据。
-
-## [2026-07-26] xiaohongshu-compliance-revision-v4 | 移除第三方平台推广信号
-
-- Session: local Codex task
-- Trigger: 小红书审核详情显示 V3 因“推广第三方平台”被限制流量，具体规则覆盖
-  引导去其他平台、教程测评式宣传、福利跳转和宣传其他平台产品服务；平台状态为
-  “未通过”。
-- Revision: V4 删除所有微信、小程序、搜索、下载和站外使用入口；移除产品首页
-  截图，将第 6 页改为“筛选重要信息、讲清关系、给出下一步”的纯内容方法；
-  正文改为“持续做看懂今天内容”，并移除 `#小程序`、`#OpenAI`、`#Claude`
-  产品导向话题。
-- Reference: 用户提供的最新真实首页只保存为
-  `marketing/xiaohongshu/2026-07-25-information-anxiety/references/latest-homepage-2026-07-26.jpg`
-  供后续产品素材参考，未用于本篇受限笔记。
-- Verification: 7 张 V4 为 1620×2160，上传后逐张 SHA-256 与本地文件一致；
-  正文不含微信、小程序、搜索或下载引导；6 个内容型话题、原创声明、AI 内容声明
-  和“AI 新手村”活动均保留。
-- Platform: 2026-07-26 00:34 创作服务平台返回“更新成功”，笔记管理页回读同一
-  笔记为“审核中”，12 次浏览和原互动数据保留，没有创建重复笔记。
-- Sensitive handling: Wiki 未记录手机号、验证码、Cookie、会话值、浏览器配置、
-  账号标识或其他凭据。
-
-## [2026-07-26] multi-platform-promotion-launch | 启动 GitHub、小红书与抖音推广
-
-- Session: local Codex task
-- GitHub: 新建独立公开仓库 `https://github.com/zephyershen/kandong-jintian`，
-  没有把推广文章写入小程序源码仓库；README、产品长文、真实首页截图和社交预览图
-  已由提交 `5bcc233` 推送到 `main`。
-- Xiaohongshu: 第二篇“AI 开始替你盯事了”于 2026-07-26 10:03 发布，
-  笔记管理页在“已发布”回读成功；公开地址为
-  `https://www.xiaohongshu.com/explore/6a656b0a0000000001003868`。
-- Douyin: 34 秒视频“AI 开始替你盯事了，但别把工作全交出去”于
-  2026-07-26 10:23 提交；作品、双比例封面和发文助手检查均通过，随后作品管理页
-  回读为“已发布”。作品 ID 为 `7666656648458407206`，公开地址为
-  `https://www.douyin.com/video/7666656648458407206`。
-- Compliance: 小红书和抖音均移除小程序、搜索、下载、二维码和站外跳转，
-  声明 AI 合成内容；GitHub 独立仓库保留清晰的小程序使用入口。
-- Sensitive handling: Wiki 未记录手机号、验证码、Cookie、登录会话、访问令牌
-  或其他账号凭据。
-
-## [2026-07-26] douyin-product-story-v2 | 用 GitHub 产品表达替换热点旁白版
-
-- Session: local Codex task
-- Trigger: 旧抖音视频聚焦热点并使用旁白，不符合产品推广方向；用户要求直接沿用
-  GitHub 独立推广仓库中更自然的图片与文案，只保留 BGM，不做 AI 阅读。
-- Creative: 新版保存在 `marketing/douyin/2026-07-26-product-story-v2/`，使用
-  GitHub 提交 `5bcc233` 的产品表达、社交预览图和真实小程序首页截图；成片为
-  1080×1920、29 秒、H.264/AAC、8 段纯图文节奏片，音轨只有原创轻量 BGM，
-  无旁白、无人声、无 AI 阅读。3:4 与 4:3 双封面均已生成。
-- Verification: 首、中、尾帧与 8 张画面逐张复核无裁切；音轨均值 -21.1 dB、
-  峰值 -7.4 dB；抖音发文助手回读“作品未见异常”，封面检测通过。公开页面
-  `https://www.douyin.com/video/7666663355465207081` 返回 HTTP 200，
-  页面显示 29 秒、标题与正文正确。
-- Platform: 2026-07-26 10:49 提交新版，约 10:50 回读为“已发布”，作品 ID
-  为 `7666663355465207081`。确认新版公开后，精确删除旧作品
-  `7666656648458407206`；作品管理总数从 34 回到 33，旧标题消失且新版保留。
-- Sensitive handling: Wiki 未记录 Cookie、登录会话、访问令牌、设备标识、
-  浏览器配置或其他账号凭据。
-
 ## [2026-07-27] column-admin-draft-publishing | 实现会员专栏管理员发布系统
 
 - Session: local Codex task
@@ -1607,7 +1512,7 @@
 
 - Session: local Codex task
 - Checkpoint: 会员专栏管理端既有改动先通过 `git diff --check` 并整体暂存；随后
-  的 UI、阅读进度与搜索改动保持未暂存，`marketing/` 未纳入，形成可独立回退边界。
+  的 UI、阅读进度与搜索改动保持未暂存，形成可独立回退边界。
 - UI: 全局按钮兼容微信 v2 最小宽度，统一数字字体与核心灰阶，扩大资讯互动热区，
   并为四个原生 Tab 补齐成对线性图标；新增共享空态，补齐精选、简报、专栏目录和
   阅读器下拉刷新；阅读器图片失败只自动
@@ -1647,7 +1552,7 @@
   通过，项目检查为 37 个 JSON、345 个 JavaScript、16 个页面和约 0.68 MiB。
 - Release boundary: 没有创建或修改生产集合、索引和数据，没有部署云函数，也没有
   上传或提交小程序。原会员专栏管理改动的 Git 暂存快照保持不变；本轮新增优化仍
-  未暂存，`marketing/` 继续不纳入。
+  未暂存。
 - Release order: 集合与规则 → 索引 → `knowledgeFeed` → `searchTokenBackfill`
   完成与三角色搜索 canary → 小程序上传审核。
 - Sensitive handling: Wiki 未记录维护令牌、OpenID、管理员标识、生产日志、条目
@@ -1677,8 +1582,7 @@
 ## [2026-07-27] release-candidate-hardening | 收口可送审候选但不执行发布
 
 - Session: local Codex task
-- Checkpoint: 先把会员专栏管理系统固化为 Git 提交 `a3d5c5a`，作为可恢复基线；
-  后续发布候选继续排除无关的 `marketing/` 工作目录。
+- Checkpoint: 先把会员专栏管理系统固化为 Git 提交 `a3d5c5a`，作为可恢复基线。
 - Backfill: 修正上一条“与来源同步并行”的实现。搜索回填改为独立定时器，不再共享
   来源同步的 300 秒调用预算；单条文档连续五次失败后进入最多 50 条的隔离列表并
   推进主游标，批量数据库故障保持整批延后。隔离条目继续由定时器重试，搜索可用状态
@@ -1735,7 +1639,7 @@
   38 个 JSON、354 个 JavaScript、16 个页面和约 0.70 MiB。微信开发者工具实画面
   确认搜索范围卡为 0、列表与详情推荐热度一致、真实互动栏未被替换。
 - Release boundary: 未修改生产集合、索引或数据，未部署云函数，未上传体验版或
-  提交微信审核；无关 `marketing/` 目录继续排除。
+  提交微信审核。
 - Sensitive handling: 未记录搜索词、OpenID、管理员标识、维护令牌、生产日志或
   其他敏感值。
 
@@ -1745,7 +1649,7 @@
 - Release anchor: 从隔离干净工作树锁定并验证提交
   `03657d7cd97783e49f34c7b52083d7b9019a34bc`；本地 RC 标签为
   `rc/2026-07-28-member-admin-global-search`。主工作区后来出现的资讯时间线
-  WXML/WXSS 修改和 `marketing/` 未跟踪目录均未进入候选。
+  WXML/WXSS 修改未进入候选。
 - CloudBase: 增量创建 `knowledge_column_progress`，生产 29 个合同集合及其
   `ADMINONLY` 规则回读收敛；新增三个搜索/进度索引，50 个合同索引收敛。
   存储规则不变。依次部署 `knowledgeOps`、`knowledgeFeed`，四函数 manifest 和
@@ -1767,15 +1671,11 @@
 - Sensitive handling: 维护令牌仅在内存和一次性临时事件文件中使用；Wiki 未记录
   令牌、OpenID、管理员标识、搜索词、原始生产错误或用户阅读记录。
 
-## [2026-07-28] final-review-candidate-inclusion | 收回排除项并锁定最终送审候选
+## [2026-07-28] final-review-candidate-inclusion | 锁定最终送审候选
 
 - Session: local Codex task
-- Supersedes: 用户明确要求不再排除资讯时间线和 `marketing/`；此前把它们留在候选
-  之外的范围结论已被本记录取代。
 - Timeline: `86c8111` 完成资讯按日续载、剩余计数、失败重试、连续时间线和稳定命中区；
   开发者工具验证成功、失败和空日期三种状态。
-- Marketing: `6b3b80f` 纳入仓库根部 88 个推广资产文件及合同测试，约 57.16 MiB；
-  `miniprogramRoot` 仍为 `hyyc/`，推广资产不会进入微信包。
 - Hardening: 最终小程序代码锚点
   `d88c1553e7b948be50b3a184c740f290a528aede` 修正滚动日期权限、免费标题级专栏
   搜索、发布 revision、简报 Tab 跳转、管理筛选状态排序防误触和空资讯分享。
@@ -1789,3 +1689,17 @@
   29 集合、50 索引、10 个触发器、355 个 JavaScript、777/777 测试和最终部署边界。
 - Sensitive handling: Wiki 未记录维护令牌、OpenID、管理员标识、搜索词、生产日志、
   用户阅读记录、预览认证信息或其他敏感值。
+
+## [2026-07-28] mini-program-only-release-scope | 发布范围收敛为小程序
+
+- Session: local Codex task
+- Supersedes: 用户明确将非小程序素材排除出本仓库的活跃版本和项目记忆；此前把该
+  工作目录纳入候选的范围结论被本记录取代。
+- Git: 非产品工作目录停止跟踪并加入忽略，本地原文件保留；对应的非产品资产测试
+  从小程序测试集移除。
+- Wiki: 按用户明确要求删除相关导航、专题页和历史正文；当前 Wiki 只维护小程序的
+  产品、代码、CloudBase、测试和微信发布事实。
+- Product behavior: `hyyc/` 的小程序功能代码未因范围清理而改变；后续重新从干净
+  提交执行完整验证、生产函数部署和微信候选上传。
+- Sensitive handling: 本记录不包含外部平台账号、会话、令牌、用户数据或其他
+  敏感值。
