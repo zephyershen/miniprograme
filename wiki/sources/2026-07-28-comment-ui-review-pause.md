@@ -3,7 +3,7 @@ title: "评论界面送审暂停与开发者工具验收"
 type: source
 tags: [comments, review, miniprogram, testing, devtools]
 observed_at: 2026-07-28
-status: pre-upload
+status: uploaded-awaiting-review
 confidence: high
 ---
 
@@ -29,10 +29,12 @@ confidence: high
 
 最终完整 `npm.cmd run verify` 通过：
 
-- 38 个 JSON、358 个 JavaScript、16 个注册页面；
-- 791/791 个 Node 测试；
+- 隔离干净发布工作树为 38 个 JSON、358 个受控 JavaScript、16 个注册页面；
+- 792/792 个 Node 测试；
 - 29 个 `ADMINONLY` 集合合同和 50 个索引合同；
-- 覆盖率与生产依赖审计均通过，客户端检查包约 0.71 MiB。
+- 覆盖率与生产依赖审计均通过，客户端检查包约 0.73 MiB；
+- 新增小程序打包边界守卫，要求 `project.config.json` 显式排除
+  `cloudfunctions / cloudrun / scripts / tests`，并让项目检查直接从同一配置计算包体。
 
 新增关闭态回归覆盖中央开关、资讯列表/详情、旧详情深链、旧资料编辑深链、会员权益、
 评论消息过滤、跨页可见消息查找、扫描预算、未读重算、关闭态零批量写、通用消息
@@ -58,6 +60,20 @@ canary 全部通过：
 
 ## 发布边界
 
-当前记录对应待上传替换候选，尚未覆盖已上传的 `2.4.0@68382f5`。最终代码提交、
-`knowledgeFeed` code-only 部署与源码哈希回读、新微信版本上传均待执行；不需要
-修改生产集合、索引、数据或存储规则，也不会提交或正式发布审核版本前的法律确认。
+评论隐藏实现提交为 `5acb52e76da8c8a7feb6bdbc082415eb73fda39a`；
+生产 `knowledgeFeed` 已从该提交 code-only 更新。四函数 manifest、10 个
+`knowledgeFeed` 触发器均回读收敛，线上下载的 118 个受控函数文件与发布工作树
+SHA-256 全部一致。部署后的六页开发者工具 canary 再次通过。
+
+首个开发上传 `2.4.1` 的 preview 为 637,272 bytes、upload 为 1,603,673 bytes。
+复核确认 upload 因 `packOptions.ignore` 未显式排除 `cloudfunctions` 而包含 142 个
+已跟踪服务端源码文件；该候选不得提交审核。随后提交
+`fffd078c4e30f3d7f03f3e731b1183ebebb6aeb6` 显式排除服务端与开发目录并加入自动
+守卫；该提交相对 `5acb52e` 没有任何 `hyyc/cloudfunctions` 变更。分支与
+`rc/2026-07-28-comments-hidden-v2` 标签均已推送。
+
+微信开发者工具从 `fffd078` 的零 `node_modules` 独立工作树生成 637,272-byte
+预览包，并成功上传开发版本 `2.4.2`；upload 回执为 639,674 bytes，仅比 preview
+多 2,402 bytes，较不安全的 `2.4.1` 减少 963,999 bytes，服务端源码已排除。上传后
+六页 canary 再次通过。未修改生产集合、索引、数据或存储规则。平台审核规则确认、
+审核提交与审核通过后的正式发布仍由用户本人完成，本次没有代为勾选或提交。

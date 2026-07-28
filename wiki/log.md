@@ -1755,3 +1755,56 @@
   审核版本通过后远程热开启。
 - Sensitive handling: 未记录 OpenID、管理员标识、消息正文、评论内容、维护令牌、
   浏览器登录态或其他敏感值。
+
+## [2026-07-28] mini-program-2.4.1-comments-hidden-upload | 评论隐藏替换候选部署与上传
+
+- Session: local Codex task
+- Anchor: 评论隐藏候选提交
+  `5acb52e76da8c8a7feb6bdbc082415eb73fda39a`、分支和
+  `rc/2026-07-28-comments-hidden-v1` 标签均已推送；`marketing/` 继续保持忽略，
+  没有跟踪或暂存。
+- Verification: 主工作区专项 76/76、完整 791/791 通过；隔离干净发布工作树安装
+  各模块锁定依赖后再次通过完整 `npm.cmd run verify`，结果为 38 个 JSON、357 个
+  受控 JavaScript、16 个页面、29 个集合合同、50 个索引合同、覆盖率与生产依赖审计
+  全部通过。主工作区先前的 358 计数包含一个被 Git 忽略的自动化脚本，不进入候选。
+- CloudBase: 仅 code-only 更新 `knowledgeFeed`，不修改集合、索引、数据、存储规则、
+  资源配置或触发器。控制面恢复 Active 后，四函数 manifest 与 10 个
+  `knowledgeFeed` 定时触发器收敛；下载线上函数并比对 118 个受控文件，SHA-256
+  缺失 0、差异 0。
+- Canary: 部署后真实管理员开发者工具会话的资讯、旧评论深链详情、会员、消息、
+  我的和资料编辑六页全部通过；资讯与详情评论图标均为 0，详情操作栏只有喜欢、
+  收藏、分享，评论弹层未挂载，消息页只显示非评论系统通知。
+- WeChat: 从零 `node_modules` 的独立工作树生成 637,272-byte 预览包并成功上传
+  `2.4.1`，但 upload 回执为 1,603,673 bytes。进一步复核确认项目打包配置没有
+  显式排除 `cloudfunctions`，导致 142 个已跟踪服务端源码进入上传包；该候选不安全，
+  不得提交审核，必须由后续版本替换。
+- Release boundary: 本条由后续
+  `mini-program-2.4.2-safe-upload` 记录取代；`2.4.1` 仅保留为问题证据。
+  未来恢复评论仍必须修改中央客户端开关、重跑回归并提交新的微信审核版本。
+- Sensitive handling: Wiki 未记录 OpenID、管理员标识、微信登录态、评论内容、
+  用户消息、维护令牌或其他敏感值。
+
+## [2026-07-28] mini-program-2.4.2-safe-upload | 排除服务端源码并上传安全候选
+
+- Session: local Codex task
+- Root cause: `project.config.json` 的 `packOptions.ignore` 未显式排除位于小程序根
+  目录下的 `cloudfunctions`；preview 与 upload 采用的未使用文件处理不同，使
+  `2.4.1` upload 比 preview 多约 966 KB 并带入服务端源码。
+- Fix: 提交 `fffd078c4e30f3d7f03f3e731b1183ebebb6aeb6` 显式排除
+  `cloudfunctions / cloudrun / scripts / tests`；项目检查改为直接读取同一配置计算
+  客户端包体并要求四个排除项，新增专项回归锁定 `cloudfunctionRoot` 与打包边界。
+  分支和 `rc/2026-07-28-comments-hidden-v2` 标签均已推送。
+- Verification: 主工作区完整 `npm.cmd run verify` 与隔离干净工作树复验均通过；
+  最终干净结果为 38 个 JSON、358 个受控 JavaScript、16 个页面、792/792 个 Node
+  测试、29 个集合合同、50 个索引合同、覆盖率和生产依赖审计全部通过。
+- CloudBase: `fffd078` 相对已部署评论实现锚点 `5acb52e` 没有任何
+  `hyyc/cloudfunctions` 变更，因此不重复部署；生产四函数 manifest、10 个
+  `knowledgeFeed` 触发器与先前 118 文件源码回读继续有效。
+- WeChat: 从 `fffd078` 的零 `node_modules` 独立工作树生成 637,272-byte 预览包，
+  上传安全开发版本 `2.4.2` 成功，upload 回执为 639,674 bytes；比不安全的 `2.4.1`
+  减少 963,999 bytes。上传后的评论隐藏六页 canary 再次通过。
+- Release boundary: 只可提交 `2.4.2`，不得提交 `2.4.1`。未替用户勾选平台审核
+  规则、未提交审核、未正式发布；下一步由用户本人确认规则并提交 `2.4.2`，审核通过
+  后仍需显式发布。
+- Sensitive handling: Wiki 未记录 OpenID、管理员标识、微信登录态、评论内容、
+  用户消息、维护令牌、服务端源码正文或其他敏感值。

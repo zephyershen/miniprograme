@@ -1,5 +1,5 @@
 ---
-title: "待上传替换候选暂时隐藏评论界面"
+title: "送审替换候选暂时隐藏评论界面"
 type: decision
 tags: [comments, review, release, feature-flag, wechat]
 date: 2026-07-28
@@ -7,7 +7,7 @@ status: accepted
 confidence: high
 ---
 
-# 待上传替换候选暂时隐藏评论界面
+# 送审替换候选暂时隐藏评论界面
 
 ## 背景
 
@@ -25,7 +25,7 @@ confidence: high
 
 ## 最终决定
 
-待上传替换候选通过 `hyyc/config/product-features.js` 将 `comments` 固定为 `false`。
+送审替换候选通过 `hyyc/config/product-features.js` 将 `comments` 固定为 `false`。
 资讯列表、资讯详情、会员权益、消息中心和个人资料页面不得显示评论相关 UI 或文案；
 历史 `comments=1&commentId=...` 与 `from=comments` 深链也不能重新打开评论。
 
@@ -40,7 +40,8 @@ confidence: high
 
 - 审核候选的资讯操作栏只保留喜欢、收藏和分享。
 - 消息中心仍显示会员和资料通知，评论通知不占用其 50 条可见消息容量。
-- 已上传的 `2.4.0` 不会被原地修改；完成部署和验证后需上传新的替换版本。
+- 已上传的 `2.4.0` 和误带服务端源码的 `2.4.1` 均已由安全评论隐藏开发版本
+  `2.4.2` 替换；前两者不得提交审核。
 - 旧正式客户端未传 `includeComments`，继续保持原有消息合同。
 - 评论恢复不能远程完成，必须修改开关、更新回归并提交新的微信审核版本。
 
@@ -60,6 +61,9 @@ confidence: high
 
 ## 状态与来源
 
-状态为 `accepted / pre-upload`。实现与验证证据见
+状态为 `accepted / uploaded-awaiting-review`。实现与验证证据见
 [评论界面送审暂停与开发者工具验收](../sources/2026-07-28-comment-ui-review-pause.md)；
-最终 Git SHA、云函数回读和微信上传回执在实际完成后补记。
+评论隐藏实现锚点为 `5acb52e76da8c8a7feb6bdbc082415eb73fda39a`，最终安全
+打包锚点为 `fffd078c4e30f3d7f03f3e731b1183ebebb6aeb6`。云函数 118 个受控
+文件回读一致，微信开发版本 `2.4.2` 已上传且 upload 回执为 639,674 bytes。审核
+规则确认、审核提交与正式发布仍由用户本人完成。
