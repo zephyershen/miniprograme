@@ -1766,3 +1766,26 @@
   状态仍需人工确认；远端分支还未包含四个新候选提交和本地 RC 标签。
 - Sensitive handling: 维护令牌仅在内存和一次性临时事件文件中使用；Wiki 未记录
   令牌、OpenID、管理员标识、搜索词、原始生产错误或用户阅读记录。
+
+## [2026-07-28] final-review-candidate-inclusion | 收回排除项并锁定最终送审候选
+
+- Session: local Codex task
+- Supersedes: 用户明确要求不再排除资讯时间线和 `marketing/`；此前把它们留在候选
+  之外的范围结论已被本记录取代。
+- Timeline: `86c8111` 完成资讯按日续载、剩余计数、失败重试、连续时间线和稳定命中区；
+  开发者工具验证成功、失败和空日期三种状态。
+- Marketing: `6b3b80f` 纳入仓库根部 88 个推广资产文件及合同测试，约 57.16 MiB；
+  `miniprogramRoot` 仍为 `hyyc/`，推广资产不会进入微信包。
+- Hardening: 最终小程序代码锚点
+  `d88c1553e7b948be50b3a184c740f290a528aede` 修正滚动日期权限、免费标题级专栏
+  搜索、发布 revision、简报 Tab 跳转、管理筛选状态排序防误触和空资讯分享。
+- Verification: 隔离干净工作树完整验证通过：38 个 JSON、355 个 JavaScript、
+  16 个页面、777/777 个 Node 测试、29 个集合、50 个索引、覆盖率与生产依赖审计；
+  微信开发者工具从精确代码提交生成 632,253-byte 预览包。
+- Release boundary: 生产后端仍来自 `03657d7`。由于 `d88c155` 修改了
+  `knowledgeFeed`，正式微信上传前还须 code-only 部署该函数并完成回读/canary；
+  按用户要求，本轮没有部署、上传、提交审核或发布。
+- Memory: `index.md`、`overview.md`、小程序实体页和 7 月 28 日发布证据已统一为
+  29 集合、50 索引、10 个触发器、355 个 JavaScript、777/777 测试和最终部署边界。
+- Sensitive handling: Wiki 未记录维护令牌、OpenID、管理员标识、搜索词、生产日志、
+  用户阅读记录、预览认证信息或其他敏感值。
