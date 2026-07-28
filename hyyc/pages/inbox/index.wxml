@@ -127,9 +127,9 @@
     </view>
 
     <view class="filter-sort-row">
-      <view wx:if="{{feed.searchReady}}" class="feed-search-shortcut" bindtap="openSearch" aria-role="button" aria-label="搜索资讯、GitHub、会员专栏与知识简报">
+      <view class="feed-search-shortcut" bindtap="openSearch" aria-role="button" aria-label="搜索资讯、GitHub、会员专栏与知识简报">
         <view class="feed-search-icon"></view>
-        <text>搜索</text>
+        <text class="feed-search-label">搜索</text>
       </view>
       <view class="filter-bar" bindtap="openFilters">
         <view class="filter-bar-copy">
@@ -145,7 +145,7 @@
           class="sort-choice {{item.active ? 'sort-choice-active' : ''}}"
           data-key="{{item.key}}"
           bindtap="selectSort"
-        >{{item.label}}</view>
+        ><text class="sort-choice-label">{{item.label}}</text></view>
       </view>
     </view>
   </view>

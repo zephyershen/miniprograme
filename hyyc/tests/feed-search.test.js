@@ -326,7 +326,7 @@ test('searches protected live digests without exposing them to free users', asyn
   assert.equal(result.items[0].windowKey, '7d');
 });
 
-test('registers the search route, server action, additive indexes, and readiness-gated inbox entry', () => {
+test('registers the search route, server action, additive indexes, and persistent inbox entry', () => {
   const app = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'app.json'), 'utf8'));
   assert.ok(app.pages.includes('pages/search/index'));
 
@@ -349,7 +349,8 @@ test('registers the search route, server action, additive indexes, and readiness
   assert.match(backend, /\bfeedSearch\b/);
   assert.match(backend, /\bsearchTokenBackfill\b/);
   assert.match(api, /action: 'feedSearch'/);
-  assert.match(inbox, /wx:if="{{feed\.searchReady}}".*openSearch/);
+  assert.match(inbox, /class="feed-search-shortcut" bindtap="openSearch"/);
+  assert.doesNotMatch(inbox, /wx:if="{{feed\.searchReady}}".*openSearch/);
   assert.match(searchPage, /会员专栏与知识简报/);
   assert.match(searchPage, /item\.titleParts/);
   assert.match(searchPage, /useHistory/);

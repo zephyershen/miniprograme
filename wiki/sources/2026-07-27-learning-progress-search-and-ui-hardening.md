@@ -2,7 +2,7 @@
 title: "会员学习进度、跨历史搜索与界面一致性加固"
 type: source
 tags: [miniprogram, membership, progress, search, ui, cloudbase]
-last_updated: 2026-07-27
+last_updated: 2026-07-28
 status: local-verified
 confidence: high
 ---
@@ -38,11 +38,15 @@ confidence: high
   令在途截图任务失效。中断可续跑、重复执行幂等，并用游标比较阻止并发旧批次越过
   新进度。稳定失败的单条文档连续五次失败后进入有界隔离列表，主游标继续前进，
   独立定时器持续重试；批量故障不会被误当作毒丸。`knowledgeOps.status` 暴露扫描量、
-  安全错误码、隔离 ID 和批次耗时。主扫描完成前首页隐藏搜索入口，深链
-  `feedSearch` 返回 `SEARCH_UNAVAILABLE`，避免把缺结果伪装成“没有找到”。
+  安全错误码、隔离 ID 和批次耗时。首页搜索入口保持常驻，主扫描完成前由搜索页
+  在实际查询时展示“搜索正在准备”；`feedSearch` 返回 `SEARCH_UNAVAILABLE`，
+  避免把缺结果伪装成“没有找到”。
 - 精选、搜索和会员价格中的普通说明文字不再误用表单 `<label>`；会员目录为免费用户
   展示“Pro 自动记录学习进度”的真实转化说明；管理列表新增本地关键词和发布状态筛选，
   有筛选时禁用容易误排的上下移动。
+- 2026-07-28 根据开发者工具实画面修正首页控制条回归：搜索入口不再受
+  `feed.searchReady` 条件隐藏；筛选、排序和搜索仍保留 88rpx 点击范围，但视觉胶囊
+  缩回 60rpx，避免把无障碍热区直接画成过高组件。
 
 ## 合同与验证
 

@@ -717,7 +717,6 @@ Page({
   },
 
   openSearch() {
-    if (!this.data.feed || this.data.feed.searchReady !== true) return;
     wx.navigateTo({ url: '/pages/search/index' });
   },
 

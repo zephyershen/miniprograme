@@ -52,7 +52,12 @@ test('keeps filter choices tappable and uses text nodes for non-form copy', () =
   assert.match(inboxStyles, /\.filter-bar\s*\{[^}]*min-height:\s*88rpx;/s);
   assert.match(inboxStyles, /\.sort-choice\s*\{[^}]*min-height:\s*88rpx;/s);
   assert.match(inboxStyles, /\.feed-search-shortcut\s*\{[^}]*min-height:\s*88rpx;/s);
+  assert.match(inboxStyles, /\.filter-bar::before\s*\{[^}]*inset:\s*14rpx 0;/s);
+  assert.match(inboxStyles, /\.sort-choice-track::before\s*\{[^}]*inset:\s*14rpx 0;/s);
+  assert.match(inboxStyles, /\.sort-choice-active::before\s*\{[^}]*inset:\s*14rpx 0;/s);
+  assert.match(inboxStyles, /\.feed-search-shortcut::before\s*\{[^}]*inset:\s*14rpx 0;/s);
   assert.match(inboxMarkup, /aria-label="搜索资讯、GitHub、会员专栏与知识简报"/);
+  assert.doesNotMatch(inboxMarkup, /wx:if="{{feed\.searchReady}}".*openSearch/);
   assert.match(featuredStyles, /\.filter-option\s*\{[^}]*min-height:\s*88rpx;/s);
   textOnlyMarkup.forEach((markup) => assert.doesNotMatch(markup, /<label\b/));
 });

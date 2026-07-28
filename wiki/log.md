@@ -1701,3 +1701,19 @@
   遮罩和语义色的完整验收合同。两项均未用假配置或半套主题进入本次候选。
 - Sensitive handling: Wiki 未记录维护令牌、OpenID、管理员标识、搜索词、生产日志、
   用户阅读记录、条目内容或其他敏感值。
+
+## [2026-07-28] inbox-search-control-regression | 恢复搜索入口与紧凑控制条
+
+- Session: local Codex task
+- Trigger: 用户提供开发者工具截图，确认首页搜索入口消失，筛选和排序胶囊被 88rpx
+  热区直接撑高。
+- Root cause: 搜索入口错误地由尚未部署到生产的 `feed.searchReady` 控制；热区改造
+  把 44px 可点击范围同时当成了实心控件高度。
+- Change: 搜索入口改为常驻并始终可进入搜索页，未就绪状态继续由服务端
+  `SEARCH_UNAVAILABLE` 和搜索页负责解释；三个控制保留 88rpx 命中范围，视觉表面
+  统一为 60rpx。
+- Verification: 定向搜索、首页模型和 UI 一致性测试 39/39 通过，项目检查通过；
+  微信开发者工具普通编译后确认入口可见、控制条紧凑，实际点击可打开四范围搜索页。
+- Release boundary: 仅修改本地小程序、测试和项目记忆；未部署云函数、修改生产数据、
+  上传体验版或提交审核。
+- Sensitive handling: 未记录搜索词、OpenID、生产日志或其他敏感值。
