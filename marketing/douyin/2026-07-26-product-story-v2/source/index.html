@@ -1,0 +1,684 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>看懂今天 · 产品故事</title>
+  <style>
+    :root {
+      --ink: #101820;
+      --muted: #526270;
+      --blue: #1599ee;
+      --blue-deep: #087ac6;
+      --sky: #eaf7ff;
+      --paper: #f8fbfd;
+      --line: rgba(16, 24, 32, 0.1);
+      --yellow: #ffdd78;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: #dce8ef;
+      font-family: "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+      color: var(--ink);
+    }
+
+    body {
+      overflow: hidden;
+    }
+
+    .frame {
+      position: relative;
+      width: 1080px;
+      height: 1920px;
+      overflow: hidden;
+      background:
+        linear-gradient(rgba(21, 153, 238, 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(21, 153, 238, 0.045) 1px, transparent 1px),
+        radial-gradient(circle at 15% 8%, rgba(64, 186, 255, 0.22), transparent 30%),
+        linear-gradient(145deg, #f8fcff 0%, #f1f7fb 48%, #edf4f8 100%);
+      background-size: 44px 44px, 44px 44px, auto, auto;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      padding: 112px 78px 96px;
+      display: none;
+      flex-direction: column;
+    }
+
+    .slide.active { display: flex; }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 16px;
+      color: var(--blue-deep);
+      font-size: 31px;
+      font-weight: 800;
+      letter-spacing: 1px;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 42px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--blue);
+    }
+
+    h1, h2, p { margin: 0; }
+
+    h1 {
+      margin-top: 58px;
+      font-size: 112px;
+      line-height: 1.02;
+      letter-spacing: -7px;
+      font-weight: 950;
+    }
+
+    h2 {
+      margin-top: 56px;
+      font-size: 82px;
+      line-height: 1.12;
+      letter-spacing: -4px;
+      font-weight: 950;
+    }
+
+    .blue { color: var(--blue); }
+
+    .lead {
+      margin-top: 42px;
+      color: #405260;
+      font-size: 42px;
+      line-height: 1.55;
+      font-weight: 650;
+    }
+
+    .hero-art {
+      position: relative;
+      margin-top: 68px;
+      width: 924px;
+      height: 520px;
+      overflow: hidden;
+      border: 2px solid rgba(21, 153, 238, 0.12);
+      border-radius: 40px;
+      box-shadow: 0 30px 70px rgba(38, 76, 104, 0.18);
+      background: white;
+    }
+
+    .hero-art img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .chips {
+      display: flex;
+      gap: 18px;
+      flex-wrap: wrap;
+      margin-top: 42px;
+    }
+
+    .chip {
+      padding: 17px 26px;
+      border: 2px solid rgba(16, 24, 32, 0.1);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.9);
+      color: #30404d;
+      font-size: 29px;
+      font-weight: 800;
+    }
+
+    .cards {
+      display: grid;
+      gap: 24px;
+      margin-top: 70px;
+    }
+
+    .card {
+      position: relative;
+      min-height: 218px;
+      padding: 34px 38px 34px 118px;
+      border: 2px solid rgba(16, 24, 32, 0.08);
+      border-radius: 34px;
+      background: rgba(255, 255, 255, 0.92);
+      box-shadow: 0 18px 48px rgba(32, 75, 105, 0.09);
+    }
+
+    .card .num {
+      position: absolute;
+      left: 36px;
+      top: 34px;
+      width: 54px;
+      height: 54px;
+      display: grid;
+      place-items: center;
+      border-radius: 18px;
+      background: var(--sky);
+      color: var(--blue-deep);
+      font-size: 27px;
+      font-weight: 950;
+    }
+
+    .card strong {
+      display: block;
+      font-size: 41px;
+      line-height: 1.24;
+    }
+
+    .card span {
+      display: block;
+      margin-top: 13px;
+      color: var(--muted);
+      font-size: 30px;
+      line-height: 1.45;
+    }
+
+    .quote {
+      margin-top: 84px;
+      padding: 64px 58px;
+      border: 2px solid rgba(21, 153, 238, 0.16);
+      border-radius: 42px;
+      background: rgba(255, 255, 255, 0.94);
+      box-shadow: 0 28px 80px rgba(40, 88, 122, 0.12);
+      font-size: 61px;
+      line-height: 1.36;
+      font-weight: 900;
+    }
+
+    .quote small {
+      display: block;
+      margin-top: 34px;
+      color: var(--blue-deep);
+      font-size: 29px;
+      font-weight: 800;
+    }
+
+    .product-grid {
+      display: grid;
+      grid-template-columns: 1fr 440px;
+      gap: 38px;
+      align-items: center;
+      margin-top: 66px;
+      flex: 1;
+    }
+
+    .product-copy {
+      align-self: center;
+    }
+
+    .product-copy p {
+      color: #405260;
+      font-size: 37px;
+      line-height: 1.6;
+      font-weight: 650;
+    }
+
+    .product-copy b {
+      color: var(--ink);
+      font-weight: 950;
+    }
+
+    .phone {
+      position: relative;
+      width: 430px;
+      height: 930px;
+      overflow: hidden;
+      border: 18px solid #111a22;
+      border-radius: 68px;
+      background: white;
+      box-shadow: 0 40px 80px rgba(15, 33, 47, 0.24);
+      transform: rotate(2deg);
+    }
+
+    .phone::before {
+      content: "";
+      position: absolute;
+      z-index: 2;
+      top: -1px;
+      left: 50%;
+      width: 180px;
+      height: 36px;
+      transform: translateX(-50%);
+      border-radius: 0 0 22px 22px;
+      background: #111a22;
+    }
+
+    .phone img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top center;
+    }
+
+    .index-steps {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 22px;
+      margin-top: 62px;
+    }
+
+    .index-step {
+      min-height: 275px;
+      padding: 34px;
+      border: 2px solid rgba(16, 24, 32, 0.08);
+      border-radius: 32px;
+      background: rgba(255, 255, 255, 0.92);
+    }
+
+    .index-step b {
+      display: block;
+      color: var(--blue-deep);
+      font-size: 29px;
+    }
+
+    .index-step strong {
+      display: block;
+      margin-top: 22px;
+      font-size: 40px;
+      line-height: 1.24;
+    }
+
+    .index-step p {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 27px;
+      line-height: 1.5;
+    }
+
+    .questions {
+      display: grid;
+      gap: 28px;
+      margin-top: 76px;
+    }
+
+    .question {
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 28px;
+      align-items: center;
+      padding: 32px;
+      border-radius: 34px;
+      background: white;
+      box-shadow: 0 18px 48px rgba(34, 78, 109, 0.09);
+      font-size: 43px;
+      line-height: 1.28;
+      font-weight: 900;
+    }
+
+    .question i {
+      width: 78px;
+      height: 78px;
+      display: grid;
+      place-items: center;
+      border-radius: 25px;
+      background: var(--sky);
+      color: var(--blue-deep);
+      font-size: 35px;
+      font-style: normal;
+    }
+
+    .final {
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+
+    .final .mark {
+      display: inline-flex;
+      padding: 20px 34px;
+      border: 3px solid #111a22;
+      border-radius: 24px;
+      background: var(--yellow);
+      box-shadow: 8px 10px 0 var(--blue);
+      font-size: 36px;
+      font-weight: 950;
+      transform: rotate(-2deg);
+    }
+
+    .final h2 {
+      margin-top: 72px;
+      max-width: 890px;
+      font-size: 108px;
+      line-height: 1.04;
+    }
+
+    .final .product {
+      margin-top: 68px;
+      padding: 34px 56px;
+      border-radius: 999px;
+      background: #111a22;
+      color: white;
+      font-size: 43px;
+      font-weight: 900;
+    }
+
+    .footer {
+      margin-top: auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 38px;
+      color: #6b7b87;
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: 1px;
+    }
+
+    .footer .brand {
+      color: #24333f;
+    }
+
+    .progress {
+      display: flex;
+      gap: 9px;
+    }
+
+    .progress span {
+      width: 24px;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(36, 51, 63, 0.16);
+    }
+
+    .progress span.on {
+      width: 58px;
+      background: var(--blue);
+    }
+
+    .cover {
+      position: absolute;
+      inset: 0;
+      display: none;
+      overflow: hidden;
+      background:
+        linear-gradient(rgba(21, 153, 238, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(21, 153, 238, 0.05) 1px, transparent 1px),
+        radial-gradient(circle at 15% 8%, rgba(64, 186, 255, 0.25), transparent 32%),
+        linear-gradient(145deg, #f8fcff, #eef6fb);
+      background-size: 42px 42px, 42px 42px, auto, auto;
+    }
+
+    .cover.active { display: block; }
+
+    .cover-copy {
+      position: absolute;
+      z-index: 2;
+    }
+
+    .cover .cover-title {
+      margin: 34px 0 0;
+      color: var(--ink);
+      font-weight: 950;
+      letter-spacing: -5px;
+      line-height: 1.02;
+    }
+
+    .cover .cover-title em {
+      color: var(--blue);
+      font-style: normal;
+    }
+
+    .cover .cover-sub {
+      color: #405260;
+      font-weight: 750;
+      line-height: 1.42;
+    }
+
+    .cover .cover-phone {
+      position: absolute;
+      overflow: hidden;
+      border: 15px solid #111a22;
+      border-radius: 56px;
+      background: white;
+      box-shadow: 0 30px 70px rgba(24, 53, 73, 0.2);
+      transform: rotate(4deg);
+    }
+
+    .cover .cover-phone img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top center;
+    }
+
+    .cover-v {
+      width: 1080px;
+      height: 1440px;
+    }
+
+    .cover-v .cover-copy {
+      left: 68px;
+      top: 74px;
+      width: 680px;
+    }
+
+    .cover-v .eyebrow { font-size: 27px; }
+    .cover-v .cover-title { font-size: 92px; }
+    .cover-v .cover-sub { margin-top: 30px; font-size: 32px; width: 610px; }
+    .cover-v .cover-phone {
+      right: 55px;
+      bottom: -120px;
+      width: 430px;
+      height: 930px;
+    }
+
+    .cover-h {
+      width: 1440px;
+      height: 1080px;
+    }
+
+    .cover-h .cover-copy {
+      left: 84px;
+      top: 82px;
+      width: 810px;
+    }
+
+    .cover-h .eyebrow { font-size: 28px; }
+    .cover-h .cover-title { font-size: 90px; max-width: 770px; }
+    .cover-h .cover-sub { margin-top: 30px; font-size: 33px; width: 740px; }
+    .cover-h .cover-phone {
+      right: 86px;
+      bottom: -168px;
+      width: 460px;
+      height: 994px;
+    }
+  </style>
+</head>
+<body>
+  <main class="frame" id="frame">
+    <section class="slide" data-slide="1">
+      <div class="eyebrow">微信小程序 · AI 资讯</div>
+      <h1>少看一点，<br><span class="blue">也不怕错过</span></h1>
+      <p class="lead">把分散的 AI 动态、资讯、推文和开源项目，变成真正值得看的今天。</p>
+      <div class="hero-art"><img src="../assets/social-preview.png" alt="" /></div>
+      <div class="chips">
+        <div class="chip">筛掉噪音</div>
+        <div class="chip">解释重要性</div>
+        <div class="chip">给出下一步</div>
+      </div>
+      <div class="footer">
+        <span class="brand">看懂今天</span>
+        <div class="progress"><span class="on"></span><span></span><span></span><span></span></div>
+        <span>01 / 08</span>
+      </div>
+    </section>
+
+    <section class="slide" data-slide="2">
+      <div class="eyebrow">我们为什么做它</div>
+      <h2>每天看到更多信息，<br>却不一定<span class="blue">更接近答案</span></h2>
+      <div class="cards">
+        <div class="card">
+          <div class="num">01</div>
+          <strong>不知道应该从哪里获取可靠信息</strong>
+          <span>群聊、时间线、网站和收藏夹彼此分散。</span>
+        </div>
+        <div class="card">
+          <div class="num">02</div>
+          <strong>看到了，也不知道哪一条真的重要</strong>
+          <span>“刚刚发生”不等于“现在就要行动”。</span>
+        </div>
+        <div class="card">
+          <div class="num">03</div>
+          <strong>知道它重要，却不知道今天需要做什么</strong>
+          <span>信息没有变成判断，只变成新的待办事项。</span>
+        </div>
+      </div>
+      <div class="footer">
+        <span class="brand">看懂今天</span>
+        <div class="progress"><span></span><span class="on"></span><span></span><span></span></div>
+        <span>02 / 08</span>
+      </div>
+    </section>
+
+    <section class="slide" data-slide="3">
+      <div class="eyebrow">信息焦虑的真相</div>
+      <h2>真正让人累的，<br>不是信息太少</h2>
+      <div class="quote">
+        而是“还没想明白”的事情，越来越多。
+        <small>收藏不是消化，知道也不等于判断。</small>
+      </div>
+      <p class="lead">我们想做的不是继续增加“看到的数量”，而是减少“还没想明白的数量”。</p>
+      <div class="footer">
+        <span class="brand">看懂今天</span>
+        <div class="progress"><span></span><span></span><span class="on"></span><span></span></div>
+        <span>03 / 08</span>
+      </div>
+    </section>
+
+    <section class="slide" data-slide="4">
+      <div class="eyebrow">产品是什么</div>
+      <h2>「看懂今天」<br>是一款<span class="blue">微信小程序</span></h2>
+      <div class="product-grid">
+        <div class="product-copy">
+          <p>也是一套<b>信息减负方法</b>。</p>
+          <p style="margin-top:28px">把官方动态、行业资讯、原作者推文和 GitHub 开源项目放进同一个时间线。</p>
+        </div>
+        <div class="phone"><img src="../assets/home.jpg" alt="" /></div>
+      </div>
+      <div class="footer">
+        <span class="brand">看懂今天</span>
+        <div class="progress"><span></span><span></span><span></span><span class="on"></span></div>
+        <span>04 / 08</span>
+      </div>
+    </section>
+
+    <section class="slide" data-slide="5">
+      <div class="eyebrow">我们的取舍</div>
+      <h2>不是让你<br><span class="blue">刷得更多</span></h2>
+      <div class="quote">
+        它更像一张每天更新的编辑索引。
+        <small>先帮你看清“发生了什么”，再把注意力留给“为什么与我有关”。</small>
+      </div>
+      <div class="chips" style="margin-top:58px">
+        <div class="chip">不是无限信息流</div>
+        <div class="chip">不制造“再不学就晚了”</div>
+        <div class="chip">不替你做决定</div>
+      </div>
+      <div class="footer">
+        <span class="brand">看懂今天</span>
+        <div class="progress"><span class="on"></span><span></span><span></span><span></span></div>
+        <span>05 / 08</span>
+      </div>
+    </section>
+
+    <section class="slide" data-slide="6">
+      <div class="eyebrow">一张编辑索引，四个动作</div>
+      <h2>把“更多信息”<br>变成<span class="blue">更少焦虑</span></h2>
+      <div class="index-steps">
+        <div class="index-step">
+          <b>01 · 先收拢来源</b>
+          <strong>统一查看</strong>
+          <p>官方动态、行业资讯、推文和开源项目。</p>
+        </div>
+        <div class="index-step">
+          <b>02 · 降低理解成本</b>
+          <strong>先看速览</strong>
+          <p>保留原作者、发布时间与来源。</p>
+        </div>
+        <div class="index-step">
+          <b>03 · 把判断权还给你</b>
+          <strong>筛选噪音</strong>
+          <p>按时间、主题、来源、最新或热度排序。</p>
+        </div>
+        <div class="index-step">
+          <b>04 · 留下值得回看的</b>
+          <strong>真正消化</strong>
+          <p>喜爱、收藏、评论与分享，不再堆积。</p>
+        </div>
+      </div>
+      <div class="footer">
+        <span class="brand">看懂今天</span>
+        <div class="progress"><span></span><span class="on"></span><span></span><span></span></div>
+        <span>06 / 08</span>
+      </div>
+    </section>
+
+    <section class="slide" data-slide="7">
+      <div class="eyebrow">真正有用的信息</div>
+      <h2>至少应该回答<br><span class="blue">三件事</span></h2>
+      <div class="questions">
+        <div class="question"><i>1</i><span>发生了什么？</span></div>
+        <div class="question"><i>2</i><span>为什么与我有关？</span></div>
+        <div class="question"><i>3</i><span>我现在需要行动吗？</span></div>
+      </div>
+      <p class="lead">如果一条内容无法帮助你完成这三个判断，它很可能只是在占用注意力。</p>
+      <div class="footer">
+        <span class="brand">看懂今天</span>
+        <div class="progress"><span></span><span></span><span class="on"></span><span></span></div>
+        <span>07 / 08</span>
+      </div>
+    </section>
+
+    <section class="slide final" data-slide="8">
+      <div class="mark">看懂今天</div>
+      <h2>少看一点，<br><span class="blue">也不怕错过</span></h2>
+      <p class="lead">筛掉噪音，解释重要性，给出下一步。</p>
+      <div class="product">微信小程序 · 看懂今天</div>
+      <div class="footer" style="position:absolute;left:78px;right:78px;bottom:96px">
+        <span class="brand">KANDONG JINTIAN</span>
+        <div class="progress"><span></span><span></span><span></span><span class="on"></span></div>
+        <span>08 / 08</span>
+      </div>
+    </section>
+  </main>
+
+  <section class="cover cover-v" id="cover-v">
+    <div class="cover-copy">
+      <div class="eyebrow">微信小程序 · AI 资讯</div>
+      <div class="cover-title">少看一点，<br><em>也不怕错过</em></div>
+      <div class="cover-sub">不是让你刷得更多，而是更快判断什么可以不看。</div>
+    </div>
+    <div class="cover-phone"><img src="../assets/home.jpg" alt="" /></div>
+  </section>
+
+  <section class="cover cover-h" id="cover-h">
+    <div class="cover-copy">
+      <div class="eyebrow">微信小程序 · AI 资讯</div>
+      <div class="cover-title">少看一点，<br><em>也不怕错过</em></div>
+      <div class="cover-sub">把分散的信息，变成真正值得看的今天。</div>
+    </div>
+    <div class="cover-phone"><img src="../assets/home.jpg" alt="" /></div>
+  </section>
+
+  <script>
+    const query = new URLSearchParams(location.search);
+    const slide = query.get("slide");
+    const cover = query.get("cover");
+    if (slide) {
+      document.querySelector(`[data-slide="${slide}"]`)?.classList.add("active");
+    } else if (cover) {
+      document.querySelector(`#cover-${cover}`)?.classList.add("active");
+      document.querySelector("#frame").style.display = "none";
+    } else {
+      document.querySelector('[data-slide="1"]').classList.add("active");
+    }
+  </script>
+</body>
+</html>

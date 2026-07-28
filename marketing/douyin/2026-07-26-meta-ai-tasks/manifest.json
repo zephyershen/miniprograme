@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "status": "published",
+  "createdAt": "2026-07-26T09:40:00+08:00",
+  "submittedAt": "2026-07-26T10:23:00+08:00",
+  "publishedAt": "2026-07-26T10:23:27+08:00",
+  "format": {
+    "type": "vertical-video",
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "targetDurationSeconds": 32
+  },
+  "source": {
+    "publisher": "Meta",
+    "publishedOn": "2026-07-24",
+    "url": "https://about.fb.com/news/2026/07/meta-ai-muse-spark-doesnt-just-think-it-acts/"
+  },
+  "assets": {
+    "slides": [
+      "exports/01-hook.png",
+      "exports/02-ai-tasks.png",
+      "exports/03-update.png",
+      "exports/04-shift.png",
+      "exports/05-formula.png",
+      "exports/06-risk.png",
+      "exports/07-boundary.png",
+      "exports/08-ending.png"
+    ],
+    "voice": "audio/voice.wav",
+    "video": "exports/kandong-jintian-meta-ai-tasks.mp4",
+    "covers": {
+      "vertical": "exports/cover-vertical-3x4.png",
+      "horizontal": "exports/cover-horizontal-4x3.png"
+    }
+  },
+  "publication": {
+    "platform": "douyin",
+    "account": "看懂今天",
+    "douyinId": "2830947401szf",
+    "awemeId": "7666656648458407206",
+    "url": "https://www.douyin.com/video/7666656648458407206",
+    "status": "published"
+  },
+  "compliance": {
+    "externalTrafficDiversion": false,
+    "containsContactDetails": false,
+    "containsQRCode": false,
+    "containsDownloadInstruction": false,
+    "humanReviewRequired": true
+  }
+}

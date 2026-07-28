@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "status": "published",
+  "createdAt": "2026-07-26T10:35:00+08:00",
+  "submittedAt": "2026-07-26T10:49:32+08:00",
+  "publishedAt": "2026-07-26T10:50:36+08:00",
+  "format": {
+    "type": "vertical-video",
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "durationSeconds": 29,
+    "targetDurationSeconds": 29,
+    "videoCodec": "h264",
+    "audioCodec": "aac",
+    "pixelFormat": "yuv420p"
+  },
+  "source": {
+    "repository": "https://github.com/zephyershen/kandong-jintian",
+    "commit": "5bcc233cb38a40ef9c23921c63c71d9a8193be39",
+    "copy": [
+      "https://github.com/zephyershen/kandong-jintian/blob/5bcc233cb38a40ef9c23921c63c71d9a8193be39/README.md",
+      "https://github.com/zephyershen/kandong-jintian/blob/5bcc233cb38a40ef9c23921c63c71d9a8193be39/stories/why-we-built-kandong-jintian.md"
+    ],
+    "images": [
+      "assets/social-preview.png",
+      "assets/home.jpg"
+    ]
+  },
+  "audio": {
+    "type": "original-instrumental-bgm",
+    "voiceover": false,
+    "speech": false
+  },
+  "assets": {
+    "slides": [
+      "exports/01-slide.png",
+      "exports/02-slide.png",
+      "exports/03-slide.png",
+      "exports/04-slide.png",
+      "exports/05-slide.png",
+      "exports/06-slide.png",
+      "exports/07-slide.png",
+      "exports/08-slide.png"
+    ],
+    "bgm": "audio/kandong-light-bgm.wav",
+    "video": "exports/kandong-jintian-product-story-v2.mp4",
+    "covers": {
+      "vertical": "exports/cover-vertical-3x4.png",
+      "horizontal": "exports/cover-horizontal-4x3.png"
+    }
+  },
+  "replacement": {
+    "supersedesAwemeId": "7666656648458407206",
+    "supersedesUrl": "https://www.douyin.com/video/7666656648458407206",
+    "status": "deleted",
+    "deletedAt": "2026-07-26T10:52:26+08:00"
+  },
+  "publication": {
+    "platform": "douyin",
+    "account": "看懂今天",
+    "awemeId": "7666663355465207081",
+    "url": "https://www.douyin.com/video/7666663355465207081",
+    "status": "published",
+    "publicPageVerified": true,
+    "publicPageHttpStatus": 200
+  },
+  "compliance": {
+    "containsQRCode": false,
+    "containsContactDetails": false,
+    "containsSpokenPromotion": false,
+    "humanReviewRequired": true,
+    "humanReviewCompleted": true
+  },
+  "verification": {
+    "visualFramesReviewed": [
+      "work/qa-first.png",
+      "work/qa-middle.png",
+      "work/qa-last.png"
+    ],
+    "audio": {
+      "meanVolumeDb": -21.1,
+      "maxVolumeDb": -7.4,
+      "voiceoverDetected": false
+    },
+    "passed": true
+  }
+}

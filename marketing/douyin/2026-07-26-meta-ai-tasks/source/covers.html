@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>看懂今天｜抖音双封面</title>
+  <style>
+    :root {
+      --paper: #f7f9fb;
+      --ink: #101820;
+      --blue: #1d9bf0;
+      --yellow: #ffe38a;
+      --coral: #ff6b5e;
+      --line: #dbe4ea;
+    }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      margin: 0;
+      background: #cbd3da;
+      color: var(--ink);
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    body {
+      display: grid;
+      justify-content: center;
+      gap: 48px;
+      padding: 48px;
+    }
+
+    .cover {
+      position: relative;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 86% 8%, rgba(29,155,240,.16), transparent 30%),
+        var(--paper);
+      isolation: isolate;
+    }
+
+    .cover::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      opacity: .3;
+      background-image:
+        linear-gradient(rgba(16,24,32,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(16,24,32,.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      color: var(--blue);
+      font-weight: 850;
+      letter-spacing: .1em;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 48px;
+      height: 9px;
+      border-radius: 99px;
+      background: var(--blue);
+    }
+
+    h1,
+    p { margin: 0; }
+
+    h1 {
+      letter-spacing: -.06em;
+      font-weight: 920;
+    }
+
+    h1 span { color: var(--blue); }
+
+    .warning {
+      display: inline-block;
+      width: max-content;
+      max-width: 100%;
+      border: 4px solid var(--ink);
+      border-radius: 24px;
+      background: var(--yellow);
+      color: var(--coral);
+      font-weight: 900;
+      transform: rotate(-1deg);
+      box-shadow: 12px 12px 0 var(--blue);
+    }
+
+    .formula {
+      display: grid;
+      gap: 16px;
+    }
+
+    .formula div {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      border: 3px solid var(--line);
+      border-radius: 22px;
+      background: rgba(255,255,255,.94);
+      font-weight: 760;
+    }
+
+    .formula b {
+      display: grid;
+      flex: none;
+      place-items: center;
+      border-radius: 15px;
+      background: var(--ink);
+      color: white;
+    }
+
+    .brand {
+      position: absolute;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-weight: 900;
+    }
+
+    .brand::before {
+      content: "";
+      width: 20px;
+      height: 20px;
+      border: 6px solid var(--blue);
+      border-radius: 50%;
+    }
+
+    .vertical {
+      width: 1080px;
+      height: 1440px;
+      padding: 108px 82px;
+    }
+
+    .vertical .eyebrow { font-size: 32px; }
+    .vertical h1 {
+      margin-top: 74px;
+      font-size: 104px;
+      line-height: 1.08;
+    }
+    .vertical .warning {
+      margin-top: 58px;
+      padding: 25px 32px;
+      font-size: 46px;
+    }
+    .vertical .formula {
+      margin-top: 72px;
+      grid-template-columns: 1fr 1fr;
+    }
+    .vertical .formula div {
+      min-height: 116px;
+      padding: 22px;
+      font-size: 34px;
+    }
+    .vertical .formula b {
+      width: 54px;
+      height: 54px;
+      font-size: 28px;
+    }
+    .vertical .brand {
+      left: 82px;
+      bottom: 68px;
+      font-size: 31px;
+    }
+
+    .horizontal {
+      width: 1440px;
+      height: 1080px;
+      display: grid;
+      grid-template-columns: 1.08fr .92fr;
+      gap: 74px;
+      padding: 92px 96px;
+    }
+
+    .horizontal .eyebrow { font-size: 30px; }
+    .horizontal h1 {
+      margin-top: 66px;
+      font-size: 92px;
+      line-height: 1.08;
+    }
+    .horizontal .warning {
+      margin-top: 54px;
+      padding: 23px 28px;
+      font-size: 38px;
+    }
+    .horizontal .formula {
+      align-content: center;
+    }
+    .horizontal .formula div {
+      min-height: 124px;
+      padding: 24px 26px;
+      font-size: 35px;
+    }
+    .horizontal .formula b {
+      width: 58px;
+      height: 58px;
+      font-size: 29px;
+    }
+    .horizontal .brand {
+      left: 96px;
+      bottom: 72px;
+      font-size: 30px;
+    }
+  </style>
+</head>
+<body>
+  <section class="cover vertical" id="vertical-cover">
+    <div class="eyebrow">AI 工作方式新变化</div>
+    <h1>AI 开始<br><span>替你盯事了</span></h1>
+    <p class="warning">但别把工作全交出去</p>
+    <div class="formula">
+      <div><b>1</b>什么事</div>
+      <div><b>2</b>什么时候</div>
+      <div><b>3</b>什么结果</div>
+      <div><b>4</b>哪里复核</div>
+    </div>
+    <div class="brand">看懂今天</div>
+  </section>
+
+  <section class="cover horizontal" id="horizontal-cover">
+    <div>
+      <div class="eyebrow">AI 工作方式新变化</div>
+      <h1>AI 开始<br><span>替你盯事了</span></h1>
+      <p class="warning">但别把工作全交出去</p>
+    </div>
+    <div class="formula">
+      <div><b>1</b>什么事</div>
+      <div><b>2</b>什么时候</div>
+      <div><b>3</b>什么结果</div>
+      <div><b>4</b>哪里复核</div>
+    </div>
+    <div class="brand">看懂今天</div>
+  </section>
+</body>
+</html>

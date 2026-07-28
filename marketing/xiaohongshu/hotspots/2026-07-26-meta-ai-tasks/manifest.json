@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "status": "published",
+  "createdAt": "2026-07-26T06:00:00+08:00",
+  "publishedAt": "2026-07-26T10:03:00+08:00",
+  "publication": {
+    "platform": "xiaohongshu",
+    "account": "看懂今天",
+    "noteId": "6a656b0a0000000001003868",
+    "url": "https://www.xiaohongshu.com/explore/6a656b0a0000000001003868"
+  },
+  "topic": "Meta AI persistent tasks",
+  "eventDate": "2026-07-24",
+  "visualAssets": [
+    "exports/01-cover.png",
+    "exports/02-update.png",
+    "exports/03-why.png",
+    "exports/04-shift.png",
+    "exports/05-formula.png",
+    "exports/06-risk.png",
+    "exports/07-ending.png"
+  ],
+  "contentFile": "copy.md",
+  "sourceVerification": {
+    "verifiedOn": "2026-07-26",
+    "sources": [
+      {
+        "publisher": "Meta",
+        "type": "official announcement",
+        "publishedOn": "2026-07-24",
+        "url": "https://about.fb.com/news/2026/07/meta-ai-muse-spark-doesnt-just-think-it-acts/"
+      },
+      {
+        "publisher": "The Indian Express",
+        "type": "independent report",
+        "publishedOn": "2026-07-25",
+        "url": "https://indianexpress.com/article/technology/artificial-intelligence/meta-ai-muse-spark-1-1-new-features-10802642/"
+      }
+    ],
+    "claimsVerified": [
+      "Meta AI is introducing tasks, research, slides, and app connections.",
+      "The rollout begins in select markets, not globally."
+    ]
+  },
+  "compliance": {
+    "autoPublish": false,
+    "externalTrafficDiversion": false,
+    "containsWeChatId": false,
+    "containsQRCode": false,
+    "containsCommentOrDMInducement": false,
+    "humanReviewRequired": false
+  }
+}

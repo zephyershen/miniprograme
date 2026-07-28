@@ -1,0 +1,94 @@
+{
+  "campaign": "看懂今天·普通人的信息焦虑减负",
+  "postId": "xhs-001-information-anxiety",
+  "platform": "xiaohongshu",
+  "format": "image-post",
+  "createdAt": "2026-07-25",
+  "dimensions": {
+    "width": 1620,
+    "height": 2160,
+    "ratio": "3:4"
+  },
+  "renderScale": "1.5x from a 1080×1440 CSS artboard",
+  "visualSystem": {
+    "background": "#f7f8fa",
+    "ink": "#111820",
+    "editorialBlue": "#1d9bf0",
+    "fontFallback": [
+      "PingFang SC",
+      "Microsoft YaHei",
+      "Noto Sans CJK SC"
+    ]
+  },
+  "source": "source/index.html",
+  "copy": "copy.md",
+  "publication": {
+    "publishedAt": "2026-07-25T23:29:00+08:00",
+    "updatedAt": "2026-07-26T00:34:09+08:00",
+    "status": "update_under_review",
+    "title": "刷得越多，为什么越焦虑？",
+    "topics": [
+      "信息焦虑",
+      "AI工具使用",
+      "职场成长",
+      "认知提升",
+      "AI新手村",
+      "ai"
+    ],
+    "activity": "AI新手村",
+    "originalDeclaration": true,
+    "aiContentDeclaration": true
+  },
+  "exports": [
+    "exports/01-cover.png",
+    "exports/02-overload.png",
+    "exports/03-unknowns.png",
+    "exports/04-collecting.png",
+    "exports/05-filter.png",
+    "exports/06-product.png",
+    "exports/07-ending.png"
+  ],
+  "revision": {
+    "version": 4,
+    "status": "submitted_under_review",
+    "purpose": "Remove third-party platform promotion signals after the platform limited distribution.",
+    "homepageSource": "output/playwright/wechat-feed-new-items-pill.png",
+    "latestHomepageReference": "references/latest-homepage-2026-07-26.jpg",
+    "miniProgramName": "看懂今天",
+    "submittedAt": "2026-07-26T00:21:03+08:00",
+    "platformActionAt": "2026-07-26T00:21:00+08:00",
+    "platformAction": "distribution_limited_for_third_party_platform_promotion",
+    "complianceSubmittedAt": "2026-07-26T00:34:09+08:00",
+    "blockedBy": null
+  },
+  "exportsV2": [
+    "exports-v2/01-cover.png",
+    "exports-v2/02-overload.png",
+    "exports-v2/03-unknowns.png",
+    "exports-v2/04-collecting.png",
+    "exports-v2/05-filter.png",
+    "exports-v2/06-product.png",
+    "exports-v2/07-ending.png"
+  ],
+  "exportsV4Compliant": [
+    "exports-v4-compliant/01-cover.png",
+    "exports-v4-compliant/02-overload.png",
+    "exports-v4-compliant/03-unknowns.png",
+    "exports-v4-compliant/04-collecting.png",
+    "exports-v4-compliant/05-filter.png",
+    "exports-v4-compliant/06-method.png",
+    "exports-v4-compliant/07-ending.png"
+  ],
+  "claims": [
+    "看懂今天帮助筛选重要变化",
+    "用普通语言解释信息与用户的关系",
+    "帮助用户判断是否需要采取行动"
+  ],
+  "prohibitedInPost": [
+    "微信二维码",
+    "微信号",
+    "站外链接",
+    "去微信搜索",
+    "诱导评论或私信领取资料"
+  ]
+}
