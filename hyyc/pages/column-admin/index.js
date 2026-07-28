@@ -6,6 +6,7 @@ const {
 } = require('../../features/column-admin/api.js');
 const {
   decorateEntryList,
+  nextEntryOrder,
   columnAdminLoadError
 } = require('../../features/column-admin/model.js');
 const { refreshMembershipAccess } = require('../../features/membership/session.js');
@@ -129,17 +130,8 @@ Page({
     const current = this.data.items[index];
     const before = this.data.items[targetIndex];
     if (current.track !== before.track) return;
-    const outside = this.data.items[targetIndex + direction];
-    let nextOrder;
-    if (direction < 0) {
-      nextOrder = outside
-        ? (Number(outside.order) + Number(before.order)) / 2
-        : Math.max(0.1, Number(before.order) - 1);
-    } else {
-      nextOrder = outside
-        ? (Number(before.order) + Number(outside.order)) / 2
-        : Number(before.order) + 1;
-    }
+    const nextOrder = nextEntryOrder(this.data.items, index, direction);
+    if (!Number.isFinite(nextOrder)) return;
     this.setData({ movingId: id });
     try {
       const entry = await getColumnEntry(id);

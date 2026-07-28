@@ -835,14 +835,20 @@ Page({
   onShareAppMessage(event) {
     const dataset = event && event.target && event.target.dataset || {};
     const item = this.findFeedItem(dataset.id) || this.loadedItems && this.loadedItems[0];
+    if (!item || !item.id) {
+      return {
+        title: '一条值得看的 AI 资讯',
+        path: '/pages/inbox/index'
+      };
+    }
     const presentedItems = this.data && this.data.feed
       ? [this.data.feed.leadItem, ...(this.data.feed.remainingItems || [])].filter(Boolean)
       : [];
     const presented = presentedItems.find((entry) => entry.id === (item && item.id))
       || presentedItems[0];
     const share = {
-      title: item ? item.title : '一条值得看的 AI 资讯',
-      path: `/pages/feed-detail/index?id=${encodeURIComponent(item && item.id || '')}`
+      title: item.title || '一条值得看的 AI 资讯',
+      path: `/pages/feed-detail/index?id=${encodeURIComponent(item.id)}`
     };
     if (presented && presented.listVisualUrl) share.imageUrl = presented.listVisualUrl;
     return share;

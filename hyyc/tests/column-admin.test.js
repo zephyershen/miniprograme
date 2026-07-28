@@ -20,6 +20,7 @@ const {
   editableForm,
   draftFromForm,
   decorateEntryList,
+  nextEntryOrder,
   columnAdminLoadError
 } = require('../features/column-admin/model');
 
@@ -186,6 +187,25 @@ test('allows list reordering only between adjacent entries in the same category'
     [true, false],
     [false, false]
   ]);
+});
+
+test('calculates move order only from neighbours in the same category', () => {
+  const items = [
+    { id: 'a1', track: 'understand', order: 1 },
+    { id: 'a2', track: 'understand', order: 2 },
+    { id: 'a3', track: 'understand', order: 3 },
+    { id: 'b1', track: 'instruct', order: 1 }
+  ];
+  assert.equal(nextEntryOrder(items, 0, 1), 2.5);
+  assert.equal(nextEntryOrder(items, 1, -1), 0.5);
+  assert.equal(nextEntryOrder(items, 1, 1), 4);
+  assert.equal(nextEntryOrder(items, 2, 1), null);
+  assert.equal(nextEntryOrder(items, 0, -1), null);
+  assert.equal(nextEntryOrder([
+    items[0],
+    { ...items[1], canMoveDown: false },
+    items[2]
+  ], 1, 1), null);
 });
 
 test('filters the administrator list by status and text without offering unsafe moves', () => {

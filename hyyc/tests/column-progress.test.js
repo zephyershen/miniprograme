@@ -118,7 +118,7 @@ test('rechecks Pro entitlement, derives the owner server-side, and verifies a pu
     catalogService: {
       async publishedEntry(id, kind) {
         return id === 'lesson_intro' && kind === 'course'
-          ? { revision: 7 }
+          ? { publishedRevision: 7, revision: 99 }
           : null;
       }
     },

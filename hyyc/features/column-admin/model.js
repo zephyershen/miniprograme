@@ -186,6 +186,30 @@ function columnAdminLoadError(error) {
   };
 }
 
+function nextEntryOrder(items, index, direction) {
+  const values = Array.isArray(items) ? items : [];
+  const step = Number(direction);
+  if (!Number.isInteger(index) || ![-1, 1].includes(step)) return null;
+  const current = values[index];
+  const targetIndex = index + step;
+  const target = values[targetIndex];
+  if (!current || !target || current.track !== target.track) return null;
+  const movePermission = step < 0 ? 'canMoveUp' : 'canMoveDown';
+  if (Object.prototype.hasOwnProperty.call(current, movePermission)
+    && current[movePermission] !== true) return null;
+  const targetOrder = Number(target.order);
+  if (!Number.isFinite(targetOrder) || targetOrder <= 0) return null;
+  const outside = values[targetIndex + step];
+  if (outside && outside.track === current.track) {
+    const outsideOrder = Number(outside.order);
+    if (Number.isFinite(outsideOrder) && outsideOrder > 0) {
+      return (targetOrder + outsideOrder) / 2;
+    }
+  }
+  if (step < 0) return targetOrder / 2;
+  return targetOrder < 999999 ? targetOrder + 1 : null;
+}
+
 function decorateEntryList(payload, activeKind = 'course', filters = {}) {
   const items = payload && Array.isArray(payload.items) ? payload.items : [];
   const filtered = items.filter((item) => item.kind === activeKind);
@@ -231,6 +255,7 @@ module.exports = {
   draftFromForm,
   entryStatus,
   columnAdminLoadError,
+  nextEntryOrder,
   decorateEntryList,
   tracksForKind
 };

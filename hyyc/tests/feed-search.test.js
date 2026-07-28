@@ -30,6 +30,10 @@ const {
   createContentSearchService
 } = require('../cloudfunctions/knowledgeFeed/services/content-search-service');
 const {
+  rememberBriefingWindow,
+  consumeBriefingWindow
+} = require('../features/briefing/navigation');
+const {
   decodeCursor,
   createGlobalSearchService
 } = require('../cloudfunctions/knowledgeFeed/services/global-search-service');
@@ -265,7 +269,16 @@ test('highlights matches and keeps a bounded local search history', () => {
   assert.equal(writes.at(-1).removed, 'knowledgeSearchHistory.v1');
 });
 
-test('searches published column metadata for everyone and body only for Pro', async () => {
+test('passes a briefing window through a short-lived one-time tab intent', () => {
+  const app = { globalData: {} };
+  assert.equal(rememberBriefingWindow(app, '7d', NOW), true);
+  assert.equal(consumeBriefingWindow(app, NOW + 1000), '7d');
+  assert.equal(consumeBriefingWindow(app, NOW + 1000), '');
+  rememberBriefingWindow(app, '30d', NOW);
+  assert.equal(consumeBriefingWindow(app, NOW + 31_000), '');
+});
+
+test('searches only column titles for free viewers and protected copy for Pro', async () => {
   const entries = [{
     id: 'course_prompt_001',
     kind: 'course',
@@ -274,6 +287,7 @@ test('searches published column metadata for everyone and body only for Pro', as
       id: 'course_prompt_001',
       title: '提示词基础',
       subtitle: '写清任务、上下文和验收标准',
+      category: 'private-category',
       categoryLabel: '基础知识',
       tags: ['prompt'],
       sections: { steps: ['仅会员正文里的独特术语'] }
@@ -291,14 +305,32 @@ test('searches published column metadata for everyone and body only for Pro', as
     entitlements: { aiColumn: true, digests: ['24h', '7d', '30d'] }
   };
 
-  assert.equal((await service.search({
+  const freeTitle = await service.search({
     query: '提示词',
     scope: 'column'
-  }, free)).items[0].locked, true);
+  }, free);
+  assert.equal(freeTitle.items[0].locked, true);
+  assert.equal(freeTitle.items[0].summary, '');
+  assert.equal(freeTitle.items[0].category, 'course');
+  assert.equal(freeTitle.items[0].categoryLabel, '基础知识');
+  assert.equal((await service.search({
+    query: '写清任务',
+    scope: 'column'
+  }, free)).resultCount, 0);
+  assert.equal((await service.search({
+    query: 'private-category',
+    scope: 'column'
+  }, free)).resultCount, 0);
   assert.equal((await service.search({
     query: '独特术语',
     scope: 'column'
   }, free)).resultCount, 0);
+  const proSubtitle = await service.search({
+    query: '写清任务',
+    scope: 'column'
+  }, pro);
+  assert.equal(proSubtitle.resultCount, 1);
+  assert.equal(proSubtitle.items[0].summary, '写清任务、上下文和验收标准');
   assert.equal((await service.search({
     query: '独特术语',
     scope: 'column'

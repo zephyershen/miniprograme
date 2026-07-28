@@ -5,6 +5,10 @@ const {
   searchFailureState
 } = require('../../features/knowledge-feed/search-model.js');
 const {
+  rememberBriefingWindow,
+  clearBriefingWindow
+} = require('../../features/briefing/navigation.js');
+const {
   applyResolvedItemMedia,
   collectItemMediaFileIds,
   knowledgeMediaSession
@@ -265,8 +269,11 @@ Page({
     }
     if (kind === 'briefing') {
       const windowKey = event.currentTarget.dataset.windowKey || '24h';
-      wx.navigateTo({
-        url: `/pages/briefing/index?windowKey=${encodeURIComponent(windowKey)}`
+      const app = getApp();
+      rememberBriefingWindow(app, windowKey);
+      wx.switchTab({
+        url: '/pages/briefing/index',
+        fail: () => clearBriefingWindow(app)
       });
       return;
     }

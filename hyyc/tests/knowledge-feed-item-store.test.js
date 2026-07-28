@@ -429,7 +429,7 @@ test('returns one collapsible header per selected day and pages an opened day on
   });
   const member = entitlementView('member', ITEM_CONFIG);
   const feed = await service.getFeed({ filters: { time: '30d' } }, member);
-  assert.equal(feed.dayBuckets.length, 30);
+  assert.equal(feed.dayBuckets.length, 31);
   assert.equal(feed.dayBuckets[0].dateKey, '2026-07-17');
   assert.equal(feed.dayBuckets[1].dateKey, '2026-07-16');
   assert.equal(feed.dayBuckets[1].count, 1);
@@ -441,6 +441,74 @@ test('returns one collapsible header per selected day and pages an opened day on
   }, member);
   assert.deepEqual(opened.items.map((item) => item.id), ['dayitem02']);
   assert.equal(opened.hasMore, false);
+});
+
+test('keeps every calendar date intersecting a rolling entitlement window', async () => {
+  const items = [
+    toStoredFeedItem(rawItem('rollingtoday', '2026-07-17T03:00:00.000Z', {
+      coverFileId: 'cloud://visual/rolling-today.jpg', coverStatus: 'ready'
+    }), { provider: 'aihot', generation: 'rolling', observedAt: new Date(NOW), coverage: 'all' }),
+    toStoredFeedItem(rawItem('rollingprior', '2026-07-16T05:00:00.000Z', {
+      coverFileId: 'cloud://visual/rolling-prior.jpg', coverStatus: 'ready'
+    }), { provider: 'aihot', generation: 'rolling', observedAt: new Date(NOW), coverage: 'all' })
+  ];
+  const service = createItemFeedQueryService({
+    itemRepository: memoryItemRepository(items),
+    dayIndexRepository: memoryDayIndexRepository(items),
+    syncStateRepository: { get: async () => ({ allItemsSyncedAt: new Date(NOW) }) },
+    legacyFeedService: { getFeed: async () => { throw new Error('legacy not expected'); } },
+    config: ITEM_CONFIG,
+    now: () => NOW
+  });
+  const free = entitlementView('free', ITEM_CONFIG);
+  const feed = await service.getFeed({ filters: { time: '1d' }, limit: 1 }, free);
+  assert.deepEqual(feed.dayBuckets.map((bucket) => [bucket.dateKey, bucket.count]), [
+    ['2026-07-17', 1],
+    ['2026-07-16', 1]
+  ]);
+
+  const opened = await service.getDay({
+    dateKey: '2026-07-16',
+    filters: { time: '1d' },
+    limit: 20
+  }, free);
+  assert.deepEqual(opened.items.map((item) => item.id), ['rollingprior']);
+});
+
+test('lets an administrator open any non-future archived day from the all-time timeline', async () => {
+  const items = [
+    toStoredFeedItem(rawItem('archive001', '2026-07-17T03:00:00.000Z', {
+      coverFileId: 'cloud://visual/archive-current.jpg', coverStatus: 'ready'
+    }), { provider: 'aihot', generation: 'archive', observedAt: new Date(NOW), coverage: 'all' }),
+    toStoredFeedItem(rawItem('archive002', '2025-07-16T03:00:00.000Z', {
+      coverFileId: 'cloud://visual/archive-old.jpg', coverStatus: 'ready'
+    }), { provider: 'aihot', generation: 'archive', observedAt: new Date(NOW), coverage: 'all' })
+  ];
+  const service = createItemFeedQueryService({
+    itemRepository: memoryItemRepository(items),
+    dayIndexRepository: memoryDayIndexRepository(items),
+    syncStateRepository: { get: async () => ({ allItemsSyncedAt: new Date(NOW) }) },
+    legacyFeedService: { getFeed: async () => { throw new Error('legacy not expected'); } },
+    config: ITEM_CONFIG,
+    now: () => NOW
+  });
+  const admin = entitlementView('admin', ITEM_CONFIG);
+  const feed = await service.getFeed({}, admin);
+  assert.deepEqual(feed.dayBuckets.map((bucket) => bucket.dateKey), [
+    '2026-07-17',
+    '2025-07-16'
+  ]);
+
+  const opened = await service.getDay({
+    dateKey: '2025-07-16',
+    filters: { time: 'all' },
+    limit: 20
+  }, admin);
+  assert.deepEqual(opened.items.map((item) => item.id), ['archive002']);
+  await assert.rejects(() => service.getDay({
+    dateKey: '2026-07-18',
+    filters: { time: 'all' }
+  }, admin), { code: 'INVALID_REQUEST' });
 });
 
 test('computes feed counts only on the first page', async () => {

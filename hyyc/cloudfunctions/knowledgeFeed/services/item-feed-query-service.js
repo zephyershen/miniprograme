@@ -34,14 +34,23 @@ function shanghaiDateKey(value) {
 
 function dayKeysForTime(timeKey, currentTime, entries = []) {
   if (timeKey === 'all') {
-    return [...new Set(entries.map((entry) => shanghaiDateKey(new Date(entry.publishedAt).getTime())))]
-      .filter((key) => /^\d{4}-\d{2}-\d{2}$/.test(key))
+    return [...new Set(entries
+      .map((entry) => new Date(entry && entry.publishedAt).getTime())
+      .filter((timestamp) => Number.isFinite(timestamp) && timestamp <= Number(currentTime))
+      .map(shanghaiDateKey))]
       .sort()
       .reverse();
   }
-  const days = Math.max(1, Math.round((TIME_WINDOWS[timeKey] || DAY_MS) / DAY_MS));
+  const windowMs = TIME_WINDOWS[timeKey] || DAY_MS;
   const currentDateStart = Date.parse(`${shanghaiDateKey(currentTime)}T00:00:00+08:00`);
-  return Array.from({ length: days }, (_, index) => shanghaiDateKey(currentDateStart - (index * DAY_MS)));
+  const earliestDateStart = Date.parse(
+    `${shanghaiDateKey(Number(currentTime) - windowMs)}T00:00:00+08:00`
+  );
+  const calendarDays = Math.floor((currentDateStart - earliestDateStart) / DAY_MS) + 1;
+  return Array.from(
+    { length: Math.max(1, calendarDays) },
+    (_, index) => shanghaiDateKey(currentDateStart - (index * DAY_MS))
+  );
 }
 
 function shanghaiDayRange(dateKey) {
@@ -52,6 +61,18 @@ function shanghaiDayRange(dateKey) {
     since: new Date(start).toISOString(),
     until: new Date(start + DAY_MS).toISOString()
   };
+}
+
+function dayIntersectsTimeWindow(dateKey, timeKey, currentTime) {
+  const range = shanghaiDayRange(dateKey);
+  const currentTimestamp = Number(currentTime);
+  if (!range || !Number.isFinite(currentTimestamp)) return false;
+  const dayStart = new Date(range.since).getTime();
+  const dayEnd = new Date(range.until).getTime();
+  if (dayStart > currentTimestamp) return false;
+  if (timeKey === 'all') return true;
+  const windowMs = TIME_WINDOWS[timeKey];
+  return Number.isFinite(windowMs) && dayEnd > currentTimestamp - windowMs;
 }
 
 function buildDayBuckets(entries, query, currentTime) {
@@ -381,7 +402,7 @@ function createItemFeedQueryService({
     });
     const currentTime = now();
     const range = shanghaiDayRange(input.dateKey);
-    if (!range || !dayKeysForTime(time, currentTime).includes(input.dateKey)) {
+    if (!range || !dayIntersectsTimeWindow(input.dateKey, time, currentTime)) {
       throw new AppError('INVALID_REQUEST', '日期不在当前可查看范围内');
     }
     const allowedSince = querySince(time, entitlement, currentTime);
@@ -574,6 +595,7 @@ module.exports = {
   shanghaiDateKey,
   dayKeysForTime,
   shanghaiDayRange,
+  dayIntersectsTimeWindow,
   buildDayBuckets,
   createItemFeedQueryService
 };

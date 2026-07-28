@@ -167,6 +167,27 @@ test('keeps sharing enabled on the directory, briefing, membership, and search p
   });
 });
 
+test('opens every tab bar destination with switchTab instead of stack navigation', () => {
+  const appConfig = JSON.parse(read('app.json'));
+  const tabRoutes = new Set(appConfig.tabBar.list.map((item) => `/${item.pagePath}`));
+  const offenders = [];
+  collectFiles('pages', '.js').forEach((file) => {
+    const source = fs.readFileSync(file, 'utf8');
+    const routePattern = /wx\.(?:navigateTo|redirectTo)\s*\(\s*\{\s*url:\s*['"`](\/pages\/[^?'"`]+)/g;
+    for (const match of source.matchAll(routePattern)) {
+      if (tabRoutes.has(match[1])) {
+        offenders.push(`${path.relative(APP_ROOT, file)} -> ${match[1]}`);
+      }
+    }
+  });
+  assert.deepEqual(offenders, []);
+
+  const search = read('pages/search/index.js');
+  const briefing = read('pages/briefing/index.js');
+  assert.match(search, /rememberBriefingWindow[\s\S]*wx\.switchTab\(\{\s*url:\s*'\/pages\/briefing\/index'/);
+  assert.match(briefing, /consumeBriefingWindow\(getApp\(\)\)/);
+});
+
 test('labels recommendation heat separately from real like actions', () => {
   const inboxMarkup = read('pages/inbox/index.wxml');
   const detailMarkup = read('pages/feed-detail/index.wxml');

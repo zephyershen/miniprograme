@@ -64,6 +64,7 @@ function paged(items, request, scopeLabel) {
 
 function columnSearchDocument(entry, unlocked) {
   const content = entry && entry.content || {};
+  if (!unlocked) return { title: content.title };
   const metadata = {
     title: content.title,
     subtitle: content.subtitle,
@@ -72,7 +73,7 @@ function columnSearchDocument(entry, unlocked) {
     track: content.track,
     tags: content.tags
   };
-  return unlocked ? { metadata, content } : metadata;
+  return { metadata, content };
 }
 
 function columnResult(entry, unlocked) {
@@ -83,11 +84,15 @@ function columnResult(entry, unlocked) {
     kind: 'column',
     entryType: practical ? 'practical' : 'lesson',
     title: content.title || '',
-    summary: content.subtitle || '',
+    summary: unlocked ? content.subtitle || '' : '',
     source: '会员专栏',
     publishedAt: entry.publishedAt || entry.updatedAt || null,
-    category: content.category || content.track || (practical ? 'practical' : 'course'),
-    categoryLabel: content.categoryLabel || (practical ? '应用操作' : '基础知识'),
+    category: unlocked
+      ? content.category || content.track || (practical ? 'practical' : 'course')
+      : practical ? 'practical' : 'course',
+    categoryLabel: unlocked
+      ? content.categoryLabel || (practical ? '应用操作' : '基础知识')
+      : practical ? '应用操作' : '基础知识',
     categoryMarker: practical ? 'DO' : 'KN',
     locked: !unlocked
   };

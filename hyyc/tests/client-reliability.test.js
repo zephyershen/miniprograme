@@ -1100,6 +1100,21 @@ test('first-page refresh settles pending day loads and resets their pagination s
   }
 });
 
+test('shares the inbox instead of an empty detail route when no feed item is available', () => {
+  const page = loadPage('../pages/inbox/index');
+  const share = page.onShareAppMessage.call({
+    data: { feed: { leadItem: null, remainingItems: [] } },
+    loadedItems: [],
+    findFeedItem() {
+      return null;
+    }
+  }, {});
+  assert.deepEqual(share, {
+    title: '一条值得看的 AI 资讯',
+    path: '/pages/inbox/index'
+  });
+});
+
 test('pull-to-refresh keeps the current feed while the authoritative refresh is in flight', async () => {
   const page = loadPage('../pages/inbox/index');
   const previousWx = global.wx;

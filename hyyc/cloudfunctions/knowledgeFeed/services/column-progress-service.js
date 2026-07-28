@@ -65,7 +65,10 @@ function createColumnProgressService({
     if (!published) throw new AppError('ITEM_NOT_FOUND', '这节内容不存在');
     const document = await repository.save(actor.ownerKey, {
       ...value,
-      publishedRevision: Math.max(0, Math.floor(Number(published.revision) || 0))
+      publishedRevision: Math.max(
+        0,
+        Math.floor(Number(published.publishedRevision ?? published.revision) || 0)
+      )
     }, new Date(now()).toISOString());
     return { item: publicProgress(document) };
   }

@@ -13,6 +13,7 @@ const {
 } = require('../../features/membership/session.js');
 const { membershipPresentation } = require('../../features/membership/presentation.js');
 const { finishPullDownRefresh } = require('../../features/runtime/pull-down-refresh.js');
+const { consumeBriefingWindow } = require('../../features/briefing/navigation.js');
 
 function activate(options, key) {
   return options.map((item) => ({ ...item, active: item.key === key }));
@@ -38,7 +39,22 @@ Page({
   },
 
   onShow() {
-    this.resolveAccess({ force: true, preserveCurrent: this.contentLoaded === true });
+    const intendedWindow = consumeBriefingWindow(getApp());
+    const windowChanged = Boolean(intendedWindow && intendedWindow !== this.data.windowKey);
+    const resolve = () => this.resolveAccess({
+      force: true,
+      preserveCurrent: !windowChanged && this.contentLoaded === true
+    });
+    if (!windowChanged) {
+      resolve();
+      return;
+    }
+    this.rawBriefing = null;
+    this.contentLoaded = false;
+    this.setData({
+      windowKey: intendedWindow,
+      windowOptions: activate(WINDOW_OPTIONS, intendedWindow)
+    }, resolve);
   },
 
   onPullDownRefresh() {
