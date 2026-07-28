@@ -16,6 +16,7 @@ const { loadMessages } = require('../../features/messages/session.js');
 const {
   waitForViewerAccountSession
 } = require('../../features/account/session.js');
+const { isProductFeatureEnabled } = require('../../config/product-features.js');
 
 function sameProfilePresentation(left, right) {
   return JSON.stringify(left || {}) === JSON.stringify(right || {});
@@ -27,6 +28,7 @@ Page({
     roleSwitching: false,
     switchingRole: '',
     error: '',
+    commentsEnabled: isProductFeatureEnabled('comments'),
     membership: membershipPresentation(null),
     userProfile: decorateUserProfile(null),
     messageCenter: { unreadCount: 0, hasUnread: false, loading: true }

@@ -1,9 +1,10 @@
 const {
   createMessagesState,
-  normalizeMessagesResult,
   mergeResolvedMessageMedia,
   removeMessageFromState
 } = require('../../features/messages/model.js');
+const { visibleMessagesResult } = require('../../features/messages/visibility.js');
+const { isProductFeatureEnabled } = require('../../config/product-features.js');
 const { resolveMessageMedia } = require('../../features/messages/media.js');
 const {
   loadMessages: loadMessagesSession,
@@ -33,8 +34,9 @@ function clamp(value, minimum, maximum) {
 
 function messageNavigationUrl(message) {
   if (!message || !message.itemId) return '';
-  const comments = message.openComments ? '&comments=1' : '';
-  const comment = message.commentId
+  const commentsEnabled = isProductFeatureEnabled('comments');
+  const comments = commentsEnabled && message.openComments ? '&comments=1' : '';
+  const comment = commentsEnabled && message.commentId
     ? `&commentId=${encodeURIComponent(message.commentId)}`
     : '';
   return `/pages/feed-detail/index?id=${encodeURIComponent(message.itemId)}${comments}${comment}`;
@@ -60,7 +62,11 @@ function messageReadStatePatch(current = [], next = [], rootPath = 'messages') {
 }
 
 Page({
-  data: createMessagesState(),
+  data: {
+    ...createMessagesState(),
+    commentsEnabled: isProductFeatureEnabled('comments'),
+    activeMessageTab: isProductFeatureEnabled('comments') ? 'interaction' : 'system'
+  },
 
   onLoad() {
     this.pageDisposed = false;
@@ -147,6 +153,7 @@ Page({
 
   switchMessageTab(event) {
     const tab = event.currentTarget.dataset.tab || 'interaction';
+    if (tab === 'interaction' && !isProductFeatureEnabled('comments')) return;
     if (tab === this.data.activeMessageTab) return;
     this.setData({
       activeMessageTab: tab,
@@ -241,7 +248,7 @@ Page({
       ? { loading: true, error: '' }
       : { error: '' });
     try {
-      const result = normalizeMessagesResult(await loadMessagesSession({ force }));
+      const result = visibleMessagesResult(await loadMessagesSession({ force }));
       if (this.pageDisposed || requestId !== this.messagesLoadRequestId) return false;
       this.messagesLoaded = true;
       const messagesChanged = JSON.stringify(this.data.messages) !== JSON.stringify(result.messages);
@@ -309,7 +316,7 @@ Page({
     this.messageReadInFlight.add(message.id);
     this.applyMessageReadLocally(message.id);
     try {
-      const result = normalizeMessagesResult(
+      const result = visibleMessagesResult(
         await markMessageRead(message.id, message.version)
       );
       if (!this.pageDisposed && mutationGeneration === this.messageMutationGeneration) {
@@ -372,7 +379,7 @@ Page({
       swipeDragOffset: 0
     });
     try {
-      const result = normalizeMessagesResult(await deleteMessageSession(messageId));
+      const result = visibleMessagesResult(await deleteMessageSession(messageId));
       if (this.pageDisposed || mutationGeneration !== this.messageMutationGeneration) return false;
       this.setData({
         messages: result.messages,
@@ -400,6 +407,7 @@ Page({
   },
 
   async markAllMessages() {
+    if (!isProductFeatureEnabled('comments')) return false;
     if (this.data.markingAll || this.data.deletingMessageId || !this.data.hasUnread) return false;
     const mutationGeneration = (this.messageMutationGeneration || 0) + 1;
     this.messageMutationGeneration = mutationGeneration;
@@ -420,7 +428,7 @@ Page({
       hasUnread: false
     });
     try {
-      const result = normalizeMessagesResult(await markAllMessagesRead());
+      const result = visibleMessagesResult(await markAllMessagesRead());
       if (this.pageDisposed || mutationGeneration !== this.messageMutationGeneration) return false;
       const readPatch = messageReadStatePatch(this.data.messages, result.messages);
       this.setData({

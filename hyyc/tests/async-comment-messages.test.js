@@ -10,7 +10,8 @@ const {
 } = require('../cloudfunctions/knowledgeFeed/services/comment-review-service');
 const {
   createUserMessageService,
-  directMessage
+  directMessage,
+  messageListOptions
 } = require('../cloudfunctions/knowledgeFeed/services/user-message-service');
 const {
   createScheduledWorkService
@@ -335,6 +336,127 @@ test('deletes a user message through the owner-scoped repository and returns a f
 
   assert.deepEqual(calls, [{ ownerKey: OWNER, messageId: 'message-1' }]);
   assert.deepEqual(result, { messages: [], unreadCount: 0 });
+});
+
+test('lists non-comment messages without letting hidden comment rows consume the page', async () => {
+  const calls = [];
+  const service = createUserMessageService({
+    repository: {
+      listOwnerMessages: async (ownerKey, limit, options) => {
+        calls.push({ ownerKey, limit, options });
+        return [
+          {
+            _id: 'profile-message',
+            type: 'profile_approved',
+            category: 'profile',
+            unread: true
+          },
+          {
+            _id: 'membership-message',
+            type: 'membership_succeeded',
+            category: 'membership',
+            unread: false
+          }
+        ];
+      },
+      unreadCount: async () => {
+        throw new Error('hidden comment unread count must not be queried');
+      }
+    },
+    config: { userMessagePageSize: 50 }
+  });
+
+  const result = await service.list({ ownerKey: OWNER }, { includeComments: false });
+
+  assert.deepEqual(calls, [{
+    ownerKey: OWNER,
+    limit: 50,
+    options: { excludeCategories: ['comments'] }
+  }]);
+  assert.deepEqual(result.messages.map((message) => message.id), [
+    'profile-message',
+    'membership-message'
+  ]);
+  assert.equal(result.unreadCount, 1);
+});
+
+test('keeps legacy message requests comment-capable and honors only an explicit false', () => {
+  assert.deepEqual(messageListOptions(), { includeComments: true });
+  assert.deepEqual(messageListOptions({}), { includeComments: true });
+  assert.deepEqual(messageListOptions({ includeComments: true }), { includeComments: true });
+  assert.deepEqual(messageListOptions({ includeComments: 'false' }), { includeComments: true });
+  assert.deepEqual(messageListOptions({ includeComments: false }), { includeComments: false });
+});
+
+test('preserves the hidden-message list mode after single-read and delete mutations', async () => {
+  const calls = [];
+  const service = createUserMessageService({
+    repository: {
+      markRead: async (ownerKey, messageId, version) => {
+        calls.push({ action: 'read', ownerKey, messageId, version });
+      },
+      deleteMessage: async (ownerKey, messageId) => {
+        calls.push({ action: 'delete', ownerKey, messageId });
+      },
+      listOwnerMessages: async (ownerKey, limit, options) => {
+        calls.push({ action: 'list', ownerKey, limit, options });
+        return [];
+      },
+      unreadCount: async () => {
+        throw new Error('hidden mode must not query the global unread count');
+      }
+    },
+    config: { userMessagePageSize: 50 },
+    now: () => NOW
+  });
+  const options = { includeComments: false };
+
+  await service.markRead('message-one', 'event-one', { ownerKey: OWNER }, options);
+  await service.deleteMessage('message-two', { ownerKey: OWNER }, options);
+
+  assert.deepEqual(calls, [
+    {
+      action: 'read',
+      ownerKey: OWNER,
+      messageId: 'message-one',
+      version: 'event-one'
+    },
+    {
+      action: 'list',
+      ownerKey: OWNER,
+      limit: 50,
+      options: { excludeCategories: ['comments'] }
+    },
+    {
+      action: 'delete',
+      ownerKey: OWNER,
+      messageId: 'message-two'
+    },
+    {
+      action: 'list',
+      ownerKey: OWNER,
+      limit: 50,
+      options: { excludeCategories: ['comments'] }
+    }
+  ]);
+});
+
+test('refuses bulk read while comments are hidden without mutating their unread history', async () => {
+  let markAllCalls = 0;
+  const service = createUserMessageService({
+    repository: {
+      markAllRead: async () => {
+        markAllCalls += 1;
+      }
+    },
+    config: {}
+  });
+
+  await assert.rejects(
+    () => service.markAllRead({ ownerKey: OWNER }, { includeComments: false }),
+    (error) => error && error.code === 'COMMENTS_PAUSED'
+  );
+  assert.equal(markAllCalls, 0);
 });
 
 test('delivers a reply only to its direct and root comment owners with actor context', async () => {

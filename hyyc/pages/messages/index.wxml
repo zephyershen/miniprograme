@@ -2,9 +2,10 @@
   <view class="messages-header">
     <view class="messages-heading">
       <view class="messages-title">消息</view>
-      <view class="messages-deck">会员开通、审核结果和你参与的讨论动态，都会留在这里。</view>
+      <view class="messages-deck">{{commentsEnabled ? '会员开通、审核结果和你参与的讨论动态，都会留在这里。' : '会员开通与资料审核结果，都会留在这里。'}}</view>
     </view>
     <button
+      wx:if="{{commentsEnabled}}"
       class="read-all-action"
       disabled="{{!hasUnread || markingAll || deletingMessageId || loading}}"
       loading="{{markingAll}}"
@@ -15,7 +16,7 @@
   <view wx:if="{{loading}}" class="messages-state-card">
     <view class="messages-spinner"></view>
     <view class="state-title">正在整理消息</view>
-    <view class="state-copy">审核结果和讨论动态马上就好。</view>
+    <view class="state-copy">{{commentsEnabled ? '审核结果和讨论动态马上就好。' : '会员与资料通知马上就好。'}}</view>
   </view>
 
   <view wx:elif="{{error}}" class="messages-state-card messages-error-card">
@@ -30,13 +31,13 @@
   <view wx:elif="{{!messages.length}}" class="messages-state-card messages-empty-card">
     <empty-state
       title="暂时没有消息"
-      copy="会员开通、资料或评论审核结果，以及你参与资讯的新评论，会出现在这里。"
+      copy="{{commentsEnabled ? '会员开通、资料或评论审核结果，以及你参与资讯的新评论，会出现在这里。' : '会员开通与资料审核结果会出现在这里。'}}"
       action-label=""
     />
   </view>
 
   <block wx:else>
-    <view class="message-tabs">
+    <view wx:if="{{commentsEnabled}}" class="message-tabs">
       <view
         class="message-tab {{activeMessageTab === 'interaction' ? 'is-active' : ''}}"
         data-tab="interaction"
@@ -54,7 +55,7 @@
         <text wx:if="{{systemCount}}" class="message-tab-count">{{systemCount}}</text>
       </view>
     </view>
-    <view class="message-list" wx:if="{{activeMessageTab === 'interaction'}}">
+    <view class="message-list" wx:if="{{commentsEnabled && activeMessageTab === 'interaction'}}">
       <view wx:if="{{!interactionCount}}" class="interaction-empty">
         <empty-state
           title="还没有评论互动"

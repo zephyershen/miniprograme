@@ -24,6 +24,7 @@ confidence: high
 - [小程序 UI 与功能审计分流及首批加固](syntheses/2026-07-27-ui-audit-triage.md) — 外部审计的采纳边界、按钮 v2 兼容基线、首页卡片模板去重，以及后续视觉与功能分期
 - [会员学习进度、跨历史搜索与界面一致性加固](sources/2026-07-27-learning-progress-search-and-ui-hardening.md) — 阅读进度、继续学习、一框全站搜索、稳定推荐热度、统一空态与刷新、图片签名恢复的本地实现记录
 - [会员专栏、学习进度与全站搜索生产发布准备](sources/2026-07-28-member-column-search-release-prep.md) — 29 集合/50 索引生产收敛、8,152 条搜索回填、三角色双图发布 canary、最终代码加固、632,253-byte 微信预览候选和待部署/未提交审核边界
+- [评论界面送审暂停与开发者工具验收](sources/2026-07-28-comment-ui-review-pause.md) — 待上传替换候选隐藏评论入口、气泡、弹层、专属文案与通知，保留后端和未来恢复路径；791/791 回归与六页开发者工具 canary
 - [资料异步审核、预览支付诊断与微信消息回调上线](sources/2026-07-24-async-profile-review-and-preview-payment-diagnostics.md) — “审核中”队列、真机支付故障边界、入站消息 webhook 与生产收敛
 - [资料保存审核超时修复与生产部署](sources/2026-07-24-profile-moderation-timeout-repair.md) — 预览版资料保存失败根因、模型无思考修复、代码-only 发布与真实 canary 边界
 - [2026-07-23 全项目生产就绪审计](reports/production-readiness-audit-2026-07-23.md) — 已被发布候选修复结果取代的审计前快照
@@ -43,6 +44,7 @@ confidence: high
 - [评论采用主动资料身份与原图附件，资讯互动使用乐观目标状态](decisions/2026-07-19-profiled-media-comments-and-optimistic-engagement.md) — 即时按钮反馈、幂等事务、头像昵称、表情与手机原图评论
 - [精选与简报采用 AI 自动发布，评论采用多模态 AI 先审后发](decisions/2026-07-19-automatic-ai-curation-and-comment-moderation.md) — 自动资讯分析、精选/简报发布、评论图文 fail-closed 审核与治理风险
 - [评论与资料采用后台 AI 审核，结果统一进入站内消息](decisions/2026-07-24-async-comments-and-message-center.md) — 取代评论同步等待；后台审核、可靠 outbox、消息中心、稳定加载与会员身份绑定
+- [待上传替换候选暂时隐藏评论界面](decisions/2026-07-28-pause-comment-ui-for-review.md) — 使用确定性客户端发布开关隐藏所有可达评论界面，保留后端与历史数据；未来恢复需作为新版本重新审核
 - [会员专栏采用管理员草稿与发布快照](decisions/2026-07-27-column-admin-draft-publishing.md) — 真实管理员小程序后台、代码基线 + 数据库覆盖、版本冲突和发布媒体保护
 - [采用微信小程序虚拟支付销售一次性 30 天会员](decisions/2026-07-19-wechat-virtual-payment-membership.md) — 道具直购、官方查单/发货、幂等权益、退款回收与服务端内容保护；取代斗拱支付决策
 - [CloudBase 主模型与 Packy 自动兜底方案](decisions/2026-07-20-cloudbase-ai-primary-packy-fallback.md) — 已切换资源点计费；CloudBase 为主、Packy 做预算与故障兜底
@@ -140,7 +142,7 @@ confidence: high
 
 ## 当前发布边界与下一入口
 
-- 最终小程序代码锚点为 `68382f5`：资讯按日续载、滚动日期权限、免费标题级专栏
+- 已上传开发版本 `2.4.0` 的小程序代码锚点为 `68382f5`：资讯按日续载、滚动日期权限、免费标题级专栏
   搜索、发布 revision、简报 Tab 跳转、管理排序防误触、空资讯分享和搜索文本
   NFKC 同构归一化已加固。
 - 当前生产合同为 29 个 `ADMINONLY` 集合、50 个索引、4 个正式函数和
@@ -153,10 +155,14 @@ confidence: high
 - 微信开发版本 `2.4.0` 已从该精确提交上传，回执包体为 632,253 bytes；公众平台
   已回读正式线上 `2.3.5`、审核区为空和 `2.4.0` 开发卡片。提交弹窗已打开，尚待
   用户本人确认已阅读平台审核规则后继续，正式发布仍需等待审核通过。
+- 新的评论隐藏替换候选已通过 791/791 回归与六页开发者工具 canary；精确 Git SHA、
+  `knowledgeFeed` code-only 部署回读和新微信开发版本上传尚待执行。该候选不修改
+  集合、索引、生产数据或存储规则。
 - 预览支付继续使用 `env=0`，只能按真实扣款谨慎测试；开发者工具模拟器不作为支付
   验收环境。已付款账号只验证权益恢复，不得重复购买。
 - 依赖风险登记有效至 2026-08-06；若审核延后越过该日期，须重新审计。微信订阅消息
   因缺少公众平台真实模板合同未接入，不使用假模板；站内消息仍是当前可用闭环。
-- 分支和 RC 标签 `rc/2026-07-28-member-admin-global-search-v3` 已推送；当前唯一
-  发布步骤为公众平台提交 `2.4.0` 审核，审核通过后再显式发布。
+- 分支和 RC 标签 `rc/2026-07-28-member-admin-global-search-v3` 已推送；它对应旧的
+  `2.4.0` 开发卡片。下一步先上传评论隐藏替换版本，再由用户本人确认平台审核规则并
+  提交审核，审核通过后仍需显式发布。
 - 当前仓库为 `D:\miniprogram`；接手时先读 [项目总览](overview.md)，再按需要读 [README](../README.md)。

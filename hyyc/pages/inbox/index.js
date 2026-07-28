@@ -55,6 +55,7 @@ const {
 const {
   createPageMediaRecovery
 } = require('../../features/knowledge-feed/cloud-media-recovery.js');
+const { isProductFeatureEnabled } = require('../../config/product-features.js');
 
 function feedLayoutState(sortMode, activeChannel) {
   return {
@@ -159,6 +160,7 @@ Page({
   data: {
     ...createInitialListState(),
     refreshingFeed: false,
+    commentsEnabled: isProductFeatureEnabled('comments'),
     membershipPromptVisible: false,
     membershipPromptFeature: 'curated_feed'
   },
@@ -801,14 +803,16 @@ Page({
   },
 
   openComments(event) {
+    if (!isProductFeatureEnabled('comments')) return false;
     const id = event.currentTarget.dataset.id;
     const item = this.findFeedItem(id);
-    if (!item) return;
+    if (!item) return false;
     if (!item.engagement || !item.engagement.canComment) {
       this.openMembershipPrompt('comments');
-      return;
+      return false;
     }
     wx.navigateTo({ url: `/pages/feed-detail/index?id=${encodeURIComponent(id)}&comments=1` });
+    return true;
   },
 
   openMembershipPrompt(featureKey) {

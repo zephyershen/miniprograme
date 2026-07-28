@@ -33,10 +33,18 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
-function loadMessagesPage(session) {
+function loadMessagesPage(session, { commentsEnabled } = {}) {
   const sessionPath = require.resolve('../features/messages/session');
+  const featuresPath = require.resolve('../config/product-features');
   const pagePath = require.resolve('../pages/messages/index');
   const restoreSession = replaceModule(sessionPath, session);
+  const restoreFeatures = commentsEnabled === undefined
+    ? () => {}
+    : replaceModule(featuresPath, {
+        isProductFeatureEnabled: (feature) => (
+          feature === 'comments' && commentsEnabled
+        )
+      });
   const previousPageModule = require.cache[pagePath];
   const previousPage = global.Page;
   let definition;
@@ -47,6 +55,7 @@ function loadMessagesPage(session) {
     definition,
     restore() {
       restoreSession();
+      restoreFeatures();
       if (previousPageModule) require.cache[pagePath] = previousPageModule;
       else delete require.cache[pagePath];
       if (previousPage) global.Page = previousPage;
@@ -191,12 +200,16 @@ test('uses the agreed knowledgeFeed actions for listing, read and delete mutatio
   }
 
   assert.deepEqual(calls, [
-    { name: 'knowledgeFeed', data: { action: 'messages' } },
+    {
+      name: 'knowledgeFeed',
+      data: { action: 'messages', includeComments: false }
+    },
     {
       name: 'knowledgeFeed',
       data: {
         action: 'markMessageRead',
         messageId: 'message/01',
+        includeComments: false,
         messageVersion: 'event-01'
       }
     },
@@ -204,19 +217,23 @@ test('uses the agreed knowledgeFeed actions for listing, read and delete mutatio
       name: 'knowledgeFeed',
       data: {
         action: 'deleteMessage',
-        messageId: 'message/01'
+        messageId: 'message/01',
+        includeComments: false
       }
     },
-    { name: 'knowledgeFeed', data: { action: 'markAllMessagesRead' } }
+    {
+      name: 'knowledgeFeed',
+      data: { action: 'markAllMessagesRead', includeComments: false }
+    }
   ]);
 });
 
 test('loads the page, marks a row read and opens its related feed item', async () => {
   const rawMessages = [{
     id: 'message-1',
-    kind: 'thread_activity',
-    title: '讨论有新进展',
-    body: '看看新观点',
+    kind: 'profile_review_approved',
+    title: '资料审核通过',
+    body: '新的资料已经生效',
     itemId: 'item/01',
     version: 'event-01',
     occurredAt: '2026-07-24T07:30:00.000Z',
@@ -268,11 +285,11 @@ test('loads the page, marks a row read and opens its related feed item', async (
   }
 });
 
-test('opens delete only on a horizontal swipe and removes either message category', async () => {
+test('opens delete only on a horizontal swipe and removes visible system messages', async () => {
   const rawMessages = [
     {
-      id: 'interaction-1',
-      type: 'comment_received',
+      id: 'membership-1',
+      type: 'membership_activated',
       itemId: 'item-1',
       unread: true
     },
@@ -318,7 +335,7 @@ test('opens delete only on a horizontal swipe and removes either message categor
     assert.equal(page.data.swipedMessageId, '');
 
     page.onMessageTouchStart.call(page, {
-      currentTarget: { dataset: { messageId: 'interaction-1' } },
+      currentTarget: { dataset: { messageId: 'membership-1' } },
       touches: [{ clientX: 300, clientY: 100 }]
     });
     page.onMessageTouchMove.call(page, {
@@ -327,12 +344,12 @@ test('opens delete only on a horizontal swipe and removes either message categor
     page.onMessageTouchEnd.call(page, {
       changedTouches: [{ clientX: 245, clientY: 104 }]
     });
-    assert.equal(page.data.swipedMessageId, 'interaction-1');
+    assert.equal(page.data.swipedMessageId, 'membership-1');
 
     assert.equal(await page.deleteMessage.call(page, {
-      currentTarget: { dataset: { messageId: 'interaction-1' } }
+      currentTarget: { dataset: { messageId: 'membership-1' } }
     }), true);
-    assert.deepEqual(deletions, ['interaction-1']);
+    assert.deepEqual(deletions, ['membership-1']);
     assert.deepEqual(page.data.messages.map((message) => message.id), ['system-1']);
     assert.equal(page.data.interactionCount, 0);
     assert.equal(page.data.systemCount, 1);
@@ -361,7 +378,7 @@ test('supports all-read, loading, error, empty and unread visual states', async 
         unreadCount: 0
       };
     }
-  });
+  }, { commentsEnabled: true });
   try {
     const page = pageContext(loaded.definition);
     await page.onLoad.call(page);
@@ -455,8 +472,8 @@ test('ignores an older single-read response after a newer message mutation finis
   const first = deferred();
   const second = deferred();
   const rawMessages = [
-    { id: 'one', version: 'event-one', kind: 'comment_received', isRead: false },
-    { id: 'two', version: 'event-two', kind: 'comment_received', isRead: false }
+    { id: 'one', version: 'event-one', kind: 'profile_approved', isRead: false },
+    { id: 'two', version: 'event-two', kind: 'membership_succeeded', isRead: false }
   ];
   let readCalls = 0;
   const loaded = loadMessagesPage({
@@ -578,7 +595,7 @@ test('cancels queued and in-flight message operations when the viewer changes', 
   const restoreApi = replaceModule(apiPath, {
     getMessages: async () => {
       calls.push('load');
-      return { messages: [{ id: scope, kind: 'comment_received' }], unreadCount: 1 };
+      return { messages: [{ id: scope, kind: 'profile_approved' }], unreadCount: 1 };
     },
     markMessageRead: async () => {
       calls.push('read');
@@ -605,7 +622,7 @@ test('cancels queued and in-flight message operations when the viewer changes', 
 
     scope = 'viewer-b';
     clearViewerCache();
-    inFlight.resolve({ messages: [{ id: 'viewer-a', kind: 'comment_received' }], unreadCount: 1 });
+    inFlight.resolve({ messages: [{ id: 'viewer-a', kind: 'profile_approved' }], unreadCount: 1 });
     const results = await Promise.allSettled([readRequest, queuedLoad]);
     assert.deepEqual(results.map((result) => result.status), ['rejected', 'rejected']);
     assert.ok(results.every((result) => result.reason.code === 'VIEWER_CHANGED'));

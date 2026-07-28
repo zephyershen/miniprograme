@@ -33,6 +33,49 @@ function serverDate(db, fallback) {
   return typeof db.serverDate === 'function' ? db.serverDate() : fallback;
 }
 
+function messageCategory(message) {
+  const route = message && message.route && typeof message.route === 'object'
+    ? message.route
+    : {};
+  const payload = message && message.payload && typeof message.payload === 'object'
+    ? message.payload
+    : {};
+  const categories = [
+    message && message.category,
+    message && message.messageCategory,
+    route.category,
+    payload.category
+  ].map((value) => String(value || '').trim().toLowerCase())
+    .filter(Boolean);
+  const type = String(message && message.type || '').trim().toLowerCase();
+  if (
+    /^(?:comment_|thread_comment_)/.test(type)
+    || type === 'thread_activity'
+    || categories.some((category) => (
+      ['comment', 'comments', 'discussion'].includes(category)
+    ))
+    || message && message.openComments === true
+    || route.openComments === true
+    || payload.openComments === true
+    || Boolean(
+      message && (
+        message.commentId
+        || message.parentCommentId
+        || message.replyToCommentId
+      )
+      || route.commentId
+      || route.parentCommentId
+      || route.replyToCommentId
+      || payload.commentId
+      || payload.parentCommentId
+      || payload.replyToCommentId
+    )
+  ) {
+    return 'comments';
+  }
+  return categories[0] || 'system';
+}
+
 async function documentOrNull(reference) {
   try {
     return (await reference.get()).data;
@@ -295,16 +338,63 @@ function createUserMessageRepository(db, config) {
     return current ? { _id: id, ...current } : null;
   }
 
-  async function listOwnerMessages(ownerKey, limit = config.userMessagePageSize) {
+  async function listOwnerMessages(
+    ownerKey,
+    limit = config.userMessagePageSize,
+    { excludeCategories = [] } = {}
+  ) {
     await ensureMessages();
     const size = Math.max(1, Math.min(100, Number(limit) || 50));
-    const response = await messages()
-      .where({ ownerKey: assertOwnerKey(ownerKey) })
-      .orderBy('createdAt', 'desc')
-      .orderBy('_id', 'desc')
-      .limit(size)
-      .get();
-    return (response && response.data) || [];
+    const safeOwnerKey = assertOwnerKey(ownerKey);
+    const excluded = new Set((Array.isArray(excludeCategories) ? excludeCategories : [])
+      .filter((category) => typeof category === 'string' && category.trim())
+      .map((category) => category.trim().toLowerCase()));
+    if (!excluded.size) {
+      const response = await messages()
+        .where({ ownerKey: safeOwnerKey })
+        .orderBy('createdAt', 'desc')
+        .orderBy('_id', 'desc')
+        .limit(size)
+        .get();
+      return (response && response.data) || [];
+    }
+
+    const visible = [];
+    const seen = new Set();
+    const pageSize = 100;
+    const scanPageLimit = Math.max(
+      1,
+      Math.min(100, Number(config.userMessageListScanPageLimit) || 20)
+    );
+    let offset = 0;
+    let scannedPages = 0;
+    while (visible.length < size) {
+      const response = await messages()
+        .where({ ownerKey: safeOwnerKey })
+        .orderBy('createdAt', 'desc')
+        .orderBy('_id', 'desc')
+        .skip(offset)
+        .limit(pageSize)
+        .get();
+      const documents = (response && response.data) || [];
+      scannedPages += 1;
+      documents.forEach((message) => {
+        const id = message && (message._id || message.id);
+        if (id && seen.has(id)) return;
+        if (id) seen.add(id);
+        if (!excluded.has(messageCategory(message))) visible.push(message);
+      });
+      if (visible.length >= size) break;
+      if (documents.length < pageSize) break;
+      if (scannedPages >= scanPageLimit) {
+        throw new AppError(
+          'MESSAGE_LIST_SCAN_LIMIT',
+          '消息较多，请稍后重试'
+        );
+      }
+      offset += documents.length;
+    }
+    return visible.slice(0, size);
   }
 
   async function unreadCount(ownerKey) {

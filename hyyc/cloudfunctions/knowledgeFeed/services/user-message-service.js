@@ -1,4 +1,5 @@
 const crypto = require('node:crypto');
+const { AppError } = require('../lib/errors');
 const { mapWithConcurrency } = require('../repositories/collection-support');
 
 const RETRY_DELAYS_MS = Object.freeze([
@@ -107,6 +108,12 @@ function directMessage(event) {
     }
   };
   return values[event.type] || null;
+}
+
+function messageListOptions(event) {
+  return {
+    includeComments: !(event && event.includeComments === false)
+  };
 }
 
 function createUserMessageService({
@@ -227,7 +234,18 @@ function createUserMessageService({
     }, { scanned: candidates.length });
   }
 
-  async function list(actor) {
+  async function list(actor, { includeComments = true } = {}) {
+    if (includeComments === false) {
+      const messages = await repository.listOwnerMessages(
+        actor.ownerKey,
+        config.userMessagePageSize,
+        { excludeCategories: ['comments'] }
+      );
+      return {
+        messages: messages.map(messageView),
+        unreadCount: messages.filter((message) => message && message.unread).length
+      };
+    }
     const [messages, unreadCount] = await Promise.all([
       repository.listOwnerMessages(actor.ownerKey, config.userMessagePageSize),
       repository.unreadCount(actor.ownerKey)
@@ -235,24 +253,27 @@ function createUserMessageService({
     return { messages: messages.map(messageView), unreadCount };
   }
 
-  async function markRead(messageId, messageVersion, actor) {
+  async function markRead(messageId, messageVersion, actor, options) {
     await repository.markRead(
       actor.ownerKey,
       messageId,
       typeof messageVersion === 'string' ? messageVersion : '',
       new Date(now())
     );
-    return list(actor);
+    return list(actor, options);
   }
 
-  async function deleteMessage(messageId, actor) {
+  async function deleteMessage(messageId, actor, options) {
     await repository.deleteMessage(actor.ownerKey, messageId);
-    return list(actor);
+    return list(actor, options);
   }
 
-  async function markAllRead(actor) {
+  async function markAllRead(actor, options) {
+    if (options && options.includeComments === false) {
+      throw new AppError('COMMENTS_PAUSED', '当前版本不支持全部已读');
+    }
     await repository.markAllRead(actor.ownerKey, new Date(now()));
-    return list(actor);
+    return list(actor, options);
   }
 
   return { processDue, list, markRead, deleteMessage, markAllRead };
@@ -262,5 +283,6 @@ module.exports = {
   retryDelay,
   messageView,
   directMessage,
+  messageListOptions,
   createUserMessageService
 };

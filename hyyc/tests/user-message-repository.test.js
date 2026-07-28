@@ -198,6 +198,145 @@ test('pushes the event-time cutoff into the participant query before applying it
   assert.equal(db.queryLog[0].filters.createdAt.value.toISOString(), EVENT_AT.toISOString());
 });
 
+test('finds visible system messages beyond a full page of excluded comment notifications', async () => {
+  const storedMessages = {};
+  for (let index = 0; index < 120; index += 1) {
+    storedMessages[`comment-${index}`] = {
+      ownerKey: OWNER,
+      category: 'comments',
+      type: 'comment_received',
+      unread: true,
+      createdAt: new Date(EVENT_AT.getTime() + 1000 + index)
+    };
+  }
+  storedMessages.profile = {
+    ownerKey: OWNER,
+    category: 'profile',
+    type: 'profile_approved',
+    unread: true,
+    createdAt: EVENT_AT
+  };
+  storedMessages.membership = {
+    ownerKey: OWNER,
+    category: 'membership',
+    type: 'membership_succeeded',
+    unread: false,
+    createdAt: new Date(EVENT_AT.getTime() - 1000)
+  };
+  const db = createMemoryDb({ messages: storedMessages });
+
+  const listed = await repository(db).listOwnerMessages(OWNER, 50, {
+    excludeCategories: ['COMMENTS']
+  });
+
+  assert.deepEqual(listed.map((message) => message._id), ['profile', 'membership']);
+  assert.equal(db.queryLog.length, 2);
+});
+
+test('returns an empty list after reaching the end of only legacy comment messages', async () => {
+  const db = createMemoryDb({
+    messages: {
+      current: {
+        ownerKey: OWNER,
+        category: 'comments',
+        type: 'comment_received',
+        createdAt: EVENT_AT
+      },
+      legacy: {
+        ownerKey: OWNER,
+        type: 'thread_comment_published',
+        createdAt: new Date(EVENT_AT.getTime() - 1000)
+      },
+      activity: {
+        ownerKey: OWNER,
+        type: 'thread_activity',
+        createdAt: new Date(EVENT_AT.getTime() - 2000)
+      },
+      discussion: {
+        ownerKey: OWNER,
+        category: 'discussion',
+        type: 'legacy',
+        createdAt: new Date(EVENT_AT.getTime() - 3000)
+      },
+      identifiers: {
+        ownerKey: OWNER,
+        type: 'legacy',
+        commentId: 'legacy-comment',
+        createdAt: new Date(EVENT_AT.getTime() - 4000)
+      },
+      nested: {
+        ownerKey: OWNER,
+        type: 'legacy',
+        payload: {
+          route: 'legacy',
+          replyToCommentId: 'legacy-reply'
+        },
+        createdAt: new Date(EVENT_AT.getTime() - 5000)
+      }
+    }
+  });
+
+  const listed = await repository(db).listOwnerMessages(OWNER, 50, {
+    excludeCategories: ['comments']
+  });
+
+  assert.deepEqual(listed, []);
+  assert.equal(db.queryLog.length, 1);
+});
+
+test('keeps visible messages globally ordered and capped after multi-page filtering', async () => {
+  const storedMessages = {};
+  for (let index = 0; index < 110; index += 1) {
+    storedMessages[`comment-${index}`] = {
+      ownerKey: OWNER,
+      category: 'comments',
+      type: 'comment_received',
+      createdAt: new Date(EVENT_AT.getTime() + 1000 + index)
+    };
+  }
+  for (let index = 0; index < 60; index += 1) {
+    storedMessages[`system-${index}`] = {
+      ownerKey: OWNER,
+      category: 'profile',
+      type: 'profile_approved',
+      createdAt: new Date(EVENT_AT.getTime() - index)
+    };
+  }
+  const db = createMemoryDb({ messages: storedMessages });
+
+  const listed = await repository(db).listOwnerMessages(OWNER, 50, {
+    excludeCategories: ['comments']
+  });
+
+  assert.equal(listed.length, 50);
+  assert.deepEqual(
+    listed.map((message) => message._id),
+    Array.from({ length: 50 }, (_, index) => `system-${index}`)
+  );
+  assert.equal(db.queryLog.length, 2);
+});
+
+test('fails explicitly instead of timing out or returning a partial filtered message list', async () => {
+  const storedMessages = Object.fromEntries(Array.from({ length: 101 }, (_, index) => [
+    `comment-${index}`,
+    {
+      ownerKey: OWNER,
+      category: index === 100 ? undefined : 'comments',
+      type: index === 100 ? 'thread_comment_published' : 'comment_received',
+      unread: true,
+      createdAt: new Date(EVENT_AT.getTime() + index)
+    }
+  ]));
+  const db = createMemoryDb({ messages: storedMessages });
+
+  await assert.rejects(
+    () => repository(db, { userMessageListScanPageLimit: 1 })
+      .listOwnerMessages(OWNER, 50, { excludeCategories: ['comments'] }),
+    (error) => error && error.code === 'MESSAGE_LIST_SCAN_LIMIT'
+  );
+  assert.equal(db.queryLog.length, 1);
+});
+
 test('keeps replayed direct events read and uses the business event time', async () => {
   const db = createMemoryDb();
   const messages = repository(db);

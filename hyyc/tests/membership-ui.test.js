@@ -120,10 +120,10 @@ test('presents an active membership as renewable with its explicit period end', 
   assert.equal(active.periodEndLabel, '2026.09.22');
 });
 
-test('keeps the complete Pro benefit list in one model without claiming free engagement actions', () => {
+test('hides the paused comment benefit without changing the remaining Pro value model', () => {
   const benefits = membershipBenefits();
   assert.deepEqual(benefits.map((item) => item.key), [
-    'curated', 'courses', 'practicals', 'briefings', 'history', 'comments', 'support'
+    'curated', 'courses', 'practicals', 'briefings', 'history', 'support'
   ]);
   assert.match(benefits.find((item) => item.key === 'courses').copy, /持续更新的基础课全文/);
   assert.match(benefits.find((item) => item.key === 'courses').title, /高清手绘图文/);
@@ -133,12 +133,14 @@ test('keeps the complete Pro benefit list in one model without claiming free eng
   assert.doesNotMatch(JSON.stringify(benefits), /喜欢|收藏功能|分享/);
 
   const commentPrompt = membershipPrompt('comments');
-  assert.equal(commentPrompt.focusBenefit.key, 'comments');
-  assert.equal(commentPrompt.benefits[0].key, 'comments');
+  assert.equal(commentPrompt.featureKey, 'curated_feed');
+  assert.equal(commentPrompt.focusBenefit.key, 'curated');
+  assert.equal(commentPrompt.benefits[0].key, 'curated');
   assert.deepEqual(
     new Set(commentPrompt.benefits.map((item) => item.key)),
     new Set(benefits.map((item) => item.key))
   );
+  assert.doesNotMatch(JSON.stringify(commentPrompt), /评论/);
   assert.doesNotMatch(
     JSON.stringify(membershipPrompt('digests')),
     /影响判断|跟你有什么关系/

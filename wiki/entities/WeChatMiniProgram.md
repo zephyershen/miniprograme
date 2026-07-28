@@ -2,7 +2,7 @@
 title: "知识获取平台微信小程序"
 type: entity
 tags: [wechat, miniprogram, cloud-development, knowledge-platform, editorial-index]
-sources: [../sources/2026-07-13-digest-inbox-implementation.md, ../sources/2026-07-14-cloud-cleanup-and-deployment.md, ../sources/2026-07-15-wechat-e2e-and-runtime-fixes.md, ../sources/2026-07-15-editorial-ui-implementation.md, ../sources/2026-07-15-aihot-feed-integration.md, ../sources/2026-07-16-source-preview-deployment.md, ../sources/2026-07-17-full-feed-admin-and-capacity.md, ../sources/2026-07-18-engagement-ui-implementation.md, ../sources/2026-07-19-interaction-reliability-and-comment-media.md, ../sources/2026-07-19-packy-grok-intelligence.md, ../sources/2026-07-19-profile-moderation-and-huifu-payment.md, ../sources/2026-07-20-cloudbase-ai-cost-and-hybrid-routing.md, ../sources/2026-07-21-timeout-feed-and-manual-production-validation.md, ../sources/2026-07-22-cloudbase-scf-source-preview-and-mobile-timeline.md, ../sources/2026-07-22-six-concurrency-and-personal-proxy-headroom.md, ../sources/2026-07-22-cloud-media-proactive-renewal.md, ../sources/2026-07-22-runtime-reliability-performance-and-feed-spacing.md, ../sources/2026-07-24-async-comments-message-center-and-stable-loading.md, ../sources/2026-07-24-visible-wechat-account-confirmation-and-payment-diagnostics.md, ../sources/2026-07-24-two-step-membership-login-and-optional-profile.md, ../sources/2026-07-28-member-column-search-release-prep.md, ../decisions/2026-07-19-automatic-ai-curation-and-comment-moderation.md, ../decisions/2026-07-19-huifu-membership-payment-and-paid-content.md, ../decisions/2026-07-20-cloudbase-ai-primary-packy-fallback.md, ../decisions/2026-07-21-image-independent-feed-and-direct-practical-manual.md, ../decisions/2026-07-22-cloudbase-scf-source-preview.md, ../decisions/2026-07-24-async-comments-and-message-center.md]
+sources: [../sources/2026-07-13-digest-inbox-implementation.md, ../sources/2026-07-14-cloud-cleanup-and-deployment.md, ../sources/2026-07-15-wechat-e2e-and-runtime-fixes.md, ../sources/2026-07-15-editorial-ui-implementation.md, ../sources/2026-07-15-aihot-feed-integration.md, ../sources/2026-07-16-source-preview-deployment.md, ../sources/2026-07-17-full-feed-admin-and-capacity.md, ../sources/2026-07-18-engagement-ui-implementation.md, ../sources/2026-07-19-interaction-reliability-and-comment-media.md, ../sources/2026-07-19-packy-grok-intelligence.md, ../sources/2026-07-19-profile-moderation-and-huifu-payment.md, ../sources/2026-07-20-cloudbase-ai-cost-and-hybrid-routing.md, ../sources/2026-07-21-timeout-feed-and-manual-production-validation.md, ../sources/2026-07-22-cloudbase-scf-source-preview-and-mobile-timeline.md, ../sources/2026-07-22-six-concurrency-and-personal-proxy-headroom.md, ../sources/2026-07-22-cloud-media-proactive-renewal.md, ../sources/2026-07-22-runtime-reliability-performance-and-feed-spacing.md, ../sources/2026-07-24-async-comments-message-center-and-stable-loading.md, ../sources/2026-07-24-visible-wechat-account-confirmation-and-payment-diagnostics.md, ../sources/2026-07-24-two-step-membership-login-and-optional-profile.md, ../sources/2026-07-28-member-column-search-release-prep.md, ../sources/2026-07-28-comment-ui-review-pause.md, ../decisions/2026-07-19-automatic-ai-curation-and-comment-moderation.md, ../decisions/2026-07-19-huifu-membership-payment-and-paid-content.md, ../decisions/2026-07-20-cloudbase-ai-primary-packy-fallback.md, ../decisions/2026-07-21-image-independent-feed-and-direct-practical-manual.md, ../decisions/2026-07-22-cloudbase-scf-source-preview.md, ../decisions/2026-07-24-async-comments-and-message-center.md, ../decisions/2026-07-28-pause-comment-ui-for-review.md]
 last_updated: 2026-07-28
 status: confirmed
 confidence: high
@@ -47,7 +47,12 @@ AIHOT，GitHub 使用 AIGCLINK 原生标签和全部历史。普通用户查看�
 - 真实密钥只能留在云环境变量或受限配置中；普通 Wiki 和仓库不保存密钥值。
 - 当前业务集合只由云函数访问；公共资讯缓存与按日历史归档都不保存用户身份。
 - 普通用户由云函数限制滚动 24 小时，Pro 为 30 天，管理员查看项目全部已归档数据；角色由 OpenID 的 SHA-256 派生键、独立会员记录和管理员授权决定，管理员优先。当前唯一微信账号已授予管理员角色，普通 Wiki 不记录其身份哈希。
-- 喜爱与收藏对所有真实微信用户开放；评论只对 Pro/管理员开放并由服务端重鉴权。评论先以作者可见的 `pending` 状态提交，后台审核通过后才公开；同一资讯 30 秒冷却、滚动 24 小时最多 30 条。互动和评论表为 `ADMINONLY`，公开结果不包含派生身份键。
+- 喜爱与收藏对所有真实微信用户开放。评论后端只允许 Pro/管理员并由服务端重鉴权，
+  但待上传替换候选通过 `PRODUCT_FEATURES.comments=false` 暂时隐藏全部评论入口、
+  气泡、弹层、权益文案和评论通知；旧深链也不能打开评论。评论仍先以作者可见的
+  `pending` 状态提交，后台审核通过后才公开；同一资讯 30 秒冷却、滚动 24 小时最多
+  30 条。互动和评论表为 `ADMINONLY`，公开结果不包含派生身份键。未来恢复评论必须
+  修改客户端发布开关并重新提交微信审核，不能远程热开启。
 - 评论发布者通过微信 `chooseAvatar` 与昵称输入主动选择展示资料；候选保存后进入
   `knowledge_user_profile_reviews` 后台队列，用户本人看到“审核中”。已有通过资料
   在新候选通过前继续公开；首次资料在通过前保持未完成。公开资料和审核队列均为
@@ -76,7 +81,7 @@ AIHOT，GitHub 使用 AIGCLINK 原生标签和全部历史。普通用户查看�
 - 本地执行 `npm test` 与 `npm run check`。
 - 真实微信上下文的已验证闭环：保存关注方向、导入公开文章、查看摘要、保留卡片、核对统计、清除个人数据。
 - 2026-07-16 微信开发者工具已编译并渲染分页资讯首页、原文截图详情、来源 URL 和相关阅读；来源区位于“接着看”之前，控制台无项目级红色错误。
-- 当前本地回归为 775/775 个 Node 测试；项目检查覆盖 38 个 JSON、354 个
+- 当前本地回归为 791/791 个 Node 测试；项目检查覆盖 38 个 JSON、358 个
   JavaScript 和 16 个注册页面。GitHub 全量库、全页懒加载转圈、稳定互动、
   权益缓存、用户媒体、截图网络边界、模型主备路由、预算熔断、评论与资料后台
   审核、站内消息、微信登录绑定、订阅验证退出、虚拟支付签名/查单及生产自动队列
@@ -100,7 +105,16 @@ AI 资讯全量源已部署，具备每分钟指纹检查、6 小时条目条件
 
 SCF 实际状态已复核：生产 `knowledgeFeed` 有 10 个隔离定时器，分别执行每分钟来源同步、独立搜索 token 回填、每分钟 `:10/:25/:40/:55` 视觉 worker、每 10 分钟分析、每小时归档与旧视觉、日/周/月简报，以及同一每分钟审核调度中的资料/评论/消息 worker；`membershipBilling` 有 1 个每 15 分钟的有界最旧优先对账定时器。会员架构现为普通滚动 24 小时、Pro 30 天、管理员全部归档；29 个合同集合均为 `ADMINONLY`，50 个合同索引全部收敛。自动分析、简报生成、真实精选和简报公开均已启用。`membershipBilling` 已部署为微信虚拟支付事件函数，服务端购买方案当前 `available=true`、商品原价与现价均为 590 分，1090 分仅作界面比较价；客户端失败诊断覆盖官方码、未知数字码和无数字码三类安全字段。入站消息支持发货通知、iOS 退款询问和退款结果通知，但真实资金矩阵尚未完成双端真机验收。
 
-2026-07-19 `knowledgeFeed` 已部署事务顺序读、冲突短重试和乐观目标状态；生产验证后 `TransactionBusy` 为 0。当前评论文本/附件和昵称/头像均先保存为私有候选，后台以租约和 claim 审核，允许结果才事务公开；用户界面显示必要的“审核中”，结果进入我的消息。主要懒加载页统一转圈，后台换签、轮询、喜爱与收藏只更新局部字段，避免阅读中的整页闪动。项目当前未调用微信 `mediaCheckAsync/imgSecCheck/msgSecCheck`，也未配置 CloudBase COS 自动内容审核。完整实施证据见[异步评论、站内消息、稳定加载与会员绑定上线](../sources/2026-07-24-async-comments-message-center-and-stable-loading.md)。
+2026-07-19 `knowledgeFeed` 已部署事务顺序读、冲突短重试和乐观目标状态；生产验证后
+`TransactionBusy` 为 0。评论文本/附件和昵称/头像仍按私有候选、租约与 claim 审核，
+允许后才事务公开；审核结果继续保留在消息数据中。2026-07-28 待上传替换候选暂时
+隐藏评论 UI，并在客户端过滤评论消息和评论未读；新版消息请求还会由服务端越过
+评论通知继续返回会员/资料消息，后端与历史数据没有删除。主要懒
+加载页统一转圈，后台换签、轮询、喜爱与收藏只更新局部字段，避免阅读中的整页闪动。
+项目当前未调用微信 `mediaCheckAsync/imgSecCheck/msgSecCheck`，也未配置 CloudBase
+COS 自动内容审核。完整历史实施证据见
+[异步评论、站内消息、稳定加载与会员绑定上线](../sources/2026-07-24-async-comments-message-center-and-stable-loading.md)，
+当前暂停证据见[评论界面送审暂停与开发者工具验收](../sources/2026-07-28-comment-ui-review-pause.md)。
 
 该精选源不等同于重点厂商官方源分别直连；娱乐、社会、游戏和英语仍为待接入状态，当前不显示导航入口。当前没有已验证的外部业务域名，微信小程序也不能直接唤起任意系统浏览器，因此外部原文入口复制 URL 并提示用户到手机浏览器粘贴。
 

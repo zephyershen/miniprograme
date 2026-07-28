@@ -459,11 +459,18 @@ test('detail hydration preserves the latest locally confirmed engagement', () =>
   assert.equal(context.data.item.engagement.likeCount, 8);
 });
 
-test('detail comment entry sends free viewers to membership without mounting comments', () => {
+test('detail comment entry stays closed for this release and preserves the gated restore path', () => {
   const page = loadPage('../pages/feed-detail/index');
-  const createContext = (canComment, commentsOpen = false) => ({
+  const restoredPage = loadPage('../pages/feed-detail/index', [[
+    '../config/product-features',
+    {
+      isProductFeatureEnabled: (feature) => feature === 'comments'
+    }
+  ]]);
+  const createContext = (definition, canComment, commentsEnabled, commentsOpen = false) => ({
     data: {
       item: { engagement: { canComment } },
+      commentsEnabled,
       commentsOpen,
       membershipPromptVisible: false,
       membershipPromptFeature: ''
@@ -471,17 +478,22 @@ test('detail comment entry sends free viewers to membership without mounting com
     setData(patch) {
       Object.assign(this.data, patch);
     },
-    openMembershipPrompt: page.openMembershipPrompt
+    openMembershipPrompt: definition.openMembershipPrompt
   });
 
-  const freeViewer = createContext(false, true);
-  page.openComments.call(freeViewer);
+  const disabledViewer = createContext(page, true, false, true);
+  assert.equal(page.openComments.call(disabledViewer), false);
+  assert.equal(disabledViewer.data.commentsOpen, false);
+  assert.equal(disabledViewer.data.membershipPromptVisible, false);
+
+  const freeViewer = createContext(restoredPage, false, true);
+  assert.equal(restoredPage.openComments.call(freeViewer), false);
   assert.equal(freeViewer.data.commentsOpen, false);
   assert.equal(freeViewer.data.membershipPromptVisible, true);
   assert.equal(freeViewer.data.membershipPromptFeature, 'comments');
 
-  const member = createContext(true);
-  page.openComments.call(member);
+  const member = createContext(restoredPage, true, true);
+  assert.equal(restoredPage.openComments.call(member), true);
   assert.equal(member.data.commentsOpen, true);
   assert.equal(member.data.membershipPromptVisible, false);
 });

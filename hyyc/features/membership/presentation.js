@@ -1,11 +1,11 @@
 const {
-  PRO_BENEFITS,
   MEMBERSHIP_TERMS,
   membershipBenefits,
   membershipMetrics
 } = require('./benefits.js');
+const { isProductFeatureEnabled } = require('../../config/product-features.js');
 
-const MEMBERSHIP_BENEFITS = PRO_BENEFITS;
+const MEMBERSHIP_BENEFITS = Object.freeze(membershipBenefits());
 const ROLE_PREVIEW_OPTIONS = Object.freeze([
   { key: 'free', label: '普通用户' },
   { key: 'member', label: 'Pro 会员' },
@@ -32,8 +32,10 @@ function membershipPresentation(access, now = Date.now()) {
   const roleCopy = role === 'admin'
     ? '已拥有全部已归档资讯与所有会员能力。'
     : role === 'member'
-      ? '已开放 AI 专栏、精选、三档简报、30 天历史与会员评论。'
-    : '默认可查看最近 24 小时的全部资讯。';
+      ? (isProductFeatureEnabled('comments')
+        ? '已开放 AI 专栏、精选、三档简报、30 天历史与会员评论。'
+        : '已开放 AI 专栏、精选、三档简报与 30 天历史。')
+      : '默认可查看最近 24 小时的全部资讯。';
   return {
     role,
     roleLabel,

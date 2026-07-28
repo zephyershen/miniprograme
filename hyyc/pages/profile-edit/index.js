@@ -1,5 +1,6 @@
 const { loadUserProfile, updateUserProfile } = require('../../features/user-profile/session.js');
 const { uploadAvatar } = require('../../features/user-profile/media.js');
+const { isProductFeatureEnabled } = require('../../config/product-features.js');
 
 Page({
   data: {
@@ -11,6 +12,7 @@ Page({
     avatarChanged: false,
     reviewPending: false,
     reviewMessage: '',
+    commentsEnabled: isProductFeatureEnabled('comments'),
     membershipSetup: false,
     canSave: false
   },
@@ -19,7 +21,7 @@ Page({
     this.pageDisposed = false;
     this.saveCompleted = false;
     this.returnTimer = null;
-    this.returnToComments = options.from === 'comments';
+    this.returnToComments = isProductFeatureEnabled('comments') && options.from === 'comments';
     this.setData({ membershipSetup: options.from === 'membership' });
     this.loadProfile();
   },

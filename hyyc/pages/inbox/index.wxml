@@ -59,7 +59,7 @@
               </view>
               <template
                 is="feed-post-card"
-                data="{{postItem: dayItem, mediaRoot: 'feed.dayGroups[' + dayIndex + '].items[' + itemIndex + ']'}}"
+                data="{{postItem: dayItem, mediaRoot: 'feed.dayGroups[' + dayIndex + '].items[' + itemIndex + ']', commentsEnabled: commentsEnabled}}"
               />
             </view>
             <view wx:if="{{dayGroup.error && dayGroup.items.length}}" class="timeline-day-more" data-date-key="{{dayGroup.dateKey}}" bindtap="loadMoreTimelineDay" aria-role="button" aria-label="{{dayGroup.error}}，点击重试">
@@ -93,7 +93,7 @@
         <view class="timeline-entry timeline-entry-flat">
           <template
             is="feed-post-card"
-            data="{{postItem: feed.leadItem, mediaRoot: 'feed.leadItem'}}"
+            data="{{postItem: feed.leadItem, mediaRoot: 'feed.leadItem', commentsEnabled: commentsEnabled}}"
           />
         </view>
       </view>
@@ -102,7 +102,7 @@
         <view class="timeline-entry timeline-entry-flat">
           <template
             is="feed-post-card"
-            data="{{postItem: item, mediaRoot: 'feed.remainingItems[' + index + ']'}}"
+            data="{{postItem: item, mediaRoot: 'feed.remainingItems[' + index + ']', commentsEnabled: commentsEnabled}}"
           />
         </view>
       </view>
@@ -325,7 +325,7 @@
     </view>
     <view class="post-foot">
       <view class="post-actions" catchtap="stopPropagation">
-        <view class="post-action {{postItem.engagement.canComment ? '' : 'post-action-disabled'}}" data-id="{{postItem.id}}" catchtap="openComments"><view class="action-icon icon-comment"></view><text wx:if="{{postItem.engagement.commentLabel}}">{{postItem.engagement.commentLabel}}</text></view>
+        <view wx:if="{{commentsEnabled}}" class="post-action {{postItem.engagement.canComment ? '' : 'post-action-disabled'}}" data-id="{{postItem.id}}" catchtap="openComments"><view class="action-icon icon-comment"></view><text wx:if="{{postItem.engagement.commentLabel}}">{{postItem.engagement.commentLabel}}</text></view>
         <view class="post-action {{postItem.engagement.liked ? 'post-action-liked' : ''}}" data-id="{{postItem.id}}" catchtap="handleLike"><view class="action-icon icon-like {{postItem.engagement.liked ? 'icon-like-active' : ''}}"></view><text wx:if="{{postItem.engagement.likeLabel}}">{{postItem.engagement.likeLabel}}</text></view>
         <view class="post-action {{postItem.engagement.favorited ? 'post-action-saved' : ''}}" data-id="{{postItem.id}}" catchtap="handleFavorite"><view class="action-icon icon-bookmark {{postItem.engagement.favorited ? 'icon-bookmark-active' : ''}}"></view></view>
         <button class="post-action post-share" open-type="share" data-id="{{postItem.id}}" catchtap="noop"><view class="action-icon icon-share"></view></button>

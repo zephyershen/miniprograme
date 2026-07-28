@@ -31,7 +31,7 @@
         </view>
         <view wx:if="{{userProfile.reviewPending}}" class="user-profile-editline">
           <text class="user-profile-editicon"></text>
-          <text class="user-profile-edittext">{{userProfile.isComplete ? '资料审核中，通过前评论仍用原资料' : '资料审核中，通过后即可评论'}}</text>
+          <text class="user-profile-edittext">{{commentsEnabled ? (userProfile.isComplete ? '资料审核中，通过前评论仍用原资料' : '资料审核中，通过后即可评论') : (userProfile.isComplete ? '资料审核中，通过前继续使用原资料' : '资料审核中')}}</text>
         </view>
         <view wx:elif="{{userProfile.review.status === 'rejected'}}" class="user-profile-editline is-rejected">
           <text class="user-profile-editicon"></text>
@@ -39,7 +39,7 @@
         </view>
         <view wx:else class="user-profile-editline">
           <text class="user-profile-editicon"></text>
-          <text class="user-profile-edittext">{{userProfile.isComplete ? '编辑资料，展示我的头像和昵称' : '完善头像昵称，用作评论身份'}}</text>
+          <text class="user-profile-edittext">{{commentsEnabled ? (userProfile.isComplete ? '编辑资料，展示我的头像和昵称' : '完善头像昵称，用作评论身份') : (userProfile.isComplete ? '编辑头像和昵称' : '完善头像和昵称')}}</text>
         </view>
       </view>
       <text class="user-profile-arrow">›</text>

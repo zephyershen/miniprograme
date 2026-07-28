@@ -3,6 +3,7 @@ const {
   membershipBenefits,
   membershipMetrics
 } = require('./benefits.js');
+const { isProductFeatureEnabled } = require('../../config/product-features.js');
 
 const PROMPTS = Object.freeze({
   curated_feed: {
@@ -39,14 +40,19 @@ const AI_COLUMN_PROMPT = Object.freeze({
 });
 
 function membershipPrompt(featureKey) {
-  const promptKey = /^digest_(?:24h|7d|30d)$/.test(featureKey) ? 'digests' : featureKey;
-  const prompt = featureKey === 'ai_column'
+  const visibleFeatureKey = featureKey === 'comments' && !isProductFeatureEnabled('comments')
+    ? 'curated_feed'
+    : featureKey;
+  const promptKey = /^digest_(?:24h|7d|30d)$/.test(visibleFeatureKey)
+    ? 'digests'
+    : visibleFeatureKey;
+  const prompt = visibleFeatureKey === 'ai_column'
     ? AI_COLUMN_PROMPT
     : (PROMPTS[promptKey] || PROMPTS.curated_feed);
-  const benefits = membershipBenefits(featureKey);
+  const benefits = membershipBenefits(visibleFeatureKey);
   return {
     ...prompt,
-    featureKey,
+    featureKey: visibleFeatureKey,
     focusBenefit: benefits.find((item) => item.featured) || benefits[0],
     benefits,
     metrics: membershipMetrics(),

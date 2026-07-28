@@ -4,7 +4,7 @@ const {
   deleteMessage: requestDeleteMessage,
   markAllMessagesRead: requestMarkAllMessagesRead
 } = require('./api.js');
-const { normalizeMessagesResult } = require('./model.js');
+const { visibleMessagesResult } = require('./visibility.js');
 const { membershipCacheScope } = require('../membership/session.js');
 const { createQueryCache } = require('../runtime/query-cache.js');
 const { registerViewerCache } = require('../runtime/viewer-cache-registry.js');
@@ -41,7 +41,7 @@ function loadMessages({ force = false, scope = currentScope() } = {}) {
     assertCurrentViewer(scope, generation);
     return messagesCache.load(scope, async () => {
       assertCurrentViewer(scope, generation);
-      const result = normalizeMessagesResult(await getMessages());
+      const result = visibleMessagesResult(await getMessages());
       assertCurrentViewer(scope, generation);
       return result;
     }, { force });
@@ -53,7 +53,7 @@ function markMessageRead(messageId, messageVersion) {
   const generation = messageViewerGeneration;
   return enqueueMessageOperation(async () => {
     assertCurrentViewer(scope, generation);
-    const result = normalizeMessagesResult(
+    const result = visibleMessagesResult(
       await requestMarkMessageRead(messageId, messageVersion)
     );
     assertCurrentViewer(scope, generation);
@@ -66,7 +66,7 @@ function deleteMessage(messageId) {
   const generation = messageViewerGeneration;
   return enqueueMessageOperation(async () => {
     assertCurrentViewer(scope, generation);
-    const result = normalizeMessagesResult(await requestDeleteMessage(messageId));
+    const result = visibleMessagesResult(await requestDeleteMessage(messageId));
     assertCurrentViewer(scope, generation);
     return messagesCache.remember(scope, result);
   });
@@ -77,7 +77,7 @@ function markAllMessagesRead() {
   const generation = messageViewerGeneration;
   return enqueueMessageOperation(async () => {
     assertCurrentViewer(scope, generation);
-    const result = normalizeMessagesResult(await requestMarkAllMessagesRead());
+    const result = visibleMessagesResult(await requestMarkAllMessagesRead());
     assertCurrentViewer(scope, generation);
     return messagesCache.remember(scope, result);
   });

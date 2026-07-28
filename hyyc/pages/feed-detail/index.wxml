@@ -77,7 +77,7 @@
     </view>
 
     <view class="detail-actions">
-      <view class="detail-action" bindtap="openComments"><view class="action-icon icon-comment"></view><text class="detail-action-label">评论{{item.engagement.commentLabel ? ' ' + item.engagement.commentLabel : ''}}</text></view>
+      <view wx:if="{{commentsEnabled}}" class="detail-action" bindtap="openComments"><view class="action-icon icon-comment"></view><text class="detail-action-label">评论{{item.engagement.commentLabel ? ' ' + item.engagement.commentLabel : ''}}</text></view>
       <view class="detail-action" bindtap="handleLike"><view class="action-icon icon-like {{item.engagement.liked ? 'icon-like-active' : ''}}"></view><text class="detail-action-label">喜欢{{item.engagement.likeLabel ? ' ' + item.engagement.likeLabel : ''}}</text></view>
       <view class="detail-action" bindtap="handleFavorite"><view class="action-icon icon-bookmark {{item.engagement.favorited ? 'icon-bookmark-active' : ''}}"></view><text class="detail-action-label">收藏</text></view>
       <button class="detail-action detail-share" open-type="share"><view class="action-icon icon-share"></view><text class="detail-action-label">分享</text></button>
@@ -184,7 +184,7 @@
   </block>
 
   <comment-sheet
-    wx:if="{{item && item.engagement.canComment}}"
+    wx:if="{{commentsEnabled && item && item.engagement.canComment}}"
     visible="{{commentsOpen}}"
     item-id="{{item.id}}"
     comment-count="{{item.engagement.commentCount}}"

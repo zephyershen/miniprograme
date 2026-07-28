@@ -101,7 +101,10 @@ const { createCloudbaseMediaUploader } = require('./services/cloudbase-media-upl
 const { createCommentModerationService } = require('./services/comment-moderation-service');
 const { createProfileModerationService } = require('./services/profile-moderation-service');
 const { createCommentReviewService } = require('./services/comment-review-service');
-const { createUserMessageService } = require('./services/user-message-service');
+const {
+  createUserMessageService,
+  messageListOptions
+} = require('./services/user-message-service');
 const { createColumnContentService } = require('./services/column-content-service');
 const { createColumnCatalogService } = require('./services/column-catalog-service');
 const { createColumnAdminService } = require('./services/column-admin-service');
@@ -684,18 +687,24 @@ const ACTION_HANDLERS = Object.freeze({
     const actor = actorService.resolve();
     return userProfileService.save(event.profile, actor);
   },
-  messages: async () => userMessageService.list(actorService.resolve()),
+  messages: async (event) => userMessageService.list(
+    actorService.resolve(),
+    messageListOptions(event)
+  ),
   markMessageRead: async (event) => userMessageService.markRead(
     event.messageId,
     event.messageVersion,
-    actorService.resolve()
+    actorService.resolve(),
+    messageListOptions(event)
   ),
   deleteMessage: async (event) => userMessageService.deleteMessage(
     event.messageId,
-    actorService.resolve()
+    actorService.resolve(),
+    messageListOptions(event)
   ),
-  markAllMessagesRead: async () => userMessageService.markAllRead(
-    actorService.resolve()
+  markAllMessagesRead: async (event) => userMessageService.markAllRead(
+    actorService.resolve(),
+    messageListOptions(event)
   ),
   columnContent: async () => {
     const actor = actorService.resolve();

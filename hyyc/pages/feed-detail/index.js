@@ -28,6 +28,7 @@ const {
 const {
   createPageMediaRecovery
 } = require('../../features/knowledge-feed/cloud-media-recovery.js');
+const { isProductFeatureEnabled } = require('../../config/product-features.js');
 
 const SOURCE_URL_EXPAND_THRESHOLD = 42;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -68,17 +69,21 @@ Page({
     previewAutoplay: true,
     sourceUrlCanExpand: false,
     sourceUrlExpanded: false,
+    commentsEnabled: isProductFeatureEnabled('comments'),
     commentsOpen: false,
     focusedCommentId: '',
     membershipPromptVisible: false,
-    membershipPromptFeature: 'comments'
+    membershipPromptFeature: 'curated_feed'
   },
 
   onLoad(options) {
+    const commentsEnabled = isProductFeatureEnabled('comments');
     this.itemId = options.id || '';
     this.digestId = options.digestId || '';
-    this.openCommentsAfterLoad = options.comments === '1';
-    this.setData({ focusedCommentId: options.commentId || '' });
+    this.openCommentsAfterLoad = commentsEnabled && options.comments === '1';
+    this.setData({
+      focusedCommentId: commentsEnabled ? (options.commentId || '') : ''
+    });
     this.pageDisposed = false;
     this.detailLoadRequestId = 0;
     this.skipNextDetailRevalidation = true;
@@ -258,13 +263,18 @@ Page({
   },
 
   openComments() {
+    if (!isProductFeatureEnabled('comments')) {
+      if (this.data.commentsOpen) this.setData({ commentsOpen: false });
+      return false;
+    }
     const engagement = this.data.item && this.data.item.engagement;
-    if (!engagement) return;
+    if (!engagement) return false;
     if (engagement.canComment !== true) {
       this.openMembershipPrompt('comments');
-      return;
+      return false;
     }
     this.setData({ commentsOpen: true });
+    return true;
   },
 
   closeComments() {
@@ -283,15 +293,19 @@ Page({
   },
 
   handleCommentsLocked() {
+    if (!isProductFeatureEnabled('comments')) return false;
     this.openMembershipPrompt('comments');
+    return true;
   },
 
   openMembershipPrompt(featureKey) {
+    if (featureKey === 'comments' && !isProductFeatureEnabled('comments')) return false;
     this.setData({
       commentsOpen: false,
       membershipPromptVisible: true,
-      membershipPromptFeature: featureKey || 'comments'
+      membershipPromptFeature: featureKey || 'curated_feed'
     });
+    return true;
   },
 
   closeMembershipPrompt() {

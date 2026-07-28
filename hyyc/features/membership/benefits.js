@@ -1,3 +1,5 @@
+const { isProductFeatureEnabled } = require('../../config/product-features.js');
+
 const PRO_MEMBERSHIP_NAME = 'Pro 会员';
 
 const PRO_BENEFITS = Object.freeze([
@@ -77,10 +79,12 @@ function cloneBenefit(item, featured = false) {
 
 function membershipBenefits(featureKey = '') {
   const normalizedFeatureKey = String(featureKey || '').trim();
-  const benefits = PRO_BENEFITS.map((item) => cloneBenefit(
-    item,
-    Boolean(normalizedFeatureKey && item.featureKeys.includes(normalizedFeatureKey))
-  ));
+  const benefits = PRO_BENEFITS
+    .filter((item) => item.key !== 'comments' || isProductFeatureEnabled('comments'))
+    .map((item) => cloneBenefit(
+      item,
+      Boolean(normalizedFeatureKey && item.featureKeys.includes(normalizedFeatureKey))
+    ));
   if (!normalizedFeatureKey) return benefits;
   return benefits.filter((item) => item.featured)
     .concat(benefits.filter((item) => !item.featured));

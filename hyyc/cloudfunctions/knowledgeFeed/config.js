@@ -157,6 +157,7 @@ const ENGAGEMENT_CONFIG = Object.freeze({
     messageParticipantLimit: 200,
     messageParticipantScanLimit: 1000,
     userMessagePageSize: 50,
+    userMessageListScanPageLimit: 20,
     userMessageMarkAllBudgetMs: 15 * 1000,
   userMediaFileIdRoot: 'cloud://hyyc-1gi3f5sqc5becabf.6879-hyyc-1gi3f5sqc5becabf-1395663220/',
   userMediaStagingPathPrefix: 'user-media/staging/',
