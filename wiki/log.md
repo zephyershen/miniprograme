@@ -1703,3 +1703,33 @@
   提交执行完整验证、生产函数部署和微信候选上传。
 - Sensitive handling: 本记录不包含外部平台账号、会话、令牌、用户数据或其他
   敏感值。
+
+## [2026-07-28] mini-program-2.4.0-upload | 最终生产 canary 与微信开发版本上传
+
+- Session: local Codex task
+- Scope: 只处理 `hyyc/` 小程序、CloudBase、测试、Git 与微信发布；非产品工作目录
+  已从当前 Git 版本解除跟踪并忽略，对应测试和 Wiki 内容已删除，本地原文件保留。
+- Anchor: 最终代码提交
+  `68382f5dddcb1ea0deb0840363abe77938434f71`；分支与标签
+  `rc/2026-07-28-member-admin-global-search-v3` 均已推送并回读到同一 SHA。
+- Verification: 隔离干净工作树完整 `npm.cmd run verify` 通过：38 个 JSON、
+  354 个 JavaScript、16 个页面、775/775 个 Node 测试、29 个集合合同、50 个索引
+  合同、覆盖率和生产依赖审计全部通过。微信预览与上传包均为 632,253 bytes。
+- CloudBase: 从最终 SHA code-only 更新 `knowledgeFeed`；四函数 manifest、29 个
+  `ADMINONLY` 集合、50 个合同索引和存储规则全部收敛。线上下载回读的
+  `column-progress-service.js`、`content-search-service.js` 和
+  `item-feed-query-service.js` SHA-256 均与候选一致。
+- Canary: 真实管理员上下文依次切换普通、Pro 和管理员；公开目录为 24+6，普通正文
+  与进度拒绝，Pro/管理员正文和进度可读，三种预览身份都保留真实管理入口。管理列表
+  为 25+7（含草稿/下架 canary）；完整全角标点课程标题搜索命中。时间线续载/错误
+  重试命中区均为 47px，空日期无重复 loading；搜索结果跳转周简报后激活 `7d`。
+- Search correction: 首轮 canary 发现查询做 NFKC、被搜索文本未同域归一化，导致
+  直接复制含全角问号的标题无法命中；`68382f5` 修复并加入真实标题回归，重新完成
+  全量验证、部署、源码回读和三角色 canary 后才继续上传。
+- WeChat: 开发版本 `2.4.0` 已通过开发者工具 CLI 上传成功，说明为“新增会员专栏
+  管理发布、学习进度、继续学习和全站搜索；优化首页、空态、刷新与图片恢复。”
+  公众平台管理员扫码登录后，已回读正式线上 `2.3.5`、审核区为空和 `2.4.0`
+  开发卡片。提交弹窗要求勾选“已阅读并了解平台审核规则”；该用户本人确认未由
+  自动化代签，审核通过后仍需显式发布。
+- Sensitive handling: 未把维护令牌、OpenID、管理员标识、浏览器登录态、生产内容、
+  用户进度或原始云端错误写入仓库或 Wiki。
